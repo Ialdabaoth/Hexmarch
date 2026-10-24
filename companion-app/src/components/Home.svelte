@@ -8,6 +8,7 @@
   import HpEditor from './HpEditor.svelte';
   import XpEditor from './XpEditor.svelte';
   import GearPicker from './GearPicker.svelte';
+  import RollLog from './RollLog.svelte';
   import { portraitFromFile } from '../lib/portrait';
 
   let fileInput = $state<HTMLInputElement>();
@@ -16,6 +17,8 @@
   let editingHp = $state(false);
   let editingXp = $state(false);
   let pickingGear = $state<'armor' | 'main' | 'off' | null>(null);
+  let jsonText = $state<string | null>(null);
+  let tab = $state<'log' | 'backup'>('log');
 
   async function setPortrait(file: File) {
     if (!active) return;
@@ -60,17 +63,41 @@
     }
   }
 
+  async function importText(text: string): Promise<boolean> {
+    try {
+      const imported = importFile(JSON.parse(text));
+      await app.upsert(imported);
+      app.notify(`Imported ${imported.length} character${imported.length === 1 ? '' : 's'}`);
+      return true;
+    } catch (err) {
+      app.notify(err instanceof SyntaxError ? "That isn't valid JSON" : (err as Error).message);
+      return false;
+    }
+  }
+
   async function onImport(e: Event) {
     const file = (e.target as HTMLInputElement).files?.[0];
     if (!file) return;
-    try {
-      const imported = importFile(JSON.parse(await file.text()));
-      await app.upsert(imported);
-      app.notify(`Imported ${imported.length} character${imported.length === 1 ? '' : 's'}`);
-    } catch (err) {
-      app.notify((err as Error).message);
-    }
+    await importText(await file.text());
     if (fileInput) fileInput.value = '';
+  }
+
+  // Copy and paste for when files are awkward, as on a phone or between apps.
+  function toggleJson() {
+    jsonText = jsonText === null ? JSON.stringify(exportBundle(app.sheets), null, 2) : null;
+  }
+
+  async function copyJson() {
+    try {
+      await navigator.clipboard.writeText(jsonText ?? '');
+      app.notify('Copied');
+    } catch {
+      app.notify("Couldn't copy; select the text and copy it instead");
+    }
+  }
+
+  async function importPasted() {
+    if (jsonText && (await importText(jsonText))) jsonText = null;
   }
 </script>
 
@@ -94,12 +121,6 @@
       <button class:on={page === i} onclick={() => { page = i; card?.showPage(i); }}>{label}</button>
     {/each}
   </div>
-  <p class="small muted hint">Tap a number to roll it, or hold and slide up for Easy, down for Hard. Tap HP, XP, armor, a hand or the portrait to change them. Swipe to turn the card over.</p>
-
-  <div class="row actions">
-    <button class="primary grow" onclick={() => (app.view = { name: 'sheet', id: active!.id })}>Full sheet</button>
-    <button onclick={() => (app.view = { name: 'render', id: active!.id, mode: 'postcard' })}>PDF</button>
-  </div>
 {:else}
   <div class="card empty">
     <p>No characters yet.</p>
@@ -108,15 +129,42 @@
   </div>
 {/if}
 
-<details class="backup">
-  <summary class="small muted">Backup and import</summary>
-  <div class="row">
-    <button onclick={() => downloadJson('materia-mundi-characters.json', exportBundle(app.sheets))} disabled={!app.sheets.length}>Export all (JSON)</button>
-    <button onclick={() => fileInput?.click()}>Import JSON</button>
-    <input bind:this={fileInput} type="file" accept="application/json,.json" hidden onchange={onImport} />
+<section class="tabs-panel">
+  <div class="tabs" role="tablist">
+    <button role="tab" aria-selected={tab === 'log'} class:on={tab === 'log'} onclick={() => (tab = 'log')}>Session (Rolls/Results/History)</button>
+    <button role="tab" aria-selected={tab === 'backup'} class:on={tab === 'backup'} onclick={() => (tab = 'backup')}>Character (Print/Backup/Import)</button>
   </div>
-  <p class="muted small">Characters live only on this device. Export a backup now and then, or to move them to another phone.</p>
-</details>
+  {#if tab === 'log'}
+    {#if active}
+      <p class="small muted hint">Tap a number to roll it, or hold and slide up for Easy, down for Hard. Tap HP, XP, armor, a hand or the portrait to change them. Swipe to turn the card over.</p>
+    {/if}
+    <RollLog />
+  {:else}
+    <div class="backup">
+      {#if active}
+        <div class="row actions">
+          <button class="primary grow" onclick={() => (app.view = { name: 'sheet', id: active.id })}>Full sheet</button>
+          <button onclick={() => (app.view = { name: 'render', id: active.id, mode: 'postcard' })}>PDF</button>
+        </div>
+      {/if}
+      <div class="row">
+        <button onclick={() => downloadJson('materia-mundi-characters.json', exportBundle(app.sheets))} disabled={!app.sheets.length}>Export all (JSON)</button>
+        <button onclick={() => fileInput?.click()}>Import JSON</button>
+        <input bind:this={fileInput} type="file" accept="application/json,.json" hidden onchange={onImport} />
+        <button onclick={toggleJson}>{jsonText === null ? 'Show JSON (copy / paste)' : 'Hide JSON'}</button>
+      </div>
+      {#if jsonText !== null}
+        <textarea class="json" bind:value={jsonText} spellcheck="false" aria-label="Characters as JSON"></textarea>
+        <div class="row">
+          <button onclick={copyJson}>Copy</button>
+          <button onclick={() => (jsonText = '')}>Clear</button>
+          <button class="primary" onclick={importPasted} disabled={!jsonText.trim()}>Import pasted</button>
+        </div>
+      {/if}
+      <p class="muted small">Characters live only on this device. Export a backup now and then, or to move them to another phone.</p>
+    </div>
+  {/if}
+</section>
 
 <style>
   .party {
@@ -146,10 +194,14 @@
   .pager { display: flex; justify-content: center; gap: 0.5rem; margin-top: 0.6rem; }
   .pager button { min-height: 32px; padding: 0.2rem 0.9rem; border-radius: 999px; font-size: 0.85rem; }
   .pager button.on { background: var(--ink); color: var(--bg); border-color: var(--ink); }
-  .hint { text-align: center; margin: 0.4rem 0 0.8rem; }
-  .actions { margin-bottom: 1rem; }
+  .hint { margin: 0 0 0.6rem; }
+  .actions { margin-bottom: 0.75rem; }
   .empty { text-align: center; }
   .empty p { margin: 0.25rem 0 0.75rem; }
-  .backup { margin-top: 0.5rem; }
-  .backup summary { min-height: 32px; cursor: pointer; }
+  .tabs-panel { margin-top: 0.75rem; }
+  .tabs { display: flex; border-bottom: 1px solid var(--line); margin-bottom: 0.6rem; }
+  .tabs button { flex: 1; min-height: 40px; border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: none; color: var(--muted); font-size: 0.9rem; }
+  .tabs button.on { color: var(--ink); border-bottom-color: var(--accent); font-weight: 600; }
+  .backup .row { flex-wrap: wrap; }
+  .json { width: 100%; box-sizing: border-box; height: 14rem; margin: 0.5rem 0; font: 0.75rem/1.35 ui-monospace, Menlo, monospace; }
 </style>
