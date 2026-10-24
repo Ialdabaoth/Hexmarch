@@ -54,120 +54,124 @@
      print match exactly. At print size 1cqw = 0.05in. -->
 <div class="cards layout-{layout}" bind:this={scroller} {onscroll}>
   <section class="pc front" aria-label="Front">
-    <header>
-      {#if onportraitfile}
-        <!-- A real file input under the finger: iOS won't always open a picker from a script. -->
-        <label class="portrait" class:empty={!data.portrait}>
-          {#if data.portrait}<img src={data.portrait} alt="" />{:else}+{/if}
-          <input class="pick" type="file" accept="image/*" aria-label={data.portrait ? 'Change portrait' : 'Add portrait'}
-            onchange={(e) => {
-              const input = e.currentTarget;
-              const file = input.files?.[0];
-              if (file) onportraitfile(file);
-              input.value = '';
-            }} />
-        </label>
-      {:else if data.portrait}<img class="portrait" src={data.portrait} alt="" />{/if}
-      <div class="who">
-        <h1>{v.c.name}</h1>
-        <div class="sub">{v.title} · {#if onxp}<button type="button" class="xpbtn tap" onclick={() => onxp()}>XP {v.xp}</button>{:else}XP {v.xp}{/if}</div>
-      </div>
-      <div class="brand">{#if v.c.rules.id === 'mm'}Materia<br />Mundi{:else}{v.c.rules.name}{/if}</div>
-    </header>
+    <div class="face">
+      <header>
+        {#if onportraitfile}
+          <!-- A real file input under the finger: iOS won't always open a picker from a script. -->
+          <label class="portrait" class:empty={!data.portrait}>
+            {#if data.portrait}<img src={data.portrait} alt="" />{:else}+{/if}
+            <input class="pick" type="file" accept="image/*" aria-label={data.portrait ? 'Change portrait' : 'Add portrait'}
+              onchange={(e) => {
+                const input = e.currentTarget;
+                const file = input.files?.[0];
+                if (file) onportraitfile(file);
+                input.value = '';
+              }} />
+          </label>
+        {:else if data.portrait}<img class="portrait" src={data.portrait} alt="" />{/if}
+        <div class="who">
+          <h1>{v.c.name}</h1>
+          <div class="sub">{v.title} · {#if onxp}<button type="button" class="xpbtn tap" onclick={() => onxp()}>XP {v.xp}</button>{:else}XP {v.xp}{/if}</div>
+        </div>
+        <div class="brand">{#if v.c.rules.id === 'mm'}Materia<br />Mundi{:else}{v.c.rules.name}{/if}</div>
+      </header>
 
-    <div class="vitals">
-      <div class="stats">
-        <button type="button" class="tap" disabled={!onhp} onclick={() => onhp?.()}>
-          <span>HP</span><b>{#if v.live}{v.c.hp} {:else}<i class="blank"></i>{/if}/ {v.c.hpMax}</b>
+      <div class="vitals">
+        <div class="stats">
+          <button type="button" class="tap" disabled={!onhp} onclick={() => onhp?.()}>
+            <span>HP</span><b>{#if v.live}{v.c.hp} {:else}<i class="blank"></i>{/if}/ {v.c.hpMax}</b>
+          </button>
+          <button type="button" class="tap" disabled={!onroll} onclick={() => roll({ kind: 'expr', label: 'Hit die', expression: v.hitDie, min: 1 })}>
+            <span>Hit die</span><b>{v.hitDie}</b>
+          </button>
+          <button type="button" class="tap" disabled={!ongear} onclick={() => ongear?.('armor')} title={g.worn?.name}>
+            <span>Armor</span><b>{g.defense || '—'}</b>
+          </button>
+          <div class:over={v.carry.encumbered}><span>Carry</span><b>{v.carry.load}/{v.carry.capacity}</b></div>
+        </div>
+        <button type="button" class="atk tap" disabled={!onroll} use:holdRoll={check({ kind: 'check', label: 'Melee attack', sides: 20, threshold: v.attacks.melee, attack: true })}>
+          <span>Melee</span><b>{v.attacks.melee}+</b>
         </button>
-        <button type="button" class="tap" disabled={!onroll} onclick={() => roll({ kind: 'expr', label: 'Hit die', expression: v.hitDie, min: 1 })}>
-          <span>Hit die</span><b>{v.hitDie}</b>
-        </button>
-        <button type="button" class="tap" disabled={!ongear} onclick={() => ongear?.('armor')} title={g.worn?.name}>
-          <span>Armor</span><b>{g.defense || '—'}</b>
-        </button>
-        <div class:over={v.carry.encumbered}><span>Carry</span><b>{v.carry.load}/{v.carry.capacity}</b></div>
-      </div>
-      <button type="button" class="atk tap" disabled={!onroll} use:holdRoll={check({ kind: 'check', label: 'Melee attack', sides: 20, threshold: v.attacks.melee, attack: true })}>
-        <span>Melee</span><b>{v.attacks.melee}+</b>
-      </button>
-      <button type="button" class="atk tap" disabled={!onroll} use:holdRoll={check({ kind: 'check', label: 'Ranged attack', sides: 20, threshold: v.attacks.ranged, attack: true })}>
-        <span>Ranged</span><b>{v.attacks.ranged}+</b>
-      </button>
-    </div>
-
-    <div class="abilities">
-      {#each v.abilities as a}
-        <button type="button" class="ab tap" disabled={!onroll} use:holdRoll={check({ kind: 'check', label: `Save vs. ${a.save}`, sides: 20, threshold: a.threshold })}>
-          <span class="lbl">{a.short} {a.score}</span>
-          <span class="save">vs. {a.save}</span>
-          <b>{a.threshold}+</b>
-        </button>
-      {/each}
-    </div>
-
-    <!-- Two hands: tap a name to change what's held, tap the dice to roll damage.
-         A weapon held in both hands greys out the off hand. -->
-    <div class="hands">
-      <div class="hand">
-        <button type="button" class="slot tap" disabled={!ongear} onclick={() => ongear?.('main')}>
-          <span>Main hand</span><b>{g.main?.name ?? (v.live ? 'Empty' : '')}</b>
-        </button>
-        <button type="button" class="chip tap" disabled={!onroll} onclick={() => roll({ kind: 'expr', label: `${g.main?.name ?? 'Unarmed'} damage`, expression: g.damage })}>
-          {g.damage}
+        <button type="button" class="atk tap" disabled={!onroll} use:holdRoll={check({ kind: 'check', label: 'Ranged attack', sides: 20, threshold: v.attacks.ranged, attack: true })}>
+          <span>Ranged</span><b>{v.attacks.ranged}+</b>
         </button>
       </div>
-      <div class="hand" class:blocked={g.main?.size === 'heavy'}>
-        <button type="button" class="slot tap" disabled={!ongear || g.main?.size === 'heavy'} onclick={() => ongear?.('off')}>
-          <span>Off hand</span><b class:aside={g.bothHands}>{g.bothHands ? 'Main weapon two-handed' : g.off?.name ?? (v.live ? 'Empty' : '')}</b>
-        </button>
-        {#if g.off}<span class="chip note">{g.off.shield ? 'Shield' : '+d6'}</span>{/if}
+
+      <!-- Two hands: tap a name to change what's held, tap the dice to roll damage.
+           A weapon held in both hands greys out the off hand. -->
+      <div class="hands">
+        <div class="hand">
+          <button type="button" class="slot tap" disabled={!ongear} onclick={() => ongear?.('main')}>
+            <span>Main hand</span><b>{g.main?.name ?? (v.live ? 'Empty' : '')}</b>
+          </button>
+          <button type="button" class="chip tap" disabled={!onroll} onclick={() => roll({ kind: 'expr', label: `${g.main?.name ?? 'Unarmed'} damage`, expression: g.damage })}>
+            {g.damage}
+          </button>
+        </div>
+        <div class="hand" class:blocked={g.main?.size === 'heavy'}>
+          <button type="button" class="slot tap" disabled={!ongear || g.main?.size === 'heavy'} onclick={() => ongear?.('off')}>
+            <span>Off hand</span><b class:aside={g.bothHands}>{g.bothHands ? 'Main weapon two-handed' : g.off?.name ?? (v.live ? 'Empty' : '')}</b>
+          </button>
+          {#if g.off}<span class="chip note">{g.off.shield ? 'Shield' : '+d6'}</span>{/if}
+        </div>
+      </div>
+
+      <div class="abilities">
+        {#each v.abilities as a}
+          <button type="button" class="ab tap" disabled={!onroll} use:holdRoll={check({ kind: 'check', label: `Save vs. ${a.save}`, sides: 20, threshold: a.threshold })}>
+            <span class="lbl">{a.short} {a.score}</span>
+            <span class="save">vs. {a.save}</span>
+            <b>{a.threshold}+</b>
+          </button>
+        {/each}
       </div>
     </div>
   </section>
 
   <section class="pc back" aria-label="Back">
-    <!-- One column per ability, its three talents underneath. -->
-    <div class="talents">
-      {#each v.abilities.filter((a) => v.talents.some((t) => t.ability === a.id)) as a}
-        <div class="tcol">
-          <span class="thead">{a.short} {a.score}</span>
-          {#each v.talents.filter((t) => t.ability === a.id) as t}
-            <button type="button" class="tal tap" disabled={!onroll} use:holdRoll={check({ kind: 'check', label: t.name, sides: 6, threshold: t.threshold })}>
-              <span>{t.name}{t.expert ? '*' : ''}</span><b>{t.threshold}+</b>
-            </button>
-          {/each}
-        </div>
-      {/each}
-    </div>
+    <div class="face">
+      <!-- One column per ability, its three talents underneath. -->
+      <div class="talents">
+        {#each v.abilities.filter((a) => v.talents.some((t) => t.ability === a.id)) as a}
+          <div class="tcol">
+            <span class="thead">{a.short} {a.score}</span>
+            {#each v.talents.filter((t) => t.ability === a.id) as t}
+              <button type="button" class="tal tap" disabled={!onroll} use:holdRoll={check({ kind: 'check', label: t.name, sides: 6, threshold: t.threshold })}>
+                <span>{t.name}{t.expert ? '*' : ''}</span><b>{t.threshold}+</b>
+              </button>
+            {/each}
+          </div>
+        {/each}
+      </div>
 
-    <div class="cols">
-      <div>
-        <h2>{v.cls.name}</h2>
-        <ul>{#each v.features as f}<li>{f.name}</li>{/each}</ul>
-        {#each v.levels.filter((l) => l.feat) as l}<div class="note">L{l.level}: {l.feat}</div>{/each}
-      </div>
-      <div>
-        {#if v.cls.magic}
-          <h2>{v.cls.magic.prepared}s</h2>
+      <div class="cols">
+        <div>
+          <h2>{v.cls.name}</h2>
+          <ul>{#each v.features as f}<li>{f.name}</li>{/each}</ul>
+          {#each v.levels.filter((l) => l.feat) as l}<div class="note">L{l.level}: {l.feat}</div>{/each}
+        </div>
+        <div>
+          {#if v.cls.magic}
+            <h2>{v.cls.magic.prepared}s</h2>
+            <ul>
+              {#each inv.prepared.slice(0, 5) as p}<li>☐ {v.circle(p.circle)} {p.magic}</li>{/each}
+              {#if !inv.prepared.length}<li class="muted">☐ ________</li><li class="muted">☐ ________</li>{/if}
+            </ul>
+          {:else}
+            <h2>Gear</h2>
+            <ul>
+              {#each inv.items.slice(0, 5) as item}<li>{item}</li>{/each}
+              {#if inv.items.length > 5}<li class="muted">+{inv.items.length - 5} more</li>{/if}
+            </ul>
+          {/if}
+        </div>
+        <div>
+          <h2>Retinue</h2>
           <ul>
-            {#each inv.prepared.slice(0, 5) as p}<li>☐ {v.circle(p.circle)} {p.magic}</li>{/each}
-            {#if !inv.prepared.length}<li class="muted">☐ ________</li><li class="muted">☐ ________</li>{/if}
+            {#each data.followers.slice(0, 4) as f}<li>{f.name} <span class="muted">({f.attitude})</span></li>{/each}
+            {#if !data.followers.length}<li class="muted">—</li>{/if}
           </ul>
-        {:else}
-          <h2>Gear</h2>
-          <ul>
-            {#each inv.items.slice(0, 5) as item}<li>{item}</li>{/each}
-            {#if inv.items.length > 5}<li class="muted">+{inv.items.length - 5} more</li>{/if}
-          </ul>
-        {/if}
-      </div>
-      <div>
-        <h2>Retinue</h2>
-        <ul>
-          {#each data.followers.slice(0, 4) as f}<li>{f.name} <span class="muted">({f.attitude})</span></li>{/each}
-          {#if !data.followers.length}<li class="muted">—</li>{/if}
-        </ul>
+        </div>
       </div>
     </div>
   </section>
@@ -206,12 +210,14 @@
     overflow: hidden;
     position: relative;
   }
-  .pc > * { font-size: 2.2cqw; }
-  .front, .back { padding: 3.2cqw 3.6cqw; display: flex; flex-direction: column; gap: 2cqw; }
+  /* Padding and gaps live on an inner face: a container can't size its own box in cqw,
+     so on .pc itself they would follow the window width instead of the card. */
+  .face { height: 100%; box-sizing: border-box; padding: 3.2cqw 3.6cqw; display: flex; flex-direction: column; gap: 2cqw; }
+  .face > * { font-size: 2.2cqw; }
   /* Spare height is shared evenly between the rows of the front. */
-  .front { justify-content: space-between; }
+  .front .face { justify-content: space-between; }
   header { display: flex; gap: 2.4cqw; align-items: center; }
-  .portrait { width: 12cqw; height: 12cqw; flex: none; border-radius: 1.2cqw; object-fit: cover; border: 0.2cqw solid #1d1712; overflow: hidden; position: relative; cursor: pointer; }
+  .portrait { margin: 0; width: 12cqw; height: 12cqw; flex: none; border-radius: 1.2cqw; object-fit: cover; border: 0.2cqw solid #1d1712; overflow: hidden; position: relative; cursor: pointer; }
   .pick { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; font-size: 0; }
   .portrait img { width: 100%; height: 100%; object-fit: cover; display: block; }
   .portrait.empty { display: grid; place-items: center; border-style: dashed; color: #8a7a68; font: 4cqw Georgia, serif; }
