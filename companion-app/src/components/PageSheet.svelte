@@ -1,9 +1,15 @@
 <script lang="ts">
   import type { SheetView } from '../lib/render';
+  import { damage as dice, grips, type WeaponItem } from '../lib/gear';
 
   let { view: v }: { view: SheetView } = $props();
   let data = $derived(v.c.data);
   let inv = $derived(data.inventory);
+
+  const held = (w: WeaponItem) => (inv.wielded[0] === w.id ? (inv.wielded[1] === w.id || w.size === 'heavy' ? 'both hands' : 'main') : inv.wielded[1] === w.id ? 'off' : '');
+  const str = $derived(v.c.abilities.str);
+  const damage = (w: WeaponItem) => (w.shield ? 'shield' : grips(w).map((g) => dice(w, undefined, g === 'two', str)).filter((d, i, all) => all.indexOf(d) === i).join(' / '));
+  const reach = (w: WeaponItem) => (w.ranged ? `range ${w.range}` : [w.reach ? `reach ${w.reach}` : '', w.range ? `thrown ${w.range}` : ''].filter(Boolean).join(', '));
 </script>
 
 <!-- A full letter-size sheet. Sections flow onto extra pages as inventories grow;
@@ -20,10 +26,10 @@
 
   <div class="vitals">
     <div><span>Hit points</span><b><i class="blank"></i> / {v.c.hpMax}</b></div>
-    <div><span>Armor</span><b>{inv.armor.rating || '—'}</b><small>{inv.armor.worn}</small></div>
+    <div><span>Armor</span><b>{v.gear.defense || '—'}</b><small>{v.gear.worn?.name ?? ''}</small></div>
     <div><span>Melee</span><b>{v.attacks.melee}+</b></div>
     <div><span>Ranged</span><b>{v.attacks.ranged}+</b></div>
-    <div><span>Carry</span><b>{v.carry.encumbrance} / {v.carry.capacity}</b><small>encumbered / max</small></div>
+    <div><span>Carry</span><b>{v.carry.load} / {v.carry.capacity}</b><small>enc. over {v.carry.threshold}</small></div>
   </div>
 
   <div class="grid">
@@ -54,7 +60,7 @@
       <table>
         <tbody>
           {#each inv.weapons as w}
-            <tr><th>{w.name}</th><td>{w.damage}</td><td>{w.range}</td><td class="num">{w.range === 'melee' ? v.attacks.melee : v.attacks.ranged}+</td></tr>
+            <tr><th>{w.name}{held(w) ? ` (${held(w)})` : ''}</th><td>{damage(w)}</td><td>{w.size}{reach(w) ? `, ${reach(w)}` : ''}</td><td class="num">{w.shield ? '' : `${w.ranged ? v.attacks.ranged : v.attacks.melee}+`}</td></tr>
           {/each}
           {#each Array(Math.max(0, 3 - inv.weapons.length)) as _}<tr class="empty"><th>&nbsp;</th><td></td><td></td><td></td></tr>{/each}
         </tbody>

@@ -25,7 +25,7 @@ Import accepts either, so sheets can also be written or edited by hand.
 ```json
 {
   "format": "materia-mundi-character",
-  "version": 1,
+  "version": 2,
   "rules": "mm",
   "id": "c0ffee00-0000-4000-8000-000000000001",
   "name": "Holly",
@@ -48,9 +48,21 @@ Import accepts either, so sheets can also be written or edited by hand.
     "cha": { "score": 1, "wit": 1 }
   },
   "inventory": {
-    "armor": { "rating": 2, "worn": "Light armor" },
-    "weapons": [{ "name": "Hand crossbow", "damage": "d6", "range": "ranged" }],
-    "items": ["Two daggers", "Lockpicking tools", "Dungeoneer's kit"],
+    "armor": [
+      { "id": "a1", "name": "Light armor", "type": "light", "encumbrance": 1, "bonus": 0, "enchantment": "" }
+    ],
+    "weapons": [
+      {
+        "id": "w1", "name": "Light crossbow", "type": "Light Crossbow", "size": "light",
+        "encumbrance": 0, "reach": 0, "range": 10, "ranged": true, "shield": false,
+        "bonus": 0, "enchantment": "", "properties": ["Simple", "Range 10"]
+      },
+      { "id": "w2", "name": "Dagger", "type": "Dagger", "size": "light", "range": 2 },
+      { "id": "w3", "name": "Grandmother's dagger", "type": "Dagger", "size": "light", "range": 2, "bonus": 1 }
+    ],
+    "worn": "a1",
+    "wielded": ["w3", "w2"],
+    "items": ["Lockpicking tools", "Dungeoneer's kit"],
     "book": [],
     "prepared": []
   },
@@ -107,5 +119,43 @@ level 1 `hp` can be left out (it is the starting HP from the rules).
   "book": [{ "magic": "Bless", "circle": 1 }],
   "prepared": [{ "magic": "Bless", "circle": 1, "spent": false }]
   ```
+- `inventory.armor` and `inventory.weapons` are items. `worn` is the `id` of the armor
+  being worn and `wielded` holds the `id`s of the weapons in the main and off hands
+  (`""` for an empty hand; the same `id` twice for a medium weapon held two-handed).
+  See below.
 - `id` is optional; importing a sheet with the same `id` updates that character
   instead of adding a copy.
+
+## Armor and weapons
+
+Each piece of armor and each weapon is an item with its own `id`, so the sheet can say
+which ones are worn and wielded. Only `type` is required when writing one by hand; the
+rest fills in from the ruleset's equipment list (Compendium p. 46–49, E9 p. 35–37).
+
+Armor:
+
+- `type`: `light`, `medium` or `heavy`, which sets its defense (1, 2 or 3).
+- `encumbrance`: 1, 2 or 3 by default.
+- `bonus`: added to defense (`1` for masterwork).
+- `enchantment`: free text for now.
+
+Weapons and shields:
+
+- `type`: the kind from the equipment list, such as `Longsword` or `Shield`.
+- `size`: `light`, `medium` or `heavy`. Light weapons deal d6; medium deal d6+Str in one
+  hand or 2d6 in two; heavy deal 2d6+Str (ranged: d6, d6, 2d6). Light weapons and
+  shields take one hand and heavy weapons both; a medium weapon takes one or two,
+  chosen when it's wielded.
+- `encumbrance`: 0 for light and medium weapons carried at the ready, 1 for heavy
+  weapons and shields, 2 for polearms and greatbows (Materia Mundi).
+- `reach`: extra melee reach in paces. `range`: short range (or thrown range) in paces.
+- `ranged`, `shield`: true or false.
+- `bonus`: added to melee damage, or to ranged attack throws (masterwork, p. 48).
+- `enchantment`: free text for now. `properties`: the list's other properties.
+
+The off hand can hold a shield or a light melee weapon (which adds its d6 to the main
+hand's damage), as long as the main hand isn't using both hands. A medium weapon held
+two-handed has its `id` in both places in `wielded`.
+
+Version 1 sheets, with `"armor": { "rating", "worn" }` and weapons as `name`, `damage`
+and `range`, still import; the app turns them into items.

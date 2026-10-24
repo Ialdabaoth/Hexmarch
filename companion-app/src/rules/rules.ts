@@ -208,11 +208,43 @@ export interface Mechanics {
   throwMin: number;
 }
 
+export type ArmorType = 'light' | 'medium' | 'heavy';
+export type WeaponSize = 'light' | 'medium' | 'heavy';
+
+// A kind of armor from the ruleset's equipment chapter.
+export interface ArmorKind {
+  type: ArmorType;
+  defense: number;
+  encumbrance: number;
+  properties: string[];
+}
+
+// A kind of weapon (or a shield) from the ruleset's equipment chapter.
+export interface WeaponKind {
+  type: string;
+  size: WeaponSize;
+  ranged?: boolean;
+  // Paces: short range for ranged weapons, thrown range, or extra melee reach.
+  range?: number;
+  thrown?: number;
+  reach?: number;
+  shield?: boolean;
+  properties: string[];
+  encumbrance: number;
+}
+
+export interface GearCatalog {
+  page: number;
+  armor: ArmorKind[];
+  weapons: WeaponKind[];
+}
+
 export interface RulesetOptions {
   id: string;
   name: string;
   source: string;
   mechanics: Mechanics;
+  gear: GearCatalog;
   originRoll: { start: string; tables: Record<string, RollTable> };
   origins: Origin[];
   classes: CharacterClass[];
@@ -228,6 +260,17 @@ export class Ruleset {
   get classes() { return this.options.classes; }
   get originRoll() { return this.options.originRoll; }
   get mechanics() { return this.options.mechanics; }
+  get gear() { return this.options.gear; }
+
+  armorKind(type: ArmorType): ArmorKind {
+    return this.gear.armor.find((a) => a.type === type) ?? this.gear.armor[0];
+  }
+
+  // Case-insensitive, so "longsword" in a class's gear list finds "Longsword".
+  weaponKind(type: string): WeaponKind | undefined {
+    const t = type.trim().toLowerCase();
+    return this.gear.weapons.find((w) => w.type.toLowerCase() === t);
+  }
 
   private combined = new Map<string, CharacterClass>();
 

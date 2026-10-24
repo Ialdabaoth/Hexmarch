@@ -1,7 +1,7 @@
 // Everything a rendered sheet shows. Printouts are records, so they use the sheet's
 // permanent values and leave current HP blank; the home screen passes the live state.
 
-import { Character, attackThresholds, carrying, freshState, type LiveState, hasExpertise, hitDieLabel, saveThreshold, xpToNext } from './character';
+import { Character, attackThresholds, carrying, equipment, freshState, type LiveState, hasExpertise, hitDieLabel, saveThreshold, xpToNext } from './character';
 import type { SheetData } from './sheet';
 import { ABILITIES, TALENTS, type Difficulty } from '../rules/rules';
 
@@ -18,6 +18,7 @@ export function sheetView(data: SheetData, live?: LiveState) {
     hitDie: hitDieLabel(c),
     attacks: attackThresholds(c),
     carry: carrying(c),
+    gear: equipment(c),
     abilities: ABILITIES.map((a) => ({ ...a, score: signed(c.abilities[a.id]), threshold: saveThreshold(c, a.id) })),
     talents: TALENTS.map((t) => ({ ...t, threshold: c.talents[t.id], expert: hasExpertise(c, t.id) })),
     features: cls.features.filter((f) => f.level <= c.level),

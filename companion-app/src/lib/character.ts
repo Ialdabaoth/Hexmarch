@@ -8,6 +8,7 @@ import {
   ABILITIES, TALENTS, NPC_TRAITS,
   abilityFromRoll, primesOf, type AbilityId, type ClassId, type Origin, type OriginId, type Ruleset, type TalentId
 } from '../rules/rules';
+import { damage, defense, gearLoad, usesBothHands } from './gear';
 import { CharacterSheet, blankFollower, newId, zeroAbilities, type Abilities, type Follower, type SheetData } from './sheet';
 
 export { newId, zeroAbilities, blankFollower, type Abilities, type Follower };
@@ -137,10 +138,14 @@ export function saveThreshold(c: Pick<Character, 'rules' | 'abilities' | 'level'
 }
 
 // Melee uses Str, ranged uses Dex. In E9 only fighters add their level.
-export function attackThresholds(c: Rated) {
+// A masterwork ranged weapon in hand makes ranged attacks one easier to land (p. 48).
+export function attackThresholds(c: Rated & { data?: SheetData }) {
+  const inv = c.data?.inventory;
+  const main = inv?.weapons.find((w) => w.id === inv.wielded[0]);
+  const rangedBonus = main?.ranged ? main.bonus : 0;
   return {
     melee: c.rules.attack(c.classId, c.abilities.str, c.level),
-    ranged: c.rules.attack(c.classId, c.abilities.dex, c.level)
+    ranged: Math.max(c.rules.mechanics.throwMin, c.rules.attack(c.classId, c.abilities.dex, c.level) - rangedBonus)
   };
 }
 
@@ -157,9 +162,31 @@ export function hasExpertise(c: Pick<Character, 'rules' | 'classId'>, talent: Ta
   return c.rules.getClass(c.classId).expertise?.includes(talent) ?? false;
 }
 
-export function carrying(c: Pick<Character, 'abilities'>) {
+// Carrying capacity is 6 + Str; past half of it you're encumbered, past all of it
+// burdened (p. 51). Load counts armor, heavy weapons, shields and polearms; the rest of
+// the pack is up to the player.
+export function carrying(c: Pick<Character, 'abilities' | 'data'>) {
   const capacity = 6 + c.abilities.str;
-  return { capacity, encumbrance: Math.floor(capacity / 2) };
+  const threshold = Math.floor(capacity / 2);
+  const load = gearLoad(c.data.inventory.armor, c.data.inventory.weapons);
+  return { capacity, threshold, load, encumbered: load > threshold, burdened: load > capacity };
+}
+
+// What the character is wearing and wielding, and what that does in a fight.
+export function equipment(c: Character) {
+  const inv = c.data.inventory;
+  const worn = inv.armor.find((a) => a.id === inv.worn);
+  const main = inv.weapons.find((w) => w.id === inv.wielded[0]);
+  const off = inv.weapons.find((w) => w.id === inv.wielded[1]);
+  const bothHands = usesBothHands(main, inv.wielded);
+  return {
+    worn,
+    defense: defense(c.rules, worn),
+    main,
+    off: bothHands ? undefined : off,
+    bothHands,
+    damage: damage(main, bothHands ? undefined : off, bothHands, c.abilities.str)
+  };
 }
 
 // Experience needed for the next level (p. 12): equal to that level,

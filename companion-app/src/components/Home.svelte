@@ -7,6 +7,7 @@
   import Postcard from './Postcard.svelte';
   import HpEditor from './HpEditor.svelte';
   import XpEditor from './XpEditor.svelte';
+  import GearPicker from './GearPicker.svelte';
   import { portraitFromFile } from '../lib/portrait';
 
   let fileInput = $state<HTMLInputElement>();
@@ -14,6 +15,7 @@
   let page = $state(0);
   let editingHp = $state(false);
   let editingXp = $state(false);
+  let pickingGear = $state<'armor' | 'main' | 'off' | null>(null);
 
   async function setPortrait(file: File) {
     if (!active) return;
@@ -82,7 +84,8 @@
 </nav>
 
 {#if active && view}
-  <Postcard bind:this={card} {view} layout="carousel" onroll={roll} onpage={(i) => (page = i)} onhp={() => (editingHp = true)} onportraitfile={setPortrait} onxp={() => (editingXp = true)} />
+  <Postcard bind:this={card} {view} layout="carousel" onroll={roll} onpage={(i) => (page = i)} onhp={() => (editingHp = true)} onportraitfile={setPortrait} onxp={() => (editingXp = true)} ongear={(slot) => (pickingGear = slot)} />
+  {#if pickingGear}<GearPicker character={active} slot={pickingGear} onclose={() => (pickingGear = null)} />{/if}
   {#if editingXp}<XpEditor character={active} onclose={() => (editingXp = false)} />{/if}
   {#if editingHp}<HpEditor character={active} onclose={() => (editingHp = false)} />{/if}
 
@@ -91,7 +94,7 @@
       <button class:on={page === i} onclick={() => { page = i; card?.showPage(i); }}>{label}</button>
     {/each}
   </div>
-  <p class="small muted hint">Tap a number to roll it, or hold and slide up for Easy, down for Hard. Tap HP, XP or the portrait to change them. Swipe to turn the card over.</p>
+  <p class="small muted hint">Tap a number to roll it, or hold and slide up for Easy, down for Hard. Tap HP, XP, armor, a hand or the portrait to change them. Swipe to turn the card over.</p>
 
   <div class="row actions">
     <button class="primary grow" onclick={() => (app.view = { name: 'sheet', id: active!.id })}>Full sheet</button>
