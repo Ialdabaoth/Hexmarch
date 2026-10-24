@@ -76,43 +76,46 @@
         <button type="button" class="xp tap" disabled={!onxp} onclick={() => onxp?.()}><span>XP</span><b>{v.xp}</b></button>
       </header>
 
-      <div class="vitals">
-        <div class="stats">
-          <button type="button" class="tap" disabled={!onhp} onclick={() => onhp?.()}>
-            <span>HP</span><b>{#if v.live}{v.c.hp} {:else}<i class="blank"></i>{/if}/ {v.c.hpMax}</b>
+      <!-- Stats and weapons read as one block, spaced like the boxes within a row. -->
+      <div class="kit">
+        <div class="vitals">
+          <div class="stats">
+            <button type="button" class="tap" disabled={!onhp} onclick={() => onhp?.()}>
+              <span>HP</span><b>{#if v.live}{v.c.hp} {:else}<i class="blank"></i>{/if}/ {v.c.hpMax}</b>
+            </button>
+            <button type="button" class="tap" disabled={!onroll} onclick={() => roll({ kind: 'expr', label: 'Hit die', expression: v.hitDie, min: 1 })}>
+              <span>Hit die</span><b>{v.hitDie}</b>
+            </button>
+            <button type="button" class="tap" disabled={!ongear} onclick={() => ongear?.('armor')} title={g.worn?.name}>
+              <span>Armor</span><b>{g.defense || '—'}</b>
+            </button>
+            <div class:over={v.carry.encumbered}><span>Carry</span><b>{v.carry.load}/{v.carry.capacity}</b></div>
+          </div>
+          <button type="button" class="atk tap" disabled={!onroll} use:holdRoll={check({ kind: 'check', label: 'Melee attack', sides: 20, threshold: v.attacks.melee, attack: true })}>
+            <span>Melee</span><b>{v.attacks.melee}+</b>
           </button>
-          <button type="button" class="tap" disabled={!onroll} onclick={() => roll({ kind: 'expr', label: 'Hit die', expression: v.hitDie, min: 1 })}>
-            <span>Hit die</span><b>{v.hitDie}</b>
+          <button type="button" class="atk tap" disabled={!onroll} use:holdRoll={check({ kind: 'check', label: 'Ranged attack', sides: 20, threshold: v.attacks.ranged, attack: true })}>
+            <span>Ranged</span><b>{v.attacks.ranged}+</b>
           </button>
-          <button type="button" class="tap" disabled={!ongear} onclick={() => ongear?.('armor')} title={g.worn?.name}>
-            <span>Armor</span><b>{g.defense || '—'}</b>
-          </button>
-          <div class:over={v.carry.encumbered}><span>Carry</span><b>{v.carry.load}/{v.carry.capacity}</b></div>
         </div>
-        <button type="button" class="atk tap" disabled={!onroll} use:holdRoll={check({ kind: 'check', label: 'Melee attack', sides: 20, threshold: v.attacks.melee, attack: true })}>
-          <span>Melee</span><b>{v.attacks.melee}+</b>
-        </button>
-        <button type="button" class="atk tap" disabled={!onroll} use:holdRoll={check({ kind: 'check', label: 'Ranged attack', sides: 20, threshold: v.attacks.ranged, attack: true })}>
-          <span>Ranged</span><b>{v.attacks.ranged}+</b>
-        </button>
-      </div>
 
-      <!-- Two hands: tap a name to change what's held, tap the dice to roll damage.
-           A weapon held in both hands greys out the off hand. -->
-      <div class="hands">
-        <div class="hand">
-          <button type="button" class="slot tap" disabled={!ongear} onclick={() => ongear?.('main')}>
-            <span>Main hand</span><b>{g.main?.name ?? (v.live ? 'Empty' : '')}</b>
-          </button>
-          <button type="button" class="chip tap" disabled={!onroll} onclick={() => roll({ kind: 'expr', label: `${g.main?.name ?? 'Unarmed'} damage`, expression: g.damage })}>
-            {g.damage}
-          </button>
-        </div>
-        <div class="hand" class:blocked={g.main?.size === 'heavy'}>
-          <button type="button" class="slot tap" disabled={!ongear || g.main?.size === 'heavy'} onclick={() => ongear?.('off')}>
-            <span>Off hand</span><b class:aside={g.bothHands}>{g.bothHands ? 'Main weapon two-handed' : g.off?.name ?? (v.live ? 'Empty' : '')}</b>
-          </button>
-          {#if g.off}<span class="chip note">{g.off.shield ? 'Shield' : '+d6'}</span>{/if}
+        <!-- Two hands: tap a name to change what's held, tap the dice to roll damage.
+             A weapon held in both hands greys out the off hand. -->
+        <div class="hands">
+          <div class="hand">
+            <button type="button" class="slot tap" disabled={!ongear} onclick={() => ongear?.('main')}>
+              <span>Main hand</span><b>{g.main?.name ?? (v.live ? 'Empty' : '')}</b>
+            </button>
+            <button type="button" class="chip tap" disabled={!onroll} onclick={() => roll({ kind: 'expr', label: `${g.main?.name ?? 'Unarmed'} damage`, expression: g.damage })}>
+              {g.damage}
+            </button>
+          </div>
+          <div class="hand" class:blocked={g.main?.size === 'heavy'}>
+            <button type="button" class="slot tap" disabled={!ongear || g.main?.size === 'heavy'} onclick={() => ongear?.('off')}>
+              <span>Off hand</span><b class:aside={g.bothHands}>{g.bothHands ? 'Main weapon two-handed' : g.off?.name ?? (v.live ? 'Empty' : '')}</b>
+            </button>
+            {#if g.off}<span class="chip note">{g.off.shield ? 'Shield' : '+d6'}</span>{/if}
+          </div>
         </div>
       </div>
 
@@ -227,6 +230,7 @@
   .xp { flex: none; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.3cqw; min-width: 15cqw; padding: 1cqw 1.6cqw; border: 0.15cqw solid #c9b896; border-radius: 1cqw; text-align: center; }
   .xp span { font-size: 1.7cqw; text-transform: uppercase; letter-spacing: 0.06em; color: #5b4a36; }
   .xp b { font: 700 3.6cqw/1.1 Georgia, serif; white-space: nowrap; }
+  .kit { display: flex; flex-direction: column; gap: 1cqw; }
   .vitals { display: grid; grid-template-columns: 4fr 1fr 1fr; gap: 1cqw; }
   .stats { display: grid; grid-template-columns: repeat(4, 1fr); border: 0.2cqw solid #1d1712; border-radius: 1cqw; }
   .stats > *, .atk { padding: 0.8cqw 1cqw; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
