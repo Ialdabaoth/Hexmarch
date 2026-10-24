@@ -6,13 +6,16 @@
 // character.ts adds current HP and temporary boosts or debuffs on top.
 
 import { rollDie, type Rng } from './dice';
+import { defaultLoadout, newArmor, newWeapon, parseKit, type ArmorItem, type Hands, type WeaponItem } from './gear';
 import {
   ABILITIES, DEFAULT_RULES, TALENTS, findRules, hasKind, normalizeRulesId, primesOf, rulesFor, scheduledTraining,
   type AbilityId, type Attitude, type ClassId, type OriginId, type Ruleset, type TalentId
 } from '../rules/rules';
 
 export const FORMAT = 'materia-mundi-character';
-export const FORMAT_VERSION = 1;
+// Version 2 made armor and weapons items with their own properties (version 1 files
+// had an armor rating and weapons as name, damage and melee/ranged; they still load).
+export const FORMAT_VERSION = 2;
 
 // Changes are tallies keyed by what they change: "agility": 1 improves Agility one
 // step (5+ to 4+), "agility": -1 worsens it, "hp": 3 adds hit points. A talent's
@@ -25,11 +28,7 @@ export type LevelupEntry = { level: number; hp: number; feat?: string } & Partia
 
 export type Abilities = Record<AbilityId, number>;
 
-export interface Weapon {
-  name: string;
-  damage: string;
-  range: 'melee' | 'ranged';
-}
+export type { ArmorItem, WeaponItem, Hands };
 
 // An entry in a spellbook, prayer book, craftbook or a druid's known glamours.
 export interface BookEntry {
@@ -85,8 +84,11 @@ export interface SheetData {
     cha: AbilityEntry;
   };
   inventory: {
-    armor: { rating: number; worn: string };
-    weapons: Weapon[];
+    armor: ArmorItem[];
+    weapons: WeaponItem[];
+    // Ids of the armor being worn and the weapons in each hand; "" for none.
+    worn: string;
+    wielded: Hands;
     items: string[];
     // Magic-users only. Preparations are physical objects, so they are inventory.
     book: BookEntry[];
@@ -223,6 +225,7 @@ export function createSheet(d: DraftCharacter): SheetData {
   // Experts train a talent at level one too (p. 11).
   const first: LevelupEntry = { level: 1, hp: rules.startingHp(d.classId, d.abilities.con) };
   if (hasKind(cls, 'expert') && d.firstTraining) first[d.firstTraining] = 1;
+  const kit = parseKit(rules, cls.gear);
   return {
     format: FORMAT,
     version: FORMAT_VERSION,
@@ -241,9 +244,8 @@ export function createSheet(d: DraftCharacter): SheetData {
       cha: withTalents('cha')
     },
     inventory: {
-      armor: { rating: 0, worn: '' },
-      weapons: [],
-      items: cls.gear.split(/,\s*/).map((g) => g[0].toUpperCase() + g.slice(1)),
+      ...kit,
+      ...defaultLoadout(rules, kit.armor, kit.weapons),
       book: [],
       prepared: []
     },
@@ -309,6 +311,64 @@ function portrait(v: unknown): string {
   if (typeof v !== 'string') return '';
   const p = v.trim();
   return /^data:image\/(png|jpeg|webp|gif);base64,[A-Za-z0-9+/=]+$/.test(p) || /^https:\/\/\S+$/.test(p) ? p : '';
+}
+
+const SIZES = ['light', 'medium', 'heavy'] as const;
+const count = (v: unknown, fallback = 0) => (Number.isFinite(Number(v)) ? Math.round(Number(v)) : fallback);
+const text = (v: unknown, fallback = '') => (typeof v === 'string' ? v : fallback);
+
+function readArmor(rules: Ruleset, a: any): ArmorItem {
+  const type = SIZES.includes(a?.type) ? a.type : 'light';
+  const base = newArmor(rules, type, text(a?.name) || undefined);
+  return {
+    ...base,
+    id: text(a?.id) || base.id,
+    encumbrance: count(a?.encumbrance, base.encumbrance),
+    bonus: count(a?.bonus),
+    enchantment: text(a?.enchantment)
+  };
+}
+
+function readWeapon(rules: Ruleset, w: any): WeaponItem {
+  const base = newWeapon(rules, text(w?.type) || text(w?.name, 'Weapon'), text(w?.name) || undefined);
+  return {
+    id: text(w?.id) || base.id,
+    name: base.name,
+    type: base.type,
+    size: SIZES.includes(w?.size) ? w.size : base.size,
+    encumbrance: count(w?.encumbrance, base.encumbrance),
+    reach: count(w?.reach, base.reach),
+    range: count(w?.range, base.range),
+    ranged: typeof w?.ranged === 'boolean' ? w.ranged : base.ranged,
+    shield: typeof w?.shield === 'boolean' ? w.shield : base.shield,
+    twoHanded: typeof w?.twoHanded === 'boolean' ? w.twoHanded : base.twoHanded,
+    bonus: count(w?.bonus),
+    enchantment: text(w?.enchantment),
+    properties: Array.isArray(w?.properties) ? w.properties.map(String) : base.properties
+  };
+}
+
+// Version 1 had armor as { rating, worn } and weapons as { name, damage, range };
+// those become items, worn and wielded as before.
+function readGear(rules: Ruleset, inv: any): Pick<SheetData['inventory'], 'armor' | 'weapons' | 'worn' | 'wielded'> {
+  const legacy = inv.armor && !Array.isArray(inv.armor);
+  const armor: ArmorItem[] = legacy
+    ? Number(inv.armor.rating) > 0 || text(inv.armor.worn)
+      ? [{ ...newArmor(rules, SIZES[Math.min(2, Math.max(1, Number(inv.armor.rating) || 1)) - 1], text(inv.armor.worn) || undefined) }]
+      : []
+    : (Array.isArray(inv.armor) ? inv.armor : []).map((a: any) => readArmor(rules, a));
+  const weapons: WeaponItem[] = (Array.isArray(inv.weapons) ? inv.weapons : []).map((w: any) => {
+    const item = readWeapon(rules, w);
+    // A version-1 ranged weapon that isn't in the equipment list still shoots.
+    if (!('type' in (w ?? {})) && w?.range === 'ranged' && !rules.weaponKind(item.type)) item.ranged = true;
+    return item;
+  });
+  if (legacy || !Array.isArray(inv.wielded)) {
+    const loadout = defaultLoadout(rules, armor, weapons);
+    return { armor, weapons, worn: armor[0]?.id ?? '', wielded: loadout.wielded };
+  }
+  const has = (list: { id: string }[], id: unknown) => (typeof id === 'string' && list.some((g) => g.id === id) ? id : '');
+  return { armor, weapons, worn: has(armor, inv.worn), wielded: [has(weapons, inv.wielded[0]), has(weapons, inv.wielded[1])] };
 }
 
 function circle(v: unknown): number {
@@ -404,12 +464,7 @@ export function readSheet(raw: unknown): SheetData {
     class: { name: cls.id, xp: Number.isInteger(f.class.xp) && f.class.xp >= 0 ? f.class.xp : 0, levelups },
     abilities,
     inventory: {
-      armor: { rating: Number(inv.armor?.rating) || 0, worn: String(inv.armor?.worn ?? '') },
-      weapons: (Array.isArray(inv.weapons) ? inv.weapons : []).map((w: any) => ({
-        name: String(w?.name ?? 'Weapon'),
-        damage: String(w?.damage ?? 'd6'),
-        range: w?.range === 'ranged' ? 'ranged' : 'melee'
-      })),
+      ...readGear(rules, inv),
       items: (Array.isArray(inv.items) ? inv.items : []).map(String),
       book: (Array.isArray(inv.book) ? inv.book : []).map((b: any) => ({ magic: String(b?.magic ?? ''), circle: circle(b?.circle) })),
       prepared: (Array.isArray(inv.prepared) ? inv.prepared : []).map((p: any) => ({

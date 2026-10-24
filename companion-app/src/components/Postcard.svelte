@@ -12,7 +12,8 @@
     onpage,
     onhp,
     onportraitfile,
-    onxp
+    onxp,
+    ongear
   }: {
     view: SheetView;
     onroll?: (r: RollRequest) => void;
@@ -24,9 +25,12 @@
     onportraitfile?: (file: File) => void;
     // Tapping XP calls this (the home screen opens the XP and level-up editor).
     onxp?: () => void;
+    // Tapping Armor or a hand calls this (the home screen opens a picker).
+    ongear?: (slot: 'armor' | 'main' | 'off') => void;
   } = $props();
   let data = $derived(v.c.data);
   let inv = $derived(data.inventory);
+  let g = $derived(v.gear);
 
   let scroller = $state<HTMLDivElement>();
 
@@ -79,8 +83,10 @@
         <button type="button" class="tap" disabled={!onroll} onclick={() => roll({ kind: 'expr', label: 'Hit die', expression: v.hitDie, min: 1 })}>
           <span>Hit die</span><b>{v.hitDie}</b>
         </button>
-        <div><span>Armor</span><b>{inv.armor.rating || '—'}</b></div>
-        <div><span>Carry</span><b>{v.carry.encumbrance}/{v.carry.capacity}</b></div>
+        <button type="button" class="tap" disabled={!ongear} onclick={() => ongear?.('armor')} title={g.worn?.name}>
+          <span>Armor</span><b>{g.defense || '—'}</b>
+        </button>
+        <div class:over={v.carry.encumbered}><span>Carry</span><b>{v.carry.load}/{v.carry.capacity}</b></div>
       </div>
       <button type="button" class="atk tap" disabled={!onroll} use:holdRoll={check({ kind: 'check', label: 'Melee attack', sides: 20, threshold: v.attacks.melee, attack: true })}>
         <span>Melee</span><b>{v.attacks.melee}+</b>
@@ -100,16 +106,25 @@
       {/each}
     </div>
 
-    <div class="weapons">
-      {#if inv.weapons.length}
-        {#each inv.weapons.slice(0, 3) as w}
-          <button type="button" class="tap" disabled={!onroll} onclick={() => roll({ kind: 'expr', label: `${w.name} damage`, expression: w.damage })}>
-            {w.name} <b>{w.damage}</b>{w.range === 'ranged' ? ' (r)' : ''}
+    <!-- Two hands: tap a name to change what's held, tap the dice to roll damage.
+         A two-handed weapon greys out the off hand. -->
+    <div class="hands">
+      <div class="hand">
+        <button type="button" class="slot tap" disabled={!ongear} onclick={() => ongear?.('main')}>
+          <span>Main hand</span><b>{g.main?.name ?? (v.live ? 'Empty' : '')}</b>
+        </button>
+        {#each g.damage as d}
+          <button type="button" class="chip tap" disabled={!onroll} onclick={() => roll({ kind: 'expr', label: `${g.main?.name ?? 'Unarmed'} damage${d.label ? ` (${d.label})` : ''}`, expression: d.expression })}>
+            {#if d.label}<small>{d.label}</small>{/if}{d.expression}
           </button>
         {/each}
-      {:else}
-        <span class="muted">Weapons: ________________</span>
-      {/if}
+      </div>
+      <div class="hand" class:blocked={g.bothHands}>
+        <button type="button" class="slot tap" disabled={!ongear || g.bothHands} onclick={() => ongear?.('off')}>
+          <span>Off hand</span><b>{g.bothHands ? 'Both hands on main' : g.off?.name ?? (v.live ? 'Empty' : '')}</b>
+        </button>
+        {#if g.off}<span class="chip note">{g.off.shield ? 'Shield' : '+d6'}</span>{/if}
+      </div>
     </div>
   </section>
 
@@ -227,7 +242,17 @@
   /* Ability on top, then a gap, then the save it guards against with its threshold. */
   .ab .save { font-size: 2cqw; color: #5b4a36; margin-top: 1cqw; }
   .ab b { font: 700 6.4cqw/0.9 Georgia, serif; margin-top: 0.3cqw; }
-  .weapons { display: flex; flex-wrap: wrap; gap: 0.6cqw 2.4cqw; font-size: 2.3cqw; border-top: 0.15cqw solid #c9b896; padding-top: 1cqw; }
+  .hands { display: grid; grid-template-columns: 1fr 1fr; gap: 1cqw; }
+  .hand { display: flex; align-items: stretch; gap: 0.8cqw; border: 0.15cqw solid #c9b896; border-radius: 1cqw; padding: 0.6cqw 0.8cqw; min-width: 0; }
+  .hand .slot { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; }
+  .hand .slot span { font-size: 1.7cqw; text-transform: uppercase; letter-spacing: 0.06em; color: #5b4a36; }
+  .hand .slot b { font: 700 2.8cqw/1.2 Georgia, serif; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .hand.blocked { background: #e6dfd2; color: #8a7a68; }
+  .hand.blocked .slot b { font: italic 2.3cqw/1.2 Georgia, serif; }
+  .chip { display: flex; flex-direction: column; align-items: center; justify-content: center; border: 0.15cqw solid #c9b896; border-radius: 0.8cqw; padding: 0 1.2cqw; font: 700 2.8cqw Georgia, serif; white-space: nowrap; }
+  .chip small { font: 1.6cqw system-ui, sans-serif; color: #5b4a36; text-transform: uppercase; }
+  .chip.note { font-size: 2.3cqw; border-style: dashed; color: #5b4a36; }
+  .over b { color: #8a2e1f; }
   .talents { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1cqw; }
   .tcol { display: flex; flex-direction: column; gap: 0.9cqw; min-width: 0; }
   .thead { font-size: 1.7cqw; text-transform: uppercase; letter-spacing: 0.08em; color: #5b4a36; text-align: center; }

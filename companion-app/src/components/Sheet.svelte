@@ -1,7 +1,7 @@
 <script lang="ts">
   import { app } from '../lib/app.svelte';
   import {
-    attackThresholds, carrying, hasExpertise, hitDieLabel, saveThreshold, talentThreshold,
+    attackThresholds, carrying, equipment, hasExpertise, hitDieLabel, saveThreshold, talentThreshold,
     type Character
   } from '../lib/character';
   import { expressionRoll, thresholdCheck } from '../lib/checks';
@@ -13,6 +13,8 @@
   import Magic from './Magic.svelte';
   import Effects from './Effects.svelte';
   import XpPanel from './XpPanel.svelte';
+  import GearEditor from './GearEditor.svelte';
+  import GearPicker from './GearPicker.svelte';
 
   let { id }: { id: string } = $props();
 
@@ -71,10 +73,7 @@
     save();
   }
 
-  function addWeapon() {
-    c?.data.inventory.weapons.push({ name: 'Dagger', damage: 'd6', range: 'melee' });
-    save();
-  }
+  let pickingGear = $state<'armor' | 'main' | 'off' | null>(null);
 
   async function remove() {
     await app.remove(id);
@@ -85,6 +84,7 @@
 {#if c && cls}
   {@const atk = attackThresholds(c)}
   {@const carry = carrying(c)}
+  {@const gear = equipment(c)}
   <div class="row">
     <button class="ghost" onclick={() => (app.view = { name: 'list' })}>‹ Card</button>
   </div>
@@ -114,13 +114,15 @@
           <button onclick={() => adjustHp(1)} aria-label="Heal 1 HP">+</button>
         </div>
       </div>
-      <div>
-        <label for="armor" class="small muted" style="margin:0">Armor</label>
-        <input id="armor" type="number" bind:value={c.data.inventory.armor.rating} onchange={save} />
-      </div>
+      <button class="pickbox" onclick={() => (pickingGear = 'armor')}>
+        <span class="small muted">Armor</span>
+        <strong>{gear.defense || '—'}</strong>
+        <span class="small">{gear.worn?.name ?? 'None worn'}</span>
+      </button>
       <div>
         <div class="small muted">Carry</div>
-        <strong>{carry.encumbrance} / {carry.capacity}</strong>
+        <strong class:over={carry.encumbered}>{carry.load} / {carry.capacity}</strong>
+        <div class="small muted">{carry.burdened ? 'burdened' : carry.encumbered ? 'encumbered' : `encumbered past ${carry.threshold}`}</div>
       </div>
     </div>
     <XpPanel character={c} />
@@ -135,19 +137,24 @@
       <span>Ranged</span><strong>{atk.ranged}+</strong>
     </button>
   </div>
-  {#each c.data.inventory.weapons as w, wi}
-    <div class="weapon">
-      <input class="wname" bind:value={w.name} onchange={save} aria-label="Weapon name" />
-      <input class="dmg" bind:value={w.damage} onchange={save} aria-label="Damage dice" />
-      <select class="rng" bind:value={w.range} onchange={save} aria-label="Melee or ranged">
-        <option value="melee">Melee</option><option value="ranged">Ranged</option>
-      </select>
-      <button use:holdRoll={(d) => check(`${w.name} attack`, 20, w.range === 'melee' ? atk.melee : atk.ranged, d, { attack: true })}>Hit</button>
-      <button onclick={() => rollExpr(`${w.name} damage`, w.damage)}>Dmg</button>
-      <button class="ghost" aria-label="Remove weapon" onclick={() => { c.data.inventory.weapons.splice(wi, 1); save(); }}>✕</button>
-    </div>
-  {/each}
-  <button class="ghost" onclick={addWeapon}>+ Add weapon</button>
+  <div class="grid2 hands">
+    <button class="pickbox" onclick={() => (pickingGear = 'main')}>
+      <span class="small muted">Main hand</span>
+      <strong>{gear.main?.name ?? 'Empty'}</strong>
+    </button>
+    <button class="pickbox" disabled={gear.bothHands} onclick={() => (pickingGear = 'off')}>
+      <span class="small muted">Off hand</span>
+      <strong>{gear.bothHands ? 'Both hands on main' : gear.off?.name ?? 'Empty'}</strong>
+    </button>
+  </div>
+  <div class="row">
+    {#each gear.damage as d}
+      <button onclick={() => rollExpr(`${gear.main?.name ?? 'Unarmed'} damage${d.label ? ` (${d.label})` : ''}`, d.expression)}>
+        Damage {d.label ? `${d.label} ` : ''}{d.expression}
+      </button>
+    {/each}
+    {#if gear.off?.shield}<span class="small muted">Shield: attacks you see coming are harder.</span>{/if}
+  </div>
 
   <h2>Abilities and saves</h2>
   <div class="grid2">
@@ -215,9 +222,8 @@
   <Followers character={c} />
 
   <h2>Gear</h2>
-  <label for="armor-notes">Armor worn</label>
-  <input id="armor-notes" bind:value={c.data.inventory.armor.worn} onchange={save} placeholder="e.g. Light armor, threshold 3" />
-  <label for="gear">Equipment</label>
+  <GearEditor character={c} />
+  <label for="gear">Other equipment</label>
   <textarea
     id="gear"
     value={c.data.inventory.items.join('\n')}
@@ -239,6 +245,7 @@
       <button class="ghost failure" onclick={() => (confirmDelete = true)}>Delete</button>
     {/if}
   </div>
+  {#if pickingGear}<GearPicker character={c} slot={pickingGear} onclose={() => (pickingGear = null)} />{/if}
 {:else}
   <p>Character not found.</p>
 {/if}
@@ -267,13 +274,11 @@
   .talent { flex-direction: column; align-items: flex-start; gap: 0; padding: 0.35rem 0.5rem; font-size: 0.85rem; min-width: 0; }
   .talent span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .talent strong { font-size: 1.1rem; }
-  .weapon {
-    margin-top: 0.5rem; display: grid; gap: 0.3rem;
-    grid-template-columns: 4.2rem 1fr auto auto auto;
-  }
-  .weapon .wname { grid-column: 1 / -1; }
-  .weapon input, .weapon select { min-width: 0; }
-  .weapon button { padding: 0.3rem 0.6rem; }
+  .pickbox { display: flex; flex-direction: column; align-items: flex-start; text-align: left; gap: 0.1rem; }
+  .pickbox strong { font-size: 1.2rem; font-family: Georgia, serif; }
+  .pickbox:disabled { opacity: 0.5; }
+  .hands { margin-top: 0.5rem; }
+  .over { color: var(--accent); }
   .checks { margin-top: 0.6rem; gap: 0.3rem; }
   .mini { min-height: 36px; padding: 0.2rem 0.55rem; }
   .features { padding-left: 1.1rem; margin: 0; }

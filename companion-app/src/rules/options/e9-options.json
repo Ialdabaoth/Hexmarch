@@ -4,7 +4,315 @@
   "source": "E9 System Reference Handbook (revised, 2026), CC BY-SA 4.0. Page numbers are the handbook's printed page numbers.",
   "mechanics": {
     "attackProgression": "fighters",
-    "throwMin": 5
+    "throwMin": 5,
+    "mediumRangedTwoHanded": true
+  },
+  "gear": {
+    "page": 35,
+    "armor": [
+      {
+        "type": "light",
+        "defense": 1,
+        "encumbrance": 1,
+        "properties": []
+      },
+      {
+        "type": "medium",
+        "defense": 2,
+        "encumbrance": 2,
+        "properties": [
+          "Steel",
+          "Interferes with Stealth"
+        ]
+      },
+      {
+        "type": "heavy",
+        "defense": 3,
+        "encumbrance": 3,
+        "properties": [
+          "Steel",
+          "Interferes with Agility and Stealth"
+        ]
+      }
+    ],
+    "weapons": [
+      {
+        "type": "Shortsword",
+        "size": "light",
+        "properties": [],
+        "encumbrance": 0
+      },
+      {
+        "type": "Dagger",
+        "size": "light",
+        "thrown": 3,
+        "properties": [
+          "Piercing",
+          "Thrown 3/6/9"
+        ],
+        "encumbrance": 0
+      },
+      {
+        "type": "Rapier",
+        "size": "light",
+        "properties": [
+          "Piercing"
+        ],
+        "encumbrance": 0
+      },
+      {
+        "type": "Handaxe",
+        "size": "light",
+        "thrown": 2,
+        "properties": [
+          "Sundering",
+          "Thrown 2/4/6"
+        ],
+        "encumbrance": 0
+      },
+      {
+        "type": "Sap",
+        "size": "light",
+        "thrown": 3,
+        "properties": [
+          "Blunt",
+          "Thrown 3/6/9"
+        ],
+        "encumbrance": 0
+      },
+      {
+        "type": "Whip",
+        "size": "light",
+        "reach": 3,
+        "properties": [
+          "Entangling",
+          "Reach"
+        ],
+        "encumbrance": 0
+      },
+      {
+        "type": "Flail",
+        "size": "light",
+        "properties": [
+          "Blunt",
+          "Entangling"
+        ],
+        "encumbrance": 0
+      },
+      {
+        "type": "Longsword",
+        "size": "medium",
+        "properties": [],
+        "encumbrance": 0
+      },
+      {
+        "type": "Pickaxe",
+        "size": "medium",
+        "properties": [
+          "Sundering",
+          "Piercing"
+        ],
+        "encumbrance": 0
+      },
+      {
+        "type": "Ax",
+        "size": "medium",
+        "properties": [
+          "Sundering"
+        ],
+        "encumbrance": 0
+      },
+      {
+        "type": "Club",
+        "size": "medium",
+        "properties": [
+          "Blunt"
+        ],
+        "encumbrance": 0
+      },
+      {
+        "type": "Hammer",
+        "size": "medium",
+        "properties": [
+          "Blunt"
+        ],
+        "encumbrance": 0
+      },
+      {
+        "type": "Threshall",
+        "size": "medium",
+        "properties": [
+          "Entangling"
+        ],
+        "encumbrance": 0
+      },
+      {
+        "type": "Javelin",
+        "size": "medium",
+        "thrown": 5,
+        "properties": [
+          "Piercing",
+          "Thrown 5/10/15"
+        ],
+        "encumbrance": 0
+      },
+      {
+        "type": "Quarterstaff",
+        "size": "medium",
+        "reach": 2,
+        "properties": [
+          "Blunt",
+          "Polearm"
+        ],
+        "encumbrance": 0
+      },
+      {
+        "type": "Spear",
+        "size": "medium",
+        "reach": 2,
+        "properties": [
+          "Piercing",
+          "Polearm"
+        ],
+        "encumbrance": 0
+      },
+      {
+        "type": "Greatsword",
+        "size": "heavy",
+        "properties": [],
+        "encumbrance": 1
+      },
+      {
+        "type": "Battleax",
+        "size": "heavy",
+        "properties": [
+          "Sundering"
+        ],
+        "encumbrance": 1
+      },
+      {
+        "type": "Maul",
+        "size": "heavy",
+        "properties": [
+          "Blunt",
+          "Piercing"
+        ],
+        "encumbrance": 1
+      },
+      {
+        "type": "Chain Whip",
+        "size": "heavy",
+        "reach": 3,
+        "properties": [
+          "Entangling",
+          "Reach"
+        ],
+        "encumbrance": 1
+      },
+      {
+        "type": "Glaive",
+        "size": "heavy",
+        "reach": 2,
+        "properties": [
+          "Polearm"
+        ],
+        "encumbrance": 1
+      },
+      {
+        "type": "Halberd",
+        "size": "heavy",
+        "reach": 2,
+        "properties": [
+          "Sundering",
+          "Polearm"
+        ],
+        "encumbrance": 1
+      },
+      {
+        "type": "Pike",
+        "size": "heavy",
+        "reach": 3,
+        "properties": [
+          "Piercing",
+          "Polearm",
+          "Reach"
+        ],
+        "encumbrance": 1
+      },
+      {
+        "type": "Lance",
+        "size": "heavy",
+        "reach": 2,
+        "properties": [
+          "Piercing",
+          "Polearm"
+        ],
+        "encumbrance": 1
+      },
+      {
+        "type": "Light Crossbow",
+        "size": "light",
+        "ranged": true,
+        "range": 10,
+        "properties": [
+          "Range 10/20/30"
+        ],
+        "encumbrance": 0
+      },
+      {
+        "type": "Shortbow",
+        "size": "medium",
+        "ranged": true,
+        "range": 15,
+        "properties": [
+          "Piercing",
+          "Range 15/30/45"
+        ],
+        "encumbrance": 0
+      },
+      {
+        "type": "Crossbow",
+        "size": "medium",
+        "ranged": true,
+        "range": 20,
+        "properties": [
+          "Piercing",
+          "Range 20/40/60"
+        ],
+        "encumbrance": 0
+      },
+      {
+        "type": "Longbow",
+        "size": "heavy",
+        "ranged": true,
+        "range": 40,
+        "properties": [
+          "Piercing",
+          "Range 40/80/120"
+        ],
+        "encumbrance": 1
+      },
+      {
+        "type": "Heavy Crossbow",
+        "size": "heavy",
+        "ranged": true,
+        "range": 30,
+        "properties": [
+          "Piercing",
+          "Range 30/60/90"
+        ],
+        "encumbrance": 1
+      },
+      {
+        "type": "Shield",
+        "size": "light",
+        "shield": true,
+        "properties": [
+          "Shield"
+        ],
+        "encumbrance": 1
+      }
+    ]
   },
   "originRoll": {
     "start": "origin",
@@ -14,10 +322,26 @@
         "die": "d6",
         "page": 6,
         "results": [
-          { "min": 1, "max": 3, "origin": "human" },
-          { "min": 4, "max": 4, "origin": "elf" },
-          { "min": 5, "max": 5, "origin": "dwarf" },
-          { "min": 6, "max": 6, "origin": "gnome" }
+          {
+            "min": 1,
+            "max": 3,
+            "origin": "human"
+          },
+          {
+            "min": 4,
+            "max": 4,
+            "origin": "elf"
+          },
+          {
+            "min": 5,
+            "max": 5,
+            "origin": "dwarf"
+          },
+          {
+            "min": 6,
+            "max": 6,
+            "origin": "gnome"
+          }
         ]
       }
     }
@@ -29,31 +353,66 @@
       "height": "4d6+54",
       "enhanced": [],
       "deficient": [],
-      "classes": ["fighter", "expert", "wizard", "priest"]
+      "classes": [
+        "fighter",
+        "expert",
+        "wizard",
+        "priest"
+      ]
     },
     {
       "id": "elf",
       "name": "Elf",
       "height": "3d6+50",
-      "enhanced": ["dex", "wis"],
-      "deficient": ["con"],
-      "classes": ["fighter", "expert", "wizard", "priest"]
+      "enhanced": [
+        "dex",
+        "wis"
+      ],
+      "deficient": [
+        "con"
+      ],
+      "classes": [
+        "fighter",
+        "expert",
+        "wizard",
+        "priest"
+      ]
     },
     {
       "id": "dwarf",
       "name": "Dwarf",
       "height": "2d6+40",
-      "enhanced": ["con", "str"],
-      "deficient": ["dex"],
-      "classes": ["fighter", "expert", "wizard", "priest"]
+      "enhanced": [
+        "con",
+        "str"
+      ],
+      "deficient": [
+        "dex"
+      ],
+      "classes": [
+        "fighter",
+        "expert",
+        "wizard",
+        "priest"
+      ]
     },
     {
       "id": "gnome",
       "name": "Gnome",
       "height": "1d6+30",
-      "enhanced": ["dex", "cha"],
-      "deficient": ["str"],
-      "classes": ["fighter", "expert", "wizard", "priest"]
+      "enhanced": [
+        "dex",
+        "cha"
+      ],
+      "deficient": [
+        "str"
+      ],
+      "classes": [
+        "fighter",
+        "expert",
+        "wizard",
+        "priest"
+      ]
     }
   ],
   "classes": [
@@ -87,9 +446,21 @@
         "Weapon Expertise: Crossbows"
       ],
       "features": [
-        { "name": "Fighter Training", "level": 1, "summary": "Melee and ranged attack throws improve by 1 each level." },
-        { "name": "Critical Hits", "level": 1, "summary": "With an attack threshold of 9+ or better, beating it by 10 or more is a critical hit." },
-        { "name": "Fighter Feats", "level": 2, "summary": "Choose a new fighter feat at levels 2, 4, 6 and 8 (p. 13)." }
+        {
+          "name": "Fighter Training",
+          "level": 1,
+          "summary": "Melee and ranged attack throws improve by 1 each level."
+        },
+        {
+          "name": "Critical Hits",
+          "level": 1,
+          "summary": "With an attack threshold of 9+ or better, beating it by 10 or more is a critical hit."
+        },
+        {
+          "name": "Fighter Feats",
+          "level": 2,
+          "summary": "Choose a new fighter feat at levels 2, 4, 6 and 8 (p. 13)."
+        }
       ]
     },
     {
@@ -101,10 +472,26 @@
       "hitDieBonus": 0,
       "gear": "Light crossbow, two daggers, light armor, lockpicking tools, dungeoneer's kit",
       "features": [
-        { "name": "Expertise", "level": 1, "summary": "Train a talent of your choice at every level, including level 1." },
-        { "name": "Climb Sheer Surface", "level": 1, "summary": "Sheer walls are a normal Agility check; normal climbs succeed automatically. Not encumbered, in medium or heavy armor, or with a shield." },
-        { "name": "Pick Lock / Disarm Mechanism", "level": 1, "summary": "Finesse check to pick a lock or disarm a mechanism you know about." },
-        { "name": "Sneak Attack", "level": 1, "summary": "Stealth check against an unaware target at the attack's difficulty: on a success the attack hits as a critical." }
+        {
+          "name": "Expertise",
+          "level": 1,
+          "summary": "Train a talent of your choice at every level, including level 1."
+        },
+        {
+          "name": "Climb Sheer Surface",
+          "level": 1,
+          "summary": "Sheer walls are a normal Agility check; normal climbs succeed automatically. Not encumbered, in medium or heavy armor, or with a shield."
+        },
+        {
+          "name": "Pick Lock / Disarm Mechanism",
+          "level": 1,
+          "summary": "Finesse check to pick a lock or disarm a mechanism you know about."
+        },
+        {
+          "name": "Sneak Attack",
+          "level": 1,
+          "summary": "Stealth check against an unaware target at the attack's difficulty: on a success the attack hits as a critical."
+        }
       ]
     },
     {
@@ -116,13 +503,38 @@
       "hitDieBonus": 0,
       "martial": "Light armor costs a first- and second-circle preparation; medium or heavy armor or a shield prevents casting",
       "gear": "Spellbook, dagger, quarterstaff, robes, potion belt, dungeoneer's kit",
-      "trainingSchedule": { "2": "lore", "4": "science", "6": "lore", "8": "science" },
-      "magic": { "book": "Spellbook", "prepared": "Prepared spell", "circleWord": "Circle" },
+      "trainingSchedule": {
+        "2": "lore",
+        "4": "science",
+        "6": "lore",
+        "8": "science"
+      },
+      "magic": {
+        "book": "Spellbook",
+        "prepared": "Prepared spell",
+        "circleWord": "Circle"
+      },
       "features": [
-        { "name": "Arcane Spellcasting", "level": 1, "summary": "Start with two first-circle, one second-circle and one third-circle spell. Prepare spells at sunrise or sunset." },
-        { "name": "Preparing During Exploration", "level": 1, "summary": "Fill an empty preparation with Science checks equal to the spell's circle, one exploration turn each." },
-        { "name": "Cantrips", "level": 1, "summary": "Each prepared spell gives an at-will cantrip." },
-        { "name": "Arcane Rituals", "level": 1, "summary": "Cast spells up to half your level (round up) as rituals, one turn and one Science check per circle." }
+        {
+          "name": "Arcane Spellcasting",
+          "level": 1,
+          "summary": "Start with two first-circle, one second-circle and one third-circle spell. Prepare spells at sunrise or sunset."
+        },
+        {
+          "name": "Preparing During Exploration",
+          "level": 1,
+          "summary": "Fill an empty preparation with Science checks equal to the spell's circle, one exploration turn each."
+        },
+        {
+          "name": "Cantrips",
+          "level": 1,
+          "summary": "Each prepared spell gives an at-will cantrip."
+        },
+        {
+          "name": "Arcane Rituals",
+          "level": 1,
+          "summary": "Cast spells up to half your level (round up) as rituals, one turn and one Science check per circle."
+        }
       ]
     },
     {
@@ -133,15 +545,48 @@
       "prime": "cha",
       "hitDieBonus": 0,
       "gear": "Quarterstaff, medium armor, prayer book, holy symbol, dungeoneer's kit",
-      "trainingSchedule": { "2": "intuition", "4": "bearing", "6": "intuition", "8": "bearing" },
-      "magic": { "book": "Prayer book", "prepared": "Prayer strip", "circleWord": "Circle" },
+      "trainingSchedule": {
+        "2": "intuition",
+        "4": "bearing",
+        "6": "intuition",
+        "8": "bearing"
+      },
+      "magic": {
+        "book": "Prayer book",
+        "prepared": "Prayer strip",
+        "circleWord": "Circle"
+      },
       "features": [
-        { "name": "Domain of Faith", "level": 1, "summary": "Perform your domain's miracles and any common miracle with any prayer strip of the same or higher circle." },
-        { "name": "Divine Miracles", "level": 1, "summary": "Prepare miracles into prayer strips at sunrise and sunset; a strip burns to ash when used." },
-        { "name": "Preparing During Exploration", "level": 1, "summary": "Fill an empty preparation with Bearing checks equal to the miracle's circle, one exploration turn each." },
-        { "name": "Rebuke the Unholy", "level": 1, "summary": "Bearing check to drive back unholy creatures of your level or lower in a 5-pace cone. Destroys 1 HD foes from level 5, 2 HD at level 9." },
-        { "name": "Divine Rituals", "level": 1, "summary": "Perform miracles from any domain up to half your level (round up) as rituals with Bearing checks." },
-        { "name": "Sworn Oaths", "level": 1, "summary": "A focus blessing can be held by a sworn oath instead; breaking the oath turns it into a curse." }
+        {
+          "name": "Domain of Faith",
+          "level": 1,
+          "summary": "Perform your domain's miracles and any common miracle with any prayer strip of the same or higher circle."
+        },
+        {
+          "name": "Divine Miracles",
+          "level": 1,
+          "summary": "Prepare miracles into prayer strips at sunrise and sunset; a strip burns to ash when used."
+        },
+        {
+          "name": "Preparing During Exploration",
+          "level": 1,
+          "summary": "Fill an empty preparation with Bearing checks equal to the miracle's circle, one exploration turn each."
+        },
+        {
+          "name": "Rebuke the Unholy",
+          "level": 1,
+          "summary": "Bearing check to drive back unholy creatures of your level or lower in a 5-pace cone. Destroys 1 HD foes from level 5, 2 HD at level 9."
+        },
+        {
+          "name": "Divine Rituals",
+          "level": 1,
+          "summary": "Perform miracles from any domain up to half your level (round up) as rituals with Bearing checks."
+        },
+        {
+          "name": "Sworn Oaths",
+          "level": 1,
+          "summary": "A focus blessing can be held by a sworn oath instead; breaking the oath turns it into a curse."
+        }
       ]
     }
   ]
