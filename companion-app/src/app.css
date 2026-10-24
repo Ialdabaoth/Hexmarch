@@ -1,0 +1,99 @@
+:root {
+  --bg: #f4ecdc;
+  --card: #fffaf0;
+  --ink: #2b2118;
+  --muted: #6b5a45;
+  --line: #d9c9aa;
+  --accent: #8a2e1f;
+  --accent-ink: #fffaf0;
+  --gold: #b8892b;
+  --good: #3f8f4f;
+  --bad: #a33b2b;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1d1712;
+    --card: #2a221b;
+    --ink: #f1e6d2;
+    --muted: #b5a48a;
+    --line: #463a2e;
+    --accent: #c4553f;
+    --accent-ink: #fffaf0;
+    --gold: #e0b55a;
+    --good: #6cc07c;
+    --bad: #e06a55;
+    color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--ink); }
+body {
+  font: 16px/1.4 system-ui, -apple-system, 'Segoe UI', sans-serif;
+  -webkit-tap-highlight-color: transparent;
+}
+h1, h2, h3 { font-family: Georgia, 'Times New Roman', serif; margin: 0 0 0.5rem; line-height: 1.2; }
+h1 { font-size: 1.4rem; }
+h2 { font-size: 1.15rem; margin-top: 1.25rem; }
+h3 { font-size: 1rem; }
+button, input, select, textarea { font: inherit; color: inherit; }
+button {
+  border: 1px solid var(--line);
+  background: var(--card);
+  border-radius: 10px;
+  padding: 0.55rem 0.9rem;
+  cursor: pointer;
+  min-height: 44px;
+}
+button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+button.ghost { background: transparent; border-color: transparent; color: var(--muted); }
+button:disabled { opacity: 0.5; cursor: default; }
+input, select, textarea {
+  width: 100%;
+  border: 1px solid var(--line);
+  background: var(--card);
+  border-radius: 8px;
+  padding: 0.5rem 0.6rem;
+  min-height: 44px;
+}
+textarea { min-height: 5rem; resize: vertical; }
+label { display: block; font-size: 0.85rem; color: var(--muted); margin: 0.6rem 0 0.25rem; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 0.9rem; }
+.row { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+.grow { flex: 1; }
+.muted { color: var(--muted); }
+.small { font-size: 0.85rem; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+.grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; }
+.stack > * + * { margin-top: 0.75rem; }
+.chip {
+  display: inline-block; padding: 0.1rem 0.5rem; border-radius: 999px;
+  border: 1px solid var(--line); font-size: 0.8rem; color: var(--muted);
+}
+.success { color: var(--good); }
+.failure { color: var(--bad); }
+.critical { color: var(--gold); }
+label.check { display: flex; gap: 0.5rem; align-items: center; color: var(--ink); }
+label.check input { width: 1.2rem; height: 1.2rem; min-height: 0; flex: none; }
+
+@media print {
+  .no-print { display: none !important; }
+  html, body { background: #fff; color: #000; }
+  main.printable { padding: 0 !important; max-width: none !important; margin: 0 !important; }
+}
+@media print {
+  html, body { margin: 0; padding: 0; }
+}
+
+/* Rolls you can press and hold for Easy or Hard (lib/hold.svelte.ts). */
+/* !important because some buttons reset every property with `all: unset`; iOS Safari
+   starts a text selection on long-press unless the button and its text both opt out. */
+.holdable, .holdable * {
+  -webkit-user-select: none !important;
+  user-select: none !important;
+  -webkit-touch-callout: none !important;
+}
+.holdable { touch-action: manipulation !important; }
+/* The button being held, matching the Easy/Hard choices it opened. */
+.holdable.held { background: #111 !important; border-color: #111 !important; color: #fff !important; }
+.holdable.held * { color: inherit !important; }

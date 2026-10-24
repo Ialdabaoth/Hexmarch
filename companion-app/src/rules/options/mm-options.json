@@ -1,0 +1,659 @@
+{
+  "id": "mm",
+  "name": "Materia Mundi",
+  "source": "Materia Mundi Compendium, first edition. Page numbers refer to the Compendium PDF.",
+  "mechanics": {
+    "attackProgression": "all",
+    "throwMin": 5
+  },
+  "originRoll": {
+    "start": "origin",
+    "tables": {
+      "origin": {
+        "name": "Origin",
+        "die": "d6",
+        "page": 9,
+        "results": [
+          {
+            "min": 1,
+            "max": 3,
+            "origin": "human"
+          },
+          {
+            "min": 4,
+            "max": 4,
+            "origin": "barbarian"
+          },
+          {
+            "min": 5,
+            "max": 5,
+            "origin": "dwarf"
+          },
+          {
+            "min": 6,
+            "max": 6,
+            "table": "fey"
+          }
+        ]
+      },
+      "fey": {
+        "name": "Fey type",
+        "die": "d6",
+        "page": 9,
+        "results": [
+          {
+            "min": 1,
+            "max": 3,
+            "origin": "elf"
+          },
+          {
+            "min": 4,
+            "max": 5,
+            "origin": "gnome"
+          },
+          {
+            "min": 6,
+            "max": 6,
+            "origin": "beastfolk"
+          }
+        ]
+      }
+    }
+  },
+  "origins": [
+    {
+      "id": "human",
+      "name": "Human",
+      "height": "4d6+55",
+      "enhanced": [],
+      "deficient": [],
+      "classes": [
+        "warrior",
+        "scout",
+        "wizard",
+        "priest"
+      ]
+    },
+    {
+      "id": "barbarian",
+      "name": "Human Barbarian",
+      "height": "4d6+55",
+      "enhanced": [],
+      "deficient": [],
+      "classes": [
+        "champion",
+        "hunter",
+        "bard",
+        "druid",
+        "priest"
+      ],
+      "note": "Chooses from the fey class list."
+    },
+    {
+      "id": "dwarf",
+      "name": "Dwarf",
+      "height": "2d6+30",
+      "enhanced": [
+        "con",
+        "str"
+      ],
+      "deficient": [
+        "dex"
+      ],
+      "classes": [
+        "stalwart",
+        "delver",
+        "dweomersmith",
+        "priest"
+      ]
+    },
+    {
+      "id": "elf",
+      "name": "Elf",
+      "height": "3d6+50",
+      "enhanced": [
+        "dex",
+        "wis"
+      ],
+      "deficient": [
+        "con"
+      ],
+      "classes": [
+        "champion",
+        "hunter",
+        "bard",
+        "druid",
+        "priest"
+      ],
+      "note": "Elf champions always take the Mystic initiation."
+    },
+    {
+      "id": "gnome",
+      "name": "Gnome",
+      "height": "1d6+30",
+      "enhanced": [
+        "dex",
+        "cha"
+      ],
+      "deficient": [
+        "str"
+      ],
+      "classes": [
+        "champion",
+        "hunter",
+        "bard",
+        "druid",
+        "priest"
+      ]
+    },
+    {
+      "id": "beastfolk",
+      "name": "Beastfolk",
+      "height": "5d6+50",
+      "enhanced": [
+        "str",
+        "dex"
+      ],
+      "deficient": [
+        "int"
+      ],
+      "classes": [
+        "champion",
+        "hunter",
+        "bard",
+        "druid",
+        "priest"
+      ],
+      "note": "Beastfolk champions take an animal initiation matching their form."
+    }
+  ],
+  "classes": [
+    {
+      "id": "warrior",
+      "name": "Warrior",
+      "kind": "fighter",
+      "page": 13,
+      "prime": "str",
+      "hitDieBonus": 2,
+      "martial": "All weapons, armor and shields",
+      "gear": "Longsword, heavy armor, shield, dungeoneer's kit",
+      "improvedCritical": true,
+      "features": [
+        {
+          "name": "Improved Critical Hit",
+          "level": 1,
+          "summary": "With an attack threshold of 9+ or better, beating it by 10 or more is a critical hit."
+        },
+        {
+          "name": "Fighter Feats",
+          "level": 2,
+          "summary": "Choose a fighter feat at levels 2, 4, 6 and 8."
+        }
+      ]
+    },
+    {
+      "id": "scout",
+      "name": "Scout",
+      "kind": "expert",
+      "page": 14,
+      "prime": "dex",
+      "hitDieBonus": 0,
+      "martial": "All weapons, simple (non-heavy) armor",
+      "gear": "Light crossbow, two daggers, light armor, lockpicking tools, dungeoneer's kit",
+      "trainable": [
+        "agility",
+        "finesse",
+        "stealth",
+        "alertness"
+      ],
+      "expertise": [
+        "agility",
+        "stealth"
+      ],
+      "features": [
+        {
+          "name": "Scout's Expertise",
+          "level": 1,
+          "summary": "Climbing and hiding are easy; not while encumbered, in medium or heavy armor, or with a shield."
+        },
+        {
+          "name": "Sneak Attack",
+          "level": 1,
+          "summary": "Use your ranged threshold against unaware targets; crit if every damage die beats your Stealth threshold."
+        }
+      ],
+      "anyTalentAt": [
+        5,
+        9
+      ]
+    },
+    {
+      "id": "wizard",
+      "name": "Wizard",
+      "kind": "magic-user",
+      "page": 15,
+      "prime": "int",
+      "hitDieBonus": 0,
+      "martial": "No non-simple weapons or armor; armor hinders arcane magic",
+      "gear": "Spellbook, dagger, quarterstaff, robes, potion belt, dungeoneer's kit",
+      "trainingSchedule": {
+        "2": "lore",
+        "4": "science",
+        "6": "lore",
+        "8": "science"
+      },
+      "magic": {
+        "book": "Spellbook",
+        "prepared": "Prepared spell",
+        "circleWord": "Circle"
+      },
+      "features": [
+        {
+          "name": "Arcane Spellcasting",
+          "level": 1,
+          "summary": "Prepare spells from your spellbook at sunrise or sunset."
+        },
+        {
+          "name": "Cantrips",
+          "level": 1,
+          "summary": "Each prepared spell gives an at-will cantrip."
+        },
+        {
+          "name": "Arcane Rituals",
+          "level": 1,
+          "summary": "Cast spells up to half your level (round up) as rituals with Science checks."
+        }
+      ]
+    },
+    {
+      "id": "priest",
+      "name": "Priest",
+      "kind": "magic-user",
+      "page": 16,
+      "prime": "cha",
+      "hitDieBonus": 0,
+      "martial": "No non-simple weapons or armor",
+      "gear": "Quarterstaff, medium armor, prayer book, holy symbol, dungeoneer's kit",
+      "trainingSchedule": {
+        "2": "intuition",
+        "4": "bearing",
+        "6": "intuition",
+        "8": "bearing"
+      },
+      "magic": {
+        "book": "Prayer book",
+        "prepared": "Prayer strip",
+        "circleWord": "Circle"
+      },
+      "features": [
+        {
+          "name": "Divine Miracles",
+          "level": 1,
+          "summary": "Prepare miracles into prayer strips; choose a domain of faith."
+        },
+        {
+          "name": "Rebuking the Unholy",
+          "level": 1,
+          "summary": "Bearing check to drive back unholy creatures with fewer hit dice in a 5-pace cone."
+        },
+        {
+          "name": "Divine Rituals",
+          "level": 1,
+          "summary": "Perform miracles up to half your level (round up) as rituals with Bearing checks."
+        }
+      ]
+    },
+    {
+      "id": "stalwart",
+      "name": "Stalwart",
+      "kind": "fighter",
+      "page": 17,
+      "prime": "con",
+      "hitDieBonus": 2,
+      "martial": "All weapons, armor and shields; wield medium and heavy weapons as a medium creature",
+      "gear": "Ax, crossbow, heavy armor, shield, dungeoneer's kit",
+      "improvedCritical": true,
+      "features": [
+        {
+          "name": "Improved Critical Hit",
+          "level": 1,
+          "summary": "With an attack threshold of 9+ or better, beating it by 10 or more is a critical hit."
+        },
+        {
+          "name": "Indefatigable",
+          "level": 1,
+          "summary": "Saves vs. Doom, Hold and Fear are easier."
+        },
+        {
+          "name": "Fighter's Feats",
+          "level": 2,
+          "summary": "Deflect Blows at 2, Defender at 4, then a feat of your choice at 6 and 8."
+        }
+      ]
+    },
+    {
+      "id": "delver",
+      "name": "Delver",
+      "kind": "expert",
+      "page": 17,
+      "prime": "wis",
+      "hitDieBonus": 1,
+      "martial": "All weapons, armor and shields",
+      "gear": "Pickaxe, light crossbow, medium armor, potion belt, dungeoneer's kit",
+      "trainable": [
+        "finesse",
+        "science",
+        "alertness",
+        "survival"
+      ],
+      "features": [
+        {
+          "name": "Armored Stealth",
+          "level": 1,
+          "summary": "Prepared medium armor does not penalize Stealth."
+        },
+        {
+          "name": "Stonesense",
+          "level": 1,
+          "summary": "Spend a turn tapping stone walls, then a Survival check maps 5 paces around you."
+        }
+      ],
+      "anyTalentAt": [
+        5,
+        9
+      ]
+    },
+    {
+      "id": "dweomersmith",
+      "name": "Dweomersmith",
+      "kind": "magic-user",
+      "page": 18,
+      "prime": "int",
+      "hitDieBonus": 1,
+      "martial": "All weapons, armor and shields",
+      "gear": "Hammer, crossbow, heavy armor, potion belt, smith's tools, artisan's tools, dungeoneer's kit",
+      "trainingSchedule": {
+        "2": "finesse",
+        "4": "science",
+        "6": "finesse",
+        "8": "science"
+      },
+      "magic": {
+        "book": "Craftbook",
+        "prepared": "Dweomer",
+        "circleWord": "Rarity"
+      },
+      "features": [
+        {
+          "name": "Dweomercraft",
+          "level": 1,
+          "summary": "Craftbook with two alchemical formulae and two magic item blueprints; prepare dweomers at sunrise or sunset."
+        },
+        {
+          "name": "Dweomersmith Rituals",
+          "level": 1,
+          "summary": "Perform first-circle dweomers as rituals with Science checks."
+        }
+      ]
+    },
+    {
+      "id": "champion",
+      "name": "Champion",
+      "kind": "fighter",
+      "page": 19,
+      "prime": "str",
+      "hitDieBonus": 2,
+      "martial": "All weapons and shields, light armor only",
+      "gear": "Greatsword, light armor",
+      "improvedCritical": true,
+      "features": [
+        {
+          "name": "Improved Critical Hit",
+          "level": 1,
+          "summary": "With an attack threshold of 9+ or better, beating it by 10 or more is a critical hit."
+        },
+        {
+          "name": "Battle-Trance",
+          "level": 2,
+          "summary": "Enter a trance on a melee attack; foes may be frightened, add level to melee damage."
+        },
+        {
+          "name": "Champion Initiation",
+          "level": 2,
+          "summary": "Choose an initiation (Mystic, Bear, Boar, Panther, Raven, Serpent, Shark, Wolf)."
+        }
+      ]
+    },
+    {
+      "id": "hunter",
+      "name": "Hunter",
+      "kind": "expert",
+      "page": 20,
+      "prime": "dex",
+      "hitDieBonus": 0,
+      "martial": "All weapons, simple (non-heavy) armor",
+      "gear": "Shortbow, two daggers, light armor",
+      "trainable": [
+        "agility",
+        "stealth",
+        "alertness",
+        "survival"
+      ],
+      "expertise": [
+        "survival"
+      ],
+      "features": [
+        {
+          "name": "Hunter's Expertise",
+          "level": 1,
+          "summary": "Tracking and navigating are easy; befriend and train wild animals."
+        },
+        {
+          "name": "Sneak Attack",
+          "level": 1,
+          "summary": "Use your ranged threshold against unaware targets; crit if every damage die beats your Stealth threshold."
+        }
+      ],
+      "anyTalentAt": [
+        5,
+        9
+      ]
+    },
+    {
+      "id": "bard",
+      "name": "Bard",
+      "kind": "expert",
+      "page": 20,
+      "prime": "cha",
+      "hitDieBonus": 0,
+      "martial": "No non-simple weapons or armor",
+      "gear": "Two daggers, quarterstaff, medium armor, musical instrument",
+      "trainable": [
+        "finesse",
+        "lore",
+        "charm",
+        "wit"
+      ],
+      "features": [
+        {
+          "name": "Magical Intuition",
+          "level": 1,
+          "summary": "Lore check to activate any magic item or prepared magic."
+        },
+        {
+          "name": "Bardsong",
+          "level": 2,
+          "summary": "Weave Dream or Song glamours into music with Charm checks."
+        }
+      ],
+      "anyTalentAt": [
+        5,
+        9
+      ]
+    },
+    {
+      "id": "druid",
+      "name": "Druid",
+      "kind": "magic-user",
+      "page": 21,
+      "prime": "wis",
+      "hitDieBonus": 0,
+      "martial": "No non-simple weapons or armor; steel hinders primal magic",
+      "gear": "Quarterstaff, dagger, light armor, potion belt",
+      "trainingSchedule": {
+        "2": "medicine",
+        "4": "survival",
+        "6": "medicine",
+        "8": "survival"
+      },
+      "magic": {
+        "book": "Known glamours",
+        "prepared": "Talisman",
+        "circleWord": "Circle"
+      },
+      "features": [
+        {
+          "name": "Primal Druidcraft",
+          "level": 1,
+          "summary": "Start knowing four first-circle glamours or wild shapes; prepare from memory."
+        },
+        {
+          "name": "Wisps",
+          "level": 1,
+          "summary": "Invest a preparation in a wisp to cast an elemental glamour for you."
+        },
+        {
+          "name": "Primal Rituals",
+          "level": 1,
+          "summary": "Perform any known glamour as a ritual with Survival checks."
+        }
+      ]
+    }
+  ],
+  "quickNpc": {
+    "die": "d20",
+    "page": 258,
+    "note": "The printed table lists Wis as the Priest's prime; the Priest class (p. 16) says Cha, which is used here.",
+    "results": [
+      {
+        "max": 3,
+        "class": "warrior",
+        "origin": "human",
+        "primes": [
+          "str"
+        ]
+      },
+      {
+        "max": 6,
+        "class": "scout",
+        "origin": "human",
+        "primes": [
+          "dex"
+        ]
+      },
+      {
+        "max": 8,
+        "class": "wizard",
+        "origin": "human",
+        "primes": [
+          "int"
+        ]
+      },
+      {
+        "max": 10,
+        "class": "priest",
+        "origin": "human",
+        "primes": [
+          "cha"
+        ]
+      },
+      {
+        "max": 11,
+        "class": "champion",
+        "origin": "barbarian",
+        "primes": [
+          "str"
+        ]
+      },
+      {
+        "max": 12,
+        "class": "hunter",
+        "origin": "barbarian",
+        "primes": [
+          "dex"
+        ]
+      },
+      {
+        "max": 13,
+        "class": "druid",
+        "origin": "barbarian",
+        "primes": [
+          "wis"
+        ]
+      },
+      {
+        "max": 14,
+        "class": "stalwart",
+        "origin": "dwarf",
+        "primes": [
+          "con",
+          "str"
+        ]
+      },
+      {
+        "max": 15,
+        "class": "delver",
+        "origin": "dwarf",
+        "primes": [
+          "con",
+          "wis"
+        ]
+      },
+      {
+        "max": 16,
+        "class": "dweomersmith",
+        "origin": "dwarf",
+        "primes": [
+          "con",
+          "int"
+        ]
+      },
+      {
+        "max": 17,
+        "class": "hunter",
+        "origin": "elf",
+        "primes": [
+          "dex",
+          "wis"
+        ]
+      },
+      {
+        "max": 18,
+        "class": "druid",
+        "origin": "elf",
+        "primes": [
+          "dex",
+          "wis"
+        ]
+      },
+      {
+        "max": 19,
+        "class": "hunter",
+        "origin": "gnome",
+        "primes": [
+          "dex",
+          "cha"
+        ]
+      },
+      {
+        "max": 20,
+        "class": "champion",
+        "origin": "beastfolk",
+        "primes": [
+          "dex",
+          "str"
+        ]
+      }
+    ]
+  }
+}
