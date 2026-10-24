@@ -8,6 +8,7 @@
   import HpEditor from './HpEditor.svelte';
   import XpEditor from './XpEditor.svelte';
   import GearPicker from './GearPicker.svelte';
+  import RollLog from './RollLog.svelte';
   import { portraitFromFile } from '../lib/portrait';
 
   let fileInput = $state<HTMLInputElement>();
@@ -17,6 +18,7 @@
   let editingXp = $state(false);
   let pickingGear = $state<'armor' | 'main' | 'off' | null>(null);
   let jsonText = $state<string | null>(null);
+  let tab = $state<'log' | 'backup'>('log');
 
   async function setPortrait(file: File) {
     if (!active) return;
@@ -133,24 +135,33 @@
   </div>
 {/if}
 
-<details class="backup">
-  <summary class="small muted">Backup and import</summary>
-  <div class="row">
-    <button onclick={() => downloadJson('materia-mundi-characters.json', exportBundle(app.sheets))} disabled={!app.sheets.length}>Export all (JSON)</button>
-    <button onclick={() => fileInput?.click()}>Import JSON</button>
-    <input bind:this={fileInput} type="file" accept="application/json,.json" hidden onchange={onImport} />
-    <button onclick={toggleJson}>{jsonText === null ? 'Show JSON (copy / paste)' : 'Hide JSON'}</button>
+<section class="tabs-panel">
+  <div class="tabs" role="tablist">
+    <button role="tab" aria-selected={tab === 'log'} class:on={tab === 'log'} onclick={() => (tab = 'log')}>Results and history</button>
+    <button role="tab" aria-selected={tab === 'backup'} class:on={tab === 'backup'} onclick={() => (tab = 'backup')}>Backup and import</button>
   </div>
-  {#if jsonText !== null}
-    <textarea class="json" bind:value={jsonText} spellcheck="false" aria-label="Characters as JSON"></textarea>
-    <div class="row">
-      <button onclick={copyJson}>Copy</button>
-      <button onclick={() => (jsonText = '')}>Clear</button>
-      <button class="primary" onclick={importPasted} disabled={!jsonText.trim()}>Import pasted</button>
+  {#if tab === 'log'}
+    <RollLog />
+  {:else}
+    <div class="backup">
+      <div class="row">
+        <button onclick={() => downloadJson('materia-mundi-characters.json', exportBundle(app.sheets))} disabled={!app.sheets.length}>Export all (JSON)</button>
+        <button onclick={() => fileInput?.click()}>Import JSON</button>
+        <input bind:this={fileInput} type="file" accept="application/json,.json" hidden onchange={onImport} />
+        <button onclick={toggleJson}>{jsonText === null ? 'Show JSON (copy / paste)' : 'Hide JSON'}</button>
+      </div>
+      {#if jsonText !== null}
+        <textarea class="json" bind:value={jsonText} spellcheck="false" aria-label="Characters as JSON"></textarea>
+        <div class="row">
+          <button onclick={copyJson}>Copy</button>
+          <button onclick={() => (jsonText = '')}>Clear</button>
+          <button class="primary" onclick={importPasted} disabled={!jsonText.trim()}>Import pasted</button>
+        </div>
+      {/if}
+      <p class="muted small">Characters live only on this device. Export a backup now and then, or to move them to another phone.</p>
     </div>
   {/if}
-  <p class="muted small">Characters live only on this device. Export a backup now and then, or to move them to another phone.</p>
-</details>
+</section>
 
 <style>
   .party {
@@ -184,8 +195,10 @@
   .actions { margin-bottom: 1rem; }
   .empty { text-align: center; }
   .empty p { margin: 0.25rem 0 0.75rem; }
-  .backup { margin-top: 0.5rem; }
-  .backup summary { min-height: 32px; cursor: pointer; }
+  .tabs-panel { margin-top: 0.5rem; }
+  .tabs { display: flex; border-bottom: 1px solid var(--line); margin-bottom: 0.6rem; }
+  .tabs button { flex: 1; min-height: 40px; border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: none; color: var(--muted); font-size: 0.9rem; }
+  .tabs button.on { color: var(--ink); border-bottom-color: var(--accent); font-weight: 600; }
   .backup .row { flex-wrap: wrap; }
   .json { width: 100%; box-sizing: border-box; height: 14rem; margin: 0.5rem 0; font: 0.75rem/1.35 ui-monospace, Menlo, monospace; }
 </style>

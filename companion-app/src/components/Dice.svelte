@@ -3,6 +3,7 @@
   import { expressionRoll, thresholdCheck } from '../lib/checks';
   import type { Difficulty } from '../rules/rules';
   import { holdRoll } from '../lib/hold.svelte';
+  import RollLog from './RollLog.svelte';
 
   let expression = $state('');
   let who = $state('');
@@ -25,9 +26,6 @@
     );
   }
 
-  function time(iso: string) {
-    return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  }
 </script>
 
 <h1>Dice</h1>
@@ -60,32 +58,10 @@
   </div>
 </details>
 
-<div class="row" style="margin-top:1rem">
-  <h2 class="grow" style="margin:0">History</h2>
-  {#if app.log.length}<button class="ghost" onclick={() => app.clearLog()}>Clear</button>{/if}
-</div>
-{#if !app.log.length}
-  <p class="muted small">Rolls from here and from character sheets show up here.</p>
-{/if}
-<ul class="log">
-  {#each app.log as e (e.id)}
-    <li>
-      <div class="row">
-        <strong class="grow">{e.label}: {e.total}
-          {#if e.outcome}<span class="small {e.outcome}">{e.outcome}</span>{/if}
-        </strong>
-        <span class="small muted">{time(e.at)}</span>
-      </div>
-      <div class="small muted">{e.who} · {e.detail.replace(/~~(\d+)~~/g, '($1)')}</div>
-      {#if app.canPost}<button class="ghost small" onclick={() => app.post(e)}>Send to Discord</button>{/if}
-    </li>
-  {/each}
-</ul>
+<h2 style="margin:1rem 0 0">History</h2>
+<RollLog />
 
 <style>
   .quick { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; margin-bottom: 0.75rem; }
   .quick button { font-size: 1.1rem; font-weight: 600; min-height: 52px; }
-  .log { list-style: none; padding: 0; margin: 0; }
-  .log li { border-bottom: 1px solid var(--line); padding: 0.5rem 0; }
-  .log button { min-height: 32px; padding: 0.1rem 0; }
 </style>
