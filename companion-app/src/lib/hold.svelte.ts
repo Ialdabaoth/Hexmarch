@@ -1,6 +1,6 @@
 // Tap a roll for a normal roll. Press and hold to turn the button black and bring up Easy
-// above it and Hard below it, drawn in the button's own shape, slide onto one and let go to roll at that difficulty. Letting go anywhere
-// else cancels. Keyboard users get a normal roll from Enter or Space.
+// above it and Hard below it, drawn in the button's own shape, slide onto one and let go to roll at that difficulty. Letting go on
+// the held button itself makes a normal roll; anywhere else cancels. Keyboard users get a normal roll from Enter or Space.
 
 import type { Difficulty } from '../rules/rules';
 
@@ -84,8 +84,13 @@ export function holdRoll(node: HTMLElement, onroll: (d: Difficulty) => void) {
     else if (Math.hypot(e.clientX - start.x, e.clientY - start.y) > SLOP) reset();
   };
 
-  const up = () => {
-    if (held && holdMenu.hover) handler(holdMenu.hover);
+  const up = (e: PointerEvent) => {
+    if (held) {
+      const box = node.getBoundingClientRect();
+      const onButton = e.clientX >= box.left && e.clientX <= box.right && e.clientY >= box.top && e.clientY <= box.bottom;
+      if (holdMenu.hover) handler(holdMenu.hover);
+      else if (onButton) handler('normal');
+    }
     reset();
   };
 
