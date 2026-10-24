@@ -71,9 +71,9 @@
         {:else if data.portrait}<img class="portrait" src={data.portrait} alt="" />{/if}
         <div class="who">
           <h1>{v.c.name}</h1>
-          <div class="sub">{v.title} · {#if onxp}<button type="button" class="xpbtn tap" onclick={() => onxp()}>XP {v.xp}</button>{:else}XP {v.xp}{/if}</div>
+          <div class="sub">{v.title}</div>
         </div>
-        <div class="brand">{#if v.c.rules.id === 'mm'}Materia<br />Mundi{:else}{v.c.rules.name}{/if}</div>
+        <button type="button" class="xp tap" disabled={!onxp} onclick={() => onxp?.()}><span>XP</span><b>{v.xp}</b></button>
       </header>
 
       <div class="vitals">
@@ -224,8 +224,9 @@
   .who { flex: 1; min-width: 0; }
   h1 { font: 700 5.2cqw/1.05 Georgia, serif; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .sub { font-size: 2.3cqw; color: #5b4a36; margin-top: 0.4cqw; }
-  .xpbtn { border: 0.15cqw solid #c9b896; border-radius: 0.8cqw; padding: 0.2cqw 1cqw; color: #1d1712; font-weight: 600; }
-  .brand { font: italic 700 2.2cqw/1 Georgia, serif; color: #8a2e1f; text-align: right; letter-spacing: 0.05em; }
+  .xp { flex: none; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.3cqw; min-width: 15cqw; padding: 1cqw 1.6cqw; border: 0.15cqw solid #c9b896; border-radius: 1cqw; text-align: center; }
+  .xp span { font-size: 1.7cqw; text-transform: uppercase; letter-spacing: 0.06em; color: #5b4a36; }
+  .xp b { font: 700 3.6cqw/1.1 Georgia, serif; white-space: nowrap; }
   .vitals { display: grid; grid-template-columns: 4fr 1fr 1fr; gap: 1cqw; }
   .stats { display: grid; grid-template-columns: repeat(4, 1fr); border: 0.2cqw solid #1d1712; border-radius: 1cqw; }
   .stats > *, .atk { padding: 0.8cqw 1cqw; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
