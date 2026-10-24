@@ -121,12 +121,6 @@
       <button class:on={page === i} onclick={() => { page = i; card?.showPage(i); }}>{label}</button>
     {/each}
   </div>
-  <p class="small muted hint">Tap a number to roll it, or hold and slide up for Easy, down for Hard. Tap HP, XP, armor, a hand or the portrait to change them. Swipe to turn the card over.</p>
-
-  <div class="row actions">
-    <button class="primary grow" onclick={() => (app.view = { name: 'sheet', id: active!.id })}>Full sheet</button>
-    <button onclick={() => (app.view = { name: 'render', id: active!.id, mode: 'postcard' })}>PDF</button>
-  </div>
 {:else}
   <div class="card empty">
     <p>No characters yet.</p>
@@ -137,13 +131,22 @@
 
 <section class="tabs-panel">
   <div class="tabs" role="tablist">
-    <button role="tab" aria-selected={tab === 'log'} class:on={tab === 'log'} onclick={() => (tab = 'log')}>Results and history</button>
-    <button role="tab" aria-selected={tab === 'backup'} class:on={tab === 'backup'} onclick={() => (tab = 'backup')}>Backup and import</button>
+    <button role="tab" aria-selected={tab === 'log'} class:on={tab === 'log'} onclick={() => (tab = 'log')}>Dice, Results &amp; History</button>
+    <button role="tab" aria-selected={tab === 'backup'} class:on={tab === 'backup'} onclick={() => (tab = 'backup')}>Character (Print/Backup/Import)</button>
   </div>
   {#if tab === 'log'}
+    {#if active}
+      <p class="small muted hint">Tap a number to roll it, or hold and slide up for Easy, down for Hard. Tap HP, XP, armor, a hand or the portrait to change them. Swipe to turn the card over.</p>
+    {/if}
     <RollLog />
   {:else}
     <div class="backup">
+      {#if active}
+        <div class="row actions">
+          <button class="primary grow" onclick={() => (app.view = { name: 'sheet', id: active.id })}>Full sheet</button>
+          <button onclick={() => (app.view = { name: 'render', id: active.id, mode: 'postcard' })}>PDF</button>
+        </div>
+      {/if}
       <div class="row">
         <button onclick={() => downloadJson('materia-mundi-characters.json', exportBundle(app.sheets))} disabled={!app.sheets.length}>Export all (JSON)</button>
         <button onclick={() => fileInput?.click()}>Import JSON</button>
@@ -191,11 +194,11 @@
   .pager { display: flex; justify-content: center; gap: 0.5rem; margin-top: 0.6rem; }
   .pager button { min-height: 32px; padding: 0.2rem 0.9rem; border-radius: 999px; font-size: 0.85rem; }
   .pager button.on { background: var(--ink); color: var(--bg); border-color: var(--ink); }
-  .hint { text-align: center; margin: 0.4rem 0 0.8rem; }
-  .actions { margin-bottom: 1rem; }
+  .hint { margin: 0 0 0.6rem; }
+  .actions { margin-bottom: 0.75rem; }
   .empty { text-align: center; }
   .empty p { margin: 0.25rem 0 0.75rem; }
-  .tabs-panel { margin-top: 0.5rem; }
+  .tabs-panel { margin-top: 0.75rem; }
   .tabs { display: flex; border-bottom: 1px solid var(--line); margin-bottom: 0.6rem; }
   .tabs button { flex: 1; min-height: 40px; border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: none; color: var(--muted); font-size: 0.9rem; }
   .tabs button.on { color: var(--ink); border-bottom-color: var(--accent); font-weight: 600; }
