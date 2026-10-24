@@ -11,7 +11,8 @@
     layout = 'stack',
     onpage,
     onhp,
-    onportraitfile
+    onportraitfile,
+    onxp
   }: {
     view: SheetView;
     onroll?: (r: RollRequest) => void;
@@ -21,6 +22,8 @@
     onhp?: () => void;
     // With this, the portrait is a photo picker and gets the chosen file.
     onportraitfile?: (file: File) => void;
+    // Tapping XP calls this (the home screen opens the XP and level-up editor).
+    onxp?: () => void;
   } = $props();
   let data = $derived(v.c.data);
   let inv = $derived(data.inventory);
@@ -63,7 +66,7 @@
       {:else if data.portrait}<img class="portrait" src={data.portrait} alt="" />{/if}
       <div class="who">
         <h1>{v.c.name}</h1>
-        <div class="sub">{v.title} · XP {v.xp}</div>
+        <div class="sub">{v.title} · {#if onxp}<button type="button" class="xpbtn tap" onclick={() => onxp()}>XP {v.xp}</button>{:else}XP {v.xp}{/if}</div>
       </div>
       <div class="brand">{#if v.c.rules.id === 'mm'}Materia<br />Mundi{:else}{v.c.rules.name}{/if}</div>
     </header>
@@ -91,7 +94,7 @@
       {#each v.abilities as a}
         <button type="button" class="ab tap" disabled={!onroll} use:holdRoll={check({ kind: 'check', label: `Save vs. ${a.save}`, sides: 20, threshold: a.threshold })}>
           <span class="lbl">{a.short} {a.score}</span>
-          <span class="save">{a.save}</span>
+          <span class="save">vs. {a.save}</span>
           <b>{a.threshold}+</b>
         </button>
       {/each}
@@ -202,10 +205,14 @@
   .who { flex: 1; min-width: 0; }
   h1 { font: 700 5.2cqw/1.05 Georgia, serif; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .sub { font-size: 2.3cqw; color: #5b4a36; margin-top: 0.4cqw; }
+  .xpbtn { border: 0.15cqw solid #c9b896; border-radius: 0.8cqw; padding: 0.2cqw 1cqw; color: #1d1712; font-weight: 600; }
   .brand { font: italic 700 2.2cqw/1 Georgia, serif; color: #8a2e1f; text-align: right; letter-spacing: 0.05em; }
   .vitals { display: grid; grid-template-columns: 4fr 1fr 1fr; gap: 1cqw; }
   .stats { display: grid; grid-template-columns: repeat(4, 1fr); border: 0.2cqw solid #1d1712; border-radius: 1cqw; }
-  .stats > *, .atk { padding: 0.8cqw 1cqw; display: flex; flex-direction: column; }
+  .stats > *, .atk { padding: 0.8cqw 1cqw; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+  /* Labels sit at the top; numbers stay centered in the room below. */
+  .stats > * { justify-content: flex-start; }
+  .stats b { flex: 1; display: flex; align-items: center; }
   .stats > * + * { border-left: 0.15cqw solid #c9b896; }
   .atk { border: 0.15cqw solid #c9b896; border-radius: 1cqw; }
   .vitals span { font-size: 1.7cqw; text-transform: uppercase; letter-spacing: 0.06em; color: #5b4a36; }
@@ -217,8 +224,9 @@
   .abilities { display: grid; grid-template-columns: repeat(6, 1fr); gap: 1cqw; }
   .ab { border: 0.15cqw solid #c9b896; border-radius: 1cqw; text-align: center; padding: 0.8cqw 0; display: flex; flex-direction: column; justify-content: center; }
   .ab .lbl { font: 700 2.8cqw/1.2 Georgia, serif; }
-  .ab .save { font-size: 2cqw; color: #5b4a36; }
-  .ab b { font: 700 6.4cqw/1.1 Georgia, serif; }
+  /* Ability on top, then a gap, then the save it guards against with its threshold. */
+  .ab .save { font-size: 2cqw; color: #5b4a36; margin-top: 1cqw; }
+  .ab b { font: 700 6.4cqw/0.9 Georgia, serif; margin-top: 0.3cqw; }
   .weapons { display: flex; flex-wrap: wrap; gap: 0.6cqw 2.4cqw; font-size: 2.3cqw; border-top: 0.15cqw solid #c9b896; padding-top: 1cqw; }
   .talents { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1cqw; }
   .tcol { display: flex; flex-direction: column; gap: 0.9cqw; min-width: 0; }

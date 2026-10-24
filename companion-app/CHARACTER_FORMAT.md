@@ -86,8 +86,9 @@ level 1 `hp` can be left out (it is the starting HP from the rules).
 
 ## Other fields
 
-- `portrait`: an image, either inline (`data:image/jpeg;base64,...`, which is what the
-  app writes after shrinking a photo to 256×256) or an `https://` link. Empty for none.
+- `portrait`: an image, either inline or an `https://` link. Empty for none. The app
+  shrinks pictures to 256×256 and writes `data:image/jpeg;base64,...`, or
+  `data:image/png;base64,...` when the picture has see-through areas.
 - `rules`: the ruleset the character uses, `mm` (Materia Mundi), `e9`, or `e9mm`
   (E9 for Materia Mundi). Older
   files that say `1e` are read as `mm`.

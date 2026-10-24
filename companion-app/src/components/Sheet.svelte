@@ -1,27 +1,24 @@
 <script lang="ts">
   import { app } from '../lib/app.svelte';
   import {
-    attackThresholds, carrying, hasExpertise, hitDieLabel, saveThreshold, talentThreshold, xpToNext,
+    attackThresholds, carrying, hasExpertise, hitDieLabel, saveThreshold, talentThreshold,
     type Character
   } from '../lib/character';
   import { expressionRoll, thresholdCheck } from '../lib/checks';
   import { downloadJson, slug } from '../lib/storage';
-  import { levelUp } from '../lib/sheet';
   import { portraitFromFile } from '../lib/portrait';
-  import { ABILITIES, TALENTS, hasKind, scheduledTraining, type Difficulty, type TalentId } from '../rules/rules';
+  import { ABILITIES, TALENTS, type Difficulty } from '../rules/rules';
   import { holdRoll } from '../lib/hold.svelte';
   import Followers from './Followers.svelte';
   import Magic from './Magic.svelte';
   import Effects from './Effects.svelte';
+  import XpPanel from './XpPanel.svelte';
 
   let { id }: { id: string } = $props();
 
   // c is computed from c.sheet; edits go to the sheet and c follows.
   let c = $derived(app.character(id)) as Character | undefined;
   let cls = $derived(c ? c.rules.getClass(c.classId) : undefined);
-  let leveling = $state(false);
-  let levelTraining = $state<TalentId | undefined>(undefined);
-  let levelFeat = $state('');
   let confirmDelete = $state(false);
 
   async function setPortrait(e: Event) {
@@ -74,17 +71,6 @@
     save();
   }
 
-  function doLevelUp() {
-    if (!c || !cls) return;
-    const entry = levelUp(c.data, { training: levelTraining, feat: levelFeat });
-    app.persist();
-    const trained = TALENTS.find((t) => entry[t.id] === 1);
-    app.notify(`Level ${entry.level}! +${entry.hp} HP${trained ? `, trained ${trained.name}` : ''}`);
-    leveling = false;
-    levelTraining = undefined;
-    levelFeat = '';
-  }
-
   function addWeapon() {
     c?.data.inventory.weapons.push({ name: 'Dagger', damage: 'd6', range: 'melee' });
     save();
@@ -99,7 +85,6 @@
 {#if c && cls}
   {@const atk = attackThresholds(c)}
   {@const carry = carrying(c)}
-  {@const toNext = xpToNext(c)}
   <div class="row">
     <button class="ghost" onclick={() => (app.view = { name: 'list' })}>‹ Card</button>
   </div>
@@ -138,39 +123,7 @@
         <strong>{carry.encumbrance} / {carry.capacity}</strong>
       </div>
     </div>
-    <div class="row xp">
-      <span class="small muted">XP</span>
-      <button onclick={() => { c.data.class.xp = Math.max(0, c.data.class.xp - 1); save(); }} aria-label="Remove experience">−</button>
-      <strong>{c.xp} / {toNext}</strong>
-      <button onclick={() => { c.data.class.xp += 1; save(); }} aria-label="Add experience">+</button>
-      {#if c.xp >= toNext && c.level < 10}
-        <button class="primary" onclick={() => (leveling = true)}>Level up</button>
-      {/if}
-    </div>
-    {#if leveling}
-      <div class="levelup">
-        <p class="small">Level {c.level + 1}: {c.rules.mechanics.attackProgression === 'all' || hasKind(cls, 'fighter') ? 'every throw drops' : 'saving throws drop'} by 1 and you roll a hit die ({hitDieLabel(c)}) for more HP.</p>
-        {#if hasKind(cls, 'expert')}
-          <select bind:value={levelTraining}>
-            <option value={undefined}>Talent to train…</option>
-            {#each c.rules.trainableAt(cls, c.level + 1) as t}<option value={t}>{TALENTS.find((x) => x.id === t)!.name}</option>{/each}
-          </select>
-        {/if}
-        {#if scheduledTraining(cls, c.level + 1).length}
-          <p class="small">Trains {scheduledTraining(cls, c.level + 1).map((t) => TALENTS.find((x) => x.id === t)!.name).join(' and ')}.</p>
-        {/if}
-        {#if hasKind(cls, 'fighter') && (c.level + 1) % 2 === 0}
-          <input bind:value={levelFeat} list="fighter-feats" placeholder="Fighter feat chosen" aria-label="Fighter feat" />
-          {#if cls.feats}<datalist id="fighter-feats">{#each cls.feats as f}<option value={f}></option>{/each}</datalist>{/if}
-        {:else}
-          <input bind:value={levelFeat} placeholder="Other choice to note (optional)" aria-label="Level-up note" />
-        {/if}
-        <div class="row">
-          <button class="primary" disabled={hasKind(cls, 'expert') && !levelTraining} onclick={doLevelUp}>Roll HP and level up</button>
-          <button class="ghost" onclick={() => (leveling = false)}>Cancel</button>
-        </div>
-      </div>
-    {/if}
+    <XpPanel character={c} />
   </section>
 
   <h2>Attacks</h2>
@@ -304,9 +257,7 @@
   .name { font-family: Georgia, serif; font-size: 1.5rem; font-weight: 700; border-color: transparent; background: transparent; padding-left: 0; }
   .vitals strong { font-size: 1.3rem; font-family: Georgia, serif; }
   .hp { gap: 0.35rem; flex-wrap: nowrap; }
-  .hp button, .xp button:not(.primary) { min-width: 40px; padding: 0.3rem; }
-  .xp { margin-top: 0.6rem; }
-  .levelup { margin-top: 0.6rem; border-top: 1px dashed var(--line); padding-top: 0.6rem; }
+  .hp button { min-width: 40px; padding: 0.3rem; }
   .stat { display: flex; justify-content: space-between; align-items: center; text-align: left; gap: 0.4rem; }
   .stat strong { font-size: 1.25rem; font-family: Georgia, serif; }
   .talents { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.4rem; }
