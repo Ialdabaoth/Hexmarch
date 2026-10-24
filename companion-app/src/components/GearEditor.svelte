@@ -1,7 +1,7 @@
 <script lang="ts">
   import { app } from '../lib/app.svelte';
   import type { Character } from '../lib/character';
-  import { defense, newArmor, newWeapon, needsBothHands } from '../lib/gear';
+  import { defense, newArmor, newWeapon } from '../lib/gear';
   import type { ArmorType } from '../rules/rules';
 
   // The armor and weapons a character carries, each with the properties a player
@@ -102,8 +102,7 @@
     <div class="row checks small">
       <label><input type="checkbox" bind:checked={w.ranged} onchange={save} /> Ranged</label>
       <label><input type="checkbox" bind:checked={w.shield} onchange={save} /> Shield</label>
-      <label><input type="checkbox" bind:checked={w.twoHanded} onchange={save} /> Two-handed</label>
-      {#if needsBothHands(c.rules, w) && !w.twoHanded}<span class="muted">(two hands: {w.size})</span>{/if}
+      <span class="muted">{w.shield || w.size === 'light' ? 'one hand' : w.size === 'heavy' ? 'two hands' : 'one or two hands'}</span>
     </div>
     {#if w.properties.length}<p class="small muted props">{w.properties.join(', ')}</p>{/if}
     <input bind:value={w.enchantment} onchange={save} placeholder="Enchantment" aria-label="Enchantment" />

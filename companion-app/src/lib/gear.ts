@@ -28,13 +28,14 @@ export interface WeaponItem {
   range: number;
   ranged: boolean;
   shield: boolean;
-  twoHanded: boolean;
   // Masterwork or magic: added to melee damage, or to ranged attack throws.
   bonus: number;
   enchantment: string;
   properties: string[];
 }
 
+// Ids of the weapons in the main and off hands ("" for empty). A medium weapon held in
+// both hands has its id in both.
 export type Hands = [main: string, off: string];
 
 export function itemId(): string {
@@ -58,7 +59,6 @@ export function newWeapon(rules: Ruleset, type: string, name?: string): WeaponIt
     range: kind?.range ?? kind?.thrown ?? 0,
     ranged: kind?.ranged ?? false,
     shield: kind?.shield ?? false,
-    twoHanded: kind?.twoHanded ?? false,
     bonus: 0,
     enchantment: '',
     properties: [...(kind?.properties ?? [])]
@@ -69,17 +69,22 @@ export function defense(rules: Ruleset, armor: ArmorItem | undefined): number {
   return armor ? rules.armorKind(armor.type).defense + armor.bonus : 0;
 }
 
-// Heavy weapons always take both hands; so do the shortbow in Materia Mundi and every
-// medium ranged weapon in E9.
-export function needsBothHands(rules: Ruleset, w: WeaponItem | undefined): boolean {
-  if (!w) return false;
-  return w.size === 'heavy' || w.twoHanded || (w.ranged && w.size === 'medium' && !!rules.mechanics.mediumRangedTwoHanded);
+// Light weapons and shields take one hand and heavy weapons both; a medium weapon
+// takes one or two, chosen when it's wielded.
+export function grips(w: WeaponItem): ('one' | 'two')[] {
+  if (w.shield || w.size === 'light') return ['one'];
+  if (w.size === 'heavy') return ['two'];
+  return ['one', 'two'];
 }
 
-// What may go in the off hand alongside the main-hand weapon: a shield or a light
-// melee weapon, and only when the main hand isn't using both hands.
-export function fitsOffHand(rules: Ruleset, main: WeaponItem | undefined, w: WeaponItem): boolean {
-  if (needsBothHands(rules, main) || needsBothHands(rules, w) || w.id === main?.id) return false;
+export function usesBothHands(main: WeaponItem | undefined, hands: Hands): boolean {
+  return !!main && (main.size === 'heavy' || (hands[1] === main.id && !main.shield));
+}
+
+// What may go in the off hand: a shield or a light melee weapon, when the main hand
+// leaves it free.
+export function fitsOffHand(main: WeaponItem | undefined, hands: Hands, w: WeaponItem): boolean {
+  if (usesBothHands(main, hands) || w.id === main?.id) return false;
   return w.shield || (w.size === 'light' && !w.ranged);
 }
 
@@ -89,18 +94,16 @@ export function fitsMainHand(w: WeaponItem): boolean {
 
 const plus = (n: number) => (n > 0 ? `+${n}` : n < 0 ? String(n) : '');
 
-// Damage dice for the weapon in the main hand (Compendium p. 49, E9 p. 35). A light
-// weapon in the off hand adds its d6. A medium melee weapon held in both hands
-// (nothing in the off hand) offers 2d6 instead of d6+Str.
-export function damageOptions(main: WeaponItem | undefined, off: WeaponItem | undefined, str: number): { label: string; expression: string }[] {
-  const offDie = off && !off.shield ? '+d6' : '';
-  if (!main) return [{ label: 'Unarmed', expression: `d6${offDie}` }];
-  const bonus = main.ranged ? '' : plus(main.bonus);
-  if (main.ranged) return [{ label: '', expression: (main.size === 'heavy' ? '2d6' : 'd6') + offDie }];
-  if (main.size === 'light') return [{ label: '', expression: `d6${bonus}${offDie}` }];
-  if (main.size === 'heavy') return [{ label: '', expression: `2d6${plus(str + main.bonus)}` }];
-  const oneHand = { label: off ? '' : '1h', expression: `d6${plus(str + main.bonus)}${offDie}` };
-  return off ? [oneHand] : [oneHand, { label: '2h', expression: `2d6${bonus}` }];
+// Damage dice for the weapon in the main hand (Compendium p. 49, E9 p. 35). A medium
+// melee weapon deals d6+Str in one hand or 2d6 in two; a light weapon in the off hand
+// adds its d6.
+export function damage(main: WeaponItem | undefined, off: WeaponItem | undefined, bothHands: boolean, str: number): string {
+  const offDie = off && !off.shield && off.id !== main?.id ? '+d6' : '';
+  if (!main) return `d6${offDie}`;
+  if (main.ranged) return (main.size === 'heavy' ? '2d6' : 'd6') + offDie;
+  if (main.size === 'light') return `d6${plus(main.bonus)}${offDie}`;
+  if (main.size === 'heavy') return `2d6${plus(str + main.bonus)}`;
+  return bothHands ? `2d6${plus(main.bonus)}` : `d6${plus(str + main.bonus)}${offDie}`;
 }
 
 // Everything worn or carried at the ready (Compendium p. 51): armor counts whether
@@ -133,11 +136,13 @@ export function parseKit(rules: Ruleset, kit: string) {
 }
 
 // Starting choices: wear the first armor, wield the first melee weapon, and fill the off
-// hand with a shield or a second light weapon when there's one to spare.
-export function defaultLoadout(rules: Ruleset, armor: ArmorItem[], weapons: WeaponItem[]): { worn: string; wielded: Hands } {
+// hand with a shield or a second light weapon when there's one to spare. A medium
+// weapon with nothing for the off hand is held two-handed.
+export function defaultLoadout(armor: ArmorItem[], weapons: WeaponItem[]): { worn: string; wielded: Hands } {
   const main = weapons.find((w) => fitsMainHand(w) && !w.ranged) ?? weapons.find((w) => fitsMainHand(w));
+  const hands: Hands = [main?.id ?? '', ''];
   const off =
-    weapons.find((w) => w.shield && fitsOffHand(rules, main, w)) ??
-    weapons.find((w) => !w.shield && fitsOffHand(rules, main, w));
-  return { worn: armor[0]?.id ?? '', wielded: [main?.id ?? '', off?.id ?? ''] };
+    weapons.find((w) => w.shield && fitsOffHand(main, hands, w)) ??
+    weapons.find((w) => !w.shield && fitsOffHand(main, hands, w));
+  return { worn: armor[0]?.id ?? '', wielded: [hands[0], off?.id ?? (main?.size === 'medium' ? main.id : '')] };
 }

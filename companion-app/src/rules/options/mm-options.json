@@ -293,10 +293,8 @@
         "size": "medium",
         "ranged": true,
         "range": 10,
-        "twoHanded": true,
         "properties": [
-          "Range 10",
-          "Two-handed"
+          "Range 10"
         ],
         "encumbrance": 0
       },

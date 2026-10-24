@@ -4,8 +4,7 @@
   "source": "E9 core rules with Materia Mundi origins as race-as-class. E9 classes cite the E9 handbook; classes marked \"book\": \"Compendium\" cite the Materia Mundi Compendium.",
   "mechanics": {
     "attackProgression": "fighters",
-    "throwMin": 5,
-    "mediumRangedTwoHanded": true
+    "throwMin": 5
   },
   "gear": {
     "page": 35,

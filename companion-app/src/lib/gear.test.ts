@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { damageOptions, defaultLoadout, fitsOffHand, gearLoad, needsBothHands, newWeapon, parseKit } from './gear';
+import { damage, defaultLoadout, fitsOffHand, gearLoad, grips, newWeapon, parseKit, usesBothHands } from './gear';
 import { Character, carrying, defaultTalents, equipment, freshState } from './character';
 import { createSheet, readSheet } from './sheet';
 import { rulesFor } from '../rules/rules';
@@ -23,28 +23,40 @@ describe('gear', () => {
     expect(g.defense).toBe(3);
     expect(g.main?.type).toBe('Longsword');
     expect(g.off?.shield).toBe(true);
-    expect(g.damage).toEqual([{ label: '', expression: 'd6+2' }]);
+    expect(g.damage).toBe('d6+2');
   });
 
   it('works out damage by size and hands', () => {
     const sword = newWeapon(mm, 'Longsword');
     const dagger = newWeapon(mm, 'Dagger');
-    expect(damageOptions(sword, undefined, 1).map((d) => d.expression)).toEqual(['d6+1', '2d6']);
-    expect(damageOptions(sword, dagger, 1).map((d) => d.expression)).toEqual(['d6+1+d6']);
-    expect(damageOptions(newWeapon(mm, 'Greatsword'), undefined, 1)[0].expression).toBe('2d6+1');
-    expect(damageOptions(newWeapon(mm, 'Longbow'), undefined, 3)[0].expression).toBe('2d6');
-    expect(damageOptions({ ...dagger, bonus: 1 }, undefined, 0)[0].expression).toBe('d6+1');
+    expect(damage(sword, undefined, false, 1)).toBe('d6+1');
+    expect(damage(sword, undefined, true, 1)).toBe('2d6');
+    expect(damage(sword, dagger, false, 1)).toBe('d6+1+d6');
+    expect(damage(newWeapon(mm, 'Greatsword'), undefined, true, 1)).toBe('2d6+1');
+    expect(damage(newWeapon(mm, 'Longbow'), undefined, true, 3)).toBe('2d6');
+    expect(damage({ ...dagger, bonus: 1 }, undefined, false, 0)).toBe('d6+1');
   });
 
-  it('keeps the off hand free for heavy and two-handed weapons', () => {
+  it('takes one hand for light weapons and shields, two for heavy, either for medium', () => {
     const shield = newWeapon(mm, 'Shield');
-    expect(needsBothHands(mm, newWeapon(mm, 'Greatsword'))).toBe(true);
-    expect(fitsOffHand(mm, newWeapon(mm, 'Greatsword'), shield)).toBe(false);
-    expect(fitsOffHand(mm, newWeapon(mm, 'Longsword'), shield)).toBe(true);
-    expect(fitsOffHand(mm, newWeapon(mm, 'Longsword'), newWeapon(mm, 'Longsword'))).toBe(false);
-    expect(needsBothHands(mm, newWeapon(mm, 'Shortbow'))).toBe(true);
-    expect(needsBothHands(mm, newWeapon(mm, 'Crossbow'))).toBe(false);
-    expect(needsBothHands(e9, newWeapon(e9, 'Crossbow'))).toBe(true);
+    const sword = newWeapon(mm, 'Longsword');
+    const great = newWeapon(mm, 'Greatsword');
+    expect(grips(shield)).toEqual(['one']);
+    expect(grips(newWeapon(mm, 'Dagger'))).toEqual(['one']);
+    expect(grips(great)).toEqual(['two']);
+    expect(grips(sword)).toEqual(['one', 'two']);
+    expect(usesBothHands(great, [great.id, ''])).toBe(true);
+    expect(usesBothHands(sword, [sword.id, sword.id])).toBe(true);
+    expect(usesBothHands(sword, [sword.id, shield.id])).toBe(false);
+    expect(fitsOffHand(great, [great.id, ''], shield)).toBe(false);
+    expect(fitsOffHand(sword, [sword.id, ''], shield)).toBe(true);
+    expect(fitsOffHand(sword, [sword.id, ''], newWeapon(mm, 'Longsword'))).toBe(false);
+  });
+
+  it('holds a lone medium weapon two-handed to start', () => {
+    const kit = parseKit(mm, 'Quarterstaff, medium armor');
+    const { wielded } = defaultLoadout(kit.armor, kit.weapons);
+    expect(wielded).toEqual([kit.weapons[0].id, kit.weapons[0].id]);
   });
 
   it('counts armor, heavy weapons, shields and polearms toward the load', () => {
@@ -57,7 +69,7 @@ describe('gear', () => {
 
   it('prefers a melee weapon in the main hand', () => {
     const kit = parseKit(mm, 'Light crossbow, two daggers, light armor');
-    const { wielded } = defaultLoadout(mm, kit.armor, kit.weapons);
+    const { wielded } = defaultLoadout(kit.armor, kit.weapons);
     expect(wielded.map((id) => kit.weapons.find((w) => w.id === id)?.type)).toEqual(['Dagger', 'Dagger']);
   });
 

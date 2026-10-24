@@ -8,7 +8,7 @@ import {
   ABILITIES, TALENTS, NPC_TRAITS,
   abilityFromRoll, primesOf, type AbilityId, type ClassId, type Origin, type OriginId, type Ruleset, type TalentId
 } from '../rules/rules';
-import { damageOptions, defense, gearLoad, needsBothHands } from './gear';
+import { damage, defense, gearLoad, usesBothHands } from './gear';
 import { CharacterSheet, blankFollower, newId, zeroAbilities, type Abilities, type Follower, type SheetData } from './sheet';
 
 export { newId, zeroAbilities, blankFollower, type Abilities, type Follower };
@@ -178,14 +178,14 @@ export function equipment(c: Character) {
   const worn = inv.armor.find((a) => a.id === inv.worn);
   const main = inv.weapons.find((w) => w.id === inv.wielded[0]);
   const off = inv.weapons.find((w) => w.id === inv.wielded[1]);
-  const bothHands = needsBothHands(c.rules, main);
+  const bothHands = usesBothHands(main, inv.wielded);
   return {
     worn,
     defense: defense(c.rules, worn),
     main,
     off: bothHands ? undefined : off,
     bothHands,
-    damage: damageOptions(main, bothHands ? undefined : off, c.abilities.str)
+    damage: damage(main, bothHands ? undefined : off, bothHands, c.abilities.str)
   };
 }
 

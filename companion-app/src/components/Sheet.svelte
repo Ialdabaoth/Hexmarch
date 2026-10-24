@@ -142,17 +142,13 @@
       <span class="small muted">Main hand</span>
       <strong>{gear.main?.name ?? 'Empty'}</strong>
     </button>
-    <button class="pickbox" disabled={gear.bothHands} onclick={() => (pickingGear = 'off')}>
+    <button class="pickbox" disabled={gear.main?.size === 'heavy'} onclick={() => (pickingGear = 'off')}>
       <span class="small muted">Off hand</span>
-      <strong>{gear.bothHands ? 'Both hands on main' : gear.off?.name ?? 'Empty'}</strong>
+      <strong>{gear.bothHands ? 'Main weapon two-handed' : gear.off?.name ?? 'Empty'}</strong>
     </button>
   </div>
   <div class="row">
-    {#each gear.damage as d}
-      <button onclick={() => rollExpr(`${gear.main?.name ?? 'Unarmed'} damage${d.label ? ` (${d.label})` : ''}`, d.expression)}>
-        Damage {d.label ? `${d.label} ` : ''}{d.expression}
-      </button>
-    {/each}
+    <button onclick={() => rollExpr(`${gear.main?.name ?? 'Unarmed'} damage`, gear.damage)}>Damage {gear.damage}</button>
     {#if gear.off?.shield}<span class="small muted">Shield: attacks you see coming are harder.</span>{/if}
   </div>
 

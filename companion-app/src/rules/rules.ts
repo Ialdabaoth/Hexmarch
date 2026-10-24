@@ -206,9 +206,6 @@ export interface Mechanics {
   attackProgression: 'all' | 'fighters';
   // Best possible saving or attack throw threshold.
   throwMin: number;
-  // E9: every medium ranged weapon takes both hands (p. 36). In Materia Mundi only the
-  // shortbow does, and the catalog marks it.
-  mediumRangedTwoHanded?: boolean;
 }
 
 export type ArmorType = 'light' | 'medium' | 'heavy';
@@ -231,7 +228,6 @@ export interface WeaponKind {
   range?: number;
   thrown?: number;
   reach?: number;
-  twoHanded?: boolean;
   shield?: boolean;
   properties: string[];
   encumbrance: number;

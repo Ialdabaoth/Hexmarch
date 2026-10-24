@@ -54,7 +54,7 @@ Import accepts either, so sheets can also be written or edited by hand.
     "weapons": [
       {
         "id": "w1", "name": "Light crossbow", "type": "Light Crossbow", "size": "light",
-        "encumbrance": 0, "reach": 0, "range": 10, "ranged": true, "shield": false, "twoHanded": false,
+        "encumbrance": 0, "reach": 0, "range": 10, "ranged": true, "shield": false,
         "bonus": 0, "enchantment": "", "properties": ["Simple", "Range 10"]
       },
       { "id": "w2", "name": "Dagger", "type": "Dagger", "size": "light", "range": 2 },
@@ -121,7 +121,8 @@ level 1 `hp` can be left out (it is the starting HP from the rules).
   ```
 - `inventory.armor` and `inventory.weapons` are items. `worn` is the `id` of the armor
   being worn and `wielded` holds the `id`s of the weapons in the main and off hands
-  (`""` for an empty hand). See below.
+  (`""` for an empty hand; the same `id` twice for a medium weapon held two-handed).
+  See below.
 - `id` is optional; importing a sheet with the same `id` updates that character
   instead of adding a copy.
 
@@ -142,17 +143,19 @@ Weapons and shields:
 
 - `type`: the kind from the equipment list, such as `Longsword` or `Shield`.
 - `size`: `light`, `medium` or `heavy`. Light weapons deal d6; medium deal d6+Str in one
-  hand or 2d6 in two; heavy deal 2d6+Str (ranged: d6, d6, 2d6). Heavy weapons take both
-  hands, so nothing can go in the off hand.
+  hand or 2d6 in two; heavy deal 2d6+Str (ranged: d6, d6, 2d6). Light weapons and
+  shields take one hand and heavy weapons both; a medium weapon takes one or two,
+  chosen when it's wielded.
 - `encumbrance`: 0 for light and medium weapons carried at the ready, 1 for heavy
   weapons and shields, 2 for polearms and greatbows (Materia Mundi).
 - `reach`: extra melee reach in paces. `range`: short range (or thrown range) in paces.
-- `ranged`, `shield`, `twoHanded`: true or false.
+- `ranged`, `shield`: true or false.
 - `bonus`: added to melee damage, or to ranged attack throws (masterwork, p. 48).
 - `enchantment`: free text for now. `properties`: the list's other properties.
 
 The off hand can hold a shield or a light melee weapon (which adds its d6 to the main
-hand's damage), as long as the main hand isn't using both hands.
+hand's damage), as long as the main hand isn't using both hands. A medium weapon held
+two-handed has its `id` in both places in `wielded`.
 
 Version 1 sheets, with `"armor": { "rating", "worn" }` and weapons as `name`, `damage`
 and `range`, still import; the app turns them into items.

@@ -107,21 +107,19 @@
     </div>
 
     <!-- Two hands: tap a name to change what's held, tap the dice to roll damage.
-         A two-handed weapon greys out the off hand. -->
+         A weapon held in both hands greys out the off hand. -->
     <div class="hands">
       <div class="hand">
         <button type="button" class="slot tap" disabled={!ongear} onclick={() => ongear?.('main')}>
           <span>Main hand</span><b>{g.main?.name ?? (v.live ? 'Empty' : '')}</b>
         </button>
-        {#each g.damage as d}
-          <button type="button" class="chip tap" disabled={!onroll} onclick={() => roll({ kind: 'expr', label: `${g.main?.name ?? 'Unarmed'} damage${d.label ? ` (${d.label})` : ''}`, expression: d.expression })}>
-            {#if d.label}<small>{d.label}</small>{/if}{d.expression}
-          </button>
-        {/each}
+        <button type="button" class="chip tap" disabled={!onroll} onclick={() => roll({ kind: 'expr', label: `${g.main?.name ?? 'Unarmed'} damage`, expression: g.damage })}>
+          {g.damage}
+        </button>
       </div>
-      <div class="hand" class:blocked={g.bothHands}>
-        <button type="button" class="slot tap" disabled={!ongear || g.bothHands} onclick={() => ongear?.('off')}>
-          <span>Off hand</span><b>{g.bothHands ? 'Both hands on main' : g.off?.name ?? (v.live ? 'Empty' : '')}</b>
+      <div class="hand" class:blocked={g.main?.size === 'heavy'}>
+        <button type="button" class="slot tap" disabled={!ongear || g.main?.size === 'heavy'} onclick={() => ongear?.('off')}>
+          <span>Off hand</span><b class:aside={g.bothHands}>{g.bothHands ? 'Main weapon two-handed' : g.off?.name ?? (v.live ? 'Empty' : '')}</b>
         </button>
         {#if g.off}<span class="chip note">{g.off.shield ? 'Shield' : '+d6'}</span>{/if}
       </div>
@@ -248,9 +246,8 @@
   .hand .slot span { font-size: 1.7cqw; text-transform: uppercase; letter-spacing: 0.06em; color: #5b4a36; }
   .hand .slot b { font: 700 2.8cqw/1.2 Georgia, serif; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .hand.blocked { background: #e6dfd2; color: #8a7a68; }
-  .hand.blocked .slot b { font: italic 2.3cqw/1.2 Georgia, serif; }
+  .hand .slot b.aside, .hand.blocked .slot b { font: italic 2.3cqw/1.2 Georgia, serif; }
   .chip { display: flex; flex-direction: column; align-items: center; justify-content: center; border: 0.15cqw solid #c9b896; border-radius: 0.8cqw; padding: 0 1.2cqw; font: 700 2.8cqw Georgia, serif; white-space: nowrap; }
-  .chip small { font: 1.6cqw system-ui, sans-serif; color: #5b4a36; text-transform: uppercase; }
   .chip.note { font-size: 2.3cqw; border-style: dashed; color: #5b4a36; }
   .over b { color: #8a2e1f; }
   .talents { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1cqw; }

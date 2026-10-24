@@ -1,13 +1,14 @@
 <script lang="ts">
   import type { SheetView } from '../lib/render';
-  import { damageOptions, type WeaponItem } from '../lib/gear';
+  import { damage as dice, grips, type WeaponItem } from '../lib/gear';
 
   let { view: v }: { view: SheetView } = $props();
   let data = $derived(v.c.data);
   let inv = $derived(data.inventory);
 
-  const held = (w: WeaponItem) => (inv.wielded[0] === w.id ? 'main' : inv.wielded[1] === w.id ? 'off' : '');
-  const damage = (w: WeaponItem) => (w.shield ? 'shield' : damageOptions(w, undefined, v.c.abilities.str).map((d) => d.expression).join(' / '));
+  const held = (w: WeaponItem) => (inv.wielded[0] === w.id ? (inv.wielded[1] === w.id || w.size === 'heavy' ? 'both hands' : 'main') : inv.wielded[1] === w.id ? 'off' : '');
+  const str = $derived(v.c.abilities.str);
+  const damage = (w: WeaponItem) => (w.shield ? 'shield' : grips(w).map((g) => dice(w, undefined, g === 'two', str)).filter((d, i, all) => all.indexOf(d) === i).join(' / '));
   const reach = (w: WeaponItem) => (w.ranged ? `range ${w.range}` : [w.reach ? `reach ${w.reach}` : '', w.range ? `thrown ${w.range}` : ''].filter(Boolean).join(', '));
 </script>
 

@@ -4,8 +4,7 @@
   "source": "E9 System Reference Handbook (revised, 2026), CC BY-SA 4.0. Page numbers are the handbook's printed page numbers.",
   "mechanics": {
     "attackProgression": "fighters",
-    "throwMin": 5,
-    "mediumRangedTwoHanded": true
+    "throwMin": 5
   },
   "gear": {
     "page": 35,

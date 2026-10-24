@@ -245,7 +245,7 @@ export function createSheet(d: DraftCharacter): SheetData {
     },
     inventory: {
       ...kit,
-      ...defaultLoadout(rules, kit.armor, kit.weapons),
+      ...defaultLoadout(kit.armor, kit.weapons),
       book: [],
       prepared: []
     },
@@ -341,7 +341,6 @@ function readWeapon(rules: Ruleset, w: any): WeaponItem {
     range: count(w?.range, base.range),
     ranged: typeof w?.ranged === 'boolean' ? w.ranged : base.ranged,
     shield: typeof w?.shield === 'boolean' ? w.shield : base.shield,
-    twoHanded: typeof w?.twoHanded === 'boolean' ? w.twoHanded : base.twoHanded,
     bonus: count(w?.bonus),
     enchantment: text(w?.enchantment),
     properties: Array.isArray(w?.properties) ? w.properties.map(String) : base.properties
@@ -364,11 +363,15 @@ function readGear(rules: Ruleset, inv: any): Pick<SheetData['inventory'], 'armor
     return item;
   });
   if (legacy || !Array.isArray(inv.wielded)) {
-    const loadout = defaultLoadout(rules, armor, weapons);
+    const loadout = defaultLoadout(armor, weapons);
     return { armor, weapons, worn: armor[0]?.id ?? '', wielded: loadout.wielded };
   }
   const has = (list: { id: string }[], id: unknown) => (typeof id === 'string' && list.some((g) => g.id === id) ? id : '');
-  return { armor, weapons, worn: has(armor, inv.worn), wielded: [has(weapons, inv.wielded[0]), has(weapons, inv.wielded[1])] };
+  const main = has(weapons, inv.wielded[0]);
+  let off = has(weapons, inv.wielded[1]);
+  // The same id in both hands means a medium weapon held two-handed; nothing else can be.
+  if (off && off === main && weapons.find((w) => w.id === main)?.size !== 'medium') off = '';
+  return { armor, weapons, worn: has(armor, inv.worn), wielded: [main, off] };
 }
 
 function circle(v: unknown): number {
