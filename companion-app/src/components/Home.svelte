@@ -16,6 +16,7 @@
   let editingHp = $state(false);
   let editingXp = $state(false);
   let pickingGear = $state<'armor' | 'main' | 'off' | null>(null);
+  let jsonText = $state<string | null>(null);
 
   async function setPortrait(file: File) {
     if (!active) return;
@@ -60,17 +61,41 @@
     }
   }
 
+  async function importText(text: string): Promise<boolean> {
+    try {
+      const imported = importFile(JSON.parse(text));
+      await app.upsert(imported);
+      app.notify(`Imported ${imported.length} character${imported.length === 1 ? '' : 's'}`);
+      return true;
+    } catch (err) {
+      app.notify(err instanceof SyntaxError ? "That isn't valid JSON" : (err as Error).message);
+      return false;
+    }
+  }
+
   async function onImport(e: Event) {
     const file = (e.target as HTMLInputElement).files?.[0];
     if (!file) return;
-    try {
-      const imported = importFile(JSON.parse(await file.text()));
-      await app.upsert(imported);
-      app.notify(`Imported ${imported.length} character${imported.length === 1 ? '' : 's'}`);
-    } catch (err) {
-      app.notify((err as Error).message);
-    }
+    await importText(await file.text());
     if (fileInput) fileInput.value = '';
+  }
+
+  // Copy and paste for when files are awkward, as on a phone or between apps.
+  function toggleJson() {
+    jsonText = jsonText === null ? JSON.stringify(exportBundle(app.sheets), null, 2) : null;
+  }
+
+  async function copyJson() {
+    try {
+      await navigator.clipboard.writeText(jsonText ?? '');
+      app.notify('Copied');
+    } catch {
+      app.notify("Couldn't copy; select the text and copy it instead");
+    }
+  }
+
+  async function importPasted() {
+    if (jsonText && (await importText(jsonText))) jsonText = null;
   }
 </script>
 
@@ -114,7 +139,16 @@
     <button onclick={() => downloadJson('materia-mundi-characters.json', exportBundle(app.sheets))} disabled={!app.sheets.length}>Export all (JSON)</button>
     <button onclick={() => fileInput?.click()}>Import JSON</button>
     <input bind:this={fileInput} type="file" accept="application/json,.json" hidden onchange={onImport} />
+    <button onclick={toggleJson}>{jsonText === null ? 'Show JSON (copy / paste)' : 'Hide JSON'}</button>
   </div>
+  {#if jsonText !== null}
+    <textarea class="json" bind:value={jsonText} spellcheck="false" aria-label="Characters as JSON"></textarea>
+    <div class="row">
+      <button onclick={copyJson}>Copy</button>
+      <button onclick={() => (jsonText = '')}>Clear</button>
+      <button class="primary" onclick={importPasted} disabled={!jsonText.trim()}>Import pasted</button>
+    </div>
+  {/if}
   <p class="muted small">Characters live only on this device. Export a backup now and then, or to move them to another phone.</p>
 </details>
 
@@ -152,4 +186,6 @@
   .empty p { margin: 0.25rem 0 0.75rem; }
   .backup { margin-top: 0.5rem; }
   .backup summary { min-height: 32px; cursor: pointer; }
+  .backup .row { flex-wrap: wrap; }
+  .json { width: 100%; box-sizing: border-box; height: 14rem; margin: 0.5rem 0; font: 0.75rem/1.35 ui-monospace, Menlo, monospace; }
 </style>

@@ -83,14 +83,22 @@
     swapped = true;
   }
 
-  function toggleTalent(t: TalentId, ability: AbilityId) {
+  // Each ability shifts min(3, |score|) of its three talents. At 0 or ±3 there's nothing
+  // to choose; at ±1 or ±2 one talent differs from the other two, and tapping the row
+  // moves that odd one along to the next talent.
+  function oddChoice(ability: AbilityId): boolean {
+    const n = Math.abs(abilities[ability]);
+    return n === 1 || n === 2;
+  }
+
+  function cycleOdd(ability: AbilityId) {
+    if (!oddChoice(ability)) return;
     const v = abilities[ability];
-    if (v === 0) return;
     const target = v > 0 ? 4 : 6;
+    const [odd, rest] = Math.abs(v) === 1 ? [target, 5] : [5, target];
     const linked = TALENTS.filter((x) => x.ability === ability);
-    const moved = linked.filter((x) => talentBase[x.id] === target).length;
-    if (talentBase[t] === target) talentBase[t] = 5;
-    else if (moved < Math.min(3, Math.abs(v))) talentBase[t] = target;
+    const next = (linked.findIndex((x) => talentBase[x.id] === odd) + 1) % linked.length;
+    linked.forEach((x, i) => (talentBase[x.id] = i === next ? odd : rest));
   }
 
   function used(id: AbilityId): string {
@@ -176,17 +184,17 @@
   {#if rolled || manual}
     <section class="card">
       <h3>3. Talents</h3>
-      <p class="small muted">Each point above or below +0 moves one linked talent to 4+ or 6+. Tap to choose which.</p>
+      <p class="small muted">Each point above or below +0 moves one linked talent to 4+ or 6+. At ±1 or ±2 one talent is the odd one out: tap the row to choose which.</p>
       {#each ABILITIES.filter((a) => TALENTS.some((t) => t.ability === a.id)) as a}
         {@const v = abilities[a.id]}
-        <div class="talentrow">
+        <button class="talentrow" disabled={!oddChoice(a.id)} onclick={() => cycleOdd(a.id)}
+          aria-label="{a.name}: change which talent is the odd one out">
           <span class="small muted">{a.short} {v > 0 ? '+' : ''}{v}</span>
           {#each TALENTS.filter((t) => t.ability === a.id) as t}
-            <button class="tal" class:moved={talentBase[t.id] !== 5} disabled={v === 0} onclick={() => toggleTalent(t.id, a.id)}>
-              {t.name} {talentBase[t.id]}+
-            </button>
+            <span class="tal" class:moved={talentBase[t.id] !== 5}>{t.name} {talentBase[t.id]}+</span>
           {/each}
-        </div>
+          {#if oddChoice(a.id)}<span class="cycle" aria-hidden="true">↻</span>{/if}
+        </button>
       {/each}
       {#if !talentSpreadValid(abilities, talentBase)}<p class="small failure">Pick the right number of talents for each ability.</p>{/if}
     </section>
@@ -225,10 +233,12 @@
   .ab { border: 1px solid var(--line); border-radius: 8px; padding: 0.4rem; text-align: center; }
   .score { font-size: 1.4rem; font-family: Georgia, serif; font-weight: 700; }
   .tiny { font-size: 0.72rem; }
-  .talentrow { display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center; margin: 0.4rem 0; }
-  .talentrow > span { width: 3.2rem; }
-  .tal { min-height: 36px; padding: 0.3rem 0.6rem; font-size: 0.9rem; }
-  .tal.moved { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+  .talentrow { display: flex; gap: 0.35rem; align-items: center; width: 100%; margin: 0.4rem 0; padding: 0.35rem 0.5rem; text-align: left; }
+  .talentrow:disabled { opacity: 1; background: transparent; }
+  .talentrow > span:first-child { width: 3.2rem; flex: none; }
+  .tal { flex: 1; font-size: 0.9rem; color: var(--muted); }
+  .tal.moved { color: var(--accent); font-weight: 600; }
+  .cycle { flex: none; font-size: 1.1rem; color: var(--accent); }
   details { margin-top: 0.6rem; }
   .seg { display: flex; }
   .seg button { flex: 1; border-radius: 0; min-height: 40px; }
