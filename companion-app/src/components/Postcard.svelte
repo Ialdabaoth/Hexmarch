@@ -210,6 +210,9 @@
   .vitals { display: grid; grid-template-columns: 4fr 1fr 1fr; gap: 1cqw; }
   .stats { display: grid; grid-template-columns: repeat(4, 1fr); border: 0.2cqw solid #1d1712; border-radius: 1cqw; }
   .stats > *, .atk { padding: 0.8cqw 1cqw; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+  /* Labels sit at the top; numbers stay centered in the room below. */
+  .stats > * { justify-content: flex-start; }
+  .stats b { flex: 1; display: flex; align-items: center; }
   .stats > * + * { border-left: 0.15cqw solid #c9b896; }
   .atk { border: 0.15cqw solid #c9b896; border-radius: 1cqw; }
   .vitals span { font-size: 1.7cqw; text-transform: uppercase; letter-spacing: 0.06em; color: #5b4a36; }
@@ -223,7 +226,7 @@
   .ab .lbl { font: 700 2.8cqw/1.2 Georgia, serif; }
   /* Ability on top, then a gap, then the save it guards against with its threshold. */
   .ab .save { font-size: 2cqw; color: #5b4a36; margin-top: 1cqw; }
-  .ab b { font: 700 6.4cqw/1 Georgia, serif; }
+  .ab b { font: 700 6.4cqw/0.9 Georgia, serif; margin-top: 0.3cqw; }
   .weapons { display: flex; flex-wrap: wrap; gap: 0.6cqw 2.4cqw; font-size: 2.3cqw; border-top: 0.15cqw solid #c9b896; padding-top: 1cqw; }
   .talents { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1cqw; }
   .tcol { display: flex; flex-direction: column; gap: 0.9cqw; min-width: 0; }
