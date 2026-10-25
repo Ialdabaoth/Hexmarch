@@ -1,5 +1,6 @@
 <script lang="ts">
   import { app } from '../lib/app.svelte';
+  import { rolledLine } from '../lib/checks';
 
   let entry = $derived(app.lastRoll);
 </script>
@@ -8,14 +9,14 @@
   <div class="result card no-print" role="status" aria-live="polite">
     <div class="row">
       <div class="grow">
-        <div class="small muted">{entry.who} · {entry.label}</div>
+        <div class="small muted">{entry.who} · {entry.difficulty && entry.difficulty !== 'normal' ? `${entry.difficulty[0].toUpperCase()}${entry.difficulty.slice(1)} ` : ''}{entry.label}</div>
         <div class="big">
           {entry.total}
           {#if entry.outcome}
             <span class={entry.outcome}>{entry.outcome === 'critical' ? 'Critical!' : entry.outcome === 'success' ? 'Success' : 'Failure'}</span>
           {/if}
         </div>
-        <div class="small muted">{entry.detail.replace(/~~(\d+)~~/g, '($1)')}</div>
+        <div class="small muted"><em>{rolledLine(entry)}</em></div>
       </div>
       <div class="actions">
         {#if app.canPost && !app.settings.autoPost}

@@ -511,7 +511,8 @@
       "magic": {
         "book": "Spellbook",
         "prepared": "Prepared spell",
-        "circleWord": "Circle"
+        "circleWord": "Circle",
+        "slots": [[1], [2], [2, 1], [2, 2], [2, 2, 1], [2, 2, 2], [0, 3, 2, 1], [0, 2, 2, 2], [0, 0, 3, 2, 1]]
       },
       "features": [
         {
@@ -553,7 +554,8 @@
       "magic": {
         "book": "Prayer book",
         "prepared": "Prayer strip",
-        "circleWord": "Circle"
+        "circleWord": "Circle",
+        "slots": [[1], [2], [2, 1], [2, 2], [2, 2, 1], [2, 2, 2], [0, 3, 2, 1], [0, 2, 2, 2], [0, 0, 3, 2, 1]]
       },
       "features": [
         {

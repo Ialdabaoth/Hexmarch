@@ -1,5 +1,6 @@
 <script lang="ts">
   import { app } from '../lib/app.svelte';
+  import { headline, rolledLine } from '../lib/checks';
 
   // Every roll made on this device, newest first, from the dice page and from sheets.
   function time(iso: string) {
@@ -16,12 +17,10 @@
   {#each app.log as e (e.id)}
     <li>
       <div class="row">
-        <strong class="grow">{e.label}: {e.total}
-          {#if e.outcome}<span class="small {e.outcome}">{e.outcome}</span>{/if}
-        </strong>
+        <strong class="grow">{headline(e)}</strong>
         <span class="small muted">{time(e.at)}</span>
       </div>
-      <div class="small muted">{e.who} · {e.detail.replace(/~~(\d+)~~/g, '($1)')}</div>
+      <div class="small muted"><em>{rolledLine(e)}</em></div>
       {#if app.canPost}<button class="ghost small" onclick={() => app.post(e)}>Send to Discord</button>{/if}
     </li>
   {/each}

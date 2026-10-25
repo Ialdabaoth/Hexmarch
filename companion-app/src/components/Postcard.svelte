@@ -13,7 +13,8 @@
     onhp,
     onportraitfile,
     onxp,
-    ongear
+    ongear,
+    oncarry
   }: {
     view: SheetView;
     onroll?: (r: RollRequest) => void;
@@ -27,6 +28,8 @@
     onxp?: () => void;
     // Tapping Armor or a hand calls this (the home screen opens a picker).
     ongear?: (slot: 'armor' | 'main' | 'off') => void;
+    // Tapping Carry calls this (the home screen opens the inventory).
+    oncarry?: () => void;
   } = $props();
   let data = $derived(v.c.data);
   let inv = $derived(data.inventory);
@@ -89,7 +92,9 @@
             <button type="button" class="tap" disabled={!ongear} onclick={() => ongear?.('armor')} title={g.worn?.name}>
               <span>Armor</span><b>{g.defense || '—'}</b>
             </button>
-            <div class:over={v.carry.encumbered}><span>Carry</span><b>{v.carry.load}/{v.carry.capacity}</b></div>
+            <button type="button" class="tap" class:over={v.carry.encumbered} disabled={!oncarry} onclick={() => oncarry?.()}>
+              <span>Carry</span><b>{v.carry.load}/{v.carry.capacity}</b>
+            </button>
           </div>
           <button type="button" class="atk tap" disabled={!onroll} use:holdRoll={check({ kind: 'check', label: 'Melee attack', sides: 20, threshold: v.attacks.melee, attack: true })}>
             <span>Melee</span><b>{v.attacks.melee}+</b>
@@ -137,7 +142,6 @@
       <div class="talents">
         {#each v.abilities.filter((a) => v.talents.some((t) => t.ability === a.id)) as a}
           <div class="tcol">
-            <span class="thead">{a.short} {a.score}</span>
             {#each v.talents.filter((t) => t.ability === a.id) as t}
               <button type="button" class="tal tap" disabled={!onroll} use:holdRoll={check({ kind: 'check', label: t.name, sides: 6, threshold: t.threshold })}>
                 <span>{t.name}{t.expert ? '*' : ''}</span><b>{t.threshold}+</b>
@@ -232,7 +236,7 @@
   .xp b { font: 700 3.6cqw/1.1 Georgia, serif; white-space: nowrap; }
   .kit { display: flex; flex-direction: column; gap: 1cqw; }
   .vitals { display: grid; grid-template-columns: 4fr 1fr 1fr; gap: 1cqw; }
-  .stats { display: grid; grid-template-columns: repeat(4, 1fr); border: 0.2cqw solid #1d1712; border-radius: 1cqw; }
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); border: 0.15cqw solid #c9b896; border-radius: 1cqw; }
   .stats > *, .atk { padding: 0.8cqw 1cqw; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
   /* Labels sit at the top; numbers stay centered in the room below. */
   .stats > * { justify-content: flex-start; }
@@ -263,7 +267,6 @@
   .over b { color: #8a2e1f; }
   .talents { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1cqw; }
   .tcol { display: flex; flex-direction: column; gap: 0.9cqw; min-width: 0; }
-  .thead { font-size: 1.7cqw; text-transform: uppercase; letter-spacing: 0.08em; color: #5b4a36; text-align: center; }
   .tal { display: flex; justify-content: space-between; gap: 0.5cqw; border: 0.15cqw solid #c9b896; border-radius: 1cqw; padding: 1.3cqw 1.2cqw; font-size: 2.3cqw; }
   .tal span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .tal { align-items: center; }
