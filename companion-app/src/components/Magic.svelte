@@ -1,7 +1,7 @@
 <script lang="ts">
   import { app } from '../lib/app.svelte';
-  import type { Character } from '../lib/character';
-  import { checkPreparations } from '../lib/magic';
+  import { equipment, type Character } from '../lib/character';
+  import { armorEffect, checkPreparations, knownLimit } from '../lib/magic';
 
   let { character: c }: { character: Character } = $props();
 
@@ -9,10 +9,15 @@
   const RARITY = ['Common', 'Uncommon', 'Rare', 'Legendary'];
   let circles = $derived(magic.circleWord === 'Rarity' ? [1, 2, 3, 4] : [1, 2, 3, 4, 5]);
   // What this level may prepare, and which preparations don't fit it.
-  let limits = $derived(checkPreparations(magic.slots, c.level, c.data.inventory.prepared));
+  let gear = $derived(equipment(c));
+  let armor = $derived(armorEffect(magic.armor, gear.worn?.type, !!(gear.main?.shield || gear.off?.shield)));
+  let limits = $derived(checkPreparations(magic.slots, c.level, c.data.inventory.prepared, armor.penalty));
+  // Druids can only know so many glamours.
+  let knownMax = $derived(knownLimit(magic.known, c.level));
+  let knownFull = $derived(knownMax != null && c.data.inventory.book.length >= knownMax);
   let room = $derived(c.data.inventory.prepared.length < limits.allowed.reduce((a, b) => a + b, 0));
   let allowedText = $derived(
-    limits.allowed.map((n, k) => (n ? `${n} ${circleName(k + 1).toLowerCase()}` : '')).filter(Boolean).join(', ')
+    limits.allowed.map((n, k) => (n ? `${circleName(k + 1)} ×${n}` : '')).filter(Boolean).join(', ')
   );
 
   function circleName(n: number) {
@@ -48,14 +53,15 @@
 <p class="small muted">{magic.prepared}s are physical items you carry; they go in the exported inventory.</p>
 
 <h3>{magic.prepared}s</h3>
-<p class="small muted">Level {c.level}: {allowedText}. Lower {magic.circleWord === 'Rarity' ? 'rarities' : 'circles'} can go in higher slots.</p>
+<p class="small muted">Level {c.level}: {allowedText || 'none'}{armor.penalty.length ? ' (less for light armor)' : ''}. Lower {magic.circleWord === 'Rarity' ? 'rarities' : 'circles'} can go in higher slots.</p>
+{#if armor.blockedBy}<p class="small failure">You can't cast your {magic.prepared.toLowerCase()}s while wearing {armor.blockedBy}.</p>{/if}
 {#each c.data.inventory.prepared as p, i}
   <div class="prep" class:spent={p.spent} class:over={limits.over.includes(i)}>
     <select bind:value={p.circle} onchange={save} aria-label={magic.circleWord}>
       {#each circles.filter((n) => n <= limits.maxCircle || n === p.circle) as n}<option value={n}>{circleName(n)}</option>{/each}
     </select>
     <input bind:value={p.magic} onchange={save} placeholder="What it holds" aria-label="Prepared magic" />
-    <button onclick={() => use(i)}>{p.spent ? 'Spent' : 'Use'}</button>
+    <button onclick={() => use(i)} disabled={!p.spent && !!armor.blockedBy}>{p.spent ? 'Spent' : 'Use'}</button>
     <button class="ghost" aria-label="Remove" onclick={() => { c.data.inventory.prepared.splice(i, 1); save(); }}>✕</button>
   </div>
 {/each}
@@ -68,7 +74,10 @@
 </div>
 
 <details open={c.data.inventory.book.length > 0}>
-  <summary><strong>{magic.book}</strong> <span class="small muted">({c.data.inventory.book.length})</span></summary>
+  <summary><strong>{magic.book}</strong> <span class="small muted" class:failure={knownMax != null && c.data.inventory.book.length > knownMax}>({c.data.inventory.book.length}{knownMax != null ? ` of ${knownMax}` : ''})</span></summary>
+  {#if knownMax != null && c.data.inventory.book.length > knownMax}
+    <p class="small failure">Level {c.level} can know {knownMax}; forget one for each new glamour or wild shape.</p>
+  {/if}
   {#each c.data.inventory.book as b, i}
     <div class="prep">
       <select bind:value={b.circle} onchange={save} aria-label={magic.circleWord}>
@@ -79,7 +88,8 @@
       <button class="ghost" aria-label="Remove" onclick={() => { c.data.inventory.book.splice(i, 1); save(); }}>✕</button>
     </div>
   {/each}
-  <button class="ghost" onclick={() => { c.data.inventory.book.push({ magic: '', circle: 1 }); save(); }}>+ Add to {magic.book.toLowerCase()}</button>
+  <button class="ghost" disabled={knownFull} onclick={() => { c.data.inventory.book.push({ magic: '', circle: 1 }); save(); }}>+ Add to {magic.book.toLowerCase()}</button>
+  {#if knownFull && knownMax === c.data.inventory.book.length}<span class="small muted">Full for level {c.level}: forget one to learn another.</span>{/if}
 </details>
 
 <style>
