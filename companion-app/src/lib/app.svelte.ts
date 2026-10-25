@@ -7,7 +7,7 @@ import { loadLive, loadLog, loadSettings, loadSheets, saveLive, saveLog, saveSet
 export type View =
   | { name: 'list' }
   | { name: 'build' }
-  | { name: 'sheet'; id: string }
+  | { name: 'sheet'; id: string; section?: string }
   | { name: 'dice' }
   | { name: 'settings' }
   | { name: 'render'; id: string; mode: RenderMode };

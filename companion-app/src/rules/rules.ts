@@ -120,8 +120,9 @@ export interface CharacterClass {
   // Fighter feats to suggest at level-up.
   feats?: string[];
   features: ClassFeature[];
-  // Magic-users: what holds their known magic and what each preparation is.
-  magic?: { book: string; prepared: string; circleWord: string };
+  // Magic-users: what holds their known magic and what each preparation is, and how
+  // many preparations of each circle (or rarity) they hold at each level, from level 1.
+  magic?: { book: string; prepared: string; circleWord: string; slots: number[][] };
   // The book the page number points to, when it isn't the ruleset's own.
   book?: string;
   // Set on a combined class such as "fighter+dweomersmith": the classes it is made of.

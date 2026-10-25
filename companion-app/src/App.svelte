@@ -34,7 +34,7 @@
     <Builder />
   {:else if app.view.name === 'sheet'}
     {#key app.view.id}
-      <Sheet id={app.view.id} />
+      <Sheet id={app.view.id} section={app.view.section} />
     {/key}
   {:else if app.view.name === 'render'}
     <Render id={app.view.id} mode={app.view.mode} />

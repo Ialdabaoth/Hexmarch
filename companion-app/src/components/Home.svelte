@@ -111,7 +111,7 @@
 </nav>
 
 {#if active && view}
-  <Postcard bind:this={card} {view} layout="carousel" onroll={roll} onpage={(i) => (page = i)} onhp={() => (editingHp = true)} onportraitfile={setPortrait} onxp={() => (editingXp = true)} ongear={(slot) => (pickingGear = slot)} />
+  <Postcard bind:this={card} {view} layout="carousel" onroll={roll} onpage={(i) => (page = i)} onhp={() => (editingHp = true)} onportraitfile={setPortrait} onxp={() => (editingXp = true)} ongear={(slot) => (pickingGear = slot)} oncarry={() => (app.view = { name: 'sheet', id: active!.id, section: 'inventory' })} />
   {#if pickingGear}<GearPicker character={active} slot={pickingGear} onclose={() => (pickingGear = null)} />{/if}
   {#if editingXp}<XpEditor character={active} onclose={() => (editingXp = false)} />{/if}
   {#if editingHp}<HpEditor character={active} onclose={() => (editingHp = false)} />{/if}

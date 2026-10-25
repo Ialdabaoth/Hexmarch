@@ -16,7 +16,12 @@
   import GearEditor from './GearEditor.svelte';
   import GearPicker from './GearPicker.svelte';
 
-  let { id }: { id: string } = $props();
+  let { id, section }: { id: string; section?: string } = $props();
+
+  // Opened at a section, e.g. from the card's Carry box: jump straight to it.
+  $effect(() => {
+    if (section) document.getElementById(section)?.scrollIntoView({ block: 'start' });
+  });
 
   // c is computed from c.sheet; edits go to the sheet and c follows.
   let c = $derived(app.character(id)) as Character | undefined;
@@ -217,7 +222,7 @@
 
   <Followers character={c} />
 
-  <h2>Gear</h2>
+  <h2 id="inventory">Gear</h2>
   <GearEditor character={c} />
   <label for="gear">Other equipment</label>
   <textarea

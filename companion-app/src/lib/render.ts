@@ -24,7 +24,8 @@ export function sheetView(data: SheetData, live?: LiveState) {
     features: cls.features.filter((f) => f.level <= c.level),
     levels: c.sheet.levels(),
     signed,
-    circle: (n: number) => (cls.magic?.circleWord === 'Rarity' ? ['Common', 'Uncommon', 'Rare'][n - 1] ?? `R${n}` : `${n}${['st', 'nd', 'rd'][n - 1] ?? 'th'}`)
+    // Rarities print as C/U/R/L to keep the line short.
+    circle: (n: number) => (cls.magic?.circleWord === 'Rarity' ? 'CURL'[n - 1] ?? `R${n}` : `${n}${['st', 'nd', 'rd'][n - 1] ?? 'th'}`)
   };
 }
 

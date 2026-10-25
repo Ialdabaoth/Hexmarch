@@ -6,10 +6,23 @@ export interface LogEntry {
   at: string;
   who: string;
   label: string;
-  // e.g. "d20 vs 14+ (easy)" or "3d6"
+  // What was rolled, e.g. "D20 vs. 14+: [15, 11] → 15" or "3d6: 4 + 2 + 6"
   detail: string;
   total: number;
   outcome?: 'success' | 'failure' | 'critical';
+  // Easy or hard checks; older entries don't have it.
+  difficulty?: Difficulty;
+}
+
+// "Sapphire - Easy Save vs. Curse: 15 (success)"
+export function headline(e: LogEntry): string {
+  const diff = e.difficulty && e.difficulty !== 'normal' ? `${e.difficulty[0].toUpperCase()}${e.difficulty.slice(1)} ` : '';
+  return `${e.who} - ${diff}${e.label}: ${e.total}${e.outcome ? ` (${e.outcome})` : ''}`;
+}
+
+// "(Rolled D20 vs. 11+: [15, 11] → 15)"
+export function rolledLine(e: LogEntry): string {
+  return `(Rolled ${e.detail.replace(/~~(\d+)~~/g, '($1)')})`;
 }
 
 // Easy rolls two dice and keeps the better, hard keeps the worse (p. 10).
@@ -28,9 +41,10 @@ export function thresholdCheck(
     at: new Date().toISOString(),
     who: opts.who,
     label: opts.label,
-    detail: `d${opts.sides} vs ${opts.threshold}+${opts.difficulty === 'normal' ? '' : ` (${opts.difficulty})`}: ${shown}`,
+    detail: `D${opts.sides} vs. ${opts.threshold}+: ${shown}`,
     total: kept,
-    outcome
+    outcome,
+    difficulty: opts.difficulty
   };
 }
 
