@@ -190,10 +190,12 @@ export function equipment(c: Character) {
 }
 
 // Experience needed for the next level (p. 12): equal to that level,
-// plus the penalty for a negative prime ability. A combined class uses its worst prime.
+// plus the penalty for a negative prime ability. A combined class uses its worst prime,
+// and gains a level in every one of its classes at once, so it pays for each of them.
 export function xpToNext(c: Rated): number {
-  const prime = Math.min(...primesOf(c.rules.getClass(c.classId)).map((p) => c.abilities[p]));
-  return c.level + 1 + (prime < 0 ? -prime : 0);
+  const cls = c.rules.getClass(c.classId);
+  const prime = Math.min(...primesOf(cls).map((p) => c.abilities[p]));
+  return (c.level + 1 + (prime < 0 ? -prime : 0)) * (cls.parts?.length ?? 1);
 }
 
 export function rollTraits(rng: Rng = Math.random): string[] {

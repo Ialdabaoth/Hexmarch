@@ -49,7 +49,10 @@
       </select>
     {/if}
     {#if scheduledTraining(cls, c.level + 1).length}
-      <p class="small">Trains {scheduledTraining(cls, c.level + 1).map((t) => TALENTS.find((x) => x.id === t)!.name).join(' and ')}.</p>
+      <p class="small">Trains {[...new Set(scheduledTraining(cls, c.level + 1))].map((t) => {
+        const times = scheduledTraining(cls, c.level + 1).filter((x) => x === t).length;
+        return `${TALENTS.find((x) => x.id === t)!.name}${times > 1 ? ' twice' : ''}`;
+      }).join(' and ')}.</p>
     {/if}
     {#if hasKind(cls, 'fighter') && (c.level + 1) % 2 === 0}
       <input bind:value={levelFeat} list="fighter-feats" placeholder="Fighter feat chosen" aria-label="Fighter feat" />

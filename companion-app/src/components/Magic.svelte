@@ -15,7 +15,11 @@
   // Druids can only know so many glamours.
   let knownMax = $derived(knownLimit(magic.known, c.level));
   let knownFull = $derived(knownMax != null && c.data.inventory.book.length >= knownMax);
-  let room = $derived(c.data.inventory.prepared.length < limits.allowed.reduce((a, b) => a + b, 0));
+  // A spent preparation is an empty slot, so only unspent ones take up room.
+  function fits(circle: number) {
+    const held = c.data.inventory.prepared.filter((p) => !p.spent);
+    return checkPreparations(magic.slots, c.level, [...held, { circle }], armor.penalty).over.length === 0;
+  }
   let allowedText = $derived(
     limits.allowed.map((n, k) => (n ? `${circleName(k + 1)} ×${n}` : '')).filter(Boolean).join(', ')
   );
@@ -29,7 +33,13 @@
   }
 
   function prepare(entry?: { magic: string; circle: number }) {
-    c.data.inventory.prepared.push({ magic: entry?.magic ?? '', circle: entry?.circle ?? 1, spent: false });
+    const prepared = c.data.inventory.prepared;
+    prepared.push({ magic: entry?.magic ?? '', circle: entry?.circle ?? 1, spent: false });
+    // The new one goes into an emptied slot: clear spent ones until everything fits.
+    const spent = () => prepared.map((p, i) => ({ p, i })).filter(({ p }) => p.spent).sort((a, b) => a.p.circle - b.p.circle);
+    while (checkPreparations(magic.slots, c.level, prepared, armor.penalty).over.length && spent().length) {
+      prepared.splice(spent()[0].i, 1);
+    }
     save();
   }
 
@@ -69,7 +79,7 @@
   <p class="small failure">Over the level {c.level} limit: {limits.over.length} {magic.prepared.toLowerCase()}{limits.over.length === 1 ? '' : 's'} marked in red won't fit.</p>
 {/if}
 <div class="row">
-  <button class="ghost" onclick={() => prepare()} disabled={!room}>+ Add {magic.prepared.toLowerCase()}</button>
+  <button class="ghost" onclick={() => prepare()} disabled={!fits(1)}>+ Add {magic.prepared.toLowerCase()}</button>
   {#if c.data.inventory.prepared.some((p) => p.spent)}<button onclick={renew}>Renew at sunrise/sunset</button>{/if}
 </div>
 
@@ -84,7 +94,7 @@
         {#each circles as n}<option value={n}>{circleName(n)}</option>{/each}
       </select>
       <input bind:value={b.magic} onchange={save} placeholder="Name" aria-label="Book entry" />
-      <button onclick={() => prepare(b)} disabled={!room || b.circle > limits.maxCircle}>Prepare</button>
+      <button onclick={() => prepare(b)} disabled={!fits(b.circle)}>Prepare</button>
       <button class="ghost" aria-label="Remove" onclick={() => { c.data.inventory.book.splice(i, 1); save(); }}>✕</button>
     </div>
   {/each}

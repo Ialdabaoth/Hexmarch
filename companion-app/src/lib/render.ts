@@ -4,11 +4,13 @@
 import { Character, attackThresholds, carrying, equipment, freshState, type LiveState, hasExpertise, hitDieLabel, saveThreshold, xpToNext } from './character';
 import type { SheetData } from './sheet';
 import { ABILITIES, TALENTS, type Difficulty } from '../rules/rules';
+import { armorEffect } from './magic';
 
 export function sheetView(data: SheetData, live?: LiveState) {
   const c = new Character(data, live ?? freshState());
   const cls = c.rules.getClass(c.classId);
   const signed = (n: number) => (n > 0 ? `+${n}` : String(n));
+  const gear = equipment(c);
   return {
     c,
     live: !!live,
@@ -18,7 +20,9 @@ export function sheetView(data: SheetData, live?: LiveState) {
     hitDie: hitDieLabel(c),
     attacks: attackThresholds(c),
     carry: carrying(c),
-    gear: equipment(c),
+    gear,
+    // What stops prepared magic being cast, e.g. "heavy armor" for a wizard.
+    magicBlockedBy: armorEffect(cls.magic?.armor, gear.worn?.type, !!(gear.main?.shield || gear.off?.shield)).blockedBy,
     abilities: ABILITIES.map((a) => ({ ...a, score: signed(c.abilities[a.id]), threshold: saveThreshold(c, a.id) })),
     talents: TALENTS.map((t) => ({ ...t, threshold: c.talents[t.id], expert: hasExpertise(c, t.id) })),
     features: cls.features.filter((f) => f.level <= c.level),

@@ -148,9 +148,10 @@ export function primesOf(cls: CharacterClass): AbilityId[] {
   return [...new Set((cls.parts ?? [cls]).map((p) => p.prime))];
 }
 
-// Talents a magic-user part trains automatically at this level.
+// Talents a magic-user part trains automatically at this level. Two parts training
+// the same talent list it twice: both trainings count.
 export function scheduledTraining(cls: CharacterClass, level: number): TalentId[] {
-  return [...new Set((cls.parts ?? [cls]).map((p) => p.trainingSchedule?.[level]).filter((t): t is TalentId => !!t))];
+  return (cls.parts ?? [cls]).map((p) => p.trainingSchedule?.[level]).filter((t): t is TalentId => !!t);
 }
 
 // Several classes taken together, all leveling at once on one XP track. An origin

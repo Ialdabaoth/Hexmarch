@@ -20,6 +20,16 @@
   let jsonText = $state<string | null>(null);
   let tab = $state<'log' | 'backup'>('log');
 
+  // Use a preparation, or prepare a spent one again (it keeps its slot).
+  function togglePrep(i: number) {
+    const p = active?.data.inventory.prepared[i];
+    const magic = active && active.rules.getClass(active.classId).magic;
+    if (!p || !magic) return;
+    p.spent = !p.spent;
+    app.persist();
+    app.notify(`${p.spent ? 'Used' : 'Prepared'}: ${p.magic || magic.prepared.toLowerCase()}`);
+  }
+
   async function setPortrait(file: File) {
     if (!active) return;
     try {
@@ -111,7 +121,7 @@
 </nav>
 
 {#if active && view}
-  <Postcard bind:this={card} {view} layout="carousel" onroll={roll} onpage={(i) => (page = i)} onhp={() => (editingHp = true)} onportraitfile={setPortrait} onxp={() => (editingXp = true)} ongear={(slot) => (pickingGear = slot)} oncarry={() => (app.view = { name: 'sheet', id: active!.id, section: 'inventory' })} />
+  <Postcard bind:this={card} {view} layout="carousel" onroll={roll} onpage={(i) => (page = i)} onhp={() => (editingHp = true)} onportraitfile={setPortrait} onxp={() => (editingXp = true)} ongear={(slot) => (pickingGear = slot)} oncarry={() => (app.view = { name: 'sheet', id: active!.id, section: 'inventory' })} onprep={togglePrep} />
   {#if pickingGear}<GearPicker character={active} slot={pickingGear} onclose={() => (pickingGear = null)} />{/if}
   {#if editingXp}<XpEditor character={active} onclose={() => (editingXp = false)} />{/if}
   {#if editingHp}<HpEditor character={active} onclose={() => (editingHp = false)} />{/if}
