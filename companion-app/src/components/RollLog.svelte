@@ -17,7 +17,10 @@
   {#each app.log as e (e.id)}
     <li>
       <div class="row">
-        <strong class="grow">{headline(e)}</strong>
+        <span class="grow">
+          <strong>{headline(e, false)}</strong>
+          {#if e.outcome}<span class="small {e.outcome}">({e.outcome})</span>{/if}
+        </span>
         <span class="small muted">{time(e.at)}</span>
       </div>
       <div class="small muted"><em>{rolledLine(e)}</em></div>

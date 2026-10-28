@@ -47,6 +47,15 @@
 </section>
 
 <section class="card" style="margin-top:0.75rem">
+  <h3>Dice</h3>
+  <label class="check small">
+    <input type="checkbox" checked={app.settings.dice3d}
+      onchange={(e) => app.updateSettings({ dice3d: (e.target as HTMLInputElement).checked })} />
+    Roll 3D dice on screen (tap to skip to the result)
+  </label>
+</section>
+
+<section class="card" style="margin-top:0.75rem">
   <h3>About</h3>
   <p class="small">
     A companion for the Materia Mundi RPG. Characters can use the Materia Mundi Compendium (first edition) or the

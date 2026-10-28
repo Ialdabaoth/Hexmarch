@@ -2,7 +2,8 @@ import { Character, freshState, type LiveState } from './character';
 import type { SheetData } from './sheet';
 import type { LogEntry } from './checks';
 import { postToDiscord, isWebhookUrl } from './discord';
-import { loadLive, loadLog, loadSettings, loadSheets, saveLive, saveLog, saveSettings, saveSheets, type Settings } from './storage';
+import { DEFAULT_SETTINGS, loadLive, loadLog, loadSettings, loadSheets, saveLive, saveLog, saveSettings, saveSheets, type Settings } from './storage';
+import { preloadDice, showDice } from './dice3d';
 
 export type View =
   | { name: 'list' }
@@ -21,7 +22,7 @@ class AppState {
   live = $state<Record<string, LiveState>>({});
   characters: Character[] = $derived(this.sheets.map((s) => new Character(s, this.live[s.id] ?? freshState())));
   log = $state<LogEntry[]>([]);
-  settings = $state<Settings>({ webhookUrl: '', autoPost: false, activeId: '', rules: 'mm' });
+  settings = $state<Settings>({ ...DEFAULT_SETTINGS });
   view = $state<View>({ name: 'list' });
   toast = $state('');
   loaded = $state(false);
@@ -38,6 +39,7 @@ class AppState {
     }
     for (const s of this.sheets) this.live[s.id] ??= freshState();
     this.loaded = true;
+    if (this.settings.dice3d) preloadDice();
   }
 
   character(id: string): Character | undefined {
@@ -84,7 +86,12 @@ class AppState {
     return isWebhookUrl(this.settings.webhookUrl);
   }
 
+  // The result shows once the dice have landed, so the dice don't give it away.
   async record(entry: LogEntry) {
+    if (this.settings.dice3d) {
+      this.lastRoll = null;
+      await showDice(entry);
+    }
     this.lastRoll = entry;
     this.log.unshift(entry);
     await saveLog(this.log).catch((e) => console.warn("Could not save", e));
