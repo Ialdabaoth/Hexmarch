@@ -217,7 +217,7 @@
   <Effects character={c} />
 
   {#if cls.magic}
-    <Magic character={c} />
+    <div id="magic"><Magic character={c} /></div>
   {/if}
 
   <Followers character={c} />

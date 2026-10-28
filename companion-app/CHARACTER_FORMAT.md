@@ -83,6 +83,8 @@ name, so a quick scan of the sheet can add them up.
 
   In the example, `"stealth": 1` appears twice in `levelups`, so Stealth is 3+.
   `"agility": 1` appears once under `abilities.dex`, so Agility is 4+.
+- A combined class can train the same talent from two of its classes at one level;
+  that level records `"survival": 2`, which counts as two steps.
 - Max HP is the sum of the `"hp"` entries in `levelups` (5 + 3 = 8 in the example).
 - Level is the number of entries in `levelups`.
 

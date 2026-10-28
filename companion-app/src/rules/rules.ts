@@ -122,7 +122,17 @@ export interface CharacterClass {
   features: ClassFeature[];
   // Magic-users: what holds their known magic and what each preparation is, and how
   // many preparations of each circle (or rarity) they hold at each level, from level 1.
-  magic?: { book: string; prepared: string; circleWord: string; slots: number[][] };
+  magic?: {
+    book: string;
+    prepared: string;
+    circleWord: string;
+    slots: number[][];
+    // Wizards: light armor costs this many preparations of each circle; these armor
+    // types (or "shield") stop prepared magic being cast at all.
+    armor?: { light: number[]; blockedBy: string[] };
+    // Druids: how many glamours they can know at each level, null for all of them.
+    known?: (number | null)[];
+  };
   // The book the page number points to, when it isn't the ruleset's own.
   book?: string;
   // Set on a combined class such as "fighter+dweomersmith": the classes it is made of.
@@ -138,9 +148,10 @@ export function primesOf(cls: CharacterClass): AbilityId[] {
   return [...new Set((cls.parts ?? [cls]).map((p) => p.prime))];
 }
 
-// Talents a magic-user part trains automatically at this level.
+// Talents a magic-user part trains automatically at this level. Two parts training
+// the same talent list it twice: both trainings count.
 export function scheduledTraining(cls: CharacterClass, level: number): TalentId[] {
-  return [...new Set((cls.parts ?? [cls]).map((p) => p.trainingSchedule?.[level]).filter((t): t is TalentId => !!t))];
+  return (cls.parts ?? [cls]).map((p) => p.trainingSchedule?.[level]).filter((t): t is TalentId => !!t);
 }
 
 // Several classes taken together, all leveling at once on one XP track. An origin

@@ -20,7 +20,8 @@ export const FORMAT_VERSION = 2;
 // Changes are tallies keyed by what they change: "agility": 1 improves Agility one
 // step (5+ to 4+), "agility": -1 worsens it, "hp": 3 adds hit points. A talent's
 // threshold is 5 minus the sum of its tallies; max HP is the sum of the "hp" tallies.
-export type Tally = 1 | -1;
+// Usually 1 or -1; a combined class trained twice in one talent at one level records 2.
+export type Tally = number;
 
 export type AbilityEntry = { score: number } & Partial<Record<TalentId, Tally>>;
 
@@ -192,7 +193,7 @@ export class CharacterSheet {
     return this.data.class.levelups.map((l) => ({
       level: l.level,
       hp: l.hp,
-      training: tallies(l).filter(([, n]) => n > 0).map(([t]) => t),
+      training: tallies(l).flatMap(([t, n]) => Array<TalentId>(Math.max(0, n)).fill(t)),
       feat: l.feat
     }));
   }
@@ -276,7 +277,8 @@ export function levelUp(sheet: SheetData, choice: LevelUpChoice, rng: Rng = Math
   if (hasKind(cls, 'expert') && choice.training && rules.trainableAt(cls, next).includes(choice.training)) {
     entry[choice.training] = 1;
   }
-  for (const t of scheduledTraining(cls, next)) if (!entry[t]) entry[t] = 1;
+  // Each class part that trains a talent this level counts, even the same talent twice.
+  for (const t of scheduledTraining(cls, next)) entry[t] = (entry[t] ?? 0) + 1;
   const feat = choice.feat?.trim();
   if (feat) entry.feat = feat;
   sheet.class.levelups.push(entry);
@@ -292,12 +294,14 @@ function fail(name: string, problem: string): never {
   throw new SheetError(`${name || 'A character'}: ${problem}`);
 }
 
-// Reads 1 / -1, or hand-typed "+", "+1", "-", "-1".
+// Reads 1 / -1, or hand-typed "+", "+1", "-", "-1"; also 2 or 3 for training
+// a combined class got from more than one of its classes at once.
 export function parseTally(v: unknown): Tally | null {
   const s = typeof v === 'number' ? String(v) : typeof v === 'string' ? v.trim() : '';
-  if (s === '+' || s === '+1' || s === '1') return 1;
-  if (s === '-' || s === '-1') return -1;
-  return null;
+  if (s === '+') return 1;
+  if (s === '-') return -1;
+  const m = /^([+-]?)([123])$/.exec(s);
+  return m ? (m[1] === '-' ? -Number(m[2]) : Number(m[2])) : null;
 }
 
 // Reads 3, "3" or "+3".

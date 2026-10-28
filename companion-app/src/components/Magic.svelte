@@ -1,7 +1,7 @@
 <script lang="ts">
   import { app } from '../lib/app.svelte';
-  import type { Character } from '../lib/character';
-  import { checkPreparations } from '../lib/magic';
+  import { equipment, type Character } from '../lib/character';
+  import { armorEffect, checkPreparations, knownLimit } from '../lib/magic';
 
   let { character: c }: { character: Character } = $props();
 
@@ -9,10 +9,19 @@
   const RARITY = ['Common', 'Uncommon', 'Rare', 'Legendary'];
   let circles = $derived(magic.circleWord === 'Rarity' ? [1, 2, 3, 4] : [1, 2, 3, 4, 5]);
   // What this level may prepare, and which preparations don't fit it.
-  let limits = $derived(checkPreparations(magic.slots, c.level, c.data.inventory.prepared));
-  let room = $derived(c.data.inventory.prepared.length < limits.allowed.reduce((a, b) => a + b, 0));
+  let gear = $derived(equipment(c));
+  let armor = $derived(armorEffect(magic.armor, gear.worn?.type, !!(gear.main?.shield || gear.off?.shield)));
+  let limits = $derived(checkPreparations(magic.slots, c.level, c.data.inventory.prepared, armor.penalty));
+  // Druids can only know so many glamours.
+  let knownMax = $derived(knownLimit(magic.known, c.level));
+  let knownFull = $derived(knownMax != null && c.data.inventory.book.length >= knownMax);
+  // A spent preparation is an empty slot, so only unspent ones take up room.
+  function fits(circle: number) {
+    const held = c.data.inventory.prepared.filter((p) => !p.spent);
+    return checkPreparations(magic.slots, c.level, [...held, { circle }], armor.penalty).over.length === 0;
+  }
   let allowedText = $derived(
-    limits.allowed.map((n, k) => (n ? `${n} ${circleName(k + 1).toLowerCase()}` : '')).filter(Boolean).join(', ')
+    limits.allowed.map((n, k) => (n ? `${circleName(k + 1)} ×${n}` : '')).filter(Boolean).join(', ')
   );
 
   function circleName(n: number) {
@@ -24,7 +33,13 @@
   }
 
   function prepare(entry?: { magic: string; circle: number }) {
-    c.data.inventory.prepared.push({ magic: entry?.magic ?? '', circle: entry?.circle ?? 1, spent: false });
+    const prepared = c.data.inventory.prepared;
+    prepared.push({ magic: entry?.magic ?? '', circle: entry?.circle ?? 1, spent: false });
+    // The new one goes into an emptied slot: clear spent ones until everything fits.
+    const spent = () => prepared.map((p, i) => ({ p, i })).filter(({ p }) => p.spent).sort((a, b) => a.p.circle - b.p.circle);
+    while (checkPreparations(magic.slots, c.level, prepared, armor.penalty).over.length && spent().length) {
+      prepared.splice(spent()[0].i, 1);
+    }
     save();
   }
 
@@ -48,14 +63,15 @@
 <p class="small muted">{magic.prepared}s are physical items you carry; they go in the exported inventory.</p>
 
 <h3>{magic.prepared}s</h3>
-<p class="small muted">Level {c.level}: {allowedText}. Lower {magic.circleWord === 'Rarity' ? 'rarities' : 'circles'} can go in higher slots.</p>
+<p class="small muted">Level {c.level}: {allowedText || 'none'}{armor.penalty.length ? ' (less for light armor)' : ''}. Lower {magic.circleWord === 'Rarity' ? 'rarities' : 'circles'} can go in higher slots.</p>
+{#if armor.blockedBy}<p class="small failure">You can't cast your {magic.prepared.toLowerCase()}s while wearing {armor.blockedBy}.</p>{/if}
 {#each c.data.inventory.prepared as p, i}
   <div class="prep" class:spent={p.spent} class:over={limits.over.includes(i)}>
     <select bind:value={p.circle} onchange={save} aria-label={magic.circleWord}>
       {#each circles.filter((n) => n <= limits.maxCircle || n === p.circle) as n}<option value={n}>{circleName(n)}</option>{/each}
     </select>
     <input bind:value={p.magic} onchange={save} placeholder="What it holds" aria-label="Prepared magic" />
-    <button onclick={() => use(i)}>{p.spent ? 'Spent' : 'Use'}</button>
+    <button onclick={() => use(i)} disabled={!p.spent && !!armor.blockedBy}>{p.spent ? 'Spent' : 'Use'}</button>
     <button class="ghost" aria-label="Remove" onclick={() => { c.data.inventory.prepared.splice(i, 1); save(); }}>✕</button>
   </div>
 {/each}
@@ -63,23 +79,27 @@
   <p class="small failure">Over the level {c.level} limit: {limits.over.length} {magic.prepared.toLowerCase()}{limits.over.length === 1 ? '' : 's'} marked in red won't fit.</p>
 {/if}
 <div class="row">
-  <button class="ghost" onclick={() => prepare()} disabled={!room}>+ Add {magic.prepared.toLowerCase()}</button>
+  <button class="ghost" onclick={() => prepare()} disabled={!fits(1)}>+ Add {magic.prepared.toLowerCase()}</button>
   {#if c.data.inventory.prepared.some((p) => p.spent)}<button onclick={renew}>Renew at sunrise/sunset</button>{/if}
 </div>
 
 <details open={c.data.inventory.book.length > 0}>
-  <summary><strong>{magic.book}</strong> <span class="small muted">({c.data.inventory.book.length})</span></summary>
+  <summary><strong>{magic.book}</strong> <span class="small muted" class:failure={knownMax != null && c.data.inventory.book.length > knownMax}>({c.data.inventory.book.length}{knownMax != null ? ` of ${knownMax}` : ''})</span></summary>
+  {#if knownMax != null && c.data.inventory.book.length > knownMax}
+    <p class="small failure">Level {c.level} can know {knownMax}; forget one for each new glamour or wild shape.</p>
+  {/if}
   {#each c.data.inventory.book as b, i}
     <div class="prep">
       <select bind:value={b.circle} onchange={save} aria-label={magic.circleWord}>
         {#each circles as n}<option value={n}>{circleName(n)}</option>{/each}
       </select>
       <input bind:value={b.magic} onchange={save} placeholder="Name" aria-label="Book entry" />
-      <button onclick={() => prepare(b)} disabled={!room || b.circle > limits.maxCircle}>Prepare</button>
+      <button onclick={() => prepare(b)} disabled={!fits(b.circle)}>Prepare</button>
       <button class="ghost" aria-label="Remove" onclick={() => { c.data.inventory.book.splice(i, 1); save(); }}>✕</button>
     </div>
   {/each}
-  <button class="ghost" onclick={() => { c.data.inventory.book.push({ magic: '', circle: 1 }); save(); }}>+ Add to {magic.book.toLowerCase()}</button>
+  <button class="ghost" disabled={knownFull} onclick={() => { c.data.inventory.book.push({ magic: '', circle: 1 }); save(); }}>+ Add to {magic.book.toLowerCase()}</button>
+  {#if knownFull && knownMax === c.data.inventory.book.length}<span class="small muted">Full for level {c.level}: forget one to learn another.</span>{/if}
 </details>
 
 <style>

@@ -212,7 +212,26 @@ describe('combined classes (E9 for Materia Mundi)', () => {
   it('uses the worst prime for experience', () => {
     const elfA = { ...zeroAbilities(), str: 1, cha: -1, wis: 1 };
     const s = createSheet({ rules: 'e9mm', name: 'Ael', origin: 'elf', classId: 'champion+bard+druid', abilities: elfA, talentBase: defaultTalents(elfA), firstTraining: 'lore' });
-    expect(xpToNext(new Character(s, freshState()))).toBe(3);
+    // Level 2 costs 2 + 1 for Cha -1, paid once for each of the three classes.
+    expect(xpToNext(new Character(s, freshState()))).toBe(9);
+  });
+
+  it('costs twice the experience for two classes', () => {
+    const gnomeA = { ...zeroAbilities(), wis: 1, int: 1 };
+    const s = createSheet({ rules: 'e9mm', name: 'Pip', origin: 'gnome', classId: 'hunter+druid', abilities: gnomeA, talentBase: defaultTalents(gnomeA), firstTraining: 'alertness' });
+    expect(xpToNext(new Character(s, freshState()))).toBe(4);
+  });
+
+  it('keeps both trainings when two classes train the same talent', () => {
+    const gnomeA = { ...zeroAbilities(), wis: 1, int: 1 };
+    const s = createSheet({ rules: 'e9mm', name: 'Pip', origin: 'gnome', classId: 'hunter+druid', abilities: gnomeA, talentBase: defaultTalents(gnomeA), firstTraining: 'alertness' });
+    levelUp(s, { training: 'agility', hpRoll: 3 });
+    levelUp(s, { training: 'agility', hpRoll: 3 });
+    const before = new Character(s, freshState()).talents.survival;
+    // Level 4: the hunter picks Survival and the druid trains it on schedule.
+    const entry = levelUp(s, { training: 'survival', hpRoll: 3 });
+    expect(entry.survival).toBe(2);
+    expect(new Character(s, freshState()).talents.survival).toBe(Math.max(2, before - 2));
   });
 });
 
