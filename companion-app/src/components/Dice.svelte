@@ -28,7 +28,9 @@
 
 </script>
 
-<h1>Dice</h1>
+<h1>Referee</h1>
+
+<h2 style="margin:0 0 0.5rem">Dice</h2>
 
 <div class="quick">
   {#each quick as q}<button onclick={() => rollIt(q)}>{q}</button>{/each}
