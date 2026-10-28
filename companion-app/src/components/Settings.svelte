@@ -1,6 +1,12 @@
 <script lang="ts">
   import { app } from '../lib/app.svelte';
   import { isWebhookUrl } from '../lib/discord';
+  import { DEFAULT_DICE_COLOR, DEFAULT_DICE_INK, showDice } from '../lib/dice3d';
+
+  const d20 = () => ({ sides: 20, value: 1 + Math.floor(Math.random() * 20), kept: true });
+  function tryDice() {
+    showDice({ dice: [d20(), d20()] }, app.diceColors);
+  }
 
   let url = $state(app.settings.webhookUrl);
   let valid = $derived(!url.trim() || isWebhookUrl(url));
@@ -53,6 +59,17 @@
       onchange={(e) => app.updateSettings({ dice3d: (e.target as HTMLInputElement).checked })} />
     Roll 3D dice on screen (tap to skip to the result)
   </label>
+  <div class="row dice-color">
+    <label class="small">Dice <input type="color" value={app.settings.diceColor} aria-label="Dice color"
+      onchange={(e) => app.updateSettings({ diceColor: (e.target as HTMLInputElement).value })} /></label>
+    <label class="small">Numbers <input type="color" value={app.settings.diceInk} aria-label="Number color"
+      onchange={(e) => app.updateSettings({ diceInk: (e.target as HTMLInputElement).value })} /></label>
+    <span class="swatch" style:background={app.settings.diceColor} style:color={app.settings.diceInk} aria-hidden="true">20</span>
+    <button onclick={tryDice} disabled={!app.settings.dice3d}>Try it</button>
+    {#if app.settings.diceColor !== DEFAULT_DICE_COLOR || app.settings.diceInk !== DEFAULT_DICE_INK}
+      <button class="ghost" onclick={() => app.updateSettings({ diceColor: DEFAULT_DICE_COLOR, diceInk: DEFAULT_DICE_INK })}>Reset</button>
+    {/if}
+  </div>
 </section>
 
 <section class="card" style="margin-top:0.75rem">
@@ -71,3 +88,10 @@
     System Reference Handbook, licensed under <a href="https://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a>.
   </p>
 </section>
+
+<style>
+  .dice-color { margin-top: 0.75rem; }
+  .dice-color label { display: flex; align-items: center; gap: 0.35rem; margin: 0; }
+  .swatch { display: inline-grid; place-items: center; width: 2.2rem; height: 2.2rem; border-radius: 6px; font: 700 0.95rem Georgia, serif; }
+  .dice-color input[type='color'] { width: 3rem; height: 2.2rem; padding: 0.1rem; border-radius: 8px; cursor: pointer; }
+</style>

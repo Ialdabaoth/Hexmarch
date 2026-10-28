@@ -25,6 +25,20 @@ const STYLES: Record<'die' | 'tens', { body: string; ink: string }> = {
   tens: { body: '#2b2118', ink: '#e0b55a' }
 };
 
+// The player's dice colours (Settings): the body and the numbers. The percentile
+// tens die keeps its own colours.
+export function setDiceColors(body: string, ink: string) {
+  const hex = /^#[0-9a-f]{6}$/i;
+  if (!hex.test(body) || !hex.test(ink)) return;
+  if (body.toLowerCase() === STYLES.die.body && ink.toLowerCase() === STYLES.die.ink) return;
+  STYLES.die = { body: body.toLowerCase(), ink: ink.toLowerCase() };
+  for (const [key, t] of textures) {
+    if (key.startsWith('tens:')) continue;
+    t.dispose();
+    textures.delete(key);
+  }
+}
+
 const SIZE = 0.95; // circumradius of a die, in table units
 const ROLL_MS = 1400;
 const STAGGER_MS = 70;

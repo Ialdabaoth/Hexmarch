@@ -294,6 +294,10 @@ class AppState {
     await saveSettings(this.settings).catch((e) => console.warn("Could not save", e));
   }
 
+  get diceColors() {
+    return { body: this.settings.diceColor, ink: this.settings.diceInk };
+  }
+
   get canPost(): boolean {
     return isWebhookUrl(this.settings.webhookUrl);
   }
@@ -302,7 +306,7 @@ class AppState {
   async record(entry: LogEntry) {
     if (this.settings.dice3d) {
       this.lastRoll = null;
-      await showDice(entry);
+      await showDice(entry, this.diceColors);
     }
     this.lastRoll = entry;
     this.log.unshift(entry);
