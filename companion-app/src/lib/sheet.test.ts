@@ -67,6 +67,8 @@ describe('character sheet', () => {
     const read = (portrait: string) => readSheet({ ...JSON.parse(JSON.stringify(s)), portrait }).portrait;
     expect(read('data:image/jpeg;base64,AAAA')).toBe('data:image/jpeg;base64,AAAA');
     expect(read('https://example.com/holly.png')).toBe('https://example.com/holly.png');
+    expect(read('cache:3f2a9c')).toBe('cache:3f2a9c');
+    expect(read('cache:../x')).toBe('');
     expect(read('javascript:alert(1)')).toBe('');
     expect(read('data:text/html;base64,AAAA')).toBe('');
   });

@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { SheetView } from '../lib/render';
+  import { app } from '../lib/app.svelte';
   import { damage as dice, grips, type WeaponItem } from '../lib/gear';
 
   let { view: v }: { view: SheetView } = $props();
@@ -16,7 +17,7 @@
      no section is split across a page break unless it is longer than a page. -->
 <article class="pg">
   <header>
-    {#if data.portrait}<img class="portrait" src={data.portrait} alt="" />{/if}
+    {#if app.portraitSrc(data.portrait)}<img class="portrait" src={app.portraitSrc(data.portrait)} alt="" />{/if}
     <div class="who">
       <h1>{v.c.name}</h1>
       <div class="sub">{v.title} · Hit die {v.hitDie} · XP {v.xp}</div>

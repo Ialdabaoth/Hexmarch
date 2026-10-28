@@ -100,9 +100,14 @@ level 1 `hp` can be left out (it is the starting HP from the rules).
 
 ## Other fields
 
-- `portrait`: an image, either inline or an `https://` link. Empty for none. The app
-  shrinks pictures to 256×256 and writes `data:image/jpeg;base64,...`, or
-  `data:image/png;base64,...` when the picture has see-through areas.
+- `portrait`: a link to an image. Empty for none.
+  - `https://...`: a picture on the web, loaded from there each time.
+  - `cache:<id>`: a picture uploaded on the device, kept in the app's own portrait
+    store so the sheet stays small. The app shrinks pictures to 256×256 JPEG (PNG
+    when the picture has see-through areas). The store isn't exported yet, so on
+    another device a `cache:` portrait shows as empty.
+  - Older files may hold the picture inline as `data:image/...;base64,...`; the app
+    reads these and moves the picture into its store.
 - `rules`: the ruleset the character uses, `mm` (Materia Mundi), `e9`, or `e9mm`
   (E9 for Materia Mundi). Older
   files that say `1e` are read as `mm`.

@@ -4,6 +4,8 @@ import type { LogEntry } from './checks';
 import { postToDiscord, isWebhookUrl } from './discord';
 import { DEFAULT_SETTINGS, loadLive, loadLog, loadSettings, loadSheets, saveLive, saveLog, saveSettings, saveSheets, type Settings } from './storage';
 import { preloadDice, showDice } from './dice3d';
+import { portraitFromFile } from './portrait';
+import { CACHE_PREFIX, cachedId, deletePortrait, isInline, loadPortraits, portraitId, portraitSrc, savePortrait } from './portraits';
 
 export type View =
   | { name: 'list' }
@@ -27,6 +29,8 @@ class AppState {
   toast = $state('');
   loaded = $state(false);
   lastRoll = $state<LogEntry | null>(null);
+  // Cached portrait pictures by id (see portraits.ts).
+  portraits = $state<Record<string, string>>({});
   private toastTimer: ReturnType<typeof setTimeout> | undefined;
 
   async load() {
@@ -38,7 +42,13 @@ class AppState {
       this.notify("This browser won't let the app save. Export characters to keep them.");
     }
     for (const s of this.sheets) this.live[s.id] ??= freshState();
+    try {
+      this.portraits = await loadPortraits();
+    } catch (e) {
+      console.warn('Portraits unavailable', e);
+    }
     this.loaded = true;
+    if (await this.cacheInlinePortraits(this.sheets)) await this.persist();
     if (this.settings.dice3d) preloadDice();
   }
 
@@ -62,6 +72,7 @@ class AppState {
 
   // Imported sheets replace any sheet with the same id.
   async upsert(list: SheetData[]) {
+    await this.cacheInlinePortraits(list);
     for (const s of list) {
       this.live[s.id] ??= freshState();
       const i = this.sheets.findIndex((x) => x.id === s.id);
@@ -69,12 +80,69 @@ class AppState {
       else this.sheets.unshift(s);
     }
     await this.persist();
+    await this.prunePortraits();
   }
 
   async remove(id: string) {
     this.sheets = this.sheets.filter((s) => s.id !== id);
     delete this.live[id];
     await this.persist();
+    await this.prunePortraits();
+  }
+
+  portraitSrc(p: string): string {
+    return portraitSrc(p, this.portraits);
+  }
+
+  // A picture from the device goes into the cache; the sheet keeps a link to it.
+  async setPortraitFile(sheet: SheetData, file: File) {
+    sheet.portrait = await this.cachePortrait(await portraitFromFile(file));
+    await this.persist();
+    await this.prunePortraits();
+  }
+
+  // A web link (or '' to remove the portrait). Web pictures aren't cached.
+  async setPortrait(sheet: SheetData, url: string) {
+    sheet.portrait = url.trim();
+    await this.persist();
+    await this.prunePortraits();
+  }
+
+  // Returns the cache link, or the picture itself if this browser won't store it.
+  private async cachePortrait(dataUrl: string): Promise<string> {
+    const id = await portraitId(dataUrl);
+    try {
+      await savePortrait(id, dataUrl);
+    } catch (e) {
+      console.warn('Could not cache portrait', e);
+      return dataUrl;
+    }
+    this.portraits[id] = dataUrl;
+    return CACHE_PREFIX + id;
+  }
+
+  // Older and imported sheets carry their pictures inline; move them into the cache.
+  private async cacheInlinePortraits(list: SheetData[]): Promise<boolean> {
+    let changed = false;
+    for (const s of list) {
+      if (!isInline(s.portrait)) continue;
+      const link = await this.cachePortrait(s.portrait);
+      if (link !== s.portrait) {
+        s.portrait = link;
+        changed = true;
+      }
+    }
+    return changed;
+  }
+
+  // Drops cached pictures no character uses any more.
+  private async prunePortraits() {
+    const used = new Set(this.sheets.map((s) => cachedId(s.portrait)));
+    for (const id of Object.keys(this.portraits)) {
+      if (used.has(id)) continue;
+      delete this.portraits[id];
+      await deletePortrait(id).catch((e) => console.warn('Could not delete portrait', e));
+    }
   }
 
   async updateSettings(patch: Partial<Settings>) {

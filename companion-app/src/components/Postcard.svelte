@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { RollRequest, SheetView } from '../lib/render';
+  import { app } from '../lib/app.svelte';
   import { holdRoll } from '../lib/hold.svelte';
   import type { Difficulty } from '../rules/rules';
 
@@ -38,6 +39,7 @@
     onprepslot?: (circle: number) => void;
   } = $props();
   let data = $derived(v.c.data);
+  let portrait = $derived(app.portraitSrc(data.portrait));
   let inv = $derived(data.inventory);
   let g = $derived(v.gear);
   // How many preparation lines fit on the back of the card.
@@ -69,9 +71,9 @@
       <header>
         {#if onportraitfile}
           <!-- A real file input under the finger: iOS won't always open a picker from a script. -->
-          <label class="portrait" class:empty={!data.portrait}>
-            {#if data.portrait}<img src={data.portrait} alt="" />{:else}+{/if}
-            <input class="pick" type="file" accept="image/*" aria-label={data.portrait ? 'Change portrait' : 'Add portrait'}
+          <label class="portrait" class:empty={!portrait}>
+            {#if portrait}<img src={portrait} alt="" />{:else}+{/if}
+            <input class="pick" type="file" accept="image/*" aria-label={portrait ? 'Change portrait' : 'Add portrait'}
               onchange={(e) => {
                 const input = e.currentTarget;
                 const file = input.files?.[0];
@@ -79,7 +81,7 @@
                 input.value = '';
               }} />
           </label>
-        {:else if data.portrait}<img class="portrait" src={data.portrait} alt="" />{/if}
+        {:else if portrait}<img class="portrait" src={portrait} alt="" />{/if}
         <div class="who">
           <h1>{v.c.name}</h1>
           <div class="sub">{v.title}</div>

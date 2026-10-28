@@ -310,11 +310,12 @@ function parseHp(v: unknown): number | null {
   return Number.isInteger(n) && n >= 0 ? n : null;
 }
 
-// Only images: an inline picture or a web link, nothing that could run.
+// Only images: a picture cached on the device, a web link, or (older sheets) an
+// inline picture, which the app moves into its cache. Nothing that could run.
 function portrait(v: unknown): string {
   if (typeof v !== 'string') return '';
   const p = v.trim();
-  return /^data:image\/(png|jpeg|webp|gif);base64,[A-Za-z0-9+/=]+$/.test(p) || /^https:\/\/\S+$/.test(p) ? p : '';
+  return /^cache:[\w-]+$/.test(p) || /^data:image\/(png|jpeg|webp|gif);base64,[A-Za-z0-9+/=]+$/.test(p) || /^https:\/\/\S+$/.test(p) ? p : '';
 }
 
 const SIZES = ['light', 'medium', 'heavy'] as const;
