@@ -58,7 +58,31 @@ describe('character sheet', () => {
     const s = createSheet({ name: 'A', origin: 'human', classId: 'priest', abilities, talentBase: defaultTalents(abilities) });
     s.inventory.book.push({ magic: 'Bless', circle: 1 });
     s.inventory.prepared.push({ magic: 'Bless', circle: 1, spent: true });
-    expect(readSheet(JSON.parse(JSON.stringify(s))).inventory.prepared).toEqual([{ magic: 'Bless', circle: 1, spent: true }]);
+    // Bless is in the Compendium's miracles: it gets a reference and its real circle.
+    expect(readSheet(JSON.parse(JSON.stringify(s))).inventory.prepared).toEqual([{ ref: 'mm:bless', magic: 'Bless', circle: 2, spent: true }]);
+  });
+
+  it('keeps magic that is not in the equipment file as written', () => {
+    const s = createSheet({ name: 'A', origin: 'human', classId: 'priest', abilities, talentBase: defaultTalents(abilities) });
+    s.inventory.book.push({ magic: 'Saint Brendan\'s Blessing', circle: 3 });
+    const back = readSheet(JSON.parse(JSON.stringify(writeSheet(s))));
+    expect(back.inventory.book).toEqual([{ magic: "Saint Brendan's Blessing", circle: 3 }]);
+  });
+
+  it('saves a book reference without its circle unless the file leaves it open', () => {
+    const s = createSheet({ name: 'D', origin: 'dwarf', classId: 'dweomersmith', abilities, talentBase: defaultTalents(abilities) });
+    s.inventory.book.push({ magic: 'Earthbreaker', circle: 2 }, { magic: 'Mirror Shield', circle: 1 });
+    const back = readSheet(JSON.parse(JSON.stringify(s)));
+    // Earthbreaker comes in any rarity, so the sheet's choice stands; a Mirror Shield is always rare.
+    expect(back.inventory.book).toEqual([
+      { ref: 'mm:earthbreaker', magic: 'Earthbreaker', circle: 2 },
+      { ref: 'mm:mirror-shield', magic: 'Mirror Shield', circle: 3 }
+    ]);
+    expect((writeSheet(back) as any).inventory.book).toEqual([
+      { ref: 'mm:earthbreaker', magic: 'Earthbreaker', circle: 2 },
+      { ref: 'mm:mirror-shield', magic: 'Mirror Shield' }
+    ]);
+    expect(readSheet(JSON.parse(JSON.stringify(writeSheet(back)))).inventory.book).toEqual(back.inventory.book);
   });
 
   it('only accepts images as portraits', () => {

@@ -10,7 +10,7 @@ import {
   armorStats, compactArmor, compactItem, compactWeapon, defaultLoadout, itemId, matchesRef, newArmor, newItem, newWeapon, parseKit,
   weaponStats, type ArmorItem, type CarriedItem, type Hands, type WeaponItem
 } from './gear';
-import { resolveItem } from '../equipment/equipment';
+import { magicLevel, magicLevels, resolveMagic, resolveItem, type MagicEntry, type MagicSystem } from '../equipment/equipment';
 import {
   ABILITIES, DEFAULT_RULES, TALENTS, findRules, hasKind, normalizeRulesId, primesOf, rulesFor, scheduledTraining,
   type AbilityId, type Attitude, type ClassId, type OriginId, type Ruleset, type TalentId
@@ -36,14 +36,18 @@ export type Abilities = Record<AbilityId, number>;
 
 export type { ArmorItem, WeaponItem, CarriedItem, Hands };
 
-// An entry in a spellbook, prayer book, craftbook or a druid's known glamours.
+// An entry in a spellbook, prayer book, craftbook or a druid's known glamours. `ref`
+// points at the equipment file ("mm:fireball"); `magic` is its name, or anything written
+// in. `circle` is the circle, or the rarity (1 common to 4 legendary) for dweomers.
 export interface BookEntry {
+  ref?: string;
   magic: string;
   circle: number;
 }
 
 // A physical preparation: a prayer strip, talisman, dweomer or prepared spell.
 export interface Preparation {
+  ref?: string;
   magic: string;
   circle: number;
   spent: boolean;
@@ -366,6 +370,29 @@ function readWeapon(rules: Ruleset, w: any): WeaponItem {
   return item;
 }
 
+// Book entries and preparations: a ref into the equipment file, or a name that is matched
+// against it (older sheets), or free text. A ref's circle or rarity comes from the file
+// unless the entry can be made at several.
+function readMagic(rules: Ruleset, system: MagicSystem | undefined, x: any): BookEntry {
+  const given = text(x?.ref) || (/^[\w-]+:[\w-]+$/.test(text(x?.magic)) ? text(x.magic) : '');
+  const named = given ? '' : text(x?.magic).trim();
+  let ref = given;
+  let found: MagicEntry | undefined = given ? resolveMagic(given) : undefined;
+  const match = !given && named ? rules.equipment.findMagic(named, system) : undefined;
+  if (match) [found, ref] = [match, match.ref];
+  const stored = circle(x?.circle);
+  if (!found) return { ...(ref ? { ref } : {}), magic: named || text(x?.name) || (ref ? ref : ''), circle: stored };
+  const levels = magicLevels(found);
+  return { ref, magic: named || text(x?.name) || found.name, circle: magicLevel(found) ?? (levels.includes(stored) ? stored : levels[0] ?? stored) };
+}
+
+function compactMagic<T extends BookEntry>(b: T): object {
+  const entry = resolveMagic(b.ref);
+  if (!entry) return b;
+  const { circle: level, ...rest } = b;
+  return magicLevel(entry) === undefined ? { ...rest, circle: level } : rest;
+}
+
 // Carried gear: a plain name (older sheets) or { id, ref, name, qty }.
 function readItem(rules: Ruleset, x: any): CarriedItem[] {
   if (typeof x === 'string') return x.trim() ? [newItem(rules, x)] : [];
@@ -502,12 +529,8 @@ export function readSheet(raw: unknown): SheetData {
     inventory: {
       ...readGear(rules, inv),
       items: (Array.isArray(inv.items) ? inv.items : []).flatMap((x: unknown) => readItem(rules, x)),
-      book: (Array.isArray(inv.book) ? inv.book : []).map((b: any) => ({ magic: String(b?.magic ?? ''), circle: circle(b?.circle) })),
-      prepared: (Array.isArray(inv.prepared) ? inv.prepared : []).map((p: any) => ({
-        magic: String(p?.magic ?? ''),
-        circle: circle(p?.circle),
-        spent: p?.spent === true
-      }))
+      book: (Array.isArray(inv.book) ? inv.book : []).map((b: any) => readMagic(rules, cls.magic?.system, b)),
+      prepared: (Array.isArray(inv.prepared) ? inv.prepared : []).map((p: any) => ({ ...readMagic(rules, cls.magic?.system, p), spent: p?.spent === true }))
     },
     followers: (Array.isArray(f.followers) ? f.followers : []).map((x: any) => {
       const base = blankFollowerFields(x?.kind === 'beast' ? 'beast' : 'follower');
@@ -531,7 +554,14 @@ export function writeSheet(d: SheetData): object {
   return {
     ...d,
     version: FORMAT_VERSION,
-    inventory: { ...inv, armor: inv.armor.map(compactArmor), weapons: inv.weapons.map(compactWeapon), items: inv.items.map(compactItem) }
+    inventory: {
+      ...inv,
+      armor: inv.armor.map(compactArmor),
+      weapons: inv.weapons.map(compactWeapon),
+      items: inv.items.map(compactItem),
+      book: inv.book.map(compactMagic),
+      prepared: inv.prepared.map(compactMagic)
+    }
   };
 }
 

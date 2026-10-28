@@ -119,12 +119,16 @@ level 1 `hp` can be left out (it is the starting HP from the rules).
   `fighter+dweomersmith`; `e9mm` dwarves, elves, gnomes and beastfolk always use one.
 - Magic-users carry their magic in `inventory`, since preparations are physical
   objects. `book` is the spellbook, prayer book or craftbook (a druid's known glamours),
-  and `prepared` lists each preparation and what it holds. `circle` is the spell
-  circle, or the rarity for dweomers (1 common, 2 uncommon, 3 rare).
+  and `prepared` lists each preparation and what it holds. Magic from the equipment
+  file has a `ref` and its name in `magic`; its circle comes from the file. Anything
+  else is written in with its `circle`: the spell circle, or the rarity for dweomers
+  (1 common, 2 uncommon, 3 rare, 4 legendary). A dweomer that can be made at several
+  rarities keeps its `circle` too. A plain name that matches the class's magic in the
+  equipment file gets its `ref` on import.
 
   ```json
-  "book": [{ "magic": "Bless", "circle": 1 }],
-  "prepared": [{ "magic": "Bless", "circle": 1, "spent": false }]
+  "book": [{ "ref": "mm:bless", "magic": "Bless" }, { "magic": "Saint Brendan's Blessing", "circle": 3 }],
+  "prepared": [{ "ref": "mm:bless", "magic": "Bless", "spent": false }]
   ```
 - `inventory.armor`, `inventory.weapons` and `inventory.items` are items. `worn` is the `id` of the armor
   being worn and `wielded` holds the `id`s of the weapons in the main and off hands

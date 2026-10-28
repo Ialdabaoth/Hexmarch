@@ -79,7 +79,7 @@ export function newArmor(rules: Ruleset, type: ArmorType, name?: string): ArmorI
   const entry = rules.equipment.armorOfType(kind.type);
   return {
     id: itemId(),
-    ...(entry ? { ref: rules.equipment.ref(entry) } : {}),
+    ...(entry ? { ref: entry.ref } : {}),
     name: name ?? `${type[0].toUpperCase()}${type.slice(1)} armor`,
     type: kind.type,
     encumbrance: kind.encumbrance,
@@ -90,7 +90,7 @@ export function newArmor(rules: Ruleset, type: ArmorType, name?: string): ArmorI
 
 export function newWeapon(rules: Ruleset, type: string, name?: string): WeaponItem {
   const entry = rules.equipment.findItem(type, ['weapon']);
-  if (entry) return { id: itemId(), ref: rules.equipment.ref(entry), name: name ?? entry.name, ...weaponStats(entry), bonus: 0, enchantment: '' };
+  if (entry) return { id: itemId(), ref: entry.ref, name: name ?? entry.name, ...weaponStats(entry), bonus: 0, enchantment: '' };
   return {
     id: itemId(),
     name: name ?? type,
@@ -112,7 +112,7 @@ export function newItem(rules: Ruleset, name: string, qty = 1): CarriedItem {
   const written = name.trim();
   return {
     id: itemId(),
-    ...(entry ? { ref: rules.equipment.ref(entry) } : {}),
+    ...(entry ? { ref: entry.ref } : {}),
     name: entry?.name ?? written[0].toUpperCase() + written.slice(1),
     qty
   };

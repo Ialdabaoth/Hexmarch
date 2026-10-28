@@ -1,8 +1,9 @@
 # Equipment files
 
 Agreed with Heph 2026-10-28 and built in steps from 0.2.1 to 0.2.5 (see **Build
-order** at the end). As of 0.2.2 the equipment files exist and sheets reference their
-armor, weapons and gear; magic, magic items and campaigns are still to come.
+order** at the end). As of 0.2.3 the equipment files hold the Compendium's armor,
+weapons, gear and magic, and sheets reference them; magic items on the sheet and
+campaigns are still to come.
 
 ## The idea in one paragraph
 
@@ -22,7 +23,7 @@ an editable custom file.
 | File id | What it is | Editable in the app |
 | ------- | ---------- | ------------------- |
 | `mm`    | Materia Mundi Compendium, first edition (default for `mm`) | No |
-| `e9`    | E9 System Reference Handbook (default for `e9` and `e9mm`) | No |
+| `e9`    | E9 System Reference Handbook (`e9` and `e9mm` use `e9` then `mm`) | No |
 | `local` | This device's custom equipment | Yes |
 | any id  | A custom file named by a campaign URL (see Campaigns) | No, the referee republishes it |
 
@@ -30,6 +31,14 @@ Published files live in `src/equipment/` (`mm-equipment.json`, `e9-equipment.jso
 The weapon and armor catalogs move out of the ruleset files' `gear` block into these.
 The rulesets keep the *mechanics* (what light, medium and heavy mean, two-weapon
 rules, wizard armor limits); the equipment files hold the *things*.
+
+A ruleset can name several files in priority order (`"equipment": ["e9", "mm"]`):
+armor and weapons come from the first, and other gear and magic from all of them, the
+first file winning when two have the same name. E9 and E9 for Materia Mundi both do
+this: E9 is a rules interface on top of an existing OSR game and has no spell list of
+its own, so its wizards and priests use the Compendium's spells and miracles for now
+(a B/X-inspired E9 list is planned), and E9 for Materia Mundi's dweomersmiths and
+druids get the Compendium's dweomers and glamours.
 
 A revised edition gets a new file id (say `mm2`), never an edit to `mm`, so old
 references keep meaning what they meant. Fixing a typo or a wrong page number in
@@ -100,7 +109,8 @@ Then by kind:
 ## Magic
 
 Spells, miracles, glamours and dweomers are all entries in `magic`, told apart by
-`system`:
+`system`. Each magic-using class names its system in the ruleset (`"magic": { "system":
+"arcane", ... }`), which picks what its book offers:
 
 | `system`  | Book calls it | Strength measured by |
 | --------- | ------------- | -------------------- |
@@ -160,8 +170,8 @@ the reference goes missing.
   "worn": "a1",
   "wielded": ["w3", "w2"],
   "items": [{ "id": "i1", "ref": "mm:dungeoneers-kit", "name": "Dungeoneer's kit", "qty": 1 }],
-  "book": [{ "magic": "mm:fireball" }],
-  "prepared": [{ "magic": "mm:bless", "spent": false }]
+  "book": [{ "ref": "mm:fireball", "magic": "Fireball" }],
+  "prepared": [{ "ref": "mm:fireball", "magic": "Fireball", "spent": false }]
 }
 ```
 
@@ -173,8 +183,9 @@ the reference goes missing.
   `rarity` is needed only when the dweomer allows several. `quality` is `good`, `fair`
   or `poor` for arcane items (p. 64). A bare string `"mm:earthbreaker"` is accepted
   as shorthand.
-- Magic in `book` and `prepared` becomes a reference; its circle or rarity comes from
-  the catalog. A dweomersmith's prepared enchantment can name the object it's on with
+- Magic in `book` and `prepared` is a `ref` plus its name in `magic`; its circle or
+  rarity comes from the catalog, and `circle` is saved only for a dweomer that can be
+  made at several rarities (1 common to 4 legendary). A dweomersmith's prepared enchantment can name the object it's on with
   `"item": "w3"`.
 - Hand-written sheets can still put a plain name anywhere a reference goes
   (`"items": ["Rope"]`); the app matches it against the character's files and keeps

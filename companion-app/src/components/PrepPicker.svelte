@@ -16,8 +16,8 @@
   }
   let choices = $derived(c.data.inventory.book.map((b, i) => ({ ...b, i, ok: b.circle <= circle && fits(b.circle) })));
 
-  function choose(entry: { magic: string; circle: number }) {
-    c.data.inventory.prepared.push({ magic: entry.magic, circle: entry.circle, spent: false });
+  function choose(entry: { ref?: string; magic: string; circle: number }) {
+    c.data.inventory.prepared.push({ ...(entry.ref ? { ref: entry.ref } : {}), magic: entry.magic, circle: entry.circle, spent: false });
     app.persist();
     app.notify(`Prepared: ${entry.magic || magic.prepared.toLowerCase()}`);
     onclose();

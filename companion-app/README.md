@@ -66,9 +66,12 @@ register it in `RULESETS`, instead of editing the old one, so existing character
 
 ## Equipment data
 
-Armor, weapons, gear, mounts and services live in equipment files in `src/equipment/`:
-`mm-equipment.json` (Compendium, with prices in silver) and `e9-equipment.json` (E9, no
-prices). Each ruleset names its default file in `"equipment"`; `e9mm` uses the E9 file.
+Armor, weapons, gear, mounts, services and magic live in equipment files in
+`src/equipment/`: `mm-equipment.json` (Compendium, with prices in silver, and its 48
+spells, 56 miracles, 40 glamours and 120 dweomers, each with a one-line summary and
+page number) and `e9-equipment.json` (E9 arms and armor, no prices). Each ruleset names
+its files in `"equipment"`; `e9` and `e9mm` use E9's arms and armor with the
+Compendium's gear and magic (E9 has no spell list of its own).
 Sheets point at entries with references like `"mm:longsword"` and save only what's
 unique to each item (name, bonus, enchantment, quantity).
 `src/equipment/equipment.ts` loads them, and a test checks every entry. The format, and

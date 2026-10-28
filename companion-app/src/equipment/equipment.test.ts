@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { RULESETS } from '../rules/rules';
-import { EQUIPMENT, equipmentFile, resolve } from './equipment';
+import { RULESETS, rulesFor } from '../rules/rules';
+import { EQUIPMENT, equipmentFile, magicLevel, magicLevels, resolve } from './equipment';
 
 // Guards hand edits to the files in this folder.
 describe.each(EQUIPMENT.map((f) => [`${f.id}-equipment.json`, f] as const))('%s', (_, file) => {
@@ -35,7 +35,7 @@ describe.each(EQUIPMENT.map((f) => [`${f.id}-equipment.json`, f] as const))('%s'
 
 describe('rulesets', () => {
   it.each(RULESETS.map((r) => [r.id, r] as const))('%s uses an equipment file that exists', (_, r) => {
-    expect(() => equipmentFile(r.options.equipment)).not.toThrow();
+    for (const id of [r.options.equipment].flat()) expect(() => equipmentFile(id)).not.toThrow();
     expect(r.gear.weapons.length).toBeGreaterThan(0);
   });
 });
@@ -49,5 +49,39 @@ describe('references', () => {
     expect(resolve('mm:no-such-thing')).toBeUndefined();
     expect(resolve('nowhere:longsword')).toBeUndefined();
     expect(resolve('longsword')).toBeUndefined();
+  });
+});
+
+describe('mm magic', () => {
+  const file = equipmentFile('mm');
+  it('has spells, miracles, glamours and dweomers', () => {
+    for (const system of ['arcane', 'divine', 'primal', 'dweomer']) expect(file.magic.some((m) => m.system === system), system).toBe(true);
+  });
+  it('entries are complete for their system', () => {
+    for (const m of file.magic) {
+      expect(m.page, m.id).toBeGreaterThan(0);
+      expect(m.summary, m.id).toBeTruthy();
+      if (m.system === 'dweomer') {
+        expect(magicLevels(m).length, m.id).toBeGreaterThan(0);
+        expect(['weapon', 'armor', 'shield', 'amulet', 'belt', 'boots', 'crown', 'ring', 'wondrous', 'potion'], m.id).toContain(m.form);
+        if (m.base) expect(resolve(m.base), `${m.id} base`).toMatchObject({ kind: expect.any(String) });
+      } else {
+        expect(m.circle, m.id).toBeGreaterThanOrEqual(1);
+        expect(m.circle, m.id).toBeLessThanOrEqual(5);
+      }
+    }
+  });
+  it('rarity counts as a level from 1 (common) to 4 (legendary)', () => {
+    expect(magicLevel(resolve('mm:mirror-shield') as any)).toBe(3);
+    expect(magicLevel(resolve('mm:earthbreaker') as any)).toBeUndefined();
+    expect(magicLevels(resolve('mm:bag-of-holding') as any)).toEqual([2, 3, 4]);
+    expect(magicLevel(resolve('mm:fireball') as any)).toBe(3);
+  });
+});
+
+describe('E9 magic', () => {
+  it('uses the Compendium spells until E9 has its own list', () => {
+    expect(rulesFor('e9').equipment.findMagic('Fireball', 'arcane')?.ref).toBe('mm:fireball');
+    expect(rulesFor('e9').gear.weapons.find((w) => w.type === 'Dagger')?.properties).toContain('Thrown 3/6/9');
   });
 });

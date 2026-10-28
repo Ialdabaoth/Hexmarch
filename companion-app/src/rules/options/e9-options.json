@@ -6,7 +6,7 @@
     "attackProgression": "fighters",
     "throwMin": 5
   },
-  "equipment": "e9",
+  "equipment": ["e9", "mm"],
   "originRoll": {
     "start": "origin",
     "tables": {
@@ -203,6 +203,7 @@
         "8": "science"
       },
       "magic": {
+        "system": "arcane",
         "book": "Spellbook",
         "prepared": "Prepared spell",
         "circleWord": "Circle",
@@ -247,6 +248,7 @@
         "8": "bearing"
       },
       "magic": {
+        "system": "divine",
         "book": "Prayer book",
         "prepared": "Prayer strip",
         "circleWord": "Circle",

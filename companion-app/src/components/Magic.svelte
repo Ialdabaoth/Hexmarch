@@ -2,6 +2,7 @@
   import { app } from '../lib/app.svelte';
   import { equipment, type Character } from '../lib/character';
   import { armorEffect, checkPreparations, knownLimit } from '../lib/magic';
+  import { magicLevel, magicLevels, resolveMagic } from '../equipment/equipment';
 
   let { character: c }: { character: Character } = $props();
 
@@ -32,9 +33,36 @@
     app.persist();
   }
 
-  function prepare(entry?: { magic: string; circle: number }) {
+  // What the equipment files offer this class, lowest circle or rarity first.
+  let catalog = $derived(
+    c.rules.equipment.magicOf(magic.system).map((m) => ({ ...m, levels: magicLevels(m) })).sort((a, b) => a.levels[0] - b.levels[0] || a.name.localeCompare(b.name))
+  );
+  let addRef = $state('');
+
+  function addToBook() {
+    if (!addRef) return;
+    const m = catalog.find((x) => x.ref === addRef);
+    c.data.inventory.book.push(m ? { ref: m.ref, magic: m.name, circle: m.levels[0] } : { magic: '', circle: 1 });
+    addRef = '';
+    save();
+  }
+
+  const fixedLevel = (ref: string | undefined) => {
+    const m = resolveMagic(ref);
+    return m ? magicLevel(m) : undefined;
+  };
+  const levelsOf = (ref: string | undefined) => {
+    const m = resolveMagic(ref);
+    return m ? magicLevels(m) : circles;
+  };
+  const about = (ref: string | undefined) => {
+    const m = resolveMagic(ref);
+    return m ? `${m.tags?.length ? `${m.tags.join(' ')} · ` : ''}p. ${m.page}. ${m.summary ?? ''}` : '';
+  };
+
+  function prepare(entry?: { ref?: string; magic: string; circle: number }) {
     const prepared = c.data.inventory.prepared;
-    prepared.push({ magic: entry?.magic ?? '', circle: entry?.circle ?? 1, spent: false });
+    prepared.push({ ...(entry?.ref ? { ref: entry.ref } : {}), magic: entry?.magic ?? '', circle: entry?.circle ?? 1, spent: false });
     // The new one goes into an emptied slot: clear spent ones until everything fits.
     const spent = () => prepared.map((p, i) => ({ p, i })).filter(({ p }) => p.spent).sort((a, b) => a.p.circle - b.p.circle);
     while (checkPreparations(magic.slots, c.level, prepared, armor.penalty).over.length && spent().length) {
@@ -67,10 +95,18 @@
 {#if armor.blockedBy}<p class="small failure">You can't cast your {magic.prepared.toLowerCase()}s while wearing {armor.blockedBy}.</p>{/if}
 {#each c.data.inventory.prepared as p, i}
   <div class="prep" class:spent={p.spent} class:over={limits.over.includes(i)}>
-    <select bind:value={p.circle} onchange={save} aria-label={magic.circleWord}>
-      {#each circles.filter((n) => n <= limits.maxCircle || n === p.circle) as n}<option value={n}>{circleName(n)}</option>{/each}
-    </select>
-    <input bind:value={p.magic} onchange={save} placeholder="What it holds" aria-label="Prepared magic" />
+    {#if fixedLevel(p.ref)}
+      <span class="level">{circleName(p.circle)}</span>
+    {:else}
+      <select bind:value={p.circle} onchange={save} aria-label={magic.circleWord}>
+        {#each levelsOf(p.ref).filter((n) => n <= limits.maxCircle || n === p.circle) as n}<option value={n}>{circleName(n)}</option>{/each}
+      </select>
+    {/if}
+    {#if p.ref}
+      <span class="named">{p.magic}</span>
+    {:else}
+      <input bind:value={p.magic} onchange={save} placeholder="What it holds" aria-label="Prepared magic" />
+    {/if}
     <button onclick={() => use(i)} disabled={!p.spent && !!armor.blockedBy}>{p.spent ? 'Spent' : 'Use'}</button>
     <button class="ghost" aria-label="Remove" onclick={() => { c.data.inventory.prepared.splice(i, 1); save(); }}>✕</button>
   </div>
@@ -90,15 +126,38 @@
   {/if}
   {#each c.data.inventory.book as b, i}
     <div class="prep">
-      <select bind:value={b.circle} onchange={save} aria-label={magic.circleWord}>
-        {#each circles as n}<option value={n}>{circleName(n)}</option>{/each}
-      </select>
-      <input bind:value={b.magic} onchange={save} placeholder="Name" aria-label="Book entry" />
+      {#if fixedLevel(b.ref)}
+        <span class="level">{circleName(b.circle)}</span>
+      {:else}
+        <select bind:value={b.circle} onchange={save} aria-label={magic.circleWord}>
+          {#each levelsOf(b.ref) as n}<option value={n}>{circleName(n)}</option>{/each}
+        </select>
+      {/if}
+      {#if b.ref}
+        <span class="named">{b.magic}</span>
+      {:else}
+        <input bind:value={b.magic} onchange={save} placeholder="Name" aria-label="Book entry" />
+      {/if}
       <button onclick={() => prepare(b)} disabled={!fits(b.circle)}>Prepare</button>
       <button class="ghost" aria-label="Remove" onclick={() => { c.data.inventory.book.splice(i, 1); save(); }}>✕</button>
     </div>
+    {#if about(b.ref)}<p class="small muted about">{about(b.ref)}</p>{/if}
   {/each}
-  <button class="ghost" disabled={knownFull} onclick={() => { c.data.inventory.book.push({ magic: '', circle: 1 }); save(); }}>+ Add to {magic.book.toLowerCase()}</button>
+  {#if catalog.length}
+    <select bind:value={addRef} onchange={addToBook} disabled={knownFull} aria-label="Add to {magic.book.toLowerCase()}">
+      <option value="">+ Add to {magic.book.toLowerCase()}…</option>
+      {#each circles as n}
+        {#if catalog.some((m) => m.levels[0] === n)}
+          <optgroup label={circleName(n)}>
+            {#each catalog.filter((m) => m.levels[0] === n) as m}<option value={m.ref}>{m.name}{m.tags?.length ? ` (${m.tags.join(' ')})` : ''}</option>{/each}
+          </optgroup>
+        {/if}
+      {/each}
+      <option value="custom">Something else…</option>
+    </select>
+  {:else}
+    <button class="ghost" disabled={knownFull} onclick={() => { c.data.inventory.book.push({ magic: '', circle: 1 }); save(); }}>+ Add to {magic.book.toLowerCase()}</button>
+  {/if}
   {#if knownFull && knownMax === c.data.inventory.book.length}<span class="small muted">Full for level {c.level}: forget one to learn another.</span>{/if}
 </details>
 
@@ -112,7 +171,11 @@
   }
   .prep select, .prep input { min-width: 0; }
   .prep button { padding: 0.3rem 0.6rem; }
-  .spent input, .spent select { opacity: 0.5; text-decoration: line-through; }
+  .level, .named { align-self: center; }
+  .level { font-size: 0.85rem; color: var(--muted); padding-left: 0.3rem; }
+  .named { font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
+  .about { margin: -0.15rem 0 0.5rem; }
+  .spent input, .spent select, .spent .named, .spent .level { opacity: 0.5; text-decoration: line-through; }
   .over select, .over input { border-color: var(--bad); color: var(--bad); }
   details { margin-top: 0.75rem; }
   summary { cursor: pointer; min-height: 32px; }
