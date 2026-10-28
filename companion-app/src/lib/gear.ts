@@ -5,7 +5,7 @@
 // file's numbers too, but a saved sheet keeps only the ref and what's unique to it.
 
 import type { ArmorType, Ruleset, WeaponSize } from '../rules/rules';
-import { magicLevel, resolveItem, resolveMagic, type EquipmentItem, type Rarity } from '../equipment/equipment';
+import { magicLevel, resolveItem, resolveMagic, type DamageType, type EquipmentItem, type Rarity } from '../equipment/equipment';
 
 // A dweomer worked into an item, which makes it a magic item. `ref` points at the
 // dweomer in the equipment file; without one, `name` is whatever was written in.
@@ -18,6 +18,8 @@ export interface Enchantment {
   // Arcane items wear from good to fair to poor without upkeep (Compendium p. 64).
   quality?: 'good' | 'fair' | 'poor';
   cursed?: boolean;
+  // Elemental items: the element chosen when it was made ("fire").
+  element?: DamageType;
 }
 
 export interface ArmorItem {
@@ -170,8 +172,14 @@ export function itemLabel(i: CarriedItem): string {
   return i.qty > 1 ? `${i.name} ×${i.qty}` : i.name;
 }
 
+// Every weapon or armor dweomer needs a masterwork base (Compendium p. 55), so an
+// enchanted item is at least +1 even when the sheet doesn't say so.
+export function itemBonus(i: { bonus: number; enchantment?: Enchantment }): number {
+  return resolveMagic(i.enchantment?.ref) ? Math.max(1, i.bonus) : i.bonus;
+}
+
 export function defense(rules: Ruleset, armor: ArmorItem | undefined): number {
-  return armor ? rules.armorKind(armor.type).defense + armor.bonus : 0;
+  return armor ? rules.armorKind(armor.type).defense + itemBonus(armor) : 0;
 }
 
 // Light weapons and shields take one hand and heavy weapons both; a medium weapon
@@ -206,9 +214,10 @@ export function damage(main: WeaponItem | undefined, off: WeaponItem | undefined
   const offDie = off && !off.shield && off.id !== main?.id ? '+d6' : '';
   if (!main) return `d6${offDie}`;
   if (main.ranged) return (main.size === 'heavy' ? '2d6' : 'd6') + offDie;
-  if (main.size === 'light') return `d6${plus(main.bonus)}${offDie}`;
-  if (main.size === 'heavy') return `2d6${plus(str + main.bonus)}`;
-  return bothHands ? `2d6${plus(main.bonus)}` : `d6${plus(str + main.bonus)}${offDie}`;
+  const bonus = itemBonus(main);
+  if (main.size === 'light') return `d6${plus(bonus)}${offDie}`;
+  if (main.size === 'heavy') return `2d6${plus(str + bonus)}`;
+  return bothHands ? `2d6${plus(bonus)}` : `d6${plus(str + bonus)}${offDie}`;
 }
 
 // Everything worn or carried at the ready (Compendium p. 51): armor counts whether

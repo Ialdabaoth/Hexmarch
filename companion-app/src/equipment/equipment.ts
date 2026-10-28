@@ -61,7 +61,52 @@ export interface MagicEntry {
   // The item it's usually built on, e.g. "mm:shield".
   base?: string;
   ingredients?: string[];
+  // What it does in numbers, as far as the app can follow it (see MagicEffect).
+  effects?: MagicEffect[];
 }
+
+// Damage types (Compendium p. 33 and p. 98). Physical damage is slashing, piercing or
+// blunt, from the weapon's properties; armor reduces only physical and metal damage.
+export const DAMAGE_TYPES = [
+  'physical', 'metal', 'petrification', 'cold', 'acid', 'lightning', 'thunder', 'radiant', 'fire', 'poison', 'aetheric', 'psychic'
+] as const;
+export type DamageType = (typeof DAMAGE_TYPES)[number];
+export const PHYSICAL = ['slashing', 'piercing', 'blunt'] as const;
+export type PhysicalSubtype = (typeof PHYSICAL)[number];
+// "physical:piercing"; "elemental" is an element picked when the item is made.
+export type DamageKind = DamageType | `physical:${PhysicalSubtype}` | 'elemental';
+
+// A number, or one that grows with the item's rarity: "rarity" is the rarity bonus
+// (common +0 to legendary +3), "level" the rarity level (common 1 to legendary 4).
+export type Amount = number | 'rarity' | 'level';
+
+// Things a bonus can go to. Saves are named as in the book ("save:doom"); "save" alone
+// is every save.
+export type EffectTarget =
+  | 'defense' | 'attack' | 'damage' | 'hp' | 'range' | 'save'
+  | `ability:${string}` | `save:${string}` | `talent:${string}`;
+
+interface EffectCommon {
+  // A condition the app shows but doesn't check: "vs. unholy", "to hide".
+  vs?: string;
+  // Conditions the app checks: the armor worn, or the kind of attack.
+  when?: { armor?: ('none' | 'light' | 'medium' | 'heavy')[]; attack?: 'melee' | 'ranged' };
+  // For potions and other passing effects: how long it lasts.
+  lasts?: string;
+  times?: number;
+}
+
+export type MagicEffect = EffectCommon &
+  (
+    | { bonus: EffectTarget; amount: Amount }
+    | { set: 'defense'; amount: Amount }
+    | { damage: string; type: DamageKind | DamageKind[]; per?: 'rarity' | 'level' }
+    | { convert: DamageKind | DamageKind[] }
+    | { resist: DamageKind | 'all'; mode: 'half' | 'immune' | 'vulnerable' | 'reduce' | 'armor'; amount?: Amount }
+    | { easier: EffectTarget }
+    | { harder: EffectTarget }
+    | { text: string }
+  );
 
 // Circles 1-5, or rarity as 1 (common) to 4 (legendary), which is how preparation slots
 // count them. Undefined when a dweomer can be made at several rarities.
@@ -266,6 +311,7 @@ export class EquipmentError extends Error {}
 
 const ITEM_KINDS = ['armor', 'weapon', 'gear', 'mount', 'service'];
 const SYSTEMS = ['arcane', 'divine', 'primal', 'dweomer'];
+const EFFECT_KINDS = ['bonus', 'set', 'damage', 'convert', 'resist', 'easier', 'harder', 'text'];
 
 // Checks a file from a campaign URL, an import, or the custom editor, and says what's
 // wrong in words a referee can act on.
@@ -285,7 +331,11 @@ export function checkEquipment(d: unknown): asserts d is EquipmentFileData {
     if (typeof e.name !== 'string' || !e.name.trim()) fail(`"${e.id}" needs a name`);
   }
   for (const i of f!.items!) if (!ITEM_KINDS.includes(i.kind)) fail(`"${i.id}" has an unknown kind "${i.kind}"`);
-  for (const m of f!.magic!) if (!SYSTEMS.includes(m.system)) fail(`"${m.id}" has an unknown system "${m.system}"`);
+  for (const m of f!.magic!) {
+    if (!SYSTEMS.includes(m.system)) fail(`"${m.id}" has an unknown system "${m.system}"`);
+    if (m.effects !== undefined && (!Array.isArray(m.effects) || m.effects.some((e) => !e || typeof e !== 'object' || !EFFECT_KINDS.some((k) => k in e))))
+      fail(`"${m.id}" has an effect the app can't read; each needs one of ${EFFECT_KINDS.join(', ')}`);
+  }
   f!.rules ??= [];
 }
 

@@ -13,6 +13,7 @@
   import Followers from './Followers.svelte';
   import Magic from './Magic.svelte';
   import Effects from './Effects.svelte';
+  import MagicItems from './MagicItems.svelte';
   import XpPanel from './XpPanel.svelte';
   import GearEditor from './GearEditor.svelte';
   import GearPicker from './GearPicker.svelte';
@@ -172,6 +173,7 @@
   </div>
   <div class="row">
     <button onclick={() => rollExpr(`${gear.main?.name ?? 'Unarmed'} damage`, gear.damage)}>Damage {gear.damage}</button>
+    <span class="small muted">{gear.damageTypes}</span>
     {#if gear.off?.shield}<span class="small muted">Shield: attacks you see coming are harder.</span>{/if}
   </div>
 
@@ -231,6 +233,8 @@
       </ul>
     </details>
   {/if}
+
+  <MagicItems magic={c.magic} />
 
   <Effects character={c} />
 

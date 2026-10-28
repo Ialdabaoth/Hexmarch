@@ -3,8 +3,8 @@
 Agreed with Heph 2026-10-28 and built in steps from 0.2.1 to 0.2.5 (see **Build
 order** at the end). As of 0.2.6 the equipment files hold the Compendium's armor,
 weapons, gear and magic, sheets reference them, magic items are items with a
-dweomer, and campaigns and the custom equipment editor work. Dweomer `effects` are
-still to come.
+dweomer, and campaigns and the custom equipment editor work. Since 0.2.8 dweomers
+carry `effects` (see **Effects and damage types**), which the app applies live.
 
 ## The idea in one paragraph
 
@@ -134,9 +134,9 @@ Common fields: `id`, `name`, `system`, `page`, `summary`, and optional `tags`
   - `base`: optional reference to the item it's normally built on
     (`"mm:shield"` for a Mirror Shield), so "add magic item" can fill in both halves.
   - `ingredients`: list of strings.
-  - `effects`: optional numbers the app can use directly, e.g.
-    `{ "attack": 1, "damagePerRarity": "1d6", "defense": 2, "encumbrance": 1 }`.
-    Anything not captured here stays in `summary` for the player to read.
+  - `effects`: optional list of what the item does that the app can follow (see
+    **Effects and damage types** below). Anything not captured there stays in
+    `summary` for the player to read.
 
 ```json
 { "id": "fireball", "name": "Fireball", "system": "arcane", "circle": 3,
@@ -152,6 +152,50 @@ Summaries plus page numbers keep the files small (Heph's call for now; in 0.4.0 
 numbers become links into a rules wiki, as an optional `wiki` URL on each entry) and send players to the book for the
 full text. A `text` field for the full entry is allowed (useful for local custom
 spells, which have no book to point at).
+
+## Effects and damage types
+
+Agreed with Heph 2026-10-28 (design doc: https://claude.ai/artifact/4QiQ7ugKoBMNT2WY6xykTS).
+A dweomer's `effects` is a list; each effect has exactly one of these keys:
+
+| Key | Shape | Example |
+| --- | --- | --- |
+| `bonus` | `{ "bonus": target, "amount": n }` | `{ "bonus": "ability:str", "amount": "rarity" }` |
+| `set` | `{ "set": "defense", "amount": n }` | Mage Robes: defense equals rarity level |
+| `damage` | `{ "damage": dice, "type": kind, "per"?: "level" }` | `{ "damage": "1d6", "type": "fire", "per": "level" }` |
+| `convert` | `{ "convert": kind or [kinds] }` | Aetheric Blade: piercing or aetheric |
+| `resist` | `{ "resist": kind or "all", "mode": "half", "immune", "vulnerable", "reduce" or "armor", "amount"? }` | `{ "resist": "psychic", "mode": "half" }` |
+| `easier` / `harder` | `{ "easier": target }` | Easy (or Hard) rolls for that target |
+| `text` | `{ "text": "..." }` | anything else worth showing |
+
+- **Targets**: `defense`, `attack`, `damage`, `hp`, `range`, `save` (all saves),
+  `save:doom` (one save by name), `ability:str`, `talent:stealth`.
+- **Amounts**: a number, `"rarity"` (the rarity bonus: common 0, uncommon 1, rare 2,
+  legendary 3, the 1st edition table) or `"level"` (common 1 to legendary 4).
+  `times` multiplies it (Windbow range: `"level"` × 10).
+- **Conditions**: `when: { "armor": ["none", "light"], "attack": "melee" }` is checked
+  by the app. `vs` is a label only: an effect with `vs` is shown, never added.
+  `lasts` marks something temporary (potions).
+- **Damage types**: `physical` (with subtypes `physical:slashing`, `physical:piercing`,
+  `physical:blunt`), `metal`, `petrification`, `cold`, `acid`, `lightning`, `thunder`,
+  `radiant`, `fire`, `poison`, `aetheric`, `psychic`, plus `elemental` for an element
+  chosen when the item is made (stored as `enchantment.element` on the sheet). A
+  weapon's own type comes from its properties: Blunt, Piercing (and bows and
+  crossbows), otherwise slashing. Armor reduces only physical and metal damage.
+  Spells and miracles use the same types and resistances.
+
+How the app applies them:
+
+- Worn armor, the weapon or shield in each hand, and carried items count. Potions
+  don't until they're drunk.
+- Only the highest bonus to each target counts (and the worst penalty).
+- Only the main hand's weapon adds to attack and damage, and only for its own kind of
+  attack (melee or ranged).
+- Every weapon or armor dweomer needs a masterwork base (p. 55), so an enchanted weapon
+  or armor counts as at least +1. A magic weapon is at least +1 to attack.
+- Magic can lift an ability past +3 (to +6 at most).
+- Nothing here is saved: the sheet keeps the item and its enchantment, and the numbers
+  are worked out each time.
 
 ## On the character sheet (format version 3)
 
@@ -181,9 +225,10 @@ the reference goes missing.
   active campaign's equipment files.
 - Per-object fields (only what differs from the catalog): `name`, `bonus`
   (masterwork), `qty`, `notes`, and `enchantment`.
-- `enchantment` is the dweomer: `{ "ref", "rarity", "charges", "quality", "cursed" }`.
+- `enchantment` is the dweomer: `{ "ref", "rarity", "charges", "quality", "cursed", "element" }`.
   `rarity` is needed only when the dweomer allows several. `quality` is `good`, `fair`
-  or `poor` for arcane items (p. 64). A bare string `"mm:earthbreaker"` is accepted
+  or `poor` for arcane items (p. 64). `element` is the element an elemental item was
+  made with. A bare string `"mm:earthbreaker"` is accepted
   as shorthand.
 - Magic in `book` and `prepared` is a `ref` plus its name in `magic`; its circle or
   rarity comes from the catalog, and `circle` is saved only for a dweomer that can be
@@ -283,6 +328,8 @@ is kept, and the home screen says so; it comes back when that campaign is opened
 5. **0.2.5** Campaigns: campaign files and URLs for rules and equipment, offline
    caching, greyed-out incompatible characters, the custom equipment editor,
    "Publish as campaign", and bundling custom entries with character export.
+6. **0.2.8** Dweomer effects and damage types: effects for 40 Compendium dweomers,
+   applied live to abilities, talents, saves, attacks, defense and damage.
 
 ## Decisions (Heph, 2026-10-28)
 

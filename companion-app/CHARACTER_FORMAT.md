@@ -154,7 +154,8 @@ that file, and the sheet keeps only what is unique to this one:
 - `enchantment`: the dweomer that makes it a magic item, as `{ "ref": "mm:flametongue",
   "name": "Flametongue", "rarity": "uncommon", "charges": 2, "quality": "fair",
   "cursed": true }`. Only `ref` or `name` is needed: `rarity` only for a dweomer that
-  comes in several rarities, `quality` (`good`, `fair`, `poor`) for arcane items. Free
+  comes in several rarities, `quality` (`good`, `fair`, `poor`) for arcane items,
+  `element` (`"fire"`, `"cold"`, ...) for an elemental item. Free
   text such as `"Blessed by Saint Olaf"` is kept as written, and a bare `"mm:..."` ref
   works too. Rings, amulets, potions and other carried magic items are items in
   `inventory.items` with an `enchantment`.

@@ -22,6 +22,7 @@ export function sheetView(data: SheetData, live?: LiveState) {
     attacks: attackThresholds(c),
     carry: carrying(c),
     gear,
+    magic: c.magic.lines(),
     // What stops prepared magic being cast, e.g. "heavy armor" for a wizard.
     magicBlockedBy: armor.blockedBy,
     // The circle of each slot this level hasn't filled yet (spent preparations still fill theirs).

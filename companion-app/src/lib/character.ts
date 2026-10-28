@@ -8,7 +8,8 @@ import {
   ABILITIES, TALENTS, NPC_TRAITS,
   abilityFromRoll, primesOf, type AbilityId, type ClassId, type Origin, type OriginId, type Ruleset, type TalentId
 } from '../rules/rules';
-import { damage, defense, gearLoad, usesBothHands } from './gear';
+import { damage, defense, gearLoad, itemBonus, usesBothHands } from './gear';
+import { Magic, damageTypeName, hasDweomer, physicalType } from './magic-effects';
 import { CharacterSheet, blankFollower, newId, zeroAbilities, type Abilities, type Follower, type SheetData } from './sheet';
 
 export { newId, zeroAbilities, blankFollower, type Abilities, type Follower };
@@ -47,6 +48,8 @@ export class Character {
   readonly talents: Record<TalentId, number>;
   readonly hpMax: number;
   readonly hp: number;
+  // What the magic items worn, wielded and carried are doing.
+  readonly magic: Magic;
 
   constructor(data: SheetData, readonly state: LiveState) {
     const sheet = (this.sheet = new CharacterSheet(data));
@@ -58,13 +61,15 @@ export class Character {
     this.level = sheet.level();
     this.xp = data.class.xp;
     const bonus = (t: EffectTarget) => state.effects.filter((e) => e.target === t).reduce((s, e) => s + e.amount, 0);
+    const magic = (this.magic = Magic.of(data.inventory));
+    // Magic can lift an ability past +3.
     this.abilities = Object.fromEntries(
-      ABILITIES.map((a) => [a.id, Math.max(-3, Math.min(3, sheet.ability(a.id) + bonus(a.id)))])
+      ABILITIES.map((a) => [a.id, Math.min(6, Math.max(-3, Math.min(3, sheet.ability(a.id) + bonus(a.id))) + magic.amount(`ability:${a.id}`))])
     ) as Abilities;
     this.talents = Object.fromEntries(
-      TALENTS.map((t) => [t.id, Math.min(6, Math.max(2, sheet.talent(t.id) - bonus(t.id)))])
+      TALENTS.map((t) => [t.id, Math.min(6, Math.max(2, sheet.talent(t.id) - bonus(t.id) - magic.amount(`talent:${t.id}`)))])
     ) as Record<TalentId, number>;
-    this.hpMax = sheet.hp();
+    this.hpMax = sheet.hp() + magic.amount('hp');
     this.hp = this.hpMax - state.damage + bonus('hp');
   }
 
@@ -133,19 +138,24 @@ export function hitDieLabel(c: Pick<Character, 'rules' | 'classId' | 'abilities'
   return c.rules.hitDieLabel(c.classId, c.abilities.con);
 }
 
-export function saveThreshold(c: Pick<Character, 'rules' | 'abilities' | 'level'>, ability: AbilityId): number {
-  return c.rules.throw(c.abilities[ability] + c.level);
+export function saveThreshold(c: Pick<Character, 'rules' | 'abilities' | 'level'> & { magic?: Magic }, ability: AbilityId): number {
+  const magic = c.magic?.amount(`save:${ability}`) ?? 0;
+  return Math.max(c.rules.mechanics.throwMin, c.rules.throw(c.abilities[ability] + c.level) - magic);
 }
 
 // Melee uses Str, ranged uses Dex. In E9 only fighters add their level.
-// A masterwork ranged weapon in hand makes ranged attacks one easier to land (p. 48).
-export function attackThresholds(c: Rated & { data?: SheetData }) {
+// A masterwork ranged weapon in hand makes ranged attacks one easier to land (p. 48), and
+// a magic weapon is +1 to attack unless its dweomer gives more; only the best bonus counts.
+export function attackThresholds(c: Rated & { data?: SheetData; magic?: Magic }) {
   const inv = c.data?.inventory;
   const main = inv?.weapons.find((w) => w.id === inv.wielded[0]);
-  const rangedBonus = main?.ranged ? main.bonus : 0;
+  const magicWeapon = hasDweomer(main) ? 1 : 0;
+  const melee = Math.max(main && !main.ranged ? magicWeapon : 0, c.magic?.amount('attack', 'melee') ?? 0);
+  const ranged = Math.max(main?.ranged ? itemBonus(main) : 0, c.magic?.amount('attack', 'ranged') ?? 0);
+  const min = c.rules.mechanics.throwMin;
   return {
-    melee: c.rules.attack(c.classId, c.abilities.str, c.level),
-    ranged: Math.max(c.rules.mechanics.throwMin, c.rules.attack(c.classId, c.abilities.dex, c.level) - rangedBonus)
+    melee: Math.max(min, c.rules.attack(c.classId, c.abilities.str, c.level) - melee),
+    ranged: Math.max(min, c.rules.attack(c.classId, c.abilities.dex, c.level) - ranged)
   };
 }
 
@@ -172,20 +182,30 @@ export function carrying(c: Pick<Character, 'abilities' | 'data'>) {
   return { capacity, threshold, load, encumbered: load > threshold, burdened: load > capacity };
 }
 
-// What the character is wearing and wielding, and what that does in a fight.
+// What the character is wearing and wielding, and what that does in a fight, magic
+// included. damage is a dice expression; damageTypes says what kind of harm it does.
 export function equipment(c: Character) {
   const inv = c.data.inventory;
   const worn = inv.armor.find((a) => a.id === inv.worn);
   const main = inv.weapons.find((w) => w.id === inv.wielded[0]);
   const off = inv.weapons.find((w) => w.id === inv.wielded[1]);
   const bothHands = usesBothHands(main, inv.wielded);
+  const attack = main?.ranged ? 'ranged' : 'melee';
+  const extra = c.magic.extraDamage(attack);
+  const bonus = c.magic.amount('damage', attack);
+  const base = damage(main, bothHands ? undefined : off, bothHands, c.abilities.str);
+  const set = c.magic.setDefense()?.amount ?? 0;
   return {
     worn,
-    defense: defense(c.rules, worn),
+    defense: Math.max(set, defense(c.rules, worn) + c.magic.amount('defense')),
     main,
     off: bothHands ? undefined : off,
     bothHands,
-    damage: damage(main, bothHands ? undefined : off, bothHands, c.abilities.str)
+    damage: base + (bonus ? `${bonus > 0 ? '+' : ''}${bonus}` : '') + extra.map((x) => `+${x.dice}`).join(''),
+    damageTypes: [
+      (c.magic.damageTypes() ?? [physicalType(main)]).map(damageTypeName).join(' or '),
+      ...extra.map((x) => `${x.dice} ${x.types.join(' or ')}`)
+    ].join(', ')
   };
 }
 

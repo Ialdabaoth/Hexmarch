@@ -77,6 +77,15 @@
       {#if v.cls.martial}<p class="small">{v.cls.martial}.</p>{/if}
     </section>
 
+    {#if v.magic.length}
+      <section class="wide">
+        <h2>Magic items</h2>
+        <ul class="features">
+          {#each v.magic as m}<li><b>{m.source}:</b> {m.text}</li>{/each}
+        </ul>
+      </section>
+    {/if}
+
     <section class="wide">
       <h2>Inventory</h2>
       <ul class="items">
