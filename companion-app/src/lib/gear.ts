@@ -1,11 +1,16 @@
 // Armor and weapons are inventory items. Each carries what a player would write on the
 // sheet (type, size, encumbrance, reach or range, bonus); what they do in play (defense,
 // damage, which hands they take) is worked out here from the ruleset's equipment chapter.
+// An item from an equipment file has a `ref` ("mm:longsword"); in memory it carries the
+// file's numbers too, but a saved sheet keeps only the ref and what's unique to it.
 
 import type { ArmorType, Ruleset, WeaponSize } from '../rules/rules';
+import { resolveItem, type EquipmentItem } from '../equipment/equipment';
 
 export interface ArmorItem {
   id: string;
+  // Where its numbers come from; left out for custom armor.
+  ref?: string;
   name: string;
   type: ArmorType;
   encumbrance: number;
@@ -17,6 +22,8 @@ export interface ArmorItem {
 
 export interface WeaponItem {
   id: string;
+  // Where its numbers come from; left out for a custom weapon.
+  ref?: string;
   name: string;
   // The kind from the equipment list ("Longsword", "Shield"); custom names are fine.
   type: string;
@@ -34,6 +41,14 @@ export interface WeaponItem {
   properties: string[];
 }
 
+// Everything else carried: gear from the equipment file, or anything written in.
+export interface CarriedItem {
+  id: string;
+  ref?: string;
+  name: string;
+  qty: number;
+}
+
 // Ids of the weapons in the main and off hands ("" for empty). A medium weapon held in
 // both hands has its id in both.
 export type Hands = [main: string, off: string];
@@ -42,27 +57,94 @@ export function itemId(): string {
   return Math.random().toString(36).slice(2, 10);
 }
 
+export function armorStats(e: EquipmentItem): Pick<ArmorItem, 'type' | 'encumbrance'> {
+  return { type: e.armorType ?? 'light', encumbrance: e.encumbrance ?? 0 };
+}
+
+export function weaponStats(e: EquipmentItem): Omit<WeaponItem, 'id' | 'ref' | 'name' | 'bonus' | 'enchantment'> {
+  return {
+    type: e.name,
+    size: e.size ?? 'medium',
+    encumbrance: e.encumbrance ?? 0,
+    reach: e.reach ?? 0,
+    range: e.range ?? e.thrown ?? 0,
+    ranged: e.ranged ?? false,
+    shield: e.shield ?? false,
+    properties: [...(e.properties ?? [])]
+  };
+}
+
 export function newArmor(rules: Ruleset, type: ArmorType, name?: string): ArmorItem {
   const kind = rules.armorKind(type);
-  return { id: itemId(), name: name ?? `${type[0].toUpperCase()}${type.slice(1)} armor`, type: kind.type, encumbrance: kind.encumbrance, bonus: 0, enchantment: '' };
+  const entry = rules.equipment.armorOfType(kind.type);
+  return {
+    id: itemId(),
+    ...(entry ? { ref: rules.equipment.ref(entry) } : {}),
+    name: name ?? `${type[0].toUpperCase()}${type.slice(1)} armor`,
+    type: kind.type,
+    encumbrance: kind.encumbrance,
+    bonus: 0,
+    enchantment: ''
+  };
 }
 
 export function newWeapon(rules: Ruleset, type: string, name?: string): WeaponItem {
-  const kind = rules.weaponKind(type);
+  const entry = rules.equipment.findItem(type, ['weapon']);
+  if (entry) return { id: itemId(), ref: rules.equipment.ref(entry), name: name ?? entry.name, ...weaponStats(entry), bonus: 0, enchantment: '' };
   return {
     id: itemId(),
-    name: name ?? kind?.type ?? type,
-    type: kind?.type ?? type,
-    size: kind?.size ?? 'medium',
-    encumbrance: kind?.encumbrance ?? 0,
-    reach: kind?.reach ?? 0,
-    range: kind?.range ?? kind?.thrown ?? 0,
-    ranged: kind?.ranged ?? false,
-    shield: kind?.shield ?? false,
+    name: name ?? type,
+    type,
+    size: 'medium',
+    encumbrance: 0,
+    reach: 0,
+    range: 0,
+    ranged: false,
+    shield: false,
     bonus: 0,
     enchantment: '',
-    properties: [...(kind?.properties ?? [])]
+    properties: []
   };
+}
+
+export function newItem(rules: Ruleset, name: string, qty = 1): CarriedItem {
+  const entry = rules.equipment.findItem(name, ['gear', 'mount', 'service']);
+  const written = name.trim();
+  return {
+    id: itemId(),
+    ...(entry ? { ref: rules.equipment.ref(entry) } : {}),
+    name: entry?.name ?? written[0].toUpperCase() + written.slice(1),
+    qty
+  };
+}
+
+// A referenced weapon that no longer matches its file (edited by hand, or an old sheet
+// with its own numbers) becomes custom, so nothing the player wrote is lost.
+export function matchesRef(w: WeaponItem): boolean {
+  const e = resolveItem(w.ref);
+  if (e?.kind !== 'weapon') return false;
+  const s = weaponStats(e);
+  return (Object.keys(s) as (keyof typeof s)[]).every((k) => JSON.stringify(s[k]) === JSON.stringify(w[k]));
+}
+
+// What a saved sheet keeps of each item: with a reference that resolves, only the ref
+// and what's unique to this one; otherwise everything.
+export function compactArmor(a: ArmorItem): object {
+  if (resolveItem(a.ref)?.kind !== 'armor') return a;
+  return { id: a.id, ref: a.ref, name: a.name, ...(a.bonus ? { bonus: a.bonus } : {}), ...(a.enchantment ? { enchantment: a.enchantment } : {}) };
+}
+
+export function compactWeapon(w: WeaponItem): object {
+  if (resolveItem(w.ref)?.kind !== 'weapon') return w;
+  return { id: w.id, ref: w.ref, name: w.name, ...(w.bonus ? { bonus: w.bonus } : {}), ...(w.enchantment ? { enchantment: w.enchantment } : {}) };
+}
+
+export function compactItem(i: CarriedItem): object {
+  return { id: i.id, ...(i.ref ? { ref: i.ref } : {}), name: i.name, ...(i.qty !== 1 ? { qty: i.qty } : {}) };
+}
+
+export function itemLabel(i: CarriedItem): string {
+  return i.qty > 1 ? `${i.name} ×${i.qty}` : i.name;
 }
 
 export function defense(rules: Ruleset, armor: ArmorItem | undefined): number {
@@ -113,11 +195,12 @@ export function gearLoad(armor: ArmorItem[], weapons: WeaponItem[]): number {
 }
 
 // Turns a class's starting kit ("Longsword, heavy armor, shield, two daggers") into
-// items. Anything that isn't armor or a known weapon stays a plain item.
+// items. Anything that isn't armor or a weapon is carried gear, from the equipment file
+// when it's there.
 export function parseKit(rules: Ruleset, kit: string) {
   const armor: ArmorItem[] = [];
   const weapons: WeaponItem[] = [];
-  const items: string[] = [];
+  const items: CarriedItem[] = [];
   const counts: Record<string, number> = { two: 2, three: 3, four: 4 };
   for (const raw of kit.split(/,\s*/).map((g) => g.trim()).filter(Boolean)) {
     const m = raw.match(/^(two|three|four)\s+(.+?)s$/i);
@@ -129,7 +212,7 @@ export function parseKit(rules: Ruleset, kit: string) {
     } else if (rules.weaponKind(name)) {
       for (let i = 0; i < count; i++) weapons.push(newWeapon(rules, name));
     } else {
-      items.push(raw[0].toUpperCase() + raw.slice(1));
+      items.push(newItem(rules, raw));
     }
   }
   return { armor, weapons, items };

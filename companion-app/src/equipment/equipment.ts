@@ -72,6 +72,20 @@ export class EquipmentFile {
     return this.byId.get(id);
   }
 
+  ref(entry: { id: string }): string {
+    return `${this.id}:${entry.id}`;
+  }
+
+  // Case-insensitive, by name or id, so "longsword" in a class kit finds "Longsword".
+  findItem(name: string, kinds?: ItemKind[]): EquipmentItem | undefined {
+    const n = name.trim().toLowerCase().replace(/[‘’]/g, "'");
+    return this.items.find((i) => (!kinds || kinds.includes(i.kind)) && (i.name.toLowerCase() === n || i.id === n));
+  }
+
+  armorOfType(type: ArmorType): EquipmentItem | undefined {
+    return this.items.find((i) => i.kind === 'armor' && !i.barding && i.armorType === type);
+  }
+
   // The character-facing armor and weapon lists, in the shape the gear rules use.
   catalog(): GearCatalog {
     const armor = this.items.filter((i) => i.kind === 'armor' && !i.barding);
@@ -106,4 +120,10 @@ export function resolve(ref: string): EquipmentItem | MagicEntry | undefined {
   const i = ref.indexOf(':');
   if (i < 0) return undefined;
   return EQUIPMENT.find((e) => e.id === ref.slice(0, i))?.get(ref.slice(i + 1));
+}
+
+// Only physical items: armor, weapons, gear, mounts, services.
+export function resolveItem(ref: string | undefined): EquipmentItem | undefined {
+  const e = ref ? resolve(ref) : undefined;
+  return e && 'kind' in e ? e : undefined;
 }

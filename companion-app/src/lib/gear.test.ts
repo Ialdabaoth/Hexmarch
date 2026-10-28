@@ -13,7 +13,9 @@ describe('gear', () => {
     const kit = parseKit(mm, 'Longsword, heavy armor, shield, two daggers, dungeoneer\'s kit');
     expect(kit.armor.map((x) => x.type)).toEqual(['heavy']);
     expect(kit.weapons.map((w) => w.type)).toEqual(['Longsword', 'Shield', 'Dagger', 'Dagger']);
-    expect(kit.items).toEqual(["Dungeoneer's kit"]);
+    expect(kit.items.map((i) => [i.ref, i.name, i.qty])).toEqual([['mm:dungeoneers-kit', "Dungeoneer's kit", 1]]);
+    expect(kit.weapons.map((w) => w.ref)).toEqual(['mm:longsword', 'mm:shield', 'mm:dagger', 'mm:dagger']);
+    expect(kit.armor[0].ref).toBe('mm:heavy-armor');
   });
 
   it('starts a warrior in armor with sword and shield', () => {

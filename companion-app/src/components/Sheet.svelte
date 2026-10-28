@@ -6,6 +6,7 @@
   } from '../lib/character';
   import { expressionRoll, thresholdCheck } from '../lib/checks';
   import { downloadJson, slug } from '../lib/storage';
+  import { writeSheet } from '../lib/sheet';
   import { isWebImageUrl } from '../lib/portraits';
   import { ABILITIES, TALENTS, type Difficulty } from '../rules/rules';
   import { holdRoll } from '../lib/hold.svelte';
@@ -241,13 +242,6 @@
 
   <h2 id="inventory">Gear</h2>
   <GearEditor character={c} />
-  <label for="gear">Other equipment</label>
-  <textarea
-    id="gear"
-    value={c.data.inventory.items.join('\n')}
-    placeholder="One item per line"
-    onchange={(e) => { c.data.inventory.items = (e.target as HTMLTextAreaElement).value.split('\n').map((x) => x.trim()).filter(Boolean); save(); }}
-  ></textarea>
   <label for="notes">Notes, feats, spells</label>
   <textarea id="notes" bind:value={c.data.notes} onchange={save}></textarea>
 
@@ -255,7 +249,7 @@
   <div class="row">
     <button class="primary" onclick={() => (app.view = { name: 'render', id: c!.id, mode: 'postcard' })}>Postcard / PDF</button>
     <button onclick={() => (app.view = { name: 'render', id: c!.id, mode: 'page' })}>Full page</button>
-    <button onclick={() => downloadJson(`${slug(c!.name)}.json`, c!.data)}>Export JSON</button>
+    <button onclick={() => downloadJson(`${slug(c!.name)}.json`, writeSheet(c!.data))}>Export JSON</button>
     {#if confirmDelete}
       <button class="primary" onclick={remove}>Really delete</button>
       <button class="ghost" onclick={() => (confirmDelete = false)}>Keep</button>

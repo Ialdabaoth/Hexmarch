@@ -1,5 +1,5 @@
 import { get, set } from 'idb-keyval';
-import { readSheet, type SheetData } from './sheet';
+import { readSheet, writeSheet, type SheetData } from './sheet';
 import type { LiveState } from './character';
 import type { LogEntry } from './checks';
 import { prefersReducedMotion } from './dice3d';
@@ -33,7 +33,7 @@ export async function loadSheets(): Promise<SheetData[]> {
 
 export async function saveSheets(list: SheetData[]): Promise<void> {
   // Svelte state proxies can't be cloned into IndexedDB, so store plain JSON.
-  await set('sheets', JSON.parse(JSON.stringify(list)));
+  await set('sheets', JSON.parse(JSON.stringify(list.map(writeSheet))));
 }
 
 // Current HP and temporary effects, by character id. Kept on the device only.

@@ -1,8 +1,8 @@
-# Equipment files (draft spec for the 0.2 sprint)
+# Equipment files
 
 Agreed with Heph 2026-10-28 and built in steps from 0.2.1 to 0.2.5 (see **Build
-order** at the end). As of 0.2.1 only the equipment files and their items exist; the
-rest of this document describes where the format is going.
+order** at the end). As of 0.2.2 the equipment files exist and sheets reference their
+armor, weapons and gear; magic, magic items and campaigns are still to come.
 
 ## The idea in one paragraph
 
@@ -248,7 +248,7 @@ to.
    `e9-equipment.json` for weapons, armor, gear and prices; rulesets stop carrying
    catalogs. No sheet change yet.
 2. **0.2.2** Sheet version 3: references for armor, weapons and items, the migration,
-   the equipment picker, and choosing the file in the builder.
+   and the equipment pickers. (Choosing a file per character waits for campaigns.)
 3. **0.2.3** Magic catalog: Compendium spells, miracles, glamours and dweomers
    entered from the book; `book` and `prepared` become references.
 4. **0.2.4** Magic items: the enchantment picker (item + dweomer), charges and

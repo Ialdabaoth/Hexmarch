@@ -25,7 +25,7 @@ Import accepts either, so sheets can also be written or edited by hand.
 ```json
 {
   "format": "materia-mundi-character",
-  "version": 2,
+  "version": 3,
   "rules": "mm",
   "id": "c0ffee00-0000-4000-8000-000000000001",
   "name": "Holly",
@@ -49,20 +49,20 @@ Import accepts either, so sheets can also be written or edited by hand.
   },
   "inventory": {
     "armor": [
-      { "id": "a1", "name": "Light armor", "type": "light", "encumbrance": 1, "bonus": 0, "enchantment": "" }
+      { "id": "a1", "ref": "mm:light-armor", "name": "Light armor" }
     ],
     "weapons": [
-      {
-        "id": "w1", "name": "Light crossbow", "type": "Light Crossbow", "size": "light",
-        "encumbrance": 0, "reach": 0, "range": 10, "ranged": true, "shield": false,
-        "bonus": 0, "enchantment": "", "properties": ["Simple", "Range 10"]
-      },
-      { "id": "w2", "name": "Dagger", "type": "Dagger", "size": "light", "range": 2 },
-      { "id": "w3", "name": "Grandmother's dagger", "type": "Dagger", "size": "light", "range": 2, "bonus": 1 }
+      { "id": "w1", "ref": "mm:light-crossbow", "name": "Light crossbow" },
+      { "id": "w2", "ref": "mm:dagger", "name": "Dagger" },
+      { "id": "w3", "ref": "mm:dagger", "name": "Grandmother's dagger", "bonus": 1 }
     ],
     "worn": "a1",
     "wielded": ["w3", "w2"],
-    "items": ["Lockpicking tools", "Dungeoneer's kit"],
+    "items": [
+      { "id": "i1", "ref": "mm:lockpicking-tools", "name": "Lockpicking tools" },
+      { "id": "i2", "ref": "mm:dungeoneers-kit", "name": "Dungeoneer's kit" },
+      { "id": "i3", "name": "Lucky coin" }
+    ],
     "book": [],
     "prepared": []
   },
@@ -126,25 +126,33 @@ level 1 `hp` can be left out (it is the starting HP from the rules).
   "book": [{ "magic": "Bless", "circle": 1 }],
   "prepared": [{ "magic": "Bless", "circle": 1, "spent": false }]
   ```
-- `inventory.armor` and `inventory.weapons` are items. `worn` is the `id` of the armor
+- `inventory.armor`, `inventory.weapons` and `inventory.items` are items. `worn` is the `id` of the armor
   being worn and `wielded` holds the `id`s of the weapons in the main and off hands
   (`""` for an empty hand; the same `id` twice for a medium weapon held two-handed).
   See below.
 - `id` is optional; importing a sheet with the same `id` updates that character
   instead of adding a copy.
 
-## Armor and weapons
+## Armor, weapons and other equipment
 
-Each piece of armor and each weapon is an item with its own `id`, so the sheet can say
-which ones are worn and wielded. Only `type` is required when writing one by hand; the
-rest fills in from the ruleset's equipment file (Compendium p. 46–49, E9 p. 36–37).
+Each piece of armor, each weapon and each other item has its own `id`, so the sheet can
+say which ones are worn and wielded. An item from an equipment file has a `ref` such as
+`"mm:longsword"` (see [EQUIPMENT_FORMAT.md](EQUIPMENT_FORMAT.md)); its numbers come from
+that file, and the sheet keeps only what is unique to this one:
+
+- `name`: what the player calls it ("Grandmother's dagger").
+- `bonus`: added to defense, melee damage or ranged attack throws (masterwork).
+- `enchantment`: free text for now; it will hold the item's dweomer.
+- `qty`: for other equipment, how many (1 if left out).
+
+On the sheet, **Customize** turns a referenced weapon or armor into a custom one whose
+numbers can be edited. A custom item, or one whose `ref` points at a file this device
+doesn't have, is saved with all its numbers:
 
 Armor:
 
 - `type`: `light`, `medium` or `heavy`, which sets its defense (1, 2 or 3).
 - `encumbrance`: 1, 2 or 3 by default.
-- `bonus`: added to defense (`1` for masterwork).
-- `enchantment`: free text for now.
 
 Weapons and shields:
 
@@ -157,12 +165,18 @@ Weapons and shields:
   weapons and shields, 2 for polearms and greatbows (Materia Mundi).
 - `reach`: extra melee reach in paces. `range`: short range (or thrown range) in paces.
 - `ranged`, `shield`: true or false.
-- `bonus`: added to melee damage, or to ranged attack throws (masterwork, p. 48).
-- `enchantment`: free text for now. `properties`: the list's other properties.
+- `properties`: the list's other properties.
+
+When writing a sheet by hand, a weapon or armor can give just `type` (`"Longsword"`,
+`"heavy"`) and an item can be a plain name (`"Rope"`); the app finds them in the
+ruleset's equipment file and adds the reference.
 
 The off hand can hold a shield or a light melee weapon (which adds its d6 to the main
 hand's damage), as long as the main hand isn't using both hands. A medium weapon held
 two-handed has its `id` in both places in `wielded`.
 
-Version 1 sheets, with `"armor": { "rating", "worn" }` and weapons as `name`, `damage`
-and `range`, still import; the app turns them into items.
+Version 2 sheets, which copied every number into the sheet and listed other equipment
+as plain names, still import: items whose numbers match the equipment file get a
+`ref`, and anything edited away from the file stays custom. Version 1 sheets, with
+`"armor": { "rating", "worn" }` and weapons as `name`, `damage` and `range`, still
+import too.

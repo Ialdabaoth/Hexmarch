@@ -7,7 +7,7 @@
 import mmOptions from './options/mm-options.json';
 import e9Options from './options/e9-options.json';
 import e9mmOptions from './options/e9mm-options.json';
-import { equipmentFile } from '../equipment/equipment';
+import { equipmentFile, type EquipmentFile } from '../equipment/equipment';
 
 export type AbilityId = 'con' | 'str' | 'dex' | 'int' | 'wis' | 'cha';
 
@@ -274,9 +274,13 @@ export class Ruleset {
   get classes() { return this.options.classes; }
   get originRoll() { return this.options.originRoll; }
   get mechanics() { return this.options.mechanics; }
+  get equipment(): EquipmentFile {
+    return equipmentFile(this.options.equipment);
+  }
+
   private _gear?: GearCatalog;
   get gear(): GearCatalog {
-    return (this._gear ??= equipmentFile(this.options.equipment).catalog());
+    return (this._gear ??= this.equipment.catalog());
   }
 
   armorKind(type: ArmorType): ArmorKind {
