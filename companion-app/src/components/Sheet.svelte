@@ -6,7 +6,7 @@
   } from '../lib/character';
   import { expressionRoll, thresholdCheck } from '../lib/checks';
   import { downloadJson, slug } from '../lib/storage';
-  import { writeSheet } from '../lib/sheet';
+  import { exportSheet } from '../lib/campaign';
   import { isWebImageUrl } from '../lib/portraits';
   import { ABILITIES, TALENTS, type Difficulty } from '../rules/rules';
   import { holdRoll } from '../lib/hold.svelte';
@@ -249,7 +249,7 @@
   <div class="row">
     <button class="primary" onclick={() => (app.view = { name: 'render', id: c!.id, mode: 'postcard' })}>Postcard / PDF</button>
     <button onclick={() => (app.view = { name: 'render', id: c!.id, mode: 'page' })}>Full page</button>
-    <button onclick={() => downloadJson(`${slug(c!.name)}.json`, writeSheet(c!.data))}>Export JSON</button>
+    <button onclick={() => downloadJson(`${slug(c!.name)}.json`, exportSheet(c!.data))}>Export JSON</button>
     {#if confirmDelete}
       <button class="primary" onclick={remove}>Really delete</button>
       <button class="ghost" onclick={() => (confirmDelete = false)}>Keep</button>

@@ -2,7 +2,7 @@
   import { app } from '../lib/app.svelte';
   import { expressionRoll, thresholdCheck } from '../lib/checks';
   import { sheetView, type RollRequest } from '../lib/render';
-  import { exportBundle, importFile } from '../lib/sheet';
+  import { exportSheets } from '../lib/campaign';
   import { downloadJson } from '../lib/storage';
   import Postcard from './Postcard.svelte';
   import HpEditor from './HpEditor.svelte';
@@ -75,8 +75,7 @@
 
   async function importText(text: string): Promise<boolean> {
     try {
-      const imported = importFile(JSON.parse(text));
-      await app.upsert(imported);
+      const imported = await app.importCharacters(JSON.parse(text));
       app.notify(`Imported ${imported.length} character${imported.length === 1 ? '' : 's'}`);
       return true;
     } catch (err) {
@@ -94,7 +93,7 @@
 
   // Copy and paste for when files are awkward, as on a phone or between apps.
   function toggleJson() {
-    jsonText = jsonText === null ? JSON.stringify(exportBundle(app.sheets), null, 2) : null;
+    jsonText = jsonText === null ? JSON.stringify(exportSheets(app.sheets), null, 2) : null;
   }
 
   async function copyJson() {
@@ -109,11 +108,20 @@
   async function importPasted() {
     if (jsonText && (await importText(jsonText))) jsonText = null;
   }
+
+  // Characters from another campaign (or from this device, while in a campaign) are
+  // dimmed: they still open, with that campaign's equipment where the device has it.
+  const elsewhere = (c: { data: { campaign?: string } }) => (c.data.campaign ?? '') !== app.campaignId;
+  function campaignName(id: string | undefined): string {
+    if (!id) return 'This device';
+    return Object.values(app.campaigns).find((x) => x.campaign.id === id)?.campaign.name ?? id;
+  }
 </script>
 
 <nav class="party" aria-label="Party">
   {#each app.characters as c (c.id)}
-    <button class="member" class:on={c.id === active?.id} onclick={() => select(c.id)} aria-label={c.name} title={c.name}>
+    <button class="member" class:on={c.id === active?.id} class:elsewhere={elsewhere(c)} onclick={() => select(c.id)} aria-label={c.name}
+      title={elsewhere(c) ? `${c.name} (${campaignName(c.data.campaign)})` : c.name}>
       {#if app.portraitSrc(c.data.portrait)}<img src={app.portraitSrc(c.data.portrait)} alt="" />{:else}<span>{initials(c.name)}</span>{/if}
     </button>
   {/each}
@@ -121,6 +129,7 @@
 </nav>
 
 {#if active && view}
+  {#if elsewhere(active)}<p class="small muted elsewhere-note">From {campaignName(active.data.campaign)}, not the campaign you're in.</p>{/if}
   <Postcard bind:this={card} {view} layout="carousel" onroll={roll} onpage={(i) => (page = i)} onhp={() => (editingHp = true)} onportraitfile={setPortrait} onxp={() => (editingXp = true)} ongear={(slot) => (pickingGear = slot)} oncarry={() => (app.view = { name: 'sheet', id: active!.id, section: 'inventory' })} onprep={togglePrep} onprepslot={(n) => (preparingCircle = n)} />
   {#if pickingGear}<GearPicker character={active} slot={pickingGear} onclose={() => (pickingGear = null)} />{/if}
   {#if preparingCircle !== null}<PrepPicker character={active} circle={preparingCircle} onclose={() => (preparingCircle = null)} />{/if}
@@ -159,7 +168,7 @@
         </div>
       {/if}
       <div class="row">
-        <button onclick={() => downloadJson('materia-mundi-characters.json', exportBundle(app.sheets))} disabled={!app.sheets.length}>Export all (JSON)</button>
+        <button onclick={() => downloadJson('materia-mundi-characters.json', exportSheets(app.sheets))} disabled={!app.sheets.length}>Export all (JSON)</button>
         <button onclick={() => fileInput?.click()}>Import JSON</button>
         <input bind:this={fileInput} type="file" accept="application/json,.json" hidden onchange={onImport} />
         <button onclick={toggleJson}>{jsonText === null ? 'Show JSON (copy / paste)' : 'Hide JSON'}</button>
@@ -172,6 +181,7 @@
           <button class="primary" onclick={importPasted} disabled={!jsonText.trim()}>Import pasted</button>
         </div>
       {/if}
+      {#if app.unreadable}<p class="small failure">{app.unreadable} saved character{app.unreadable === 1 ? '' : 's'} can't be opened, probably from a campaign this device no longer has. They're kept; open that campaign's link in Settings to see them.</p>{/if}
       <p class="muted small">Characters live only on this device. Export a backup now and then, or to move them to another phone.</p>
     </div>
   {/if}
@@ -201,6 +211,9 @@
   }
   .member.on { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); color: var(--accent); }
   .member img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .member.elsewhere { filter: grayscale(0.85) brightness(0.8); opacity: 0.7; border-style: dotted; }
+  .member.elsewhere.on { opacity: 1; }
+  .elsewhere-note { text-align: center; margin: 0 0 0.4rem; }
   .member.add { border-style: dashed; font-size: 1.4rem; }
   .pager { display: flex; justify-content: center; gap: 0.5rem; margin-top: 0.6rem; }
   .pager button { min-height: 32px; padding: 0.2rem 0.9rem; border-radius: 999px; font-size: 0.85rem; }

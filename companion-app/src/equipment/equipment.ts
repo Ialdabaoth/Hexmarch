@@ -109,27 +109,32 @@ export class EquipmentFile {
 
   // The character-facing armor and weapon lists, in the shape the gear rules use.
   catalog(): GearCatalog {
-    const armor = this.items.filter((i) => i.kind === 'armor' && !i.barding);
-    const weapons = this.items.filter((i) => i.kind === 'weapon');
-    return {
-      page: armor[0]?.page ?? weapons[0]?.page ?? 0,
-      armor: armor.map(
-        (i): ArmorKind => ({ type: i.armorType!, defense: i.defense ?? 0, encumbrance: i.encumbrance ?? 0, properties: i.properties ?? [] })
-      ),
-      weapons: weapons.map((i): WeaponKind => {
-        const w: WeaponKind = { type: i.name, size: i.size!, properties: i.properties ?? [], encumbrance: i.encumbrance ?? 0 };
-        for (const k of ['ranged', 'range', 'thrown', 'reach', 'shield'] as const) if (i[k]) (w as any)[k] = i[k];
-        return w;
-      })
-    };
+    return gearCatalog(this.items);
   }
+}
+
+function gearCatalog(items: EquipmentItem[]): GearCatalog {
+  const armor = items.filter((i) => i.kind === 'armor' && !i.barding);
+  const weapons = items.filter((i) => i.kind === 'weapon');
+  return {
+    page: armor[0]?.page ?? weapons[0]?.page ?? 0,
+    armor: armor.map(
+      (i): ArmorKind => ({ type: i.armorType!, defense: i.defense ?? 0, encumbrance: i.encumbrance ?? 0, properties: i.properties ?? [] })
+    ),
+    weapons: weapons.map((i): WeaponKind => {
+      const w: WeaponKind = { type: i.name, size: i.size!, properties: i.properties ?? [], encumbrance: i.encumbrance ?? 0 };
+      for (const k of ['ranged', 'range', 'thrown', 'reach', 'shield'] as const) if (i[k]) (w as any)[k] = i[k];
+      return w;
+    })
+  };
 }
 
 export type WithRef<T> = T & { ref: string };
 
-// The equipment files a ruleset or campaign uses, in priority order. Armor and weapons
-// come from the first file, so a ruleset's own arms list stays as the book has it;
-// other gear and magic come from all of them, the first file winning on a name.
+// The equipment files a ruleset or campaign uses, in priority order. Armor comes from
+// the first file only (armor types are a rule), and weapons from the first file plus
+// any custom ones, so a ruleset's own arms list stays as the book has it. Other gear
+// and magic come from all of them, the first file winning on a name.
 export class Catalog {
   readonly items: WithRef<EquipmentItem>[];
   readonly magic: WithRef<MagicEntry>[];
@@ -139,7 +144,7 @@ export class Catalog {
     const magic = new Map<string, WithRef<MagicEntry>>();
     files.forEach((f, i) => {
       for (const it of f.items) {
-        if (i > 0 && (it.kind === 'armor' || it.kind === 'weapon')) continue;
+        if (i > 0 && (it.kind === 'armor' || (it.kind === 'weapon' && BUILT_IN.has(f.id)))) continue;
         const key = `${it.kind}:${it.name.toLowerCase()}`;
         if (!items.has(key)) items.set(key, { ...it, ref: f.ref(it) });
       }
@@ -175,27 +180,113 @@ export class Catalog {
     return this.magicOf(system).find((m) => m.name.toLowerCase() === n || m.id === n);
   }
 
+  private _gear?: GearCatalog;
   catalog(): GearCatalog {
-    return this.primary.catalog();
+    return (this._gear ??= { ...gearCatalog(this.items), page: this.primary.catalog().page });
   }
 }
 
+// The built-in files.
 export const EQUIPMENT: EquipmentFile[] = [
   new EquipmentFile(mmEquipment as EquipmentFileData),
   new EquipmentFile(e9Equipment as EquipmentFileData)
 ];
 
+// Every file this device knows: the built-in ones, its own custom file ("local"), and
+// files from campaigns. References resolve against all of them, whatever campaign is
+// active, so a character from another campaign keeps its numbers.
+const registry = new Map<string, EquipmentFile>(EQUIPMENT.map((f) => [f.id, f]));
+const BUILT_IN = new Set(EQUIPMENT.map((f) => f.id));
+export const LOCAL_ID = 'local';
+let version = 0;
+// The active campaign's files; null uses each ruleset's own.
+let campaignFiles: string[] | null = null;
+
+export function isBuiltIn(id: string): boolean {
+  return BUILT_IN.has(id);
+}
+
+export function hasEquipment(id: string): boolean {
+  return registry.has(id);
+}
+
+export function registerEquipment(data: EquipmentFileData): EquipmentFile {
+  checkEquipment(data);
+  if (BUILT_IN.has(data.id)) throw new EquipmentError(`"${data.id}" is a built-in equipment file; give this one its own id`);
+  const f = new EquipmentFile(data);
+  registry.set(data.id, f);
+  version++;
+  return f;
+}
+
+export function unregisterEquipment(id: string) {
+  if (BUILT_IN.has(id) || !registry.delete(id)) return;
+  version++;
+}
+
+export function useCampaignEquipment(ids: string[] | null) {
+  campaignFiles = ids;
+  version++;
+}
+
 export function equipmentFile(id: string): EquipmentFile {
-  const f = EQUIPMENT.find((e) => e.id === id);
+  const f = registry.get(id);
   if (!f) throw new Error(`Unknown equipment file "${id}"`);
   return f;
+}
+
+// Changes whenever a file or the active campaign changes, so views can redraw.
+export function equipmentVersion(): number {
+  return version;
+}
+
+const catalogs = new Map<string, Catalog>();
+
+// A ruleset's files (or the campaign's instead), then this device's custom file.
+export function catalogFor(defaults: string[]): Catalog {
+  const ids = [...(campaignFiles ?? defaults), LOCAL_ID].filter((id, i, all) => registry.has(id) && all.indexOf(id) === i);
+  const key = `${version}:${ids.join(',')}`;
+  let c = catalogs.get(key);
+  if (!c) {
+    if (catalogs.size > 20) catalogs.clear();
+    c = new Catalog(ids.map((id) => registry.get(id)!));
+    catalogs.set(key, c);
+  }
+  return c;
 }
 
 // "mm:longsword" -> the Longsword entry in mm-equipment.json.
 export function resolve(ref: string): EquipmentItem | MagicEntry | undefined {
   const i = ref.indexOf(':');
   if (i < 0) return undefined;
-  return EQUIPMENT.find((e) => e.id === ref.slice(0, i))?.get(ref.slice(i + 1));
+  return registry.get(ref.slice(0, i))?.get(ref.slice(i + 1));
+}
+
+export class EquipmentError extends Error {}
+
+const ITEM_KINDS = ['armor', 'weapon', 'gear', 'mount', 'service'];
+const SYSTEMS = ['arcane', 'divine', 'primal', 'dweomer'];
+
+// Checks a file from a campaign URL, an import, or the custom editor, and says what's
+// wrong in words a referee can act on.
+export function checkEquipment(d: unknown): asserts d is EquipmentFileData {
+  const f = d as Partial<EquipmentFileData> | null;
+  const fail = (why: string) => {
+    throw new EquipmentError(`${f?.name ? `${f.name}: ` : ''}${why}`);
+  };
+  if (!f || typeof f !== 'object' || f.format !== 'materia-mundi-equipment') fail('not a Materia Mundi equipment file');
+  if (typeof f!.id !== 'string' || !/^[a-z0-9]+(-[a-z0-9]+)*$/.test(f!.id)) fail('needs an "id" in lower-case letters, digits and dashes');
+  if (!Array.isArray(f!.items) || !Array.isArray(f!.magic)) fail('needs "items" and "magic" lists');
+  const ids = new Set<string>();
+  for (const e of [...f!.items!, ...f!.magic!] as { id?: unknown; name?: unknown }[]) {
+    if (typeof e?.id !== 'string' || !/^[a-z0-9]+(-[a-z0-9]+)*$/.test(e.id)) fail(`entry ${JSON.stringify(e?.name ?? e?.id)} needs an id in lower-case letters, digits and dashes`);
+    if (ids.has(e.id as string)) fail(`two entries use the id "${e.id}"`);
+    ids.add(e.id as string);
+    if (typeof e.name !== 'string' || !e.name.trim()) fail(`"${e.id}" needs a name`);
+  }
+  for (const i of f!.items!) if (!ITEM_KINDS.includes(i.kind)) fail(`"${i.id}" has an unknown kind "${i.kind}"`);
+  for (const m of f!.magic!) if (!SYSTEMS.includes(m.system)) fail(`"${m.id}" has an unknown system "${m.system}"`);
+  f!.rules ??= [];
 }
 
 export function resolveMagic(ref: string | undefined): MagicEntry | undefined {

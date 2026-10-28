@@ -6,12 +6,17 @@
     type Abilities
   } from '../lib/character';
   import {
-    ABILITIES, ABILITY_LABELS, DEFAULT_RULES, RULESETS, TALENTS, hasKind, primesOf, rulesFor,
+    ABILITIES, ABILITY_LABELS, DEFAULT_RULES, RULESETS, TALENTS, hasKind, isBuiltInRules, primesOf, rulesFor,
     type OriginRollStep,
     type AbilityId, type ClassId, type OriginId, type TalentId
   } from '../rules/rules';
 
-  const startRules = rulesFor(app.settings.rules ?? DEFAULT_RULES);
+  import { campaignRulesId } from '../lib/campaign';
+
+  // A campaign sets the rules; otherwise any of the app's own.
+  const campaign = app.campaign;
+  const choices = campaign ? RULESETS.filter((r) => r.id === campaignRulesId(campaign)) : RULESETS.filter((r) => isBuiltInRules(r.id));
+  const startRules = campaign ? choices[0] ?? rulesFor(DEFAULT_RULES) : rulesFor(isBuiltInRules(app.settings.rules) ? app.settings.rules : DEFAULT_RULES);
   let rulesId = $state(startRules.id);
   let rules = $derived(rulesFor(rulesId));
   let name = $state('');
@@ -35,7 +40,7 @@
   // Switching rules starts the character over: origins and classes differ.
   function pickRules(id: string) {
     rulesId = id;
-    app.updateSettings({ rules: id });
+    if (!campaign) app.updateSettings({ rules: id });
     originSteps = [];
     abilities = zeroAbilities();
     talentBase = defaultTalents(abilities);
@@ -115,7 +120,7 @@
   }
 
   async function create() {
-    const sheet = createSheet({ rules: rulesId, name, origin, classId, abilities, talentBase, firstTraining });
+    const sheet = createSheet({ rules: rulesId, campaign: campaign?.campaign.id, name, origin, classId, abilities, talentBase, firstTraining });
     await app.add(sheet);
     app.view = { name: 'sheet', id: sheet.id };
   }
@@ -129,11 +134,15 @@
 <div class="stack">
   <section class="card">
     <h3>Rules</h3>
-    <div class="seg" role="group" aria-label="Rules">
-      {#each RULESETS as r}
-        <button class:on={rulesId === r.id} onclick={() => pickRules(r.id)}>{r.name}</button>
-      {/each}
-    </div>
+    {#if campaign}
+      <p class="small">{rules.name}, for {campaign.campaign.name}{campaign.campaign.referee ? ` (${campaign.campaign.referee}'s game)` : ''}.</p>
+    {:else}
+      <div class="seg" role="group" aria-label="Rules">
+        {#each choices as r}
+          <button class:on={rulesId === r.id} onclick={() => pickRules(r.id)}>{r.name}</button>
+        {/each}
+      </div>
+    {/if}
   </section>
 
   <section class="card">

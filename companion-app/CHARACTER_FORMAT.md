@@ -136,6 +136,11 @@ level 1 `hp` can be left out (it is the starting HP from the rules).
   See below.
 - `id` is optional; importing a sheet with the same `id` updates that character
   instead of adding a copy.
+- `campaign`: the id of the campaign the character was made for; left out for
+  characters made on This device. See [EQUIPMENT_FORMAT.md](EQUIPMENT_FORMAT.md).
+- `custom` (exported files only): copies of the custom equipment entries the
+  character uses, each with the `file` it came from, so the sheet opens on a device
+  that doesn't have them.
 
 ## Armor, weapons and other equipment
 

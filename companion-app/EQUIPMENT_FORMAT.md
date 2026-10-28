@@ -1,9 +1,10 @@
 # Equipment files
 
 Agreed with Heph 2026-10-28 and built in steps from 0.2.1 to 0.2.5 (see **Build
-order** at the end). As of 0.2.4 the equipment files hold the Compendium's armor,
-weapons, gear and magic, sheets reference them, and magic items are items with a
-dweomer; dweomer `effects` and campaigns are still to come.
+order** at the end). As of 0.2.5 the equipment files hold the Compendium's armor,
+weapons, gear and magic, sheets reference them, magic items are items with a
+dweomer, and campaigns and the custom equipment editor work. Dweomer `effects` are
+still to come.
 
 ## The idea in one paragraph
 
@@ -159,7 +160,7 @@ Each owned object keeps its own `id` (so `worn` and `wielded` still work) and ga
 the reference goes missing.
 
 ```json
-"campaign": "device",
+"campaign": "hansa",
 "inventory": {
   "armor": [{ "id": "a1", "ref": "mm:light-armor", "name": "Light armor" }],
   "weapons": [
@@ -175,8 +176,9 @@ the reference goes missing.
 }
 ```
 
-- `campaign` at the top of the sheet: the campaign URL the character was made for, or
-  `"device"`. The pickers offer the active campaign's equipment files.
+- `campaign` at the top of the sheet: the id of the campaign the character was made
+  for. It's left out for characters made on **This device**. The pickers offer the
+  active campaign's equipment files.
 - Per-object fields (only what differs from the catalog): `name`, `bonus`
   (masterwork), `qty`, `notes`, and `enchantment`.
 - `enchantment` is the dweomer: `{ "ref", "rarity", "charges", "quality", "cursed" }`.
@@ -200,8 +202,8 @@ dropped.
 ## Campaigns: rules and equipment from a URL
 
 A referee decides which rules and equipment their game uses and publishes that as a
-**campaign file** at a URL. Players paste the URL into Settings (or open a share
-link), and their app uses that campaign. With no URL set, the app uses
+**campaign file** at a URL. Players paste the URL into Settings, under **Campaign**,
+and their app uses that campaign. With no URL set, the app uses
 **This device**, a campaign that lives only on the phone.
 
 ```json
@@ -212,43 +214,56 @@ link), and their app uses that campaign. With no URL set, the app uses
   "name": "The Hansa Campaign",
   "referee": "Brent",
   "rules": "mm",
-  "equipment": ["mm", "https://example.com/hansa/custom-equipment.json"]
+  "equipment": ["mm", "./hansa-equipment.json"]
 }
 ```
 
 - `rules`: a built-in ruleset id, or a URL to a ruleset JSON in the same format as
   `src/rules/options/*.json`. A custom ruleset needs its own `id` (say `hansa-rules`).
-- `equipment`: published file ids and/or URLs, in priority order. A custom file at a
-  URL has its own `id` too, and references into it use that id
-  (`hansa:teutonic-blade`).
+- `equipment`: published file ids and/or links, in priority order. Links are
+  relative to the campaign file, so the files can sit side by side in one folder. A
+  custom file has its own `id` too, and references into it use that id
+  (`hansa:teutonic-blade`). Armor comes from the first file only, since armor types
+  are a rule; weapons come from the first file plus any custom files (not from
+  other built-in ones, so E9 keeps its own arms list). Gear and magic come from all
+  of them, the first winning on a name. Put the rules' own file first.
 - The app downloads the campaign and everything it names, keeps a copy for offline
-  play, and checks for updates when it's online. The host has to allow
+  play, and checks for updates each time the app opens online. Campaigns opened
+  before are listed in Settings to switch between. The host has to allow
   cross-site reads (CORS). GitHub Pages, raw GitHub files and gists do; Google Drive
   share links don't. Settings will say so when a URL can't be read.
 - A campaign from a URL is read-only in the app. The referee edits their own copy
   and republishes it.
 
-**This device** is the default campaign. You pick its ruleset and published
-equipment, and it has an editable equipment file with the id `local`. The editor
-lives in Settings under **Custom equipment**: a list grouped by kind and system, a
-form for each kind, and a raw JSON view. **Publish as campaign** exports the
-campaign file plus the custom equipment file, so a referee can build their game on
-their own phone, upload the two files somewhere, and share the link.
+**This device** is the default campaign: each character picks a built-in ruleset,
+and the device has an editable equipment file with the id `local`, which is added
+to every catalog (in a campaign too). The editor lives in Settings under **Custom
+equipment**: a list, a form for each kind (weapon, gear, mount, service, spell,
+miracle, glamour, dweomer), a raw JSON view, and import and export. Importing a file
+merges it, the imported entry winning on the same id. There's no custom armor:
+special armor is ordinary armor with a dweomer. Entry ids are made from the name
+when an entry is created and don't change after, because characters point at them.
+
+**Publish as campaign** downloads `campaign.json` plus `<id>-equipment.json` (the
+custom file, renamed to the campaign's id with its references to match). A referee
+builds their game on their own phone, puts the two files in one folder on a site
+anyone can read, and shares the link to `campaign.json`.
 
 ### Characters and campaigns
 
-A character sheet records `"campaign"`: the campaign's URL, or `"device"`. Its
-`rules` and its references say what it needs. A character is **compatible** with
-the active campaign when the campaign provides its ruleset and every file it
-references. Incompatible characters still show and still open, but greyed out on
-the home screen and character list, with a note saying which campaign they belong
-to.
+A character sheet records the `campaign` it was made for. Characters from another
+campaign (or from This device while you're in one) still show and still open, but
+are greyed out on the home screen, with a note saying which campaign they belong
+to. Their references resolve against every file the device knows, whatever
+campaign is active. New characters in a campaign use its ruleset; the rules choice
+is hidden. A saved character the app can't read (its campaign's ruleset is gone)
+is kept, and the home screen says so; it comes back when that campaign is opened.
 
 - **Exporting a character bundles any custom entries it uses** (from `local` or a
   campaign URL file) under a `custom` key, so it still opens on a device that
-  doesn't have that file. On import, entries from `local` are offered for the
-  device's own custom file; entries from a URL file are used only as a fallback
-  until that campaign is loaded.
+  doesn't have that file. On import, entries from `local` that the device lacks
+  are added to its own custom file; entries from a campaign's file are kept as
+  stand-ins until that campaign is opened.
 - "Referee-approved" means "in the campaign the referee published". The app has no
   accounts, so it trusts whatever the files say. Entries may carry an optional
   `source` note (e.g. `"Approved by Brent, session 4"`).
