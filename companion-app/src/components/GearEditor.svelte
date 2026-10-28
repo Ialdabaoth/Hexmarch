@@ -2,7 +2,8 @@
   import { app } from '../lib/app.svelte';
   import type { Character } from '../lib/character';
   import { armorStats, defense, grips, itemId, newArmor, newItem, newWeapon, weaponStats, type ArmorItem, type WeaponItem } from '../lib/gear';
-  import { resolveItem, type EquipmentItem } from '../equipment/equipment';
+  import { magicLevel, magicLevels, RARITIES, resolveItem, type EquipmentItem } from '../equipment/equipment';
+  import EnchantmentField from './EnchantmentField.svelte';
   import type { ArmorType } from '../rules/rules';
 
   // The armor, weapons and other gear a character carries. Items from the equipment
@@ -18,6 +19,19 @@
   let addArmorType = $state('');
   let addWeaponType = $state('');
   let addItemRef = $state('');
+  let addMagicRef = $state('');
+  // Magic items worn or carried rather than wielded: rings, amulets, potions and the like.
+  const CARRIED: string[] = ['amulet', 'belt', 'boots', 'crown', 'ring', 'wondrous', 'potion'];
+  let carriedMagic = $derived(file.magicOf('dweomer').filter((m) => CARRIED.includes(m.form ?? '')).sort((a, b) => a.name.localeCompare(b.name)));
+
+  function addMagicItem() {
+    const m = carriedMagic.find((x) => x.ref === addMagicRef);
+    addMagicRef = '';
+    if (!m) return;
+    const rarity = magicLevel(m) === undefined ? { rarity: RARITIES[magicLevels(m)[0] - 1] } : {};
+    inv.items.push({ id: itemId(), name: m.name, qty: 1, enchantment: { ref: m.ref, name: m.name, ...rarity } });
+    save();
+  }
 
   function save() {
     app.persist();
@@ -134,7 +148,7 @@
       </div>
       {#if missing(a.ref)}<p class="small muted note">Not in your equipment ({a.ref}); using the numbers saved with it.</p>{/if}
     {/if}
-    <input bind:value={a.enchantment} onchange={save} placeholder="Enchantment" aria-label="Enchantment" />
+    <EnchantmentField item={a} catalog={file} forms={['armor']} />
   </div>
 {/each}
 <div class="row">
@@ -188,7 +202,7 @@
       {#if w.properties.length}<p class="small muted props">{w.properties.join(', ')}</p>{/if}
       {#if missing(w.ref)}<p class="small muted note">Not in your equipment ({w.ref}); using the numbers saved with it.</p>{/if}
     {/if}
-    <input bind:value={w.enchantment} onchange={save} placeholder="Enchantment" aria-label="Enchantment" />
+    <EnchantmentField item={w} catalog={file} forms={w.shield ? ['shield'] : ['weapon']} />
   </div>
 {/each}
 <div class="row">
@@ -208,6 +222,7 @@
       <button class="ghost" aria-label="Remove item" onclick={() => removeItem(it.id)}>✕</button>
     </div>
     {#if resolveItem(it.ref)?.summary}<p class="small muted props">{resolveItem(it.ref)?.summary}</p>{/if}
+    {#if it.enchantment}<EnchantmentField item={it} catalog={file} forms={CARRIED as any} />{/if}
   </div>
 {/each}
 <div class="row">
@@ -217,6 +232,14 @@
     <option value="custom">Something else…</option>
   </select>
 </div>
+{#if carriedMagic.length}
+  <div class="row">
+    <select bind:value={addMagicRef} onchange={addMagicItem} aria-label="Add magic item">
+      <option value="">+ Add magic item or potion…</option>
+      {#each carriedMagic as m}<option value={m.ref}>{m.name} ({m.form})</option>{/each}
+    </select>
+  </div>
+{/if}
 
 <style>
   h3 { margin: 0.9rem 0 0.4rem; font-size: 1rem; }
@@ -224,7 +247,7 @@
   .top { flex-wrap: nowrap; }
   .name { flex: 1; min-width: 0; font-weight: 600; }
   .qty { width: 4rem; flex: none; }
-  .line { margin-bottom: 0.4rem; }
+  .line { margin-bottom: 0.4rem; display: flex; flex-direction: column; gap: 0.3rem; }
   .tag { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); white-space: nowrap; }
   .fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(5.5rem, 1fr)); gap: 0.4rem; }
   .fields label { display: flex; flex-direction: column; font-size: 0.75rem; color: var(--muted); margin: 0; }

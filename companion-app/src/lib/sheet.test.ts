@@ -162,3 +162,39 @@ describe('equipment references (format version 3)', () => {
     expect(s.inventory.items[0]).toEqual({ id: 'i1', ref: 'hansa:seal', name: 'Seal of the Order', qty: 2 });
   });
 });
+
+describe('magic items (item + dweomer)', () => {
+  const sheetWith = (inventory: object) => importFile({
+    format: 'materia-mundi-character', version: 3, rules: 'mm', name: 'M', origin: 'human',
+    class: { name: 'warrior', levelups: [{ level: 1 }] },
+    abilities: { con: 0, str: 0, dex: 0, int: 0, wis: 0, cha: 0 },
+    inventory
+  })[0];
+
+  it('turns a written enchantment into a dweomer when the file has it', () => {
+    const s = sheetWith({
+      weapons: [
+        { id: 'w1', type: 'Longsword', enchantment: 'Flametongue' },
+        { id: 'w2', type: 'Dagger', enchantment: 'Blessed by Saint Olaf' }
+      ]
+    });
+    expect(s.inventory.weapons[0].enchantment).toEqual({ ref: 'mm:flametongue', name: 'Flametongue', rarity: 'common' });
+    expect(s.inventory.weapons[1].enchantment).toEqual({ name: 'Blessed by Saint Olaf' });
+  });
+
+  it('saves the rarity only when the dweomer leaves it open', () => {
+    const s = sheetWith({
+      weapons: [{ id: 'w1', ref: 'mm:shield', name: 'Shield', enchantment: { ref: 'mm:mirror-shield', rarity: 'common' } }],
+      items: [{ id: 'i1', name: 'Ring of Elemental Power', enchantment: { ref: 'mm:ring-of-elemental-power', rarity: 'rare', charges: 3, quality: 'fair' } }]
+    });
+    const saved = writeSheet(s) as any;
+    expect(saved.inventory.weapons[0].enchantment).toEqual({ ref: 'mm:mirror-shield', name: 'Mirror Shield' });
+    expect(saved.inventory.items[0].enchantment).toEqual({ ref: 'mm:ring-of-elemental-power', name: 'Ring of Elemental Power', rarity: 'rare', charges: 3, quality: 'fair' });
+    expect(readSheet(JSON.parse(JSON.stringify(saved)))).toEqual(s);
+  });
+
+  it('accepts a bare dweomer reference', () => {
+    const s = sheetWith({ armor: [{ id: 'a1', type: 'heavy', enchantment: 'mm:orichalc-plate' }] });
+    expect(s.inventory.armor[0].enchantment).toEqual({ ref: 'mm:orichalc-plate', name: 'Orichalc Plate' });
+  });
+});

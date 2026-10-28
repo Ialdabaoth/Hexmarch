@@ -7,10 +7,10 @@
 
 import { rollDie, type Rng } from './dice';
 import {
-  armorStats, compactArmor, compactItem, compactWeapon, defaultLoadout, itemId, matchesRef, newArmor, newItem, newWeapon, parseKit,
+  type Enchantment, armorStats, compactArmor, compactItem, compactWeapon, defaultLoadout, itemId, matchesRef, newArmor, newItem, newWeapon, parseKit,
   weaponStats, type ArmorItem, type CarriedItem, type Hands, type WeaponItem
 } from './gear';
-import { magicLevel, magicLevels, resolveMagic, resolveItem, type MagicEntry, type MagicSystem } from '../equipment/equipment';
+import { RARITIES, magicLevel, magicLevels, resolveMagic, resolveItem, type MagicEntry, type MagicSystem, type Rarity } from '../equipment/equipment';
 import {
   ABILITIES, DEFAULT_RULES, TALENTS, findRules, hasKind, normalizeRulesId, primesOf, rulesFor, scheduledTraining,
   type AbilityId, type Attitude, type ClassId, type OriginId, type Ruleset, type TalentId
@@ -334,23 +334,23 @@ const text = (v: unknown, fallback = '') => (typeof v === 'string' ? v : fallbac
 function readArmor(rules: Ruleset, a: any): ArmorItem {
   const id = text(a?.id) || itemId();
   const bonus = count(a?.bonus);
-  const enchantment = text(a?.enchantment);
+  const enchantment = readEnchantment(rules, a?.enchantment);
   const entry = resolveItem(text(a?.ref));
-  if (entry?.kind === 'armor') return { id, ref: a.ref, name: text(a?.name) || entry.name, ...armorStats(entry), bonus, enchantment };
+  if (entry?.kind === 'armor') return { id, ref: a.ref, name: text(a?.name) || entry.name, ...armorStats(entry), bonus, ...(enchantment ? { enchantment } : {}) };
   // No reference, or one this device can't find: the sheet's own numbers.
   const type = SIZES.includes(a?.type) ? a.type : 'light';
   const { ref, ...base } = newArmor(rules, type, text(a?.name) || undefined);
   const encumbrance = count(a?.encumbrance, base.encumbrance);
   const keep = text(a?.ref) || (encumbrance === base.encumbrance ? ref : '');
-  return { ...base, id, ...(keep ? { ref: keep } : {}), encumbrance, bonus, enchantment };
+  return { ...base, id, ...(keep ? { ref: keep } : {}), encumbrance, bonus, ...(enchantment ? { enchantment } : {}) };
 }
 
 function readWeapon(rules: Ruleset, w: any): WeaponItem {
   const id = text(w?.id) || itemId();
   const bonus = count(w?.bonus);
-  const enchantment = text(w?.enchantment);
+  const enchantment = readEnchantment(rules, w?.enchantment);
   const entry = resolveItem(text(w?.ref));
-  if (entry?.kind === 'weapon') return { id, ref: w.ref, name: text(w?.name) || entry.name, ...weaponStats(entry), bonus, enchantment };
+  if (entry?.kind === 'weapon') return { id, ref: w.ref, name: text(w?.name) || entry.name, ...weaponStats(entry), bonus, ...(enchantment ? { enchantment } : {}) };
   const base = newWeapon(rules, text(w?.type) || text(w?.name, 'Weapon'), text(w?.name) || undefined);
   const item: WeaponItem = {
     id,
@@ -364,7 +364,7 @@ function readWeapon(rules: Ruleset, w: any): WeaponItem {
     ranged: typeof w?.ranged === 'boolean' ? w.ranged : base.ranged,
     shield: typeof w?.shield === 'boolean' ? w.shield : base.shield,
     bonus,
-    enchantment,
+    ...(enchantment ? { enchantment } : {}),
     properties: Array.isArray(w?.properties) ? w.properties.map(String) : base.properties
   };
   return item;
@@ -393,16 +393,41 @@ function compactMagic<T extends BookEntry>(b: T): object {
   return magicLevel(entry) === undefined ? { ...rest, circle: level } : rest;
 }
 
-// Carried gear: a plain name (older sheets) or { id, ref, name, qty }.
+// Carried gear: a plain name (older sheets) or { id, ref, name, qty, enchantment }.
 function readItem(rules: Ruleset, x: any): CarriedItem[] {
   if (typeof x === 'string') return x.trim() ? [newItem(rules, x)] : [];
   if (typeof x !== 'object' || x === null) return [];
   const ref = text(x.ref);
-  const name = text(x.name).trim() || resolveItem(ref)?.name;
+  const enchantment = readEnchantment(rules, x.enchantment);
+  const name = text(x.name).trim() || resolveItem(ref)?.name || enchantment?.name;
   if (!name) return [];
   const qty = Math.max(1, count(x.qty, 1));
-  if (!ref) return [{ ...newItem(rules, name, qty), id: text(x.id) || itemId() }];
-  return [{ id: text(x.id) || itemId(), ref, name, qty }];
+  const item: CarriedItem = ref ? { id: text(x.id) || itemId(), ref, name, qty } : { ...newItem(rules, name, qty), id: text(x.id) || itemId() };
+  return [enchantment ? { ...item, enchantment } : item];
+}
+
+// A dweomer: { ref, rarity, charges, quality, cursed }, a bare ref ("mm:earthbreaker"),
+// or free text (older sheets), which is matched against the equipment file's dweomers.
+function readEnchantment(rules: Ruleset, v: unknown): Enchantment | undefined {
+  const o: Record<string, any> = typeof v === 'string' ? (/^[\w-]+:[\w-]+$/.test(v.trim()) ? { ref: v.trim() } : { name: v }) : typeof v === 'object' && v ? v : {};
+  let ref = text(o.ref);
+  let entry: MagicEntry | undefined = ref ? resolveMagic(ref) : undefined;
+  const written = text(o.name).trim();
+  if (!ref && written) {
+    const match = rules.equipment.findMagic(written, 'dweomer');
+    if (match) [entry, ref] = [match, match.ref];
+  }
+  const name = written || entry?.name || ref;
+  if (!name) return undefined;
+  const e: Enchantment = { ...(ref ? { ref } : {}), name };
+  const levels = entry ? magicLevels(entry) : [];
+  const rarity = RARITIES.includes(o.rarity) ? (o.rarity as Rarity) : undefined;
+  if (entry && magicLevel(entry) === undefined) e.rarity = rarity && levels.includes(RARITIES.indexOf(rarity) + 1) ? rarity : RARITIES[levels[0] - 1];
+  else if (!entry && rarity) e.rarity = rarity;
+  if (Number.isInteger(o.charges) && o.charges >= 0) e.charges = o.charges;
+  if (['good', 'fair', 'poor'].includes(o.quality)) e.quality = o.quality;
+  if (o.cursed === true) e.cursed = true;
+  return e;
 }
 
 // Version 1 had armor as { rating, worn } and weapons as { name, damage, range };
