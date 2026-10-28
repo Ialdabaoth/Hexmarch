@@ -13,27 +13,40 @@ export interface Settings {
   rules: string;
   // Show rolls on tumbling 3D dice. Starts off for people who ask for less motion.
   dice3d: boolean;
+  // The campaign file's link, or '' for "This device".
+  campaign: string;
 }
 
-export const DEFAULT_SETTINGS: Settings = { webhookUrl: '', autoPost: false, activeId: '', rules: 'mm', dice3d: !prefersReducedMotion() };
+export const DEFAULT_SETTINGS: Settings = { webhookUrl: '', autoPost: false, activeId: '', rules: 'mm', dice3d: !prefersReducedMotion(), campaign: '' };
 
 // Saved sheets go through the same checks as imported files, so a sheet the
-// app can't read is skipped instead of breaking the whole list.
+// app can't read is skipped instead of breaking the whole list. Skipped sheets
+// (say, from a campaign whose files are gone) are kept as they were and saved back.
+let unreadable: unknown[] = [];
+
 export async function loadSheets(): Promise<SheetData[]> {
   const raw = (await get<unknown[]>('sheets')) ?? [];
+  unreadable = [];
   return raw.flatMap((r) => {
     try {
       return [readSheet(r)];
     } catch (e) {
       console.warn('Skipping unreadable character sheet', e);
+      unreadable.push(r);
       return [];
     }
   });
 }
 
+export function unreadableSheets(): unknown[] {
+  return unreadable;
+}
+
 export async function saveSheets(list: SheetData[]): Promise<void> {
   // Svelte state proxies can't be cloned into IndexedDB, so store plain JSON.
-  await set('sheets', JSON.parse(JSON.stringify(list.map(writeSheet))));
+  const ids = new Set(list.map((s) => s.id));
+  const kept = unreadable.filter((r) => !ids.has((r as { id?: string })?.id ?? ''));
+  await set('sheets', JSON.parse(JSON.stringify([...list.map(writeSheet), ...kept])));
 }
 
 // Current HP and temporary effects, by character id. Kept on the device only.

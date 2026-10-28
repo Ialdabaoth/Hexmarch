@@ -1,8 +1,13 @@
 import { Character, freshState, type LiveState } from './character';
-import type { SheetData } from './sheet';
+import { importFile, type SheetData } from './sheet';
 import type { LogEntry } from './checks';
 import { postToDiscord, isWebhookUrl } from './discord';
-import { DEFAULT_SETTINGS, loadLive, loadLog, loadSettings, loadSheets, saveLive, saveLog, saveSettings, saveSheets, type Settings } from './storage';
+import { DEFAULT_SETTINGS, loadLive, loadLog, loadSettings, loadSheets, saveLive, saveLog, saveSettings, saveSheets, unreadableSheets, type Settings } from './storage';
+import {
+  absorbCustom, activateCampaign, blankLocal, fetchCampaign, loadCampaigns, loadFallbacks, loadLocal, registerCampaign, saveCampaigns,
+  saveLocal, type CampaignCache
+} from './campaign';
+import { hasEquipment, registerEquipment, type EquipmentFileData } from '../equipment/equipment';
 import { preloadDice, showDice } from './dice3d';
 import { portraitFromFile } from './portrait';
 import { CACHE_PREFIX, cachedId, deletePortrait, isInline, loadPortraits, portraitId, portraitSrc, savePortrait } from './portraits';
@@ -13,6 +18,7 @@ export type View =
   | { name: 'sheet'; id: string; section?: string }
   | { name: 'dice' }
   | { name: 'settings' }
+  | { name: 'equipment' }
   | { name: 'render'; id: string; mode: RenderMode };
 
 export type RenderMode = 'postcard' | 'page';
@@ -31,11 +37,29 @@ class AppState {
   lastRoll = $state<LogEntry | null>(null);
   // Cached portrait pictures by id (see portraits.ts).
   portraits = $state<Record<string, string>>({});
+  // Campaigns this device has opened, by link, and its own custom equipment file.
+  campaigns = $state<Record<string, CampaignCache>>({});
+  local = $state<EquipmentFileData>(blankLocal());
+  // Saved characters the app can't read (kept, not shown).
+  unreadable = $state(0);
   private toastTimer: ReturnType<typeof setTimeout> | undefined;
+
+  get campaign(): CampaignCache | null {
+    return this.campaigns[this.settings.campaign] ?? null;
+  }
+
+  // The active campaign's id; '' for "This device".
+  get campaignId(): string {
+    return this.campaign?.campaign.id ?? '';
+  }
 
   async load() {
     try {
-      [this.sheets, this.live, this.log, this.settings] = await Promise.all([loadSheets(), loadLive(), loadLog(), loadSettings()]);
+      // Equipment and campaign rulesets first: sheets are read against them.
+      this.settings = await loadSettings();
+      await this.loadEquipment();
+      [this.sheets, this.live, this.log] = await Promise.all([loadSheets(), loadLive(), loadLog()]);
+      this.unreadable = unreadableSheets().length;
     } catch (e) {
       // Private browsing or an embedded preview can block storage; run without saving.
       console.warn('Storage unavailable', e);
@@ -50,6 +74,125 @@ class AppState {
     this.loaded = true;
     if (await this.cacheInlinePortraits(this.sheets)) await this.persist();
     if (this.settings.dice3d) preloadDice();
+    void this.refreshCampaign();
+  }
+
+  private async loadEquipment() {
+    try {
+      this.local = await loadLocal();
+      registerEquipment($state.snapshot(this.local));
+    } catch (e) {
+      console.warn('Custom equipment unavailable', e);
+    }
+    this.campaigns = await loadCampaigns();
+    for (const c of Object.values(this.campaigns)) {
+      try {
+        registerCampaign(c);
+      } catch (e) {
+        console.warn(`Campaign ${c.url} unreadable`, e);
+      }
+    }
+    // Stand-ins for other campaigns' entries that came with imported characters.
+    for (const f of Object.values(await loadFallbacks())) {
+      if (!hasEquipment(f.id)) {
+        try {
+          registerEquipment(f);
+        } catch (e) {
+          console.warn(e);
+        }
+      }
+    }
+    activateCampaign(this.campaign);
+  }
+
+  // Views read catalogs through characters, so new characters make them redraw.
+  private equipmentChanged() {
+    this.sheets = [...this.sheets];
+  }
+
+  // Opens a campaign by its link. Throws with a message for the player.
+  async useCampaign(url: string) {
+    const c = await fetchCampaign(url.trim());
+    await this.adoptCampaign(c);
+    this.notify(`Playing in ${c.campaign.name}`);
+  }
+
+  // Switches to a campaign opened before, fetching it again when possible.
+  async switchCampaign(url: string) {
+    try {
+      await this.adoptCampaign(await fetchCampaign(url));
+    } catch (e) {
+      const c = this.campaigns[url];
+      if (!c) throw e;
+      await this.updateSettings({ campaign: url });
+      activateCampaign(c);
+      this.equipmentChanged();
+      this.notify(`Using the saved copy of ${c.campaign.name}`);
+    }
+  }
+
+  async leaveCampaign() {
+    await this.updateSettings({ campaign: '' });
+    activateCampaign(null);
+    this.equipmentChanged();
+  }
+
+  async forgetCampaign(url: string) {
+    if (this.settings.campaign === url) await this.leaveCampaign();
+    const { [url]: _, ...rest } = this.campaigns;
+    this.campaigns = rest;
+    await saveCampaigns(this.campaigns);
+  }
+
+  private async adoptCampaign(c: CampaignCache) {
+    registerCampaign(c);
+    this.campaigns = { ...this.campaigns, [c.url]: c };
+    await saveCampaigns(this.campaigns);
+    await this.updateSettings({ campaign: c.url });
+    activateCampaign(c);
+    await this.rereadSheets();
+    this.equipmentChanged();
+  }
+
+  // The referee may have changed the campaign's files; pick that up quietly.
+  private async refreshCampaign() {
+    const url = this.settings.campaign;
+    if (!url || !navigator.onLine) return;
+    try {
+      const c = await fetchCampaign(url);
+      if (this.settings.campaign === url) await this.adoptCampaign(c);
+    } catch (e) {
+      console.warn('Campaign not refreshed', e);
+    }
+  }
+
+  // Characters that couldn't be read may be readable once a campaign's ruleset is known.
+  private async rereadSheets() {
+    if (!this.unreadable) return;
+    const sheets = await loadSheets();
+    this.unreadable = unreadableSheets().length;
+    for (const s of sheets) {
+      if (this.sheets.some((x) => x.id === s.id)) continue;
+      this.sheets.push(s);
+      this.live[s.id] ??= freshState();
+    }
+  }
+
+  async saveLocal(file: EquipmentFileData) {
+    const plain = JSON.parse(JSON.stringify(file)) as EquipmentFileData;
+    registerEquipment(plain);
+    this.local = plain;
+    await saveLocal(plain);
+    this.equipmentChanged();
+  }
+
+  // A file of characters: their custom entries first, so the sheets can use them.
+  async importCharacters(data: unknown): Promise<SheetData[]> {
+    const local = await absorbCustom(data, JSON.parse(JSON.stringify(this.local)));
+    if (local) await this.saveLocal(local);
+    const imported = importFile(data);
+    await this.upsert(imported);
+    return imported;
   }
 
   character(id: string): Character | undefined {

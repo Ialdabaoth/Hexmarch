@@ -7,7 +7,7 @@
 import mmOptions from './options/mm-options.json';
 import e9Options from './options/e9-options.json';
 import e9mmOptions from './options/e9mm-options.json';
-import { Catalog, equipmentFile, type MagicSystem } from '../equipment/equipment';
+import { catalogFor, type Catalog, type MagicSystem } from '../equipment/equipment';
 
 export type AbilityId = 'con' | 'str' | 'dex' | 'int' | 'wis' | 'cha';
 
@@ -276,15 +276,14 @@ export class Ruleset {
   get classes() { return this.options.classes; }
   get originRoll() { return this.options.originRoll; }
   get mechanics() { return this.options.mechanics; }
-  private _catalog?: Catalog;
+  // The ruleset's equipment files, or the active campaign's, plus this device's own.
   get equipment(): Catalog {
     const ids = this.options.equipment;
-    return (this._catalog ??= new Catalog((Array.isArray(ids) ? ids : [ids]).map(equipmentFile)));
+    return catalogFor(Array.isArray(ids) ? ids : [ids]);
   }
 
-  private _gear?: GearCatalog;
   get gear(): GearCatalog {
-    return (this._gear ??= this.equipment.catalog());
+    return this.equipment.catalog();
   }
 
   armorKind(type: ArmorType): ArmorKind {
@@ -387,6 +386,27 @@ export const RULESETS: Ruleset[] = [
   new Ruleset(e9Options as RulesetOptions),
   new Ruleset(e9mmOptions as RulesetOptions)
 ];
+
+const BUILT_IN_RULES = new Set(RULESETS.map((r) => r.id));
+
+export function isBuiltInRules(id: string): boolean {
+  return BUILT_IN_RULES.has(id);
+}
+
+// A ruleset from a campaign URL. It needs its own id; a later copy of the same one
+// replaces the earlier.
+export function registerRuleset(options: RulesetOptions): Ruleset {
+  if (!options || typeof options !== 'object' || typeof options.id !== 'string' || !options.id) throw new Error('A ruleset needs an "id"');
+  if (BUILT_IN_RULES.has(options.id)) throw new Error(`"${options.id}" is a built-in ruleset; give the campaign's its own id`);
+  for (const key of ['name', 'mechanics', 'originRoll', 'origins', 'classes', 'equipment'] as const) {
+    if (!(key in options)) throw new Error(`Ruleset "${options.id}" has no "${key}"`);
+  }
+  const r = new Ruleset(options);
+  const i = RULESETS.findIndex((x) => x.id === r.id);
+  if (i >= 0) RULESETS[i] = r;
+  else RULESETS.push(r);
+  return r;
+}
 
 export const DEFAULT_RULES = 'mm';
 

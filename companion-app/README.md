@@ -74,9 +74,14 @@ its files in `"equipment"`; `e9` and `e9mm` use E9's arms and armor with the
 Compendium's gear and magic (E9 has no spell list of its own).
 Sheets point at entries with references like `"mm:longsword"` and save only what's
 unique to each item (name, bonus, enchantment, quantity).
-`src/equipment/equipment.ts` loads them, and a test checks every entry. The format, and
-where it's going (references from sheets, magic, magic items, campaigns by URL), is in
-[EQUIPMENT_FORMAT.md](EQUIPMENT_FORMAT.md).
+`src/equipment/equipment.ts` loads them, and a test checks every entry.
+
+Each device also has its own custom equipment file, edited under Settings, Custom
+equipment. A referee can publish theirs as a **campaign**: a `campaign.json` naming the
+rules and equipment files, put on any site that lets other sites read it (GitHub
+Pages, a gist). Players paste its link into Settings, Campaign
+(`src/lib/campaign.ts`). Exported characters carry the custom entries they use. The
+format, campaigns included, is in [EQUIPMENT_FORMAT.md](EQUIPMENT_FORMAT.md).
 
 ## Development
 

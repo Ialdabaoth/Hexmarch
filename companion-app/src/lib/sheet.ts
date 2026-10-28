@@ -75,6 +75,8 @@ export interface SheetData {
   version: number;
   // Which ruleset built the character: "mm" (Materia Mundi) or "e9".
   rules: string;
+  // The campaign the character was made for (its id), if any; see campaign.ts.
+  campaign?: string;
   id: string;
   name: string;
   // An image: a data: URL (resized on the device) or an https:// link. Empty for none.
@@ -214,6 +216,7 @@ export class CharacterSheet {
 
 export interface DraftCharacter {
   rules?: string;
+  campaign?: string;
   name: string;
   origin: OriginId;
   classId: ClassId;
@@ -240,6 +243,7 @@ export function createSheet(d: DraftCharacter): SheetData {
     format: FORMAT,
     version: FORMAT_VERSION,
     rules: rules.id,
+    ...(d.campaign ? { campaign: d.campaign } : {}),
     id: newId(),
     name: d.name.trim() || 'Unnamed',
     portrait: '',
@@ -491,7 +495,7 @@ export function readSheet(raw: unknown): SheetData {
   const name = typeof f.name === 'string' ? f.name : '';
   if (f.format !== FORMAT) fail(name, 'not a Materia Mundi character sheet');
   const rules = findRules(f.rules);
-  if (!rules) fail(name, `unknown rules "${f.rules}"`);
+  if (!rules) fail(name, f.campaign ? `made for the campaign "${f.campaign}"; open its link in Settings first` : `unknown rules "${f.rules}"`);
   if (!rules.hasOrigin(f.origin)) fail(name, `${rules.name} has no origin "${f.origin}"`);
   if (!rules.hasClass(f.class?.name)) fail(name, `${rules.name} has no class "${f.class?.name}"`);
   const cls = rules.getClass(f.class.name);
@@ -545,6 +549,7 @@ export function readSheet(raw: unknown): SheetData {
     format: FORMAT,
     version: FORMAT_VERSION,
     rules: normalizeRulesId(f.rules),
+    ...(typeof f.campaign === 'string' && f.campaign ? { campaign: f.campaign } : {}),
     id: typeof f.id === 'string' && f.id ? f.id : newId(),
     name: name.trim() || 'Unnamed',
     portrait: portrait(f.portrait),
