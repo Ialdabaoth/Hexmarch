@@ -3,6 +3,7 @@
   import type { Enchantment } from '../lib/gear';
   import type { Catalog, MagicEntry, Rarity } from '../equipment/equipment';
   import { RARITIES, magicLevel, magicLevels, resolveMagic } from '../equipment/equipment';
+  import { ELEMENTS, describeEffect, enchantmentRarity } from '../lib/magic-effects';
 
   // The enchantment box on an item: a dweomer from the equipment file (which makes the
   // item a magic item) or anything written in.
@@ -12,6 +13,9 @@
   let e = $derived(item.enchantment);
   let entry = $derived(resolveMagic(e?.ref));
   let levels = $derived(entry ? magicLevels(entry) : []);
+  let effects = $derived(e && entry?.effects ? entry.effects.map((x) => describeEffect(x, enchantmentRarity(e, entry), e.element)) : []);
+  // An elemental item's element is chosen when it's made.
+  let elemental = $derived(!!entry?.effects?.some((x) => JSON.stringify(x).includes('"elemental"')));
 
   const RARITY_NAMES = ['Common', 'Uncommon', 'Rare', 'Legendary'];
   const label = (r: Rarity | undefined) => (r ? RARITY_NAMES[RARITIES.indexOf(r)] : '');
@@ -52,11 +56,20 @@
       <button class="ghost" aria-label="Remove enchantment" onclick={() => pick('')}>✕</button>
     </div>
     <p class="small muted note">p. {entry.page}. {entry.summary}</p>
+    {#if effects.length}<p class="small note effects">{effects.join('. ')}.</p>{/if}
     <div class="fields">
       {#if levels.length > 1}
         <label>Rarity
           <select bind:value={e.rarity} onchange={save}>
             {#each levels as n}<option value={RARITIES[n - 1]}>{RARITY_NAMES[n - 1]}</option>{/each}
+          </select>
+        </label>
+      {/if}
+      {#if elemental}
+        <label>Element
+          <select bind:value={e.element} onchange={save}>
+            <option value={undefined}>Choose…</option>
+            {#each ELEMENTS as el}<option value={el}>{el[0].toUpperCase() + el.slice(1)}</option>{/each}
           </select>
         </label>
       {/if}

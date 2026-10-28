@@ -1,6 +1,6 @@
 <script lang="ts">
   import { app } from '../lib/app.svelte';
-  import { expressionRoll, thresholdCheck } from '../lib/checks';
+  import { damageRoll, expressionRoll, thresholdCheck } from '../lib/checks';
   import { sheetView, type RollRequest } from '../lib/render';
   import { exportSheets } from '../lib/campaign';
   import { downloadJson } from '../lib/storage';
@@ -66,7 +66,9 @@
               difficulty: r.difficulty ?? 'normal',
               improvedCritical: r.attack && active.rules.getClass(active.classId).improvedCritical
             })
-          : expressionRoll({ who: active.name, label: r.label, expression: r.expression, min: r.min });
+          : r.kind === 'damage'
+            ? damageRoll({ who: active.name, label: r.label, parts: r.parts })
+            : expressionRoll({ who: active.name, label: r.label, expression: r.expression, min: r.min });
       await app.record(entry);
     } catch (e) {
       app.notify((e as Error).message);

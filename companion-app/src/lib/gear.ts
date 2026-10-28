@@ -5,7 +5,7 @@
 // file's numbers too, but a saved sheet keeps only the ref and what's unique to it.
 
 import type { ArmorType, Ruleset, WeaponSize } from '../rules/rules';
-import { magicLevel, resolveItem, resolveMagic, type EquipmentItem, type Rarity } from '../equipment/equipment';
+import { magicLevel, resolveItem, resolveMagic, type DamageType, type EquipmentItem, type Rarity } from '../equipment/equipment';
 
 // A dweomer worked into an item, which makes it a magic item. `ref` points at the
 // dweomer in the equipment file; without one, `name` is whatever was written in.
@@ -18,6 +18,8 @@ export interface Enchantment {
   // Arcane items wear from good to fair to poor without upkeep (Compendium p. 64).
   quality?: 'good' | 'fair' | 'poor';
   cursed?: boolean;
+  // Elemental items: the element chosen when it was made ("fire").
+  element?: DamageType;
 }
 
 export interface ArmorItem {
@@ -47,7 +49,7 @@ export interface WeaponItem {
   range: number;
   ranged: boolean;
   shield: boolean;
-  // Masterwork or magic: added to melee damage, or to ranged attack throws.
+  // Masterwork: added to damage. There are no attack bonuses.
   bonus: number;
   enchantment?: Enchantment;
   properties: string[];
@@ -170,8 +172,23 @@ export function itemLabel(i: CarriedItem): string {
   return i.qty > 1 ? `${i.name} ×${i.qty}` : i.name;
 }
 
+// Every weapon or armor dweomer needs a masterwork base (Compendium p. 55), so an
+// enchanted item is at least +1 even when the sheet doesn't say so.
+export function itemBonus(i: { bonus: number; enchantment?: Enchantment }): number {
+  return resolveMagic(i.enchantment?.ref) ? Math.max(1, i.bonus) : i.bonus;
+}
+
+// Masterwork weapons deal +1 damage. A dweomer needs a masterwork base, and replaces
+// that +1 with its own damage (dice or a constant) when it has some (Heph, 2026-10-28).
+export function weaponBonus(w: WeaponItem): number {
+  const entry = resolveMagic(w.enchantment?.ref);
+  if (!entry) return w.bonus;
+  const ownDamage = entry.effects?.some((e) => 'damage' in e || ('bonus' in e && e.bonus === 'damage'));
+  return ownDamage ? 0 : Math.max(1, w.bonus);
+}
+
 export function defense(rules: Ruleset, armor: ArmorItem | undefined): number {
-  return armor ? rules.armorKind(armor.type).defense + armor.bonus : 0;
+  return armor ? rules.armorKind(armor.type).defense + itemBonus(armor) : 0;
 }
 
 // Light weapons and shields take one hand and heavy weapons both; a medium weapon
@@ -205,10 +222,11 @@ const plus = (n: number) => (n > 0 ? `+${n}` : n < 0 ? String(n) : '');
 export function damage(main: WeaponItem | undefined, off: WeaponItem | undefined, bothHands: boolean, str: number): string {
   const offDie = off && !off.shield && off.id !== main?.id ? '+d6' : '';
   if (!main) return `d6${offDie}`;
-  if (main.ranged) return (main.size === 'heavy' ? '2d6' : 'd6') + offDie;
-  if (main.size === 'light') return `d6${plus(main.bonus)}${offDie}`;
-  if (main.size === 'heavy') return `2d6${plus(str + main.bonus)}`;
-  return bothHands ? `2d6${plus(main.bonus)}` : `d6${plus(str + main.bonus)}${offDie}`;
+  const bonus = weaponBonus(main);
+  if (main.ranged) return (main.size === 'heavy' ? '2d6' : 'd6') + plus(bonus) + offDie;
+  if (main.size === 'light') return `d6${plus(bonus)}${offDie}`;
+  if (main.size === 'heavy') return `2d6${plus(str + bonus)}`;
+  return bothHands ? `2d6${plus(bonus)}` : `d6${plus(str + bonus)}${offDie}`;
 }
 
 // Everything worn or carried at the ready (Compendium p. 51): armor counts whether

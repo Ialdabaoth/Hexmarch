@@ -10,7 +10,7 @@ import {
   type Enchantment, armorStats, compactArmor, compactItem, compactWeapon, defaultLoadout, itemId, matchesRef, newArmor, newItem, newWeapon, parseKit,
   weaponStats, type ArmorItem, type CarriedItem, type Hands, type WeaponItem
 } from './gear';
-import { RARITIES, magicLevel, magicLevels, resolveMagic, resolveItem, type MagicEntry, type MagicSystem, type Rarity } from '../equipment/equipment';
+import { DAMAGE_TYPES, RARITIES, magicLevel, magicLevels, resolveMagic, resolveItem, type MagicEntry, type MagicSystem, type Rarity } from '../equipment/equipment';
 import {
   ABILITIES, DEFAULT_RULES, TALENTS, findRules, hasKind, normalizeRulesId, primesOf, rulesFor, scheduledTraining,
   type AbilityId, type Attitude, type ClassId, type OriginId, type Ruleset, type TalentId
@@ -431,6 +431,7 @@ function readEnchantment(rules: Ruleset, v: unknown): Enchantment | undefined {
   if (Number.isInteger(o.charges) && o.charges >= 0) e.charges = o.charges;
   if (['good', 'fair', 'poor'].includes(o.quality)) e.quality = o.quality;
   if (o.cursed === true) e.cursed = true;
+  if (DAMAGE_TYPES.includes(o.element)) e.element = o.element;
   return e;
 }
 

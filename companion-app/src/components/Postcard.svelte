@@ -122,7 +122,7 @@
             <button type="button" class="slot tap" disabled={!ongear} onclick={() => ongear?.('main')}>
               <span>Main hand</span><b>{g.main?.name ?? (v.live ? 'Empty' : '')}</b>
             </button>
-            <button type="button" class="chip tap" disabled={!onroll} onclick={() => roll({ kind: 'expr', label: `${g.main?.name ?? 'Unarmed'} damage`, expression: g.damage })}>
+            <button type="button" class="chip tap" disabled={!onroll} onclick={() => roll({ kind: 'damage', label: `${g.main?.name ?? 'Unarmed'} damage`, parts: g.damageParts })}>
               {g.damage}
             </button>
           </div>

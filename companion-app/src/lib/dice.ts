@@ -1,4 +1,5 @@
-// Dice expressions like "3d6", "d20+2", "4d6kh3", "2d6-1 + d4".
+// Dice expressions like "3d6", "d20+2", "4d6kh3", "2d6-1 + d4", and "(d6+1)×2" for a
+// total that counts twice (a firearm's piercing plus an equal amount of thunder).
 
 export type Rng = () => number;
 
@@ -16,6 +17,7 @@ export interface RollResult {
   total: number;
   groups: DieGroup[];
   modifier: number;
+  multiplier?: number;
 }
 
 export function rollDie(sides: number, rng: Rng = Math.random): number {
@@ -24,7 +26,13 @@ export function rollDie(sides: number, rng: Rng = Math.random): number {
 
 const TERM = /([+-]?)\s*(?:(\d*)d(\d+)(?:(kh|kl)(\d+))?|(\d+))/gy;
 
-export function parse(expression: string): { groups: Omit<DieGroup, 'rolls' | 'kept'>[]; modifier: number } {
+export function parse(expression: string): { groups: Omit<DieGroup, 'rolls' | 'kept'>[]; modifier: number; multiplier?: number } {
+  const times = expression.match(/^\s*\((.+)\)\s*[×x*]\s*(\d+)\s*$/i);
+  if (times) {
+    const multiplier = Number(times[2]);
+    if (multiplier < 1 || multiplier > 10) throw new Error('Multiply by 1 to 10');
+    return { ...parse(times[1]), ...(multiplier > 1 ? { multiplier } : {}) };
+  }
   if (/[\dd]\s+\d/i.test(expression)) throw new Error(`Missing + or - in "${expression}"`);
   const src = expression.toLowerCase().replace(/\s+/g, '');
   if (!src) throw new Error('Empty dice expression');
@@ -68,7 +76,8 @@ export function roll(expression: string, rng: Rng = Math.random): RollResult {
     total += g.sign * sum;
     return { ...g, rolls, kept };
   });
-  return { expression, total, groups, modifier: parsed.modifier };
+  const m = parsed.multiplier ?? 1;
+  return { expression, total: total * m, groups, modifier: parsed.modifier, ...(m > 1 ? { multiplier: m } : {}) };
 }
 
 function keepMask(rolls: number[], keep?: DieGroup['keep']): boolean[] {
@@ -87,5 +96,5 @@ export function describe(result: RollResult): string {
     return `${g.sign < 0 ? '-' : ''}[${dice}]`;
   });
   if (result.modifier) parts.push(result.modifier > 0 ? `+${result.modifier}` : String(result.modifier));
-  return parts.join(' ');
+  return result.multiplier ? `(${parts.join(' ')}) ×${result.multiplier}` : parts.join(' ');
 }

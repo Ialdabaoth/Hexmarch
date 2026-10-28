@@ -4,7 +4,7 @@
     attackThresholds, carrying, equipment, hasExpertise, hitDieLabel, saveThreshold, talentThreshold,
     type Character
   } from '../lib/character';
-  import { expressionRoll, thresholdCheck } from '../lib/checks';
+  import { damageRoll, expressionRoll, thresholdCheck, type DamagePart } from '../lib/checks';
   import { downloadJson, slug } from '../lib/storage';
   import { exportSheet } from '../lib/campaign';
   import { isWebImageUrl } from '../lib/portraits';
@@ -13,6 +13,7 @@
   import Followers from './Followers.svelte';
   import Magic from './Magic.svelte';
   import Effects from './Effects.svelte';
+  import MagicItems from './MagicItems.svelte';
   import XpPanel from './XpPanel.svelte';
   import GearEditor from './GearEditor.svelte';
   import GearPicker from './GearPicker.svelte';
@@ -70,6 +71,15 @@
     if (!c) return;
     try {
       await app.record(expressionRoll({ who: c.name, label, expression }));
+    } catch (e) {
+      app.notify((e as Error).message);
+    }
+  }
+
+  async function rollDamage(label: string, parts: DamagePart[]) {
+    if (!c) return;
+    try {
+      await app.record(damageRoll({ who: c.name, label, parts }));
     } catch (e) {
       app.notify((e as Error).message);
     }
@@ -171,7 +181,8 @@
     </button>
   </div>
   <div class="row">
-    <button onclick={() => rollExpr(`${gear.main?.name ?? 'Unarmed'} damage`, gear.damage)}>Damage {gear.damage}</button>
+    <button onclick={() => rollDamage(`${gear.main?.name ?? 'Unarmed'} damage`, gear.damageParts)}>Damage {gear.damage}</button>
+    <span class="small muted">{gear.damageTypes}</span>
     {#if gear.off?.shield}<span class="small muted">Shield: attacks you see coming are harder.</span>{/if}
   </div>
 
@@ -231,6 +242,8 @@
       </ul>
     </details>
   {/if}
+
+  <MagicItems magic={c.magic} />
 
   <Effects character={c} />
 

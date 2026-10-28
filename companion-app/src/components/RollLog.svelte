@@ -1,6 +1,6 @@
 <script lang="ts">
   import { app } from '../lib/app.svelte';
-  import { rollName, rolledLine } from '../lib/checks';
+  import { damageLine, rollName, rolledLine } from '../lib/checks';
 
   // Every roll made on this device, newest first, from the dice page and from sheets.
   function time(iso: string) {
@@ -21,6 +21,7 @@
           <strong>{rollName(e)}:</strong>
           <strong class="total {e.outcome ?? ''}">{e.total}</strong>
           {#if e.outcome}<span class="small {e.outcome}">({e.outcome})</span>{/if}
+          {#if e.parts?.length}<span class="small">({damageLine(e)})</span>{/if}
         </span>
         <span class="small muted">{time(e.at)}</span>
       </div>
