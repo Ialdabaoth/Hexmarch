@@ -28,6 +28,15 @@
         "curse": 13,
         "fear": 15
       },
+      "adjustments": {
+        "con": -2,
+        "str": -2,
+        "dex": 1,
+        "int": -4,
+        "wis": 1,
+        "cha": -1
+      },
+      "behavior": "1-2 fearful, 3-5 wary, 6 aggressive",
       "summary": "Scavenging rodent; fights when cornered."
     },
     {
@@ -49,6 +58,15 @@
         "curse": 13,
         "fear": 14
       },
+      "adjustments": {
+        "con": -2,
+        "str": -2,
+        "dex": 3,
+        "int": -4,
+        "wis": 1,
+        "cha": 0
+      },
+      "behavior": "Wary",
       "feat": "Sonar.",
       "summary": "Night flier; navigates by sonar."
     },
@@ -71,6 +89,15 @@
         "curse": 12,
         "fear": 14
       },
+      "adjustments": {
+        "con": -1,
+        "str": -1,
+        "dex": 2,
+        "int": -4,
+        "wis": 2,
+        "cha": 0
+      },
+      "behavior": "Wary",
       "summary": "Small raptor."
     },
     {
@@ -92,6 +119,15 @@
         "curse": 12,
         "fear": 14
       },
+      "adjustments": {
+        "con": -1,
+        "str": -1,
+        "dex": 2,
+        "int": -4,
+        "wis": 2,
+        "cha": 0
+      },
+      "behavior": "Wary",
       "summary": "Nocturnal raptor."
     },
     {
@@ -113,6 +149,15 @@
         "curse": 12,
         "fear": 14
       },
+      "adjustments": {
+        "con": -1,
+        "str": -2,
+        "dex": 2,
+        "int": -1,
+        "wis": 2,
+        "cha": 0
+      },
+      "behavior": "1-2 wary, 3-5 curious, 6 aggressive",
       "summary": "Clever corvid."
     },
     {
@@ -134,6 +179,15 @@
         "curse": 13,
         "fear": 14
       },
+      "adjustments": {
+        "con": 1,
+        "str": 0,
+        "dex": 0,
+        "int": -4,
+        "wis": 1,
+        "cha": 0
+      },
+      "behavior": "1 wary, 2-5 indifferent, 6 aggressive",
       "summary": "Burrowing omnivore with a thick hide."
     },
     {
@@ -155,6 +209,15 @@
         "curse": 13,
         "fear": 14
       },
+      "adjustments": {
+        "con": -1,
+        "str": -1,
+        "dex": 2,
+        "int": -2,
+        "wis": 1,
+        "cha": 0
+      },
+      "behavior": "1 fearful, 2-4 wary, 5-6 curious",
       "summary": "Small, quick canid."
     },
     {
@@ -176,6 +239,15 @@
         "curse": 13,
         "fear": 14
       },
+      "adjustments": {
+        "con": -1,
+        "str": -1,
+        "dex": 3,
+        "int": -4,
+        "wis": 1,
+        "cha": 0
+      },
+      "behavior": "1 fearful, 2-4 wary, 5-6 curious",
       "summary": "River mustelid."
     },
     {
@@ -197,6 +269,15 @@
         "curse": 14,
         "fear": 14
       },
+      "adjustments": {
+        "con": 2,
+        "str": 0,
+        "dex": 0,
+        "int": -4,
+        "wis": 0,
+        "cha": 0
+      },
+      "behavior": "1-3 wary, 4-5 curious, 6 aggressive",
       "summary": "Grazing flock animal; charges when threatened."
     },
     {
@@ -218,6 +299,15 @@
         "curse": 13,
         "fear": 15
       },
+      "adjustments": {
+        "con": -1,
+        "str": -1,
+        "dex": 2,
+        "int": -4,
+        "wis": 1,
+        "cha": -1
+      },
+      "behavior": "1 fearful, 2-5 wary, 6 aggressive",
       "feat": "Heat vision (special) senses.",
       "summary": "Venomous snake."
     },
@@ -240,6 +330,15 @@
         "curse": 13,
         "fear": 13
       },
+      "adjustments": {
+        "con": 3,
+        "str": 3,
+        "dex": 0,
+        "int": -4,
+        "wis": 0,
+        "cha": 0
+      },
+      "behavior": "1 wary, 2-5 indifferent, 6 aggressive",
       "summary": "Forest bear; aggressive when provoked."
     },
     {
@@ -261,6 +360,15 @@
         "curse": 12,
         "fear": 13
       },
+      "adjustments": {
+        "con": 0,
+        "str": 0,
+        "dex": 4,
+        "int": -4,
+        "wis": 1,
+        "cha": 0
+      },
+      "behavior": "1 fearful, 2-5 wary, 6 curious",
       "summary": "Fastest runner of the plains."
     },
     {
@@ -282,6 +390,15 @@
         "curse": 12,
         "fear": 13
       },
+      "adjustments": {
+        "con": 2,
+        "str": 1,
+        "dex": 1,
+        "int": -4,
+        "wis": 1,
+        "cha": 0
+      },
+      "behavior": "1 fearful, 2-5 wary, 6 aggressive",
       "summary": "Timid grazer; bolts when startled."
     },
     {
@@ -303,6 +420,15 @@
         "curse": 13,
         "fear": 13
       },
+      "adjustments": {
+        "con": 2,
+        "str": 3,
+        "dex": 0,
+        "int": -4,
+        "wis": 0,
+        "cha": 0
+      },
+      "behavior": "1 wary, 2-5 indifferent, 6 aggressive",
       "summary": "Pack animal."
     },
     {
@@ -324,6 +450,15 @@
         "curse": 12,
         "fear": 13
       },
+      "adjustments": {
+        "con": 3,
+        "str": 1,
+        "dex": 0,
+        "int": -4,
+        "wis": 1,
+        "cha": 0
+      },
+      "behavior": "1 wary, 2-5 indifferent, 6 aggressive",
       "summary": "Hardy climber; butts with its horns."
     },
     {
@@ -345,6 +480,15 @@
         "curse": 13,
         "fear": 13
       },
+      "adjustments": {
+        "con": 1,
+        "str": 0,
+        "dex": 0,
+        "int": -4,
+        "wis": 0,
+        "cha": 0
+      },
+      "behavior": "1-2 wary, 3-6 indifferent",
       "summary": "Coastal swimmer."
     },
     {
@@ -366,6 +510,15 @@
         "curse": 11,
         "fear": 12
       },
+      "adjustments": {
+        "con": 1,
+        "str": 2,
+        "dex": 2,
+        "int": -4,
+        "wis": 1,
+        "cha": 0
+      },
+      "behavior": "1 fearful, 2-5 wary, 6 aggressive",
       "summary": "Solitary big cat; ambush hunter."
     },
     {
@@ -387,6 +540,15 @@
         "curse": 11,
         "fear": 11
       },
+      "adjustments": {
+        "con": 1,
+        "str": 2,
+        "dex": 1,
+        "int": -3,
+        "wis": 1,
+        "cha": 1
+      },
+      "behavior": "1 curious, 2-5 wary, 6 aggressive",
       "summary": "Pack hunter."
     },
     {
@@ -408,7 +570,16 @@
         "curse": 11,
         "fear": 10
       },
-      "summary": "Huge wolf that hunts in packs."
+      "adjustments": {
+        "con": 2,
+        "str": 3,
+        "dex": 1,
+        "int": -2,
+        "wis": 1,
+        "cha": 2
+      },
+      "behavior": "1 curious, 2-4 wary, 5-6 aggressive",
+      "summary": "Large wolf that hunts in packs."
     },
     {
       "id": "war-horse",
@@ -429,6 +600,15 @@
         "curse": 11,
         "fear": 11
       },
+      "adjustments": {
+        "con": 3,
+        "str": 3,
+        "dex": 0,
+        "int": -4,
+        "wis": 1,
+        "cha": 1
+      },
+      "behavior": "1 curious, 2-5 wary, 6 aggressive",
       "feat": "Trample: passes through medium or smaller creatures when it dashes, dealing 1d6 blunt damage to each that doesn't save vs. Blast.",
       "summary": "Trained battle mount."
     },
@@ -451,6 +631,15 @@
         "curse": 12,
         "fear": 12
       },
+      "adjustments": {
+        "con": 4,
+        "str": 4,
+        "dex": -1,
+        "int": -4,
+        "wis": 0,
+        "cha": 0
+      },
+      "behavior": "1 fearful, 2-5 wary, 6 aggressive",
       "feat": "Trample: as the War Horse.",
       "summary": "Draft beast; slow to anger."
     },
@@ -473,6 +662,15 @@
         "curse": 12,
         "fear": 12
       },
+      "adjustments": {
+        "con": 2,
+        "str": 3,
+        "dex": 0,
+        "int": -4,
+        "wis": 0,
+        "cha": 0
+      },
+      "behavior": "1-4 wary, 5-6 aggressive",
       "summary": "Tusked forest pig; charges."
     },
     {
@@ -494,6 +692,15 @@
         "curse": 12,
         "fear": 12
       },
+      "adjustments": {
+        "con": 3,
+        "str": 3,
+        "dex": 0,
+        "int": -4,
+        "wis": 0,
+        "cha": 0
+      },
+      "behavior": "1 fearful, 2-5 wary, 6 curious",
       "feat": "Trample: passes through medium or smaller creatures when it dashes, dealing 1d6 blunt damage to each that doesn't save vs. Blast.",
       "summary": "Herd animal."
     },
@@ -516,6 +723,15 @@
         "curse": 11,
         "fear": 11
       },
+      "adjustments": {
+        "con": 2,
+        "str": 1,
+        "dex": 2,
+        "int": 0,
+        "wis": 1,
+        "cha": 1
+      },
+      "behavior": "Intelligent – 1-3 wary, 4-6 curious",
       "feat": "Sonar.",
       "summary": "Intelligent sea mammal."
     },
@@ -538,6 +754,15 @@
         "curse": 12,
         "fear": 12
       },
+      "adjustments": {
+        "con": 2,
+        "str": 3,
+        "dex": 0,
+        "int": -4,
+        "wis": 1,
+        "cha": 0
+      },
+      "behavior": "1 fearful, 2-5 wary, 6 curious",
       "feat": "Trample: as the War Horse.",
       "summary": "Heavy working horse."
     },
@@ -560,6 +785,15 @@
         "curse": 11,
         "fear": 12
       },
+      "adjustments": {
+        "con": 2,
+        "str": 2,
+        "dex": 0,
+        "int": -4,
+        "wis": 1,
+        "cha": 0
+      },
+      "behavior": "1 fearful, 2-5 wary, 6 aggressive",
       "feat": "Trample: as the War Horse.",
       "summary": "Antlered forest grazer."
     },
@@ -582,6 +816,15 @@
         "curse": 11,
         "fear": 11
       },
+      "adjustments": {
+        "con": 3,
+        "str": 3,
+        "dex": 1,
+        "int": -4,
+        "wis": 0,
+        "cha": 0
+      },
+      "behavior": "1-4 wary, 5-6 aggressive",
       "feat": "Frenzy: adds +2d6 damage to an attack if the target is injured.",
       "summary": "Predatory fish."
     },
@@ -604,6 +847,15 @@
         "curse": 11,
         "fear": 11
       },
+      "adjustments": {
+        "con": 3,
+        "str": 3,
+        "dex": 1,
+        "int": 0,
+        "wis": 0,
+        "cha": 0
+      },
+      "behavior": "1-4 wary, 5-6 aggressive",
       "feat": "Sonar.",
       "summary": "Pod-hunting dolphin of the deep."
     },
@@ -626,6 +878,15 @@
         "curse": 11,
         "fear": 10
       },
+      "adjustments": {
+        "con": 1,
+        "str": 3,
+        "dex": 4,
+        "int": -2,
+        "wis": 1,
+        "cha": 2
+      },
+      "behavior": "1 curious, 2-5 wary, 6 aggressive",
       "feat": "Can turn invisible until it attacks; may cast a major illusion of itself up to 5 paces away.",
       "summary": "Large grinning cat with prehensile whisker-tendrils."
     },
@@ -648,6 +909,15 @@
         "curse": 11,
         "fear": 10
       },
+      "adjustments": {
+        "con": 1,
+        "str": 2,
+        "dex": 2,
+        "int": -1,
+        "wis": 1,
+        "cha": 2
+      },
+      "behavior": "Intelligent and malevolent",
       "feat": "Can cast beguile or fey illusion to lure mortals.",
       "summary": "Snow-white hunthind with golden antlers."
     },
@@ -670,6 +940,15 @@
         "curse": 11,
         "fear": 12
       },
+      "adjustments": {
+        "con": 1,
+        "str": 1,
+        "dex": 2,
+        "int": -4,
+        "wis": 1,
+        "cha": 0
+      },
+      "behavior": "1-2 curious, 3 wary, 4-6 aggressive",
       "summary": "Flightless predatory bird; raised as a mount."
     },
     {
@@ -691,6 +970,15 @@
         "curse": 11,
         "fear": 12
       },
+      "adjustments": {
+        "con": -1,
+        "str": -1,
+        "dex": 2,
+        "int": 1,
+        "wis": 1,
+        "cha": 0
+      },
+      "behavior": "Intelligent and curious",
       "feat": "Casts as a druid and can cast mage hand.",
       "summary": "Sapient, speech-capable crow."
     },
@@ -713,6 +1001,15 @@
         "curse": 10,
         "fear": 10
       },
+      "adjustments": {
+        "con": -1,
+        "str": -1,
+        "dex": 2,
+        "int": 0,
+        "wis": 2,
+        "cha": 2
+      },
+      "behavior": "Intelligent and curious",
       "feat": "Casts as a druid.",
       "summary": "Fox with a glowing, fanning tail."
     },
@@ -735,6 +1032,15 @@
         "curse": 11,
         "fear": 12
       },
+      "adjustments": {
+        "con": 0,
+        "str": 1,
+        "dex": 4,
+        "int": -4,
+        "wis": 1,
+        "cha": 0
+      },
+      "behavior": "1 fearful, 2-3 wary, 4-6 aggressive",
       "feat": "Digs through solid earth at full dash speed, then leaps out to sneak attack.",
       "summary": "Cat-sized vole with lightning reflexes."
     },
@@ -757,6 +1063,15 @@
         "curse": 9,
         "fear": 9
       },
+      "adjustments": {
+        "con": 0,
+        "str": 2,
+        "dex": 4,
+        "int": -3,
+        "wis": 2,
+        "cha": 2
+      },
+      "behavior": "1-3 curious, 4-5 wary, 6 aggressive",
       "feat": "Casts any Flame-based primal glamour; once per day, a primal revive.",
       "summary": "Fiery raptor with a peacock's tail."
     },
@@ -779,6 +1094,15 @@
         "curse": 10,
         "fear": 9
       },
+      "adjustments": {
+        "con": 3,
+        "str": 3,
+        "dex": 1,
+        "int": -2,
+        "wis": 1,
+        "cha": 2
+      },
+      "behavior": "Semi-Intelligent",
       "feat": "Can cast call storm or the cone of cold spell.",
       "summary": "Enormous white direwolf of winter."
     },
@@ -801,6 +1125,15 @@
         "curse": 9,
         "fear": 11
       },
+      "adjustments": {
+        "con": 2,
+        "str": 4,
+        "dex": 2,
+        "int": -4,
+        "wis": 2,
+        "cha": 0
+      },
+      "behavior": "1 curious, 2-4 wary, 5-6 aggressive",
       "feat": "Can lift and carry up to 4 tons.",
       "summary": "Giant eagle the size of a horse."
     },
@@ -823,6 +1156,15 @@
         "curse": 9,
         "fear": 11
       },
+      "adjustments": {
+        "con": 0,
+        "str": 2,
+        "dex": 4,
+        "int": -3,
+        "wis": 2,
+        "cha": 0
+      },
+      "behavior": "1 curious, 2-5 wary, 6 aggressive",
       "feat": "Casts any Air-aspected primal glamour.",
       "summary": "Storm-cloud eagle."
     },
@@ -845,6 +1187,15 @@
         "curse": 10,
         "fear": 11
       },
+      "adjustments": {
+        "con": 4,
+        "str": 3,
+        "dex": 2,
+        "int": -4,
+        "wis": 1,
+        "cha": 0
+      },
+      "behavior": "Always aggressive",
       "feat": "Digs through solid earth at full dash speed, then leaps out with a 10-foot sneak attack.",
       "summary": "Ox-sized fairy armadillo; always aggressive."
     },
@@ -867,6 +1218,15 @@
         "curse": 10,
         "fear": 11
       },
+      "adjustments": {
+        "con": 1,
+        "str": 1,
+        "dex": 1,
+        "int": -2,
+        "wis": 1,
+        "cha": 0
+      },
+      "behavior": "Semi-Intelligent",
       "feat": "Casts beguile, fey illusion, mirage, and tidal wave glamours.",
       "summary": "River-otter that drowns mortals it lures into water."
     },
@@ -889,6 +1249,15 @@
         "curse": 9,
         "fear": 9
       },
+      "adjustments": {
+        "con": 2,
+        "str": 2,
+        "dex": 2,
+        "int": -4,
+        "wis": 1,
+        "cha": 1
+      },
+      "behavior": "1 curious, 2-4 wary, 5-6 aggressive",
       "feat": "Gains +2d6 damage to each attack when injured.",
       "summary": "Horse-bodied griffon with a kite's head."
     },
@@ -911,6 +1280,15 @@
         "curse": 9,
         "fear": 9
       },
+      "adjustments": {
+        "con": 3,
+        "str": 2,
+        "dex": 2,
+        "int": -4,
+        "wis": 1,
+        "cha": 1
+      },
+      "behavior": "1 curious, 2-3 wary, 4-6 aggressive",
       "feat": "Gains +2d6 damage to each attack when injured.",
       "summary": "Lion-bodied griffon with an eagle's head."
     },
@@ -933,6 +1311,15 @@
         "curse": 9,
         "fear": 9
       },
+      "adjustments": {
+        "con": 3,
+        "str": 3,
+        "dex": 0,
+        "int": -4,
+        "wis": 1,
+        "cha": 1
+      },
+      "behavior": "1 curious, 2 wary, 3-6 aggressive",
       "feat": "Gains +2d6 damage to each attack when injured.",
       "summary": "Bear-bodied griffon; a slow, silent flier."
     },
@@ -955,6 +1342,15 @@
         "curse": 9,
         "fear": 10
       },
+      "adjustments": {
+        "con": 2,
+        "str": 3,
+        "dex": 1,
+        "int": -4,
+        "wis": 1,
+        "cha": 1
+      },
+      "behavior": "Intelligent and malevolent",
       "feat": "Casts beguile, fey illusion, or sleep glamours, and cause fear. Senses fear.",
       "summary": "Starved black warhorse with vulture wings."
     },
@@ -977,6 +1373,15 @@
         "curse": 9,
         "fear": 10
       },
+      "adjustments": {
+        "con": 2,
+        "str": 3,
+        "dex": 1,
+        "int": -4,
+        "wis": 1,
+        "cha": 0
+      },
+      "behavior": "1-2 curious, 3-5 wary, 6 aggressive",
       "feat": "Can spend 1 glamour to fly up to 160 paces.",
       "summary": "White winged warhorse."
     },
@@ -999,6 +1404,15 @@
         "curse": 8,
         "fear": 8
       },
+      "adjustments": {
+        "con": 2,
+        "str": 2,
+        "dex": 1,
+        "int": -1,
+        "wis": 2,
+        "cha": 2
+      },
+      "behavior": "Intelligent – 1-4 wary, 5-6 friendly",
       "feat": "Casts sanctuary and cure critical wounds miracles. Intelligent.",
       "summary": "Intelligent horned horse; often speaks."
     },
@@ -2185,6 +2599,98 @@
       "attacks": "as mortal",
       "abilities": "Con +0, Str +1, Dex +1, Int +0, Wis +2, Cha +0",
       "summary": "Dragon-serving serpent folk."
+    },
+    {
+      "id": "lion",
+      "name": "Lion",
+      "kind": "animal",
+      "page": 146,
+      "level": 4,
+      "size": "Large",
+      "movement": "Fast",
+      "armor": "1 (0)",
+      "hp": "(4d6+4)x2",
+      "attacks": "bite (2d6 piercing), claws (2d6+4) (8+ x2)",
+      "saves": {
+        "doom": 10,
+        "hold": 8,
+        "blast": 9,
+        "trick": 15,
+        "curse": 10,
+        "fear": 11
+      },
+      "adjustments": {
+        "con": 1,
+        "str": 3,
+        "dex": 2,
+        "int": -4,
+        "wis": 1,
+        "cha": 0
+      },
+      "behavior": "1 curious, 2-4 wary, 5-6 aggressive",
+      "summary": "Pride-hunting cat."
+    },
+    {
+      "id": "tiger",
+      "name": "Tiger",
+      "kind": "animal",
+      "page": 146,
+      "level": 4,
+      "size": "Large",
+      "movement": "Fast",
+      "armor": "1 (0)",
+      "hp": "(4d6+8)x2",
+      "attacks": "bite (2d6 piercing), claws (3d6+4) (7+ x2)",
+      "saves": {
+        "doom": 10,
+        "hold": 7,
+        "blast": 9,
+        "trick": 15,
+        "curse": 10,
+        "fear": 11
+      },
+      "adjustments": {
+        "con": 2,
+        "str": 4,
+        "dex": 2,
+        "int": -4,
+        "wis": 1,
+        "cha": 0
+      },
+      "behavior": "1 curious, 2-4 wary, 5-6 aggressive",
+      "feat": "Frenzy: adds +2d6 damage to each attack it makes in an action.",
+      "summary": "Solitary, powerful big cat."
+    },
+    {
+      "id": "grizzly-bear",
+      "name": "Grizzly Bear",
+      "kind": "animal",
+      "page": 146,
+      "level": 4,
+      "size": "Large",
+      "movement": "Normal",
+      "armor": "2 (1)",
+      "hp": "(4d6+16)x2",
+      "attacks": "bite (2d6 piercing), claws (2d6+4) (7+)",
+      "saves": {
+        "doom": 7,
+        "hold": 7,
+        "blast": 11,
+        "trick": 15,
+        "curse": 10,
+        "fear": 11
+      },
+      "adjustments": {
+        "con": 4,
+        "str": 4,
+        "dex": 0,
+        "int": -4,
+        "wis": 1,
+        "cha": 0
+      },
+      "behavior": "1 curious, 2-4 wary, 5-6 aggressive",
+      "feat": "Frenzy: adds +2d6 damage to an attack while it is injured.",
+      "summary": "Heavy, aggressive bear of the high country."
     }
   ]
 }

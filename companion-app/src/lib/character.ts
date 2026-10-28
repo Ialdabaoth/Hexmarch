@@ -235,10 +235,10 @@ export function rollTraits(rng: Rng = Math.random): string[] {
   return traits;
 }
 
-// A beast companion from the bestiary: its book level and a rolled hit point total.
+// A beast companion from the bestiary: its book level, ability adjustments and a rolled hit point total.
 export function beastFollower(m: WithRef<Monster>, rng: Rng = Math.random): Follower {
   const hp = rollHp(m.hp, rng);
-  return { ...blankFollower('beast'), name: m.name, ref: m.ref, hitDice: levelOf(m) ?? 1, hpMax: hp, hp };
+  return { ...blankFollower('beast'), name: m.name, ref: m.ref, abilities: { ...zeroAbilities(), ...m.adjustments }, hitDice: levelOf(m) ?? 1, hpMax: hp, hp };
 }
 
 // One-roll minion (p. 258), from the ruleset's quick NPC table.

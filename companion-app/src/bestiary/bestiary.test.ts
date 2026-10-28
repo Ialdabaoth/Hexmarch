@@ -40,6 +40,20 @@ describe('beast companions', () => {
     expect(beast).toMatchObject({ kind: 'beast', name: 'Dire Wolf', ref: 'mm:dire-wolf', hitDice: 3 });
     expect(beast.hpMax).toBe((3 * 6 + 6) * 2);
     expect(beast.hp).toBe(beast.hpMax);
+    expect(beast.abilities).toMatchObject({ con: 2, str: 3, dex: 1, int: -2, wis: 1, cha: 2 });
+  });
+
+  it('keeps the behaviour line and adjustments of animals', () => {
+    const wolf = BESTIARY.get('mm:dire-wolf')!;
+    expect(wolf.behavior).toBe('1 curious, 2-4 wary, 5-6 aggressive');
+    expect(wolf.adjustments).toEqual({ con: 2, str: 3, dex: 1, int: -2, wis: 1, cha: 2 });
+  });
+
+  it('has a stat block for every animal and fey beast', () => {
+    for (const m of BESTIARY.list().filter((x) => x.kind === 'animal' || x.kind === 'fey beast')) {
+      expect(m.adjustments, m.name).toBeDefined();
+      expect(m.behavior, m.name).toBeDefined();
+    }
   });
 });
 

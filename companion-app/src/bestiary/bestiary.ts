@@ -6,6 +6,7 @@ import { roll, type Rng } from '../lib/dice';
 import mmBestiary from './mm-bestiary.json';
 
 export type SaveKind = 'doom' | 'hold' | 'blast' | 'trick' | 'curse' | 'fear';
+export type AbilityKey = 'con' | 'str' | 'dex' | 'int' | 'wis' | 'cha';
 export type MonsterKind = 'animal' | 'fey beast' | 'monster' | 'fair folk' | 'dragon' | 'undead' | 'infernal' | 'qlippothic' | 'huge' | 'mortal';
 
 export interface Monster {
@@ -23,7 +24,11 @@ export interface Monster {
   attacks: string;
   // Saving throw targets ("Doom 15+" is 15); missing where the book gives none.
   saves?: Partial<Record<SaveKind, number>>;
-  // Ability adjustments, as text, for the undead and mortal races.
+  // Ability adjustments for animals and fey beasts, as the stat block prints them.
+  adjustments?: Partial<Record<AbilityKey, number>>;
+  // The book's behaviour line for animals and fey beasts ("1 wary, 2-5 indifferent, 6 aggressive").
+  behavior?: string;
+  // Ability adjustments as text, for the undead and mortal races.
   abilities?: string;
   feat?: string;
   summary: string;

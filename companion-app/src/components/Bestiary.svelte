@@ -20,6 +20,14 @@
     return `Level ${l === 0.5 ? '½' : l}`;
   }
 
+  function adjustments(m: WithRef<Monster>): string {
+    const a = m.adjustments;
+    if (!a) return '';
+    return (['con', 'str', 'dex', 'int', 'wis', 'cha'] as const)
+      .map((k) => `${k[0].toUpperCase()}${k.slice(1)} ${(a[k] ?? 0) >= 0 ? '+' : ''}${a[k] ?? 0}`)
+      .join(' ');
+  }
+
   function saves(m: WithRef<Monster>): string {
     return SAVES.filter((s) => m.saves?.[s] !== undefined).map((s) => `${s} ${m.saves?.[s]}+`).join(', ');
   }
@@ -49,7 +57,9 @@
         <dt>Armor</dt><dd>{m.armor}</dd>
         <dt>HP</dt><dd>{m.hp}</dd>
         <dt>Attacks</dt><dd>{m.attacks}</dd>
+        {#if m.adjustments}<dt>Ability</dt><dd>{adjustments(m)}</dd>{/if}
         {#if m.saves}<dt>Saves</dt><dd>{saves(m)}</dd>{/if}
+        {#if m.behavior}<dt>Behavior</dt><dd>{m.behavior}</dd>{/if}
         {#if m.abilities}<dt>Abilities</dt><dd>{m.abilities}</dd>{/if}
         {#if m.feat}<dt>Feats</dt><dd>{m.feat}</dd>{/if}
         <dt>Book</dt><dd>Bestiary p. {m.page}</dd>
