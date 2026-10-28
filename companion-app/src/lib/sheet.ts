@@ -495,7 +495,7 @@ export function readSheet(raw: unknown): SheetData {
   const name = typeof f.name === 'string' ? f.name : '';
   if (f.format !== FORMAT) fail(name, 'not a Materia Mundi character sheet');
   const rules = findRules(f.rules);
-  if (!rules) fail(name, f.campaign ? `made for the campaign "${f.campaign}"; open its link in Settings first` : `unknown rules "${f.rules}"`);
+  if (!rules) fail(name, f.campaign ? `made for the campaign "${f.campaign}"; open its link in the Campaign tab first` : `unknown rules "${f.rules}"`);
   if (!rules.hasOrigin(f.origin)) fail(name, `${rules.name} has no origin "${f.origin}"`);
   if (!rules.hasClass(f.class?.name)) fail(name, `${rules.name} has no class "${f.class?.name}"`);
   const cls = rules.getClass(f.class.name);

@@ -1,7 +1,7 @@
 # Equipment files
 
 Agreed with Heph 2026-10-28 and built in steps from 0.2.1 to 0.2.5 (see **Build
-order** at the end). As of 0.2.5 the equipment files hold the Compendium's armor,
+order** at the end). As of 0.2.6 the equipment files hold the Compendium's armor,
 weapons, gear and magic, sheets reference them, magic items are items with a
 dweomer, and campaigns and the custom equipment editor work. Dweomer `effects` are
 still to come.
@@ -202,7 +202,7 @@ dropped.
 ## Campaigns: rules and equipment from a URL
 
 A referee decides which rules and equipment their game uses and publishes that as a
-**campaign file** at a URL. Players paste the URL into Settings, under **Campaign**,
+**campaign file** at a URL. Players paste the URL into the **Campaign** tab,
 and their app uses that campaign. With no URL set, the app uses
 **This device**, a campaign that lives only on the phone.
 
@@ -229,15 +229,15 @@ and their app uses that campaign. With no URL set, the app uses
   of them, the first winning on a name. Put the rules' own file first.
 - The app downloads the campaign and everything it names, keeps a copy for offline
   play, and checks for updates each time the app opens online. Campaigns opened
-  before are listed in Settings to switch between. The host has to allow
+  before are listed in the Campaign tab to switch between. The host has to allow
   cross-site reads (CORS). GitHub Pages, raw GitHub files and gists do; Google Drive
-  share links don't. Settings will say so when a URL can't be read.
+  share links don't. The app says so when a URL can't be read.
 - A campaign from a URL is read-only in the app. The referee edits their own copy
   and republishes it.
 
 **This device** is the default campaign: each character picks a built-in ruleset,
 and the device has an editable equipment file with the id `local`, which is added
-to every catalog (in a campaign too). The editor lives in Settings under **Custom
+to every catalog (in a campaign too). The editor lives in the Campaign tab under **Custom
 equipment**: a list, a form for each kind (weapon, gear, mount, service, spell,
 miracle, glamour, dweomer), a raw JSON view, and import and export. Importing a file
 merges it, the imported entry winning on the same id. There's no custom armor:

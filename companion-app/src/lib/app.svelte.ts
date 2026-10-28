@@ -18,7 +18,8 @@ export type View =
   | { name: 'sheet'; id: string; section?: string }
   | { name: 'dice' }
   | { name: 'settings' }
-  | { name: 'equipment' }
+  | { name: 'campaign' }
+  | { name: 'equipment'; publish?: boolean }
   | { name: 'render'; id: string; mode: RenderMode };
 
 export type RenderMode = 'postcard' | 'page';
