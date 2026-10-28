@@ -2,7 +2,7 @@ import { get, set } from 'idb-keyval';
 import { readSheet, writeSheet, type SheetData } from './sheet';
 import type { LiveState } from './character';
 import type { LogEntry } from './checks';
-import { prefersReducedMotion } from './dice3d';
+import { DEFAULT_DICE_COLOR, DEFAULT_DICE_INK, prefersReducedMotion } from './dice3d';
 
 export interface Settings {
   webhookUrl: string;
@@ -13,11 +13,14 @@ export interface Settings {
   rules: string;
   // Show rolls on tumbling 3D dice. Starts off for people who ask for less motion.
   dice3d: boolean;
+  // Colours of the 3D dice and their numbers, as #rrggbb.
+  diceColor: string;
+  diceInk: string;
   // The campaign file's link, or '' for "This device".
   campaign: string;
 }
 
-export const DEFAULT_SETTINGS: Settings = { webhookUrl: '', autoPost: false, activeId: '', rules: 'mm', dice3d: !prefersReducedMotion(), campaign: '' };
+export const DEFAULT_SETTINGS: Settings = { webhookUrl: '', autoPost: false, activeId: '', rules: 'mm', dice3d: !prefersReducedMotion(), diceColor: DEFAULT_DICE_COLOR, diceInk: DEFAULT_DICE_INK, campaign: '' };
 
 // Saved sheets go through the same checks as imported files, so a sheet the
 // app can't read is skipped instead of breaking the whole list. Skipped sheets
