@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { Character, attackThresholds, defaultTalents, equipment, freshState, saveThreshold } from './character';
 import { createSheet, readSheet } from './sheet';
 import { newArmor, newWeapon, itemId } from './gear';
+import { damageLine, damageRoll } from './checks';
 import { describeEffect, physicalType, scaleDice } from './magic-effects';
 import { rulesFor } from '../rules/rules';
 
@@ -20,6 +21,7 @@ describe('magic item effects', () => {
     // The dweomer's damage replaces the masterwork +1.
     expect(g.damage).toBe('d6+2+3d6');
     expect(g.damageTypes).toBe('slashing, 3d6 fire');
+    expect(damageRoll({ who: 'W', label: 'Damage', parts: g.damageParts }, () => 0).parts).toEqual([{ amount: 3, type: 'slashing' }, { amount: 3, type: 'fire' }]);
     // There are no attack bonuses.
     expect(attackThresholds(c)).toEqual(attackThresholds(live(warrior())));
     expect(c.magic.lines()).toContainEqual({ source: sword.name, text: '+3d6 fire damage (melee)' });
@@ -107,6 +109,10 @@ describe('magic item effects', () => {
     expect(g.damage).toBe('(d6)×2');
     expect(g.damageTypes).toBe('piercing, equal thunder');
     expect(live(s).magic.lines()[0].text).toBe('An equal amount of thunder damage');
+    const hit = damageRoll({ who: 'W', label: 'Damage', parts: g.damageParts }, () => 0.5);
+    expect(hit.parts).toEqual([{ amount: 4, type: 'piercing' }, { amount: 4, type: 'thunder' }]);
+    expect(hit.total).toBe(8);
+    expect(damageLine(hit)).toBe('4 piercing + 4 thunder');
   });
 
   it('turns damage into another type', () => {

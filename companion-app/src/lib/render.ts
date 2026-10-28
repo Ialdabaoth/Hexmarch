@@ -3,6 +3,7 @@
 
 import { Character, attackThresholds, carrying, equipment, freshState, type LiveState, hasExpertise, hitDieLabel, saveThreshold, xpToNext } from './character';
 import type { SheetData } from './sheet';
+import type { DamagePart } from './checks';
 import { ABILITIES, TALENTS, type Difficulty } from '../rules/rules';
 import { armorEffect, checkPreparations, emptySlots } from './magic';
 
@@ -40,6 +41,7 @@ export function sheetView(data: SheetData, live?: LiveState) {
 // What tapping a value on a rendered card asks to roll.
 export type RollRequest =
   | { kind: 'check'; label: string; sides: 6 | 20; threshold: number; attack?: boolean; difficulty?: Difficulty }
-  | { kind: 'expr'; label: string; expression: string; min?: number };
+  | { kind: 'expr'; label: string; expression: string; min?: number }
+  | { kind: 'damage'; label: string; parts: DamagePart[] };
 
 export type SheetView = ReturnType<typeof sheetView>;

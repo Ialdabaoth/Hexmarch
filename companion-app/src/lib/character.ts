@@ -4,6 +4,7 @@
 // is permanent Con. Recomputed whenever the sheet or the live state changes.
 
 import { rollDie, type Rng } from './dice';
+import type { DamagePart } from './checks';
 import {
   ABILITIES, TALENTS, NPC_TRAITS,
   abilityFromRoll, primesOf, type AbilityId, type ClassId, type Origin, type OriginId, type Ruleset, type TalentId
@@ -199,6 +200,15 @@ export function equipment(c: Character) {
     main,
     off: bothHands ? undefined : off,
     bothHands,
+    // The same, kind by kind, for rolling.
+    damageParts: [
+      {
+        expression: base + (bonus ? `${bonus > 0 ? '+' : ''}${bonus}` : ''),
+        type: (c.magic.damageTypes() ?? [physicalType(main)]).map(damageTypeName).join(' or '),
+        ...(equal.length ? { equal: equal.map((x) => x.types.join(' or ')) } : {})
+      },
+      ...dice.map((x) => ({ expression: x.dice, type: x.types.join(' or ') }))
+    ] as DamagePart[],
     damage: twice(base + (bonus ? `${bonus > 0 ? '+' : ''}${bonus}` : '') + dice.map((x) => `+${x.dice}`).join(''), equal.length > 0),
     damageTypes: [
       (c.magic.damageTypes() ?? [physicalType(main)]).map(damageTypeName).join(' or '),

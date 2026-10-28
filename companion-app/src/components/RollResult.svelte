@@ -1,12 +1,23 @@
 <script lang="ts">
   import { app } from '../lib/app.svelte';
-  import { rolledLine } from '../lib/checks';
+  import { damageLine, rolledLine } from '../lib/checks';
 
   let entry = $derived(app.lastRoll);
+  let box = $state<HTMLElement>();
+
+  // Any tap outside the result, or Escape, puts it away.
+  function outside(ev: PointerEvent) {
+    if (entry && box && !box.contains(ev.target as Node)) app.lastRoll = null;
+  }
+  function key(ev: KeyboardEvent) {
+    if (entry && ev.key === 'Escape') app.lastRoll = null;
+  }
 </script>
 
+<svelte:window onpointerdown={outside} onkeydown={key} />
+
 {#if entry}
-  <div class="result card no-print" role="status" aria-live="polite">
+  <div class="result card no-print" role="status" aria-live="polite" bind:this={box}>
     <div class="row">
       <div class="grow">
         <div class="small muted">{entry.who} · {entry.difficulty && entry.difficulty !== 'normal' ? `${entry.difficulty[0].toUpperCase()}${entry.difficulty.slice(1)} ` : ''}{entry.label}</div>
@@ -16,14 +27,14 @@
             <span class={entry.outcome}>{entry.outcome === 'critical' ? 'Critical!' : entry.outcome === 'success' ? 'Success' : 'Failure'}</span>
           {/if}
         </div>
+        {#if entry.parts?.length}<div class="parts">{damageLine(entry)}</div>{/if}
         <div class="small muted"><em>{rolledLine(entry)}</em></div>
       </div>
-      <div class="actions">
-        {#if app.canPost && !app.settings.autoPost}
+      {#if app.canPost && !app.settings.autoPost}
+        <div class="actions">
           <button onclick={() => app.post(entry!)}>Discord</button>
-        {/if}
-        <button class="ghost" aria-label="Dismiss" onclick={() => (app.lastRoll = null)}>✕</button>
-      </div>
+        </div>
+      {/if}
     </div>
   </div>
 {/if}
@@ -47,6 +58,9 @@
   .big span {
     font-size: 1rem;
     margin-left: 0.4rem;
+  }
+  .parts {
+    font-weight: 600;
   }
   .actions {
     display: flex;
