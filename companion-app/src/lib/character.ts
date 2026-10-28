@@ -175,6 +175,8 @@ export function carrying(c: Pick<Character, 'abilities' | 'data'>) {
   return { capacity, threshold, load, encumbered: load > threshold, burdened: load > capacity };
 }
 
+const twice = (expr: string, yes: boolean) => (yes ? `(${expr})×2` : expr);
+
 // What the character is wearing and wielding, and what that does in a fight, magic
 // included. damage is a dice expression; damageTypes says what kind of harm it does.
 export function equipment(c: Character) {
@@ -185,6 +187,9 @@ export function equipment(c: Character) {
   const bothHands = usesBothHands(main, inv.wielded);
   const attack = main?.ranged ? 'ranged' : 'melee';
   const extra = c.magic.extraDamage(attack);
+  // A firearm deals its damage again as thunder: the roll counts twice.
+  const equal = extra.filter((x) => x.dice === 'equal');
+  const dice = extra.filter((x) => x.dice !== 'equal');
   const bonus = c.magic.amount('damage', attack);
   const base = damage(main, bothHands ? undefined : off, bothHands, c.abilities.str);
   const set = c.magic.setDefense()?.amount ?? 0;
@@ -194,10 +199,11 @@ export function equipment(c: Character) {
     main,
     off: bothHands ? undefined : off,
     bothHands,
-    damage: base + (bonus ? `${bonus > 0 ? '+' : ''}${bonus}` : '') + extra.map((x) => `+${x.dice}`).join(''),
+    damage: twice(base + (bonus ? `${bonus > 0 ? '+' : ''}${bonus}` : '') + dice.map((x) => `+${x.dice}`).join(''), equal.length > 0),
     damageTypes: [
       (c.magic.damageTypes() ?? [physicalType(main)]).map(damageTypeName).join(' or '),
-      ...extra.map((x) => `${x.dice} ${x.types.join(' or ')}`)
+      ...equal.map((x) => `equal ${x.types.join(' or ')}`),
+      ...dice.map((x) => `${x.dice} ${x.types.join(' or ')}`)
     ].join(', ')
   };
 }

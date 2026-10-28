@@ -163,6 +163,7 @@ A dweomer's `effects` is a list; each effect has exactly one of these keys:
 | `bonus` | `{ "bonus": target, "amount": n }` | `{ "bonus": "ability:str", "amount": "rarity" }` |
 | `set` | `{ "set": "defense", "amount": n }` | Mage Robes: defense equals rarity level |
 | `damage` | `{ "damage": dice, "type": kind, "per"?: "level" }` | `{ "damage": "1d6", "type": "fire", "per": "level" }` |
+| `damage` (equal) | `{ "damage": "equal", "type": kind }` | Firearm: its own damage again as thunder; rolls as `(d6)×2` |
 | `convert` | `{ "convert": kind or [kinds] }` | Aetheric Blade: piercing or aetheric |
 | `resist` | `{ "resist": kind or "all", "mode": "half", "immune", "vulnerable", "reduce" or "armor", "amount"? }` | `{ "resist": "psychic", "mode": "half" }` |
 | `easier` / `harder` | `{ "easier": target }` | Easy (or Hard) rolls for that target |

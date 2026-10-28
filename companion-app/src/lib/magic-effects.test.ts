@@ -97,6 +97,18 @@ describe('magic item effects', () => {
     expect(equipment(live(s)).damage).toBe('d6+3');
   });
 
+  it('makes a firearm deal its piercing damage again as thunder', () => {
+    const s = warrior();
+    const gun = newWeapon(mm, 'Crossbow');
+    gun.enchantment = { ref: 'mm:firearm', name: 'Firearm', rarity: 'uncommon' };
+    s.inventory.weapons.push(gun);
+    s.inventory.wielded = [gun.id, gun.id];
+    const g = equipment(live(s));
+    expect(g.damage).toBe('(d6)×2');
+    expect(g.damageTypes).toBe('piercing, equal thunder');
+    expect(live(s).magic.lines()[0].text).toBe('An equal amount of thunder damage');
+  });
+
   it('turns damage into another type', () => {
     const s = warrior();
     s.inventory.weapons[0].enchantment = { ref: 'mm:aetheric-blade', name: 'Aetheric Blade' };

@@ -100,6 +100,7 @@ export type MagicEffect = EffectCommon &
   (
     | { bonus: EffectTarget; amount: Amount }
     | { set: 'defense'; amount: Amount }
+    // damage "equal": as much again as the weapon's own damage, of this type (Firearm).
     | { damage: string; type: DamageKind | DamageKind[]; per?: 'rarity' | 'level' }
     | { convert: DamageKind | DamageKind[] }
     | { resist: DamageKind | 'all'; mode: 'half' | 'immune' | 'vulnerable' | 'reduce' | 'armor'; amount?: Amount }

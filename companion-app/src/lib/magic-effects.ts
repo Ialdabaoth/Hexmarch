@@ -218,6 +218,7 @@ export function describeEffect(e: MagicEffect, rarity: number, element?: DamageT
   let text: string;
   if ('bonus' in e) text = `${signed(amt(e.amount))} ${targetName(e.bonus)}`;
   else if ('set' in e) text = `Defense ${amt(e.amount)}`;
+  else if ('damage' in e && e.damage === 'equal') text = `An equal amount of ${list(e.type, element)} damage`;
   else if ('damage' in e) text = `+${scaleDice(e.damage, e.per ? rarity + 1 : 1)} ${list(e.type, element)} damage`;
   else if ('convert' in e) text = `Deals ${list(e.convert, element)} damage`;
   else if ('resist' in e) {

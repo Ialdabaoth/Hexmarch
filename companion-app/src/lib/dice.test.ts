@@ -23,6 +23,8 @@ describe('dice', () => {
     expect(() => parse('2d6 x')).toThrow();
     expect(() => parse('2d6 3')).toThrow();
     expect(() => parse('fish')).toThrow();
+    expect(parse('(d6+1)×2')).toEqual({ groups: [{ count: 1, sides: 6, sign: 1 }], modifier: 1, multiplier: 2 });
+    expect(roll('(2d6)x2', () => 0.99).total).toBe(24);
     expect(() => parse('3d6kh4')).toThrow();
   });
 
