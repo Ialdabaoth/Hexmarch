@@ -329,8 +329,8 @@ class Throw {
       const p = this.landed ? 1 : Math.min(1, Math.max(0, (now - this.start - f.delay) / ROLL_MS));
       if (p < 1) all = false;
       this.place(f, p);
-      // Two pulses a second: noticeable, well under the three-flashes-a-second limit.
-      if (f.glow) for (const m of f.materials) m.emissiveIntensity = 0.45 + 0.45 * Math.sin((now - this.start) / 80);
+      // One slow pulse every two seconds, so tinted dice stand out without flashing.
+      if (f.glow) for (const m of f.materials) m.emissiveIntensity = 0.45 + 0.45 * Math.sin(((now - this.start) * Math.PI) / 1000);
       if (p >= 1 && !f.kept) {
         const m = f.materials[0];
         const opacity = Math.max(0.35, m.opacity - 0.05);
