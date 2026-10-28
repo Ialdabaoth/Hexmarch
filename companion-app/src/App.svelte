@@ -22,7 +22,7 @@
     { name: 'list', label: 'Characters' },
     { name: 'campaign', label: 'Campaign' },
     { name: 'dice', label: 'Referee' },
-    { name: 'settings', label: 'Settings' }
+    { name: 'settings', label: '⚙️' }
   ] as const;
 
   let active = $derived(['build', 'sheet', 'render'].includes(app.view.name) ? 'list' : app.view.name === 'equipment' ? 'campaign' : app.view.name);
@@ -61,7 +61,7 @@
 
 <nav class="no-print">
   {#each tabs as t}
-    <button class:on={active === t.name} onclick={() => (app.view = { name: t.name })}>{t.label}</button>
+    <button class:on={active === t.name} aria-label={t.name === 'settings' ? 'Settings' : undefined} onclick={() => (app.view = { name: t.name })}>{t.label}</button>
   {/each}
 </nav>
 

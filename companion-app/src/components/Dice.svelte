@@ -31,7 +31,8 @@
 
 <h1>Referee</h1>
 
-<h2 style="margin:0 0 0.5rem">Dice</h2>
+<details class="section" open>
+  <summary><h2>Dice</h2></summary>
 
 <div class="quick">
   {#each quick as q}<button onclick={() => rollIt(q)}>{q}</button>{/each}
@@ -61,6 +62,8 @@
   </div>
 </details>
 
+</details>
+
 <section style="margin-top:1rem">
   <Bestiary />
 </section>
@@ -69,6 +72,8 @@
 <RollLog />
 
 <style>
+  .section > summary { cursor: pointer; }
+  .section > summary h2 { display: inline; margin: 0 0 0.5rem; }
   .quick { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; margin-bottom: 0.75rem; }
   .quick button { font-size: 1.1rem; font-weight: 600; min-height: 52px; }
 </style>

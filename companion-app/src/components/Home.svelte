@@ -153,8 +153,8 @@
 
 <section class="tabs-panel">
   <div class="tabs" role="tablist">
-    <button role="tab" aria-selected={tab === 'log'} class:on={tab === 'log'} onclick={() => (tab = 'log')}>Session (Rolls/Results/History)</button>
-    <button role="tab" aria-selected={tab === 'backup'} class:on={tab === 'backup'} onclick={() => (tab = 'backup')}>Character (Print/Backup/Import)</button>
+    <button role="tab" aria-selected={tab === 'log'} class:on={tab === 'log'} onclick={() => (tab = 'log')}>Session</button>
+    <button role="tab" aria-selected={tab === 'backup'} class:on={tab === 'backup'} onclick={() => (tab = 'backup')}>Character</button>
   </div>
   {#if tab === 'log'}
     {#if active}

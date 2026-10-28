@@ -33,7 +33,8 @@
   }
 </script>
 
-<h2>Bestiary</h2>
+<details class="section">
+  <summary><h2>Bestiary</h2></summary>
 <div class="row">
   <input class="grow" type="search" bind:value={query} placeholder="Find a monster" aria-label="Find a monster" autocomplete="off" />
   <select bind:value={kind} aria-label="Kind">
@@ -69,8 +70,11 @@
 {:else}
   <p class="small muted">No monsters match.</p>
 {/each}
+</details>
 
 <style>
+  .section > summary { cursor: pointer; }
+  .section > summary h2 { display: inline; margin: 0; }
   .head { width: 100%; display: flex; align-items: center; border: 0; background: transparent; padding: 0; text-align: left; min-height: 0; }
   .head .grow { display: flex; flex-direction: column; }
   .monster { margin-bottom: 0.5rem; padding: 0.6rem; }
