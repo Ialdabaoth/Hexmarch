@@ -2,6 +2,7 @@ import { get, set } from 'idb-keyval';
 import { readSheet, type SheetData } from './sheet';
 import type { LiveState } from './character';
 import type { LogEntry } from './checks';
+import { prefersReducedMotion } from './dice3d';
 
 export interface Settings {
   webhookUrl: string;
@@ -10,9 +11,11 @@ export interface Settings {
   activeId: string;
   // Rules picked last time in the character builder.
   rules: string;
+  // Show rolls on tumbling 3D dice. Starts off for people who ask for less motion.
+  dice3d: boolean;
 }
 
-const DEFAULT_SETTINGS: Settings = { webhookUrl: '', autoPost: false, activeId: '', rules: 'mm' };
+export const DEFAULT_SETTINGS: Settings = { webhookUrl: '', autoPost: false, activeId: '', rules: 'mm', dice3d: !prefersReducedMotion() };
 
 // Saved sheets go through the same checks as imported files, so a sheet the
 // app can't read is skipped instead of breaking the whole list.

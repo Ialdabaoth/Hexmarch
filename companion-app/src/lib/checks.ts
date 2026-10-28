@@ -12,12 +12,15 @@ export interface LogEntry {
   outcome?: 'success' | 'failure' | 'critical';
   // Easy or hard checks; older entries don't have it.
   difficulty?: Difficulty;
+  // Each die rolled, for the 3D dice; older entries don't have it.
+  dice?: { sides: number; value: number; kept: boolean }[];
 }
 
 // "Sapphire - Easy Save vs. Curse: 15 (success)"
-export function headline(e: LogEntry): string {
+// The app shows the outcome separately in color, so it can leave it off.
+export function headline(e: LogEntry, withOutcome = true): string {
   const diff = e.difficulty && e.difficulty !== 'normal' ? `${e.difficulty[0].toUpperCase()}${e.difficulty.slice(1)} ` : '';
-  return `${e.who} - ${diff}${e.label}: ${e.total}${e.outcome ? ` (${e.outcome})` : ''}`;
+  return `${e.who} - ${diff}${e.label}: ${e.total}${withOutcome && e.outcome ? ` (${e.outcome})` : ''}`;
 }
 
 // "(Rolled D20 vs. 11+: [15, 11] → 15)"
@@ -44,7 +47,8 @@ export function thresholdCheck(
     detail: `D${opts.sides} vs. ${opts.threshold}+: ${shown}`,
     total: kept,
     outcome,
-    difficulty: opts.difficulty
+    difficulty: opts.difficulty,
+    dice: dice.map((value, i) => ({ sides: opts.sides, value, kept: dice.length === 1 || i === dice.indexOf(kept) }))
   };
 }
 
@@ -58,6 +62,7 @@ export function expressionRoll(opts: { who: string; label: string; expression: s
     who: opts.who,
     label: opts.label,
     detail: `${opts.expression}: ${describe(r)}${floored ? ` (minimum ${opts.min})` : ''}`,
-    total: floored ? opts.min! : r.total
+    total: floored ? opts.min! : r.total,
+    dice: r.groups.flatMap((g) => g.rolls.map((value, i) => ({ sides: g.sides, value, kept: g.kept[i] })))
   };
 }
