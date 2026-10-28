@@ -57,6 +57,8 @@ export interface Follower {
   id: string;
   name: string;
   kind: 'follower' | 'beast';
+  // A beast taken from the bestiary, e.g. "mm:wolf-mastiff"; its name and level come from there.
+  ref?: string;
   classId?: ClassId;
   origin?: OriginId;
   level: number;

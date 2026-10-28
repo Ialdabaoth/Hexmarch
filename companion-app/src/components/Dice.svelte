@@ -4,6 +4,7 @@
   import type { Difficulty } from '../rules/rules';
   import { holdRoll } from '../lib/hold.svelte';
   import RollLog from './RollLog.svelte';
+  import Bestiary from './Bestiary.svelte';
 
   let expression = $state('');
   let who = $state('');
@@ -59,6 +60,10 @@
     <div><label for="label">What</label><input id="label" bind:value={label} placeholder="Wandering monster" /></div>
   </div>
 </details>
+
+<section style="margin-top:1rem">
+  <Bestiary />
+</section>
 
 <h2 style="margin:1rem 0 0">History</h2>
 <RollLog />

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { app } from '../lib/app.svelte';
-  import { blankFollower, quickFollower, talentThreshold, type Character, type Follower } from '../lib/character';
+  import { beastFollower, blankFollower, quickFollower, talentThreshold, type Character, type Follower } from '../lib/character';
+  import { BESTIARY, levelOf } from '../bestiary/bestiary';
   import { thresholdCheck } from '../lib/checks';
   import { ATTITUDES, loyaltyDifficulty, maxFollowers, type Difficulty } from '../rules/rules';
   import { combine, holdRoll } from '../lib/hold.svelte';
@@ -8,6 +9,8 @@
   let { character: c }: { character: Character } = $props();
 
   let open = $state<string | null>(null);
+  // Animals and fey beasts a beast companion can be taken from (the bestiary, pp. 143-150).
+  const companions = BESTIARY.companions();
 
   let followers = $derived(c.data.followers.filter((f) => f.kind === 'follower'));
   let beasts = $derived(c.data.followers.filter((f) => f.kind === 'beast'));
@@ -73,6 +76,13 @@
     c.data.followers.push(f);
     open = f.id;
     save();
+  }
+
+  // A beast from the bestiary; the picker goes back to its first line after each pick.
+  function addBeast(picker: HTMLSelectElement) {
+    const m = BESTIARY.get(picker.value);
+    if (m) add(beastFollower(m));
+    picker.value = '';
   }
 
   function remove(f: Follower) {
@@ -143,7 +153,11 @@
 <div class="row">
   <button onclick={() => add(quickFollower(c.rules))}>Roll a follower</button>
   <button onclick={() => add(blankFollower('follower'))}>Add follower</button>
-  <button onclick={() => add(blankFollower('beast'))}>Add beast</button>
+  <select aria-label="Add a beast from the bestiary" onchange={(e) => addBeast(e.currentTarget)}>
+    <option value="">Add a beast…</option>
+    {#each companions as m (m.ref)}<option value={m.ref}>{m.name} · {levelOf(m)} HD · p. {m.page}</option>{/each}
+  </select>
+  <button onclick={() => add(blankFollower('beast'))}>Blank beast</button>
 </div>
 <p class="small muted">Rolled followers use the one-roll NPC table (p. 258). Morale and directing get harder as loyalty drops.</p>
 

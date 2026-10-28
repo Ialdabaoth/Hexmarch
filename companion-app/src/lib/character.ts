@@ -12,6 +12,7 @@ import {
 import { damage, defense, gearLoad, usesBothHands } from './gear';
 import { Magic, damageTypeName, physicalType } from './magic-effects';
 import { CharacterSheet, blankFollower, newId, zeroAbilities, type Abilities, type Follower, type SheetData } from './sheet';
+import { levelOf, rollHp, type Monster, type WithRef } from '../bestiary/bestiary';
 
 export { newId, zeroAbilities, blankFollower, type Abilities, type Follower };
 
@@ -232,6 +233,12 @@ export function rollTraits(rng: Rng = Math.random): string[] {
     if (!traits.includes(trait)) traits.push(trait);
   }
   return traits;
+}
+
+// A beast companion from the bestiary: its book level and a rolled hit point total.
+export function beastFollower(m: WithRef<Monster>, rng: Rng = Math.random): Follower {
+  const hp = rollHp(m.hp, rng);
+  return { ...blankFollower('beast'), name: m.name, ref: m.ref, hitDice: levelOf(m) ?? 1, hpMax: hp, hp };
 }
 
 // One-roll minion (p. 258), from the ruleset's quick NPC table.
