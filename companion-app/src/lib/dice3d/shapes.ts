@@ -235,19 +235,22 @@ export interface ShownDie {
   // The face to land on, in the shape's own values (a d10 shows 0-9).
   face: number;
   kept: boolean;
+  // Bonus damage dice: the damage type, which picks their colours.
+  tint?: string;
 }
 
 // Turns rolled values into dice to show; sizes without a model are left out.
-export function diceToShow(dice: { sides: number; value: number; kept: boolean }[], max = 20): ShownDie[] {
+export function diceToShow(dice: { sides: number; value: number; kept: boolean; tint?: string }[], max = 20): ShownDie[] {
   const out: ShownDie[] = [];
   for (const d of dice) {
+    const tint = d.tint ? { tint: d.tint } : {};
     if (d.sides === 100) {
       const v = d.value % 100;
       out.push({ kind: 'tens', face: Math.floor(v / 10), kept: d.kept }, { kind: 10, face: v % 10, kept: d.kept });
     } else if (d.sides === 10) {
-      out.push({ kind: 10, face: d.value % 10, kept: d.kept });
+      out.push({ kind: 10, face: d.value % 10, kept: d.kept, ...tint });
     } else if ([4, 6, 8, 12, 20].includes(d.sides)) {
-      out.push({ kind: d.sides as DieKind, face: d.value, kept: d.kept });
+      out.push({ kind: d.sides as DieKind, face: d.value, kept: d.kept, ...tint });
     }
   }
   return out.slice(0, max);
