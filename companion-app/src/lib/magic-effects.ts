@@ -144,10 +144,10 @@ export class Magic {
   extraDamage(attack: 'melee' | 'ranged'): { dice: string; types: DamageType[]; source: string }[] {
     const s = { ...this.situation, attack };
     return this.active
-      .filter((a) => 'damage' in a.effect && !a.effect.vs && a.slot === 'main' && applies(a, s, this.main))
+      .filter((a) => 'damage' in a.effect && !a.effect.vs && fromWeapon(a) && applies(a, s, this.main))
       .map((a) => {
         const e = a.effect as Extract<MagicEffect, { damage: string }>;
-        return { dice: scaleDice(e.damage, e.per ? a.rarity + 1 : 1), types: kinds(e.type, a.element), source: a.source };
+        return { dice: scaleDice(e.damage, times(e.per, a.rarity, this.main)), types: kinds(e.type, a.element, this.main), source: a.source };
       });
   }
 
@@ -167,8 +167,22 @@ export class Magic {
   }
 
   lines(): { source: string; text: string }[] {
-    return this.active.map((a) => ({ source: a.source, text: describeEffect(a.effect, a.rarity, a.element) }));
+    return this.active.map((a) => ({ source: a.source, text: describeEffect(a.effect, a.rarity, a.element, fromWeapon(a) ? this.main : undefined) }));
   }
+}
+
+// Damage comes from the weapon in hand, or from carried ammunition (a quiver) for the
+// kind of attack it names.
+function fromWeapon(a: ActiveEffect): boolean {
+  return a.slot === 'main' || (a.slot === 'carried' && !!a.effect.when?.attack);
+}
+
+export function sizeSteps(w: WeaponItem | undefined): number {
+  return w?.size === 'heavy' ? 3 : w?.size === 'medium' ? 2 : 1;
+}
+
+function times(per: 'rarity' | 'level' | 'size' | undefined, rarity: number, w?: WeaponItem): number {
+  return per === 'size' ? sizeSteps(w) : per ? rarity + 1 : 1;
 }
 
 // "1d6" per rarity level at rare (level 3) is "3d6".
@@ -178,8 +192,11 @@ export function scaleDice(dice: string, n: number): string {
 }
 
 // "physical:piercing" counts as physical; "elemental" is the item's chosen element.
-function kinds(k: DamageKind | DamageKind[], element?: DamageType): DamageType[] {
-  return (Array.isArray(k) ? k : [k]).map((x) => (x === 'elemental' ? element ?? 'elemental' : x)) as DamageType[];
+// "physical" alone is the weapon's own kind (a keen blade).
+function kinds(k: DamageKind | DamageKind[], element?: DamageType, w?: WeaponItem): DamageType[] {
+  return (Array.isArray(k) ? k : [k]).map((x) =>
+    x === 'elemental' ? element ?? 'elemental' : x === 'physical' && w ? `physical:${physicalType(w)}` : x
+  ) as DamageType[];
 }
 
 // What a weapon deals before magic: blunt, piercing (and arrows and bolts) or slashing.
@@ -210,16 +227,18 @@ export function targetName(t: EffectTarget): string {
 }
 
 const signed = (n: number) => (n >= 0 ? `+${n}` : String(n));
-const list = (k: DamageKind | DamageKind[], element?: DamageType) => kinds(k, element).map(damageTypeName).join(' or ');
+const list = (k: DamageKind | DamageKind[], element?: DamageType, w?: WeaponItem) => kinds(k, element, w).map(damageTypeName).join(' or ');
 
 // One effect in words, at the item's rarity: "+2 Str", "+3d6 fire damage (melee)".
-export function describeEffect(e: MagicEffect, rarity: number, element?: DamageType): string {
+export function describeEffect(e: MagicEffect, rarity: number, element?: DamageType, weapon?: WeaponItem): string {
   const amt = (a: Amount) => amountOf(a, rarity, e.times);
   let text: string;
   if ('bonus' in e) text = `${signed(amt(e.amount))} ${targetName(e.bonus)}`;
   else if ('set' in e) text = `Defense ${amt(e.amount)}`;
   else if ('damage' in e && e.damage === 'equal') text = `An equal amount of ${list(e.type, element)} damage`;
-  else if ('damage' in e) text = `+${scaleDice(e.damage, e.per ? rarity + 1 : 1)} ${list(e.type, element)} damage`;
+  else if ('damage' in e && e.per === 'size' && !weapon)
+    text = `+${scaleDice(e.damage, 1)}/${scaleDice(e.damage, 2)}/${scaleDice(e.damage, 3)} ${list(e.type, element)} damage (light/medium/heavy weapon)`;
+  else if ('damage' in e) text = `+${scaleDice(e.damage, times(e.per, rarity, weapon))} ${list(e.type, element, weapon)} damage`;
   else if ('convert' in e) text = `Deals ${list(e.convert, element)} damage`;
   else if ('resist' in e) {
     const what = e.resist === 'all' ? 'all damage' : `${list(e.resist, element)} damage`;

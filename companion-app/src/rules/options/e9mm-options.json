@@ -6,7 +6,7 @@
     "attackProgression": "fighters",
     "throwMin": 5
   },
-  "equipment": ["e9", "mm"],
+  "equipment": ["e9", "e9mm", "mm"],
   "originRoll": {
     "start": "origin",
     "tables": {

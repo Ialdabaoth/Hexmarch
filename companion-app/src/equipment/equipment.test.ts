@@ -28,7 +28,8 @@ describe.each(EQUIPMENT.map((f) => [`${f.id}-equipment.json`, f] as const))('%s'
     }
   });
 
-  it('has one armor kind of each type for characters', () => {
+  // A file of magic only (e9mm's revised weapons) sits behind a file with the armor.
+  it.skipIf(!file.items.length)('has one armor kind of each type for characters', () => {
     expect(file.catalog().armor.map((a) => a.type).sort()).toEqual(['heavy', 'light', 'medium']);
   });
 });
