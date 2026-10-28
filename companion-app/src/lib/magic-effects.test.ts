@@ -17,11 +17,11 @@ describe('magic item effects', () => {
     sword.enchantment = { ref: 'mm:flametongue', name: 'Flametongue', rarity: 'rare' };
     const c = live(s);
     const g = equipment(c);
-    // A dweomer needs a masterwork base: +1 damage even though the sheet says 0.
-    expect(g.damage).toBe('d6+3+3d6');
+    // The dweomer's damage replaces the masterwork +1.
+    expect(g.damage).toBe('d6+2+3d6');
     expect(g.damageTypes).toBe('slashing, 3d6 fire');
-    // A magic weapon is at least +1 to attack.
-    expect(attackThresholds(c).melee).toBe(attackThresholds(live(warrior())).melee - 1);
+    // There are no attack bonuses.
+    expect(attackThresholds(c)).toEqual(attackThresholds(live(warrior())));
     expect(c.magic.lines()).toContainEqual({ source: sword.name, text: '+3d6 fire damage (melee)' });
   });
 
@@ -72,8 +72,7 @@ describe('magic item effects', () => {
     archer.inventory.weapons.push(bow);
     archer.inventory.wielded = [bow.id, bow.id];
     const c = live(archer);
-    expect(attackThresholds(c).ranged).toBe(attackThresholds(live(warrior())).ranged - 2);
-    expect(attackThresholds(c).melee).toBe(attackThresholds(live(warrior())).melee);
+    expect(attackThresholds(c)).toEqual(attackThresholds(live(warrior())));
     expect(equipment(c).damage).toBe('2d6+2');
     expect(equipment(c).damageTypes).toBe('piercing');
   });
@@ -83,6 +82,19 @@ describe('magic item effects', () => {
     s.inventory.weapons[0].enchantment = { ref: 'mm:tincture-of-elemental-essence', name: 'Tincture', element: 'lightning' };
     const back = readSheet(JSON.parse(JSON.stringify(s)));
     expect(back.inventory.weapons[0].enchantment?.element).toBe('lightning');
+  });
+
+  it('gives masterwork weapons +1 damage, kept by a dweomer with no damage of its own', () => {
+    const s = warrior();
+    const bow = newWeapon(mm, 'Shortbow');
+    bow.bonus = 1;
+    s.inventory.weapons.push(bow);
+    s.inventory.wielded = [bow.id, ''];
+    expect(equipment(live(s)).damage).toBe('d6+1');
+    const sword = s.inventory.weapons.find((w) => w.type === 'Longsword')!;
+    sword.enchantment = { ref: 'mm:keen-blade', name: 'Keen Blade' };
+    s.inventory.wielded = [sword.id, ''];
+    expect(equipment(live(s)).damage).toBe('d6+3');
   });
 
   it('turns damage into another type', () => {

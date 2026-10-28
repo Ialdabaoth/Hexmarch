@@ -75,7 +75,7 @@ export function activeEffects(inv: SheetData['inventory']): ActiveEffect[] {
 function matches(target: EffectTarget, want: string): boolean {
   if (target === want) return true;
   const [kind, which] = want.split(':');
-  if (target === kind && (kind === 'save' || kind === 'attack')) return true;
+  if (target === kind && kind === 'save') return true;
   if (kind === 'save' && target.startsWith('save:')) {
     const a = ABILITIES.find((x) => x.id === which);
     return target === `save:${a?.save.toLowerCase()}`;
@@ -83,14 +83,14 @@ function matches(target: EffectTarget, want: string): boolean {
   return false;
 }
 
-// Only the main hand's weapon adds to attacks and damage; a weapon's bonuses are for
-// its own kind of attack.
+// Only the main hand's weapon adds to damage; a weapon's bonuses are for its own kind
+// of attack.
 function applies(a: ActiveEffect, s: Situation, main?: WeaponItem): boolean {
   const when = a.effect.when;
   if (when?.armor && !when.armor.includes(s.armor)) return false;
   const attack = when?.attack ?? (a.slot === 'main' && main ? (main.ranged ? 'ranged' : 'melee') : undefined);
   if (attack && s.attack && attack !== s.attack) return false;
-  if (attack && !s.attack && 'bonus' in a.effect && ['attack', 'damage', 'range'].includes(a.effect.bonus)) return false;
+  if (attack && !s.attack && 'bonus' in a.effect && ['damage', 'range'].includes(a.effect.bonus)) return false;
   return true;
 }
 
@@ -115,7 +115,7 @@ export class Magic {
     for (const a of this.active) {
       const e = a.effect;
       if (!('bonus' in e) || e.vs || !matches(e.bonus, want) || !applies(a, s, this.main)) continue;
-      if (a.slot === 'off' && /^(attack|damage|range)/.test(want)) continue;
+      if (a.slot === 'off' && /^(damage|range)/.test(want)) continue;
       const amount = amountOf(e.amount, a.rarity, e.times);
       if (amount > (best?.amount ?? 0)) best = { amount, source: a.source };
       if (amount < (worst?.amount ?? 0)) worst = { amount, source: a.source };
@@ -198,7 +198,7 @@ export function damageTypeName(k: string): string {
 export const ELEMENTS: DamageType[] = DAMAGE_TYPES.filter((t) => !['physical', 'metal', 'petrification'].includes(t));
 
 export function targetName(t: EffectTarget): string {
-  if (t === 'defense' || t === 'attack' || t === 'damage') return t;
+  if (t === 'defense' || t === 'damage') return t;
   if (t === 'hp') return 'HP';
   if (t === 'range') return 'range (paces)';
   if (t === 'save') return 'saves';

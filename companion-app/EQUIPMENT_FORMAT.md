@@ -168,7 +168,7 @@ A dweomer's `effects` is a list; each effect has exactly one of these keys:
 | `easier` / `harder` | `{ "easier": target }` | Easy (or Hard) rolls for that target |
 | `text` | `{ "text": "..." }` | anything else worth showing |
 
-- **Targets**: `defense`, `attack`, `damage`, `hp`, `range`, `save` (all saves),
+- **Targets**: `defense`, `damage`, `hp`, `range`, `save` (all saves),
   `save:doom` (one save by name), `ability:str`, `talent:stealth`.
 - **Amounts**: a number, `"rarity"` (the rarity bonus: common 0, uncommon 1, rare 2,
   legendary 3, the 1st edition table) or `"level"` (common 1 to legendary 4).
@@ -189,10 +189,13 @@ How the app applies them:
 - Worn armor, the weapon or shield in each hand, and carried items count. Potions
   don't until they're drunk.
 - Only the highest bonus to each target counts (and the worst penalty).
-- Only the main hand's weapon adds to attack and damage, and only for its own kind of
-  attack (melee or ranged).
-- Every weapon or armor dweomer needs a masterwork base (p. 55), so an enchanted weapon
-  or armor counts as at least +1. A magic weapon is at least +1 to attack.
+- There are never attack bonuses (Heph, 2026-10-28).
+- Only the main hand's weapon adds to damage, and only for its own kind of attack
+  (melee or ranged).
+- Masterwork weapons deal +1 damage. Every weapon or armor dweomer needs a masterwork
+  base (p. 55): an enchanted weapon's own damage (dice or a constant) replaces the
+  masterwork +1, and keeps it when the dweomer adds no damage. Enchanted armor counts
+  as at least +1 defense.
 - Magic can lift an ability past +3 (to +6 at most).
 - Nothing here is saved: the sheet keeps the item and its enchantment, and the numbers
   are worked out each time.
@@ -329,7 +332,7 @@ is kept, and the home screen says so; it comes back when that campaign is opened
    caching, greyed-out incompatible characters, the custom equipment editor,
    "Publish as campaign", and bundling custom entries with character export.
 6. **0.2.8** Dweomer effects and damage types: effects for 40 Compendium dweomers,
-   applied live to abilities, talents, saves, attacks, defense and damage.
+   applied live to abilities, talents, saves, defense and damage.
 
 ## Decisions (Heph, 2026-10-28)
 

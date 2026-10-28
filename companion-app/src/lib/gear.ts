@@ -49,7 +49,7 @@ export interface WeaponItem {
   range: number;
   ranged: boolean;
   shield: boolean;
-  // Masterwork or magic: added to melee damage, or to ranged attack throws.
+  // Masterwork: added to damage. There are no attack bonuses.
   bonus: number;
   enchantment?: Enchantment;
   properties: string[];
@@ -178,6 +178,15 @@ export function itemBonus(i: { bonus: number; enchantment?: Enchantment }): numb
   return resolveMagic(i.enchantment?.ref) ? Math.max(1, i.bonus) : i.bonus;
 }
 
+// Masterwork weapons deal +1 damage. A dweomer needs a masterwork base, and replaces
+// that +1 with its own damage (dice or a constant) when it has some (Heph, 2026-10-28).
+export function weaponBonus(w: WeaponItem): number {
+  const entry = resolveMagic(w.enchantment?.ref);
+  if (!entry) return w.bonus;
+  const ownDamage = entry.effects?.some((e) => 'damage' in e || ('bonus' in e && e.bonus === 'damage'));
+  return ownDamage ? 0 : Math.max(1, w.bonus);
+}
+
 export function defense(rules: Ruleset, armor: ArmorItem | undefined): number {
   return armor ? rules.armorKind(armor.type).defense + itemBonus(armor) : 0;
 }
@@ -213,8 +222,8 @@ const plus = (n: number) => (n > 0 ? `+${n}` : n < 0 ? String(n) : '');
 export function damage(main: WeaponItem | undefined, off: WeaponItem | undefined, bothHands: boolean, str: number): string {
   const offDie = off && !off.shield && off.id !== main?.id ? '+d6' : '';
   if (!main) return `d6${offDie}`;
-  if (main.ranged) return (main.size === 'heavy' ? '2d6' : 'd6') + offDie;
-  const bonus = itemBonus(main);
+  const bonus = weaponBonus(main);
+  if (main.ranged) return (main.size === 'heavy' ? '2d6' : 'd6') + plus(bonus) + offDie;
   if (main.size === 'light') return `d6${plus(bonus)}${offDie}`;
   if (main.size === 'heavy') return `2d6${plus(str + bonus)}`;
   return bothHands ? `2d6${plus(bonus)}` : `d6${plus(str + bonus)}${offDie}`;

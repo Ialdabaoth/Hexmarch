@@ -150,7 +150,7 @@ say which ones are worn and wielded. An item from an equipment file has a `ref` 
 that file, and the sheet keeps only what is unique to this one:
 
 - `name`: what the player calls it ("Grandmother's dagger").
-- `bonus`: added to defense, melee damage or ranged attack throws (masterwork).
+- `bonus`: masterwork, added to armor's defense or a weapon's damage (never to attack throws).
 - `enchantment`: the dweomer that makes it a magic item, as `{ "ref": "mm:flametongue",
   "name": "Flametongue", "rarity": "uncommon", "charges": 2, "quality": "fair",
   "cursed": true }`. Only `ref` or `name` is needed: `rarity` only for a dweomer that

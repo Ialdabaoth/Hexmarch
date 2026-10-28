@@ -8,8 +8,8 @@ import {
   ABILITIES, TALENTS, NPC_TRAITS,
   abilityFromRoll, primesOf, type AbilityId, type ClassId, type Origin, type OriginId, type Ruleset, type TalentId
 } from '../rules/rules';
-import { damage, defense, gearLoad, itemBonus, usesBothHands } from './gear';
-import { Magic, damageTypeName, hasDweomer, physicalType } from './magic-effects';
+import { damage, defense, gearLoad, usesBothHands } from './gear';
+import { Magic, damageTypeName, physicalType } from './magic-effects';
 import { CharacterSheet, blankFollower, newId, zeroAbilities, type Abilities, type Follower, type SheetData } from './sheet';
 
 export { newId, zeroAbilities, blankFollower, type Abilities, type Follower };
@@ -143,19 +143,12 @@ export function saveThreshold(c: Pick<Character, 'rules' | 'abilities' | 'level'
   return Math.max(c.rules.mechanics.throwMin, c.rules.throw(c.abilities[ability] + c.level) - magic);
 }
 
-// Melee uses Str, ranged uses Dex. In E9 only fighters add their level.
-// A masterwork ranged weapon in hand makes ranged attacks one easier to land (p. 48), and
-// a magic weapon is +1 to attack unless its dweomer gives more; only the best bonus counts.
-export function attackThresholds(c: Rated & { data?: SheetData; magic?: Magic }) {
-  const inv = c.data?.inventory;
-  const main = inv?.weapons.find((w) => w.id === inv.wielded[0]);
-  const magicWeapon = hasDweomer(main) ? 1 : 0;
-  const melee = Math.max(main && !main.ranged ? magicWeapon : 0, c.magic?.amount('attack', 'melee') ?? 0);
-  const ranged = Math.max(main?.ranged ? itemBonus(main) : 0, c.magic?.amount('attack', 'ranged') ?? 0);
-  const min = c.rules.mechanics.throwMin;
+// Melee uses Str, ranged uses Dex. In E9 only fighters add their level. Nothing adds
+// to attack throws: masterwork and magic go to damage instead (Heph, 2026-10-28).
+export function attackThresholds(c: Rated) {
   return {
-    melee: Math.max(min, c.rules.attack(c.classId, c.abilities.str, c.level) - melee),
-    ranged: Math.max(min, c.rules.attack(c.classId, c.abilities.dex, c.level) - ranged)
+    melee: c.rules.attack(c.classId, c.abilities.str, c.level),
+    ranged: Math.max(c.rules.mechanics.throwMin, c.rules.attack(c.classId, c.abilities.dex, c.level))
   };
 }
 

@@ -83,7 +83,7 @@ export type Amount = number | 'rarity' | 'level';
 // Things a bonus can go to. Saves are named as in the book ("save:doom"); "save" alone
 // is every save.
 export type EffectTarget =
-  | 'defense' | 'attack' | 'damage' | 'hp' | 'range' | 'save'
+  | 'defense' | 'damage' | 'hp' | 'range' | 'save'
   | `ability:${string}` | `save:${string}` | `talent:${string}`;
 
 interface EffectCommon {
