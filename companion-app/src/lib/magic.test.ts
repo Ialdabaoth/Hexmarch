@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { armorEffect, checkPreparations, knownLimit, emptySlots } from './magic';
+import { armorEffect, byCircle, checkPreparations, knownLimit, emptySlots } from './magic';
 
 const STD = [[1], [2], [2, 1], [2, 2], [2, 2, 1], [2, 2, 2], [0, 3, 2, 1], [0, 2, 2, 2], [0, 0, 3, 2, 1]];
 const c = (...circles: number[]) => circles.map((circle) => ({ circle }));
@@ -61,5 +61,12 @@ describe('emptySlots', () => {
     expect(emptySlots(checkPreparations(slots, 4, [{ circle: 1 }]))).toEqual([1, 2, 2]);
     expect(emptySlots(checkPreparations(slots, 4, [{ circle: 2 }, { circle: 1 }]))).toEqual([1, 2]);
     expect(emptySlots(checkPreparations(slots, 4, []))).toEqual([1, 1, 2, 2]);
+  });
+});
+
+describe('byCircle', () => {
+  it('orders by circle, keeping sheet indexes and the added order within a circle', () => {
+    const list = [{ circle: 2, magic: 'a' }, { circle: 1, magic: 'b' }, { circle: 2, magic: 'c' }, { circle: 1, magic: 'd' }];
+    expect(byCircle(list).map(({ entry, i }) => `${entry.magic}${i}`)).toEqual(['b1', 'd3', 'a0', 'c2']);
   });
 });
