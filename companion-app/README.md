@@ -82,8 +82,9 @@ for GitHub Pages.
 The version lives in `package.json` and shows under About in Settings.
 
 - Every merged PR bumps the patch number: 0.2.0, 0.2.1, 0.2.2, …
-- A milestone (a big feature set, or a change to saved sheets that needs migrating) bumps the
-  minor number and resets the patch: 0.3.0.
+- Each sprint (a planned set of features, such as the 0.2 equipment work) bumps the minor
+  number and resets the patch: 0.3.0. Saved sheets carry their own format `version`
+  (see CHARACTER_FORMAT.md), separate from the app's.
 - 1.0.0 is the first release announced to players.
 
 Bump `version` in both `package.json` and `package-lock.json` in the PR itself.
