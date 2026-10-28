@@ -21,7 +21,7 @@
   const tabs = [
     { name: 'list', label: 'Characters' },
     { name: 'campaign', label: 'Campaign' },
-    { name: 'dice', label: 'Dice' },
+    { name: 'dice', label: 'Referee' },
     { name: 'settings', label: 'Settings' }
   ] as const;
 
