@@ -69,6 +69,8 @@ register it in `RULESETS`, instead of editing the old one, so existing character
 Armor, weapons, gear, mounts and services live in equipment files in `src/equipment/`:
 `mm-equipment.json` (Compendium, with prices in silver) and `e9-equipment.json` (E9, no
 prices). Each ruleset names its default file in `"equipment"`; `e9mm` uses the E9 file.
+Sheets point at entries with references like `"mm:longsword"` and save only what's
+unique to each item (name, bonus, enchantment, quantity).
 `src/equipment/equipment.ts` loads them, and a test checks every entry. The format, and
 where it's going (references from sheets, magic, magic items, campaigns by URL), is in
 [EQUIPMENT_FORMAT.md](EQUIPMENT_FORMAT.md).

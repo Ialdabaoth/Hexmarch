@@ -6,16 +6,21 @@
 // character.ts adds current HP and temporary boosts or debuffs on top.
 
 import { rollDie, type Rng } from './dice';
-import { defaultLoadout, newArmor, newWeapon, parseKit, type ArmorItem, type Hands, type WeaponItem } from './gear';
+import {
+  armorStats, compactArmor, compactItem, compactWeapon, defaultLoadout, itemId, matchesRef, newArmor, newItem, newWeapon, parseKit,
+  weaponStats, type ArmorItem, type CarriedItem, type Hands, type WeaponItem
+} from './gear';
+import { resolveItem } from '../equipment/equipment';
 import {
   ABILITIES, DEFAULT_RULES, TALENTS, findRules, hasKind, normalizeRulesId, primesOf, rulesFor, scheduledTraining,
   type AbilityId, type Attitude, type ClassId, type OriginId, type Ruleset, type TalentId
 } from '../rules/rules';
 
 export const FORMAT = 'materia-mundi-character';
-// Version 2 made armor and weapons items with their own properties (version 1 files
-// had an armor rating and weapons as name, damage and melee/ranged; they still load).
-export const FORMAT_VERSION = 2;
+// Version 3 points items at equipment files ("ref": "mm:longsword") instead of copying
+// their numbers. Version 2 made armor and weapons items with their own properties;
+// version 1 had an armor rating and weapons as name, damage and melee/ranged. All load.
+export const FORMAT_VERSION = 3;
 
 // Changes are tallies keyed by what they change: "agility": 1 improves Agility one
 // step (5+ to 4+), "agility": -1 worsens it, "hp": 3 adds hit points. A talent's
@@ -29,7 +34,7 @@ export type LevelupEntry = { level: number; hp: number; feat?: string } & Partia
 
 export type Abilities = Record<AbilityId, number>;
 
-export type { ArmorItem, WeaponItem, Hands };
+export type { ArmorItem, WeaponItem, CarriedItem, Hands };
 
 // An entry in a spellbook, prayer book, craftbook or a druid's known glamours.
 export interface BookEntry {
@@ -90,7 +95,7 @@ export interface SheetData {
     // Ids of the armor being worn and the weapons in each hand; "" for none.
     worn: string;
     wielded: Hands;
-    items: string[];
+    items: CarriedItem[];
     // Magic-users only. Preparations are physical objects, so they are inventory.
     book: BookEntry[];
     prepared: Preparation[];
@@ -323,21 +328,29 @@ const count = (v: unknown, fallback = 0) => (Number.isFinite(Number(v)) ? Math.r
 const text = (v: unknown, fallback = '') => (typeof v === 'string' ? v : fallback);
 
 function readArmor(rules: Ruleset, a: any): ArmorItem {
+  const id = text(a?.id) || itemId();
+  const bonus = count(a?.bonus);
+  const enchantment = text(a?.enchantment);
+  const entry = resolveItem(text(a?.ref));
+  if (entry?.kind === 'armor') return { id, ref: a.ref, name: text(a?.name) || entry.name, ...armorStats(entry), bonus, enchantment };
+  // No reference, or one this device can't find: the sheet's own numbers.
   const type = SIZES.includes(a?.type) ? a.type : 'light';
-  const base = newArmor(rules, type, text(a?.name) || undefined);
-  return {
-    ...base,
-    id: text(a?.id) || base.id,
-    encumbrance: count(a?.encumbrance, base.encumbrance),
-    bonus: count(a?.bonus),
-    enchantment: text(a?.enchantment)
-  };
+  const { ref, ...base } = newArmor(rules, type, text(a?.name) || undefined);
+  const encumbrance = count(a?.encumbrance, base.encumbrance);
+  const keep = text(a?.ref) || (encumbrance === base.encumbrance ? ref : '');
+  return { ...base, id, ...(keep ? { ref: keep } : {}), encumbrance, bonus, enchantment };
 }
 
 function readWeapon(rules: Ruleset, w: any): WeaponItem {
+  const id = text(w?.id) || itemId();
+  const bonus = count(w?.bonus);
+  const enchantment = text(w?.enchantment);
+  const entry = resolveItem(text(w?.ref));
+  if (entry?.kind === 'weapon') return { id, ref: w.ref, name: text(w?.name) || entry.name, ...weaponStats(entry), bonus, enchantment };
   const base = newWeapon(rules, text(w?.type) || text(w?.name, 'Weapon'), text(w?.name) || undefined);
-  return {
-    id: text(w?.id) || base.id,
+  const item: WeaponItem = {
+    id,
+    ...(text(w?.ref) ? { ref: text(w.ref) } : base.ref ? { ref: base.ref } : {}),
     name: base.name,
     type: base.type,
     size: SIZES.includes(w?.size) ? w.size : base.size,
@@ -346,10 +359,23 @@ function readWeapon(rules: Ruleset, w: any): WeaponItem {
     range: count(w?.range, base.range),
     ranged: typeof w?.ranged === 'boolean' ? w.ranged : base.ranged,
     shield: typeof w?.shield === 'boolean' ? w.shield : base.shield,
-    bonus: count(w?.bonus),
-    enchantment: text(w?.enchantment),
+    bonus,
+    enchantment,
     properties: Array.isArray(w?.properties) ? w.properties.map(String) : base.properties
   };
+  return item;
+}
+
+// Carried gear: a plain name (older sheets) or { id, ref, name, qty }.
+function readItem(rules: Ruleset, x: any): CarriedItem[] {
+  if (typeof x === 'string') return x.trim() ? [newItem(rules, x)] : [];
+  if (typeof x !== 'object' || x === null) return [];
+  const ref = text(x.ref);
+  const name = text(x.name).trim() || resolveItem(ref)?.name;
+  if (!name) return [];
+  const qty = Math.max(1, count(x.qty, 1));
+  if (!ref) return [{ ...newItem(rules, name, qty), id: text(x.id) || itemId() }];
+  return [{ id: text(x.id) || itemId(), ref, name, qty }];
 }
 
 // Version 1 had armor as { rating, worn } and weapons as { name, damage, range };
@@ -365,6 +391,8 @@ function readGear(rules: Ruleset, inv: any): Pick<SheetData['inventory'], 'armor
     const item = readWeapon(rules, w);
     // A version-1 ranged weapon that isn't in the equipment list still shoots.
     if (!('type' in (w ?? {})) && w?.range === 'ranged' && !rules.weaponKind(item.type)) item.ranged = true;
+    // A weapon whose numbers differ from its equipment file entry is custom.
+    if (item.ref && resolveItem(item.ref) && !matchesRef(item)) delete item.ref;
     return item;
   });
   if (legacy || !Array.isArray(inv.wielded)) {
@@ -473,7 +501,7 @@ export function readSheet(raw: unknown): SheetData {
     abilities,
     inventory: {
       ...readGear(rules, inv),
-      items: (Array.isArray(inv.items) ? inv.items : []).map(String),
+      items: (Array.isArray(inv.items) ? inv.items : []).flatMap((x: unknown) => readItem(rules, x)),
       book: (Array.isArray(inv.book) ? inv.book : []).map((b: any) => ({ magic: String(b?.magic ?? ''), circle: circle(b?.circle) })),
       prepared: (Array.isArray(inv.prepared) ? inv.prepared : []).map((p: any) => ({
         magic: String(p?.magic ?? ''),
@@ -496,6 +524,17 @@ export function importFile(data: unknown): SheetData[] {
   return list.map(readSheet);
 }
 
+// The sheet as saved and exported: referenced items keep only their ref and what's
+// unique to them.
+export function writeSheet(d: SheetData): object {
+  const inv = d.inventory;
+  return {
+    ...d,
+    version: FORMAT_VERSION,
+    inventory: { ...inv, armor: inv.armor.map(compactArmor), weapons: inv.weapons.map(compactWeapon), items: inv.items.map(compactItem) }
+  };
+}
+
 export function exportBundle(list: SheetData[]) {
-  return { format: 'materia-mundi-characters', version: FORMAT_VERSION, characters: list };
+  return { format: 'materia-mundi-characters', version: FORMAT_VERSION, characters: list.map(writeSheet) };
 }

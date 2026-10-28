@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { itemLabel } from '../lib/gear';
   import type { RollRequest, SheetView } from '../lib/render';
   import { app } from '../lib/app.svelte';
   import { holdRoll } from '../lib/hold.svelte';
@@ -194,7 +195,7 @@
           {:else}
             <h2>Gear</h2>
             <ul>
-              {#each inv.items.slice(0, 5) as item}<li>{item}</li>{/each}
+              {#each inv.items.slice(0, 5) as item}<li>{itemLabel(item)}</li>{/each}
               {#if inv.items.length > 5}<li class="muted">+{inv.items.length - 5} more</li>{/if}
             </ul>
           {/if}

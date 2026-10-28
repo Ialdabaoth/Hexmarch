@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Character, freshState, defaultTalents, quickFollower, talentThreshold } from './character';
-import { createSheet, importFile, levelUp, readSheet } from './sheet';
+import { createSheet, importFile, levelUp, readSheet, writeSheet } from './sheet';
 import { rulesFor } from '../rules/rules';
 
 const abilities = { con: -1, str: 0, dex: 2, int: 0, wis: -1, cha: 1 };
@@ -11,7 +11,7 @@ function holly() {
   });
   levelUp(s, { training: 'stealth', hpRoll: 3 });
   s.followers.push(quickFollower(rulesFor('mm')));
-  s.inventory.items = ['Light crossbow', 'Two daggers'];
+  s.inventory.items = [{ id: 'i1', name: 'Light crossbow', qty: 1 }, { id: 'i2', name: 'Dagger', qty: 2 }];
   return s;
 }
 
@@ -79,5 +79,62 @@ describe('character sheet', () => {
     expect(() => readSheet({ ...base, abilities: { ...base.abilities, dex: { score: 0, agility: '*' } } })).toThrow(/agility/);
     expect(() => readSheet({ ...base, class: { name: 'warrior', levelups: [] } })).toThrow(/level 1/);
     expect(() => readSheet({ ...base, class: { name: 'warrior', levelups: [{ level: 1, hp: 8 }, { level: 2 }] } })).toThrow(/level 2 needs "hp"/);
+  });
+});
+
+describe('equipment references (format version 3)', () => {
+  const w = { con: 0, str: 2, dex: 1, int: 0, wis: 0, cha: 0 };
+  const warrior = () => createSheet({ name: 'W', origin: 'human', classId: 'warrior', abilities: w, talentBase: defaultTalents(w) });
+
+  it('saves only the reference and what is unique to each item', () => {
+    const s = warrior();
+    s.inventory.weapons[0].bonus = 1;
+    const saved = writeSheet(s) as any;
+    expect(saved.version).toBe(3);
+    expect(saved.inventory.weapons[0]).toEqual({ id: s.inventory.weapons[0].id, ref: 'mm:longsword', name: 'Longsword', bonus: 1 });
+    expect(saved.inventory.armor[0]).toEqual({ id: s.inventory.armor[0].id, ref: 'mm:heavy-armor', name: 'Heavy armor' });
+    expect(JSON.stringify(saved.inventory)).not.toMatch(/"size"|"encumbrance"|"properties"/);
+  });
+
+  it('fills the numbers back in from the equipment file', () => {
+    const s = warrior();
+    expect(readSheet(JSON.parse(JSON.stringify(writeSheet(s))))).toEqual(s);
+  });
+
+  it('gives a version 2 sheet references where its numbers match the file', () => {
+    const [s] = importFile({
+      format: 'materia-mundi-character', version: 2, rules: 'mm', name: 'Old', origin: 'human',
+      class: { name: 'warrior', levelups: [{ level: 1 }] },
+      abilities: { con: 0, str: 0, dex: 0, int: 0, wis: 0, cha: 0 },
+      inventory: {
+        armor: [{ id: 'a1', name: 'Mail', type: 'medium', encumbrance: 2 }],
+        weapons: [
+          { id: 'w1', name: 'Sword', type: 'Longsword', size: 'medium', properties: ['Parry'] },
+          { id: 'w2', name: 'Big sword', type: 'Longsword', size: 'heavy', properties: ['Parry'] }
+        ],
+        items: ["Dungeoneer's kit", 'Lucky coin']
+      }
+    });
+    expect(s.inventory.armor[0]).toMatchObject({ ref: 'mm:medium-armor', name: 'Mail' });
+    expect(s.inventory.weapons[0].ref).toBe('mm:longsword');
+    // Edited away from the file: kept as a custom weapon.
+    expect(s.inventory.weapons[1].ref).toBeUndefined();
+    expect(s.inventory.weapons[1].size).toBe('heavy');
+    expect(s.inventory.items.map((i) => [i.ref, i.name])).toEqual([['mm:dungeoneers-kit', "Dungeoneer's kit"], [undefined, 'Lucky coin']]);
+  });
+
+  it('keeps a reference this device cannot find, with the numbers saved alongside it', () => {
+    const [s] = importFile({
+      format: 'materia-mundi-character', version: 3, rules: 'mm', name: 'Hansa', origin: 'human',
+      class: { name: 'warrior', levelups: [{ level: 1 }] },
+      abilities: { con: 0, str: 0, dex: 0, int: 0, wis: 0, cha: 0 },
+      inventory: {
+        weapons: [{ id: 'w1', ref: 'hansa:ordensschwert', name: 'Ordensschwert', type: 'Ordensschwert', size: 'heavy', encumbrance: 1 }],
+        items: [{ id: 'i1', ref: 'hansa:seal', name: 'Seal of the Order', qty: 2 }]
+      }
+    });
+    expect(s.inventory.weapons[0]).toMatchObject({ ref: 'hansa:ordensschwert', size: 'heavy', encumbrance: 1 });
+    expect((writeSheet(s) as any).inventory.weapons[0].size).toBe('heavy');
+    expect(s.inventory.items[0]).toEqual({ id: 'i1', ref: 'hansa:seal', name: 'Seal of the Order', qty: 2 });
   });
 });

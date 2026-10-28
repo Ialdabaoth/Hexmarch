@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { itemLabel } from '../lib/gear';
   import type { SheetView } from '../lib/render';
   import { app } from '../lib/app.svelte';
   import { damage as dice, grips, type WeaponItem } from '../lib/gear';
@@ -79,7 +80,7 @@
     <section class="wide">
       <h2>Inventory</h2>
       <ul class="items">
-        {#each inv.items as item}<li>{item}</li>{/each}
+        {#each inv.items as item}<li>{itemLabel(item)}</li>{/each}
         {#each Array(Math.max(0, 6 - inv.items.length)) as _}<li class="empty">&nbsp;</li>{/each}
       </ul>
     </section>
