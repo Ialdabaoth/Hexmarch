@@ -76,10 +76,10 @@ Sheets point at entries with references like `"mm:longsword"` and save only what
 unique to each item (name, bonus, enchantment, quantity).
 `src/equipment/equipment.ts` loads them, and a test checks every entry.
 
-Each device also has its own custom equipment file, edited under Settings, Custom
+Each device also has its own custom equipment file, edited in the Campaign tab, under Custom
 equipment. A referee can publish theirs as a **campaign**: a `campaign.json` naming the
 rules and equipment files, put on any site that lets other sites read it (GitHub
-Pages, a gist). Players paste its link into Settings, Campaign
+Pages, a gist). Players paste its link into the Campaign tab
 (`src/lib/campaign.ts`). Exported characters carry the custom entries they use. The
 format, campaigns included, is in [EQUIPMENT_FORMAT.md](EQUIPMENT_FORMAT.md).
 

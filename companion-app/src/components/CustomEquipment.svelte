@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from 'svelte';
   import { app } from '../lib/app.svelte';
   import { downloadJson } from '../lib/storage';
   import { publishCampaign } from '../lib/campaign';
@@ -10,6 +11,8 @@
 
   // This device's custom equipment file ("local"): referee-approved items, spells and
   // dweomers that aren't in the book. Referees can publish it as a campaign.
+
+  let { publishing: startPublishing = false }: { publishing?: boolean } = $props();
 
   type Kind = Exclude<ItemKind, 'armor'> | MagicSystem;
   const KINDS: { kind: Kind; label: string }[] = [
@@ -59,7 +62,9 @@
   let draft = $state<Draft | null>(null);
   let error = $state('');
   let jsonText = $state<string | null>(null);
-  let publishing = $state<{ name: string; id: string; referee: string; rules: string } | null>(null);
+  let publishing = $state<{ name: string; id: string; referee: string; rules: string } | null>(
+    untrack(() => startPublishing) ? { name: '', id: '', referee: '', rules: 'mm' } : null
+  );
   let fileInput: HTMLInputElement | undefined = $state();
 
   const text = (v: unknown) => (v === undefined || v === null ? '' : String(v));
@@ -253,7 +258,7 @@
 </script>
 
 <div class="row">
-  <button class="ghost" onclick={() => (app.view = { name: 'settings' })}>‹ Settings</button>
+  <button class="ghost" onclick={() => (app.view = { name: 'campaign' })}>‹ Campaign</button>
   <h1 class="grow">Custom equipment</h1>
 </div>
 

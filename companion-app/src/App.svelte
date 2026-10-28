@@ -7,6 +7,7 @@
   import Sheet from './components/Sheet.svelte';
   import Dice from './components/Dice.svelte';
   import Settings from './components/Settings.svelte';
+  import Campaign from './components/Campaign.svelte';
   import CustomEquipment from './components/CustomEquipment.svelte';
   import RollResult from './components/RollResult.svelte';
   import Render from './components/Render.svelte';
@@ -19,11 +20,12 @@
 
   const tabs = [
     { name: 'list', label: 'Characters' },
+    { name: 'campaign', label: 'Campaign' },
     { name: 'dice', label: 'Dice' },
     { name: 'settings', label: 'Settings' }
   ] as const;
 
-  let active = $derived(['build', 'sheet', 'render'].includes(app.view.name) ? 'list' : app.view.name === 'equipment' ? 'settings' : app.view.name);
+  let active = $derived(['build', 'sheet', 'render'].includes(app.view.name) ? 'list' : app.view.name === 'equipment' ? 'campaign' : app.view.name);
 </script>
 
 <main class:printable={app.view.name === 'render'}>
@@ -43,8 +45,10 @@
     <Dice />
   {:else if app.view.name === 'settings'}
     <Settings />
+  {:else if app.view.name === 'campaign'}
+    <Campaign />
   {:else if app.view.name === 'equipment'}
-    <CustomEquipment />
+    <CustomEquipment publishing={app.view.publish} />
   {/if}
 </main>
 

@@ -181,7 +181,7 @@
           <button class="primary" onclick={importPasted} disabled={!jsonText.trim()}>Import pasted</button>
         </div>
       {/if}
-      {#if app.unreadable}<p class="small failure">{app.unreadable} saved character{app.unreadable === 1 ? '' : 's'} can't be opened, probably from a campaign this device no longer has. They're kept; open that campaign's link in Settings to see them.</p>{/if}
+      {#if app.unreadable}<p class="small failure">{app.unreadable} saved character{app.unreadable === 1 ? '' : 's'} can't be opened, probably from a campaign this device no longer has. They're kept; open that campaign's link in the Campaign tab to see them.</p>{/if}
       <p class="muted small">Characters live only on this device. Export a backup now and then, or to move them to another phone.</p>
     </div>
   {/if}
