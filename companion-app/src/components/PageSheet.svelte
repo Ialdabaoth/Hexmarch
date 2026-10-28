@@ -1,6 +1,7 @@
 <script lang="ts">
   import { itemLabel } from '../lib/gear';
   import type { SheetView } from '../lib/render';
+  import { byCircle } from '../lib/magic';
   import { app } from '../lib/app.svelte';
   import { damage as dice, grips, type WeaponItem } from '../lib/gear';
 
@@ -99,7 +100,7 @@
         <h2>{v.cls.magic.prepared}s</h2>
         <table>
           <tbody>
-            {#each inv.prepared as p}<tr><td class="box">{p.spent ? '☒' : '☐'}</td><td>{v.circle(p.circle)}</td><th>{p.magic}</th></tr>{/each}
+            {#each byCircle(inv.prepared) as { entry: p }}<tr><td class="box">{p.spent ? '☒' : '☐'}</td><td>{v.circle(p.circle)}</td><th>{p.magic}</th></tr>{/each}
             {#each Array(Math.max(0, 3 - inv.prepared.length)) as _}<tr class="empty"><td class="box">☐</td><td></td><th>&nbsp;</th></tr>{/each}
           </tbody>
         </table>
@@ -108,7 +109,7 @@
         <h2>{v.cls.magic.book}</h2>
         <table>
           <tbody>
-            {#each inv.book as b}<tr><td>{v.circle(b.circle)}</td><th>{b.magic}</th></tr>{/each}
+            {#each byCircle(inv.book) as { entry: b }}<tr><td>{v.circle(b.circle)}</td><th>{b.magic}</th></tr>{/each}
             {#if !inv.book.length}<tr class="empty"><td></td><th>&nbsp;</th></tr>{/if}
           </tbody>
         </table>

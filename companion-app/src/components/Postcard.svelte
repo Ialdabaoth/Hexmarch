@@ -4,6 +4,7 @@
   import { app } from '../lib/app.svelte';
   import { holdRoll } from '../lib/hold.svelte';
   import type { Difficulty } from '../rules/rules';
+  import { byCircle } from '../lib/magic';
 
   // With onroll, values on the card are buttons that roll; without it the card is print-only.
   // layout "carousel" shows the faces side by side for swiping; "stack" is for print.
@@ -45,6 +46,13 @@
   let g = $derived(v.gear);
   // How many preparation lines fit on the back of the card.
   let prepRows = $derived(onprep ? 5 : 6);
+  // Preparations and empty slots together, by circle; filled slots come before empty ones of the same circle.
+  let prepLines = $derived([
+    ...byCircle(inv.prepared).map(({ entry, i }) => ({ p: entry, i, circle: entry.circle })),
+    ...v.emptySlots.map((circle) => ({ p: undefined, i: -1, circle }))
+  ].sort((a, b) => a.circle - b.circle || Number(!a.p) - Number(!b.p)));
+  // A "+N more" line takes a row itself, so one extra entry shows in its place.
+  let prepShown = $derived(prepLines.length <= prepRows + 1 ? prepLines.length : prepRows);
 
   let scroller = $state<HTMLDivElement>();
 
@@ -172,25 +180,25 @@
           {#if v.cls.magic}
             <h2>{v.cls.magic.prepared}s</h2>
             <ul>
-              {#each inv.prepared.slice(0, prepRows) as p, i}
-                {#if onprep}
-                  <li><button type="button" class="prep tap" class:spent={p.spent} disabled={!p.spent && !!v.magicBlockedBy} onclick={() => onprep(i)}>
-                    <span class="act">{p.spent ? 'Prepare' : 'Use'}</span><span class="what">{v.circle(p.circle)} {p.magic || '—'}</span>
+              {#each prepLines.slice(0, prepShown) as line}
+                {#if line.p}
+                  {@const p = line.p}
+                  {#if onprep}
+                    <li><button type="button" class="prep tap" class:spent={p.spent} disabled={!p.spent && !!v.magicBlockedBy} onclick={() => onprep(line.i)}>
+                      <span class="act">{p.spent ? 'Prepare' : 'Use'}</span><span class="what">{v.circle(p.circle)} {p.magic || '—'}</span>
+                    </button></li>
+                  {:else}
+                    <li>{p.spent ? '☒' : '☐'} {v.circle(p.circle)} {p.magic}</li>
+                  {/if}
+                {:else if onprepslot}
+                  <li><button type="button" class="prep tap empty" disabled={!!v.magicBlockedBy} onclick={() => onprepslot(line.circle)}>
+                    <span class="act">Prepare</span><span class="what">{v.circle(line.circle)} ________</span>
                   </button></li>
                 {:else}
-                  <li>{p.spent ? '☒' : '☐'} {v.circle(p.circle)} {p.magic}</li>
+                  <li class="muted">☐ {v.circle(line.circle)} ________</li>
                 {/if}
               {/each}
-              {#each v.emptySlots.slice(0, Math.max(0, prepRows - inv.prepared.length)) as circle}
-                {#if onprepslot}
-                  <li><button type="button" class="prep tap empty" disabled={!!v.magicBlockedBy} onclick={() => onprepslot(circle)}>
-                    <span class="act">Prepare</span><span class="what">{v.circle(circle)} ________</span>
-                  </button></li>
-                {:else}
-                  <li class="muted">☐ {v.circle(circle)} ________</li>
-                {/if}
-              {/each}
-              {#if inv.prepared.length + v.emptySlots.length > prepRows}<li class="muted">+{inv.prepared.length + v.emptySlots.length - prepRows} more</li>{/if}
+              {#if prepLines.length > prepShown}<li class="muted">+{prepLines.length - prepShown} more</li>{/if}
             </ul>
           {:else}
             <h2>Gear</h2>

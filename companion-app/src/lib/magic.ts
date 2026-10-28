@@ -50,3 +50,9 @@ export function knownLimit(known: (number | null)[] | undefined, level: number):
 export function emptySlots(check: PrepCheck): number[] {
   return check.free.flatMap((n, k) => Array<number>(n).fill(k + 1));
 }
+
+// Entries in circle order, lowest first, keeping each one's index in the sheet's list.
+// Equal circles stay in the order they were added.
+export function byCircle<T extends { circle: number }>(list: T[]): { entry: T; i: number }[] {
+  return list.map((entry, i) => ({ entry, i })).sort((a, b) => a.entry.circle - b.entry.circle || a.i - b.i);
+}

@@ -1,7 +1,7 @@
 <script lang="ts">
   import { app } from '../lib/app.svelte';
   import { equipment, type Character } from '../lib/character';
-  import { armorEffect, checkPreparations, knownLimit } from '../lib/magic';
+  import { armorEffect, byCircle, checkPreparations, knownLimit } from '../lib/magic';
   import { magicLevel, magicLevels, resolveMagic } from '../equipment/equipment';
 
   let { character: c }: { character: Character } = $props();
@@ -93,7 +93,7 @@
 <h3>{magic.prepared}s</h3>
 <p class="small muted">Level {c.level}: {allowedText || 'none'}{armor.penalty.length ? ' (less for light armor)' : ''}. Lower {magic.circleWord === 'Rarity' ? 'rarities' : 'circles'} can go in higher slots.</p>
 {#if armor.blockedBy}<p class="small failure">You can't cast your {magic.prepared.toLowerCase()}s while wearing {armor.blockedBy}.</p>{/if}
-{#each c.data.inventory.prepared as p, i}
+{#each byCircle(c.data.inventory.prepared) as { entry: p, i } (p)}
   <div class="prep" class:spent={p.spent} class:over={limits.over.includes(i)}>
     {#if fixedLevel(p.ref)}
       <span class="level">{circleName(p.circle)}</span>
@@ -124,7 +124,7 @@
   {#if knownMax != null && c.data.inventory.book.length > knownMax}
     <p class="small failure">Level {c.level} can know {knownMax}; forget one for each new glamour or wild shape.</p>
   {/if}
-  {#each c.data.inventory.book as b, i}
+  {#each byCircle(c.data.inventory.book) as { entry: b, i } (b)}
     <div class="prep">
       {#if fixedLevel(b.ref)}
         <span class="level">{circleName(b.circle)}</span>

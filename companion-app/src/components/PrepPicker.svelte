@@ -1,7 +1,7 @@
 <script lang="ts">
   import { app } from '../lib/app.svelte';
   import { equipment, type Character } from '../lib/character';
-  import { armorEffect, checkPreparations } from '../lib/magic';
+  import { armorEffect, byCircle, checkPreparations } from '../lib/magic';
 
   // Fill an empty preparation slot from the book: anything of the slot's circle or lower.
   let { character: c, circle, onclose }: { character: Character; circle: number; onclose: () => void } = $props();
@@ -14,7 +14,7 @@
   function fits(n: number) {
     return checkPreparations(magic.slots, c.level, [...c.data.inventory.prepared, { circle: n }], armor.penalty).over.length === 0;
   }
-  let choices = $derived(c.data.inventory.book.map((b, i) => ({ ...b, i, ok: b.circle <= circle && fits(b.circle) })));
+  let choices = $derived(byCircle(c.data.inventory.book).map(({ entry: b, i }) => ({ ...b, i, ok: b.circle <= circle && fits(b.circle) })));
 
   function choose(entry: { ref?: string; magic: string; circle: number }) {
     c.data.inventory.prepared.push({ ...(entry.ref ? { ref: entry.ref } : {}), magic: entry.magic, circle: entry.circle, spent: false });
