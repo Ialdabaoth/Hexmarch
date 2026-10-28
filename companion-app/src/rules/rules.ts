@@ -93,6 +93,8 @@ export interface Origin {
   deficient: AbilityId[];
   classes: ClassId[];
   note?: string;
+  // Fighter feats this origin must pick from at a level, e.g. { "2": ["Battle-Trance: Mystic initiation"] }.
+  feats?: Record<string, string[]>;
 }
 
 export interface ClassFeature {
@@ -264,6 +266,8 @@ export interface RulesetOptions {
   originRoll: { start: string; tables: Record<string, RollTable> };
   origins: Origin[];
   classes: CharacterClass[];
+  // Classes taken out of this ruleset and what replaces them on older sheets.
+  renamedClasses?: Record<string, ClassId>;
   quickNpc?: { die: string; page?: number; note?: string; results: QuickNpcRow[] };
 }
 
@@ -298,13 +302,18 @@ export class Ruleset {
 
   private combined = new Map<string, CharacterClass>();
 
+  private current(id: string): string {
+    return id.split('+').map((part) => this.options.renamedClasses?.[part] ?? part).join('+');
+  }
+
   hasClass(id: unknown): boolean {
-    return typeof id === 'string' && id.split('+').every((part) => this.classes.some((c) => c.id === part));
+    return typeof id === 'string' && this.current(id).split('+').every((part) => this.classes.some((c) => c.id === part));
   }
   hasOrigin(id: unknown): boolean {
     return this.origins.some((o) => o.id === id);
   }
   getClass(id: ClassId): CharacterClass {
+    id = this.current(id);
     if (id.includes('+')) {
       if (!this.combined.has(id)) this.combined.set(id, combine(id.split('+').map((part) => this.getClass(part))));
       return this.combined.get(id)!;

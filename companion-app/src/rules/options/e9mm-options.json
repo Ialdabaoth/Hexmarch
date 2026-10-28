@@ -97,9 +97,10 @@
         "con"
       ],
       "classes": [
-        "champion+bard+druid"
+        "fighter+expert+druid"
       ],
-      "note": "Elf champions always take the Mystic initiation."
+      "note": "At level 2 an elf's fighter feat is Battle-Trance with the Mystic initiation (Compendium p. 19): enter a trance on a melee attack; foes may be frightened, add your level to melee damage.",
+      "feats": {"2": ["Battle-Trance: Mystic initiation"]}
     },
     {
       "id": "gnome",
@@ -113,7 +114,7 @@
         "str"
       ],
       "classes": [
-        "hunter+druid"
+        "expert+druid"
       ]
     },
     {
@@ -128,11 +129,13 @@
         "int"
       ],
       "classes": [
-        "champion+druid"
+        "fighter+druid"
       ],
-      "note": "Beastfolk champions take an animal initiation matching their form."
+      "note": "At level 2 a beastfolk's fighter feat is Battle-Trance with the animal initiation matching their form (Compendium p. 19): enter a trance on a melee attack; foes may be frightened, add your level to melee damage.",
+      "feats": {"2": ["Battle-Trance: Bear initiation", "Battle-Trance: Boar initiation", "Battle-Trance: Panther initiation", "Battle-Trance: Raven initiation", "Battle-Trance: Serpent initiation", "Battle-Trance: Shark initiation", "Battle-Trance: Wolf initiation"]}
     }
   ],
+  "renamedClasses": { "hunter": "expert", "bard": "expert", "champion": "fighter" },
   "classes": [
     {
       "id": "fighter",
@@ -141,6 +144,7 @@
       "page": 12,
       "prime": "str",
       "hitDieBonus": 2,
+      "martial": "All weapons, armor and shields",
       "gear": "Longsword, heavy armor, shield, dungeoneer's kit",
       "improvedCritical": true,
       "feats": [
@@ -167,17 +171,7 @@
         {
           "name": "Fighter Training",
           "level": 1,
-          "summary": "Melee and ranged attack throws improve by 1 each level."
-        },
-        {
-          "name": "Critical Hits",
-          "level": 1,
-          "summary": "With an attack threshold of 9+ or better, beating it by 10 or more is a critical hit."
-        },
-        {
-          "name": "Fighter Feats",
-          "level": 2,
-          "summary": "Choose a new fighter feat at levels 2, 4, 6 and 8 (p. 13)."
+          "summary": "Melee and ranged attack throws improve by 1 each level. With an attack threshold of 9+ or better, beating it by 10 or more is a critical hit. Choose a new fighter feat at levels 2, 4, 6 and 8 (p. 13)."
         }
       ]
     },
@@ -193,17 +187,7 @@
         {
           "name": "Expertise",
           "level": 1,
-          "summary": "Train a talent of your choice at every level, including level 1."
-        },
-        {
-          "name": "Climb Sheer Surface",
-          "level": 1,
-          "summary": "Sheer walls are a normal Agility check; normal climbs succeed automatically. Not encumbered, in medium or heavy armor, or with a shield."
-        },
-        {
-          "name": "Pick Lock / Disarm Mechanism",
-          "level": 1,
-          "summary": "Finesse check to pick a lock or disarm a mechanism you know about."
+          "summary": "Train a talent of your choice at every level, including level 1. Sheer walls are a normal Agility check and normal climbs succeed automatically (not encumbered, in medium or heavy armor, or with a shield). Finesse check to pick a lock or disarm a mechanism you know about."
         },
         {
           "name": "Sneak Attack",
@@ -239,22 +223,12 @@
         {
           "name": "Arcane Spellcasting",
           "level": 1,
-          "summary": "Start with two first-circle, one second-circle and one third-circle spell. Prepare spells at sunrise or sunset."
-        },
-        {
-          "name": "Preparing During Exploration",
-          "level": 1,
-          "summary": "Fill an empty preparation with Science checks equal to the spell's circle, one exploration turn each."
+          "summary": "Start with two first-circle, one second-circle and one third-circle spell; prepare spells at sunrise or sunset. Fill an empty preparation during exploration with Science checks equal to the spell's circle, one turn each. Cast spells up to half your level (round up) as rituals, one turn and one Science check per circle."
         },
         {
           "name": "Cantrips",
           "level": 1,
           "summary": "Each prepared spell gives an at-will cantrip."
-        },
-        {
-          "name": "Arcane Rituals",
-          "level": 1,
-          "summary": "Cast spells up to half your level (round up) as rituals, one turn and one Science check per circle."
         }
       ]
     },
@@ -281,34 +255,14 @@
       },
       "features": [
         {
-          "name": "Domain of Faith",
-          "level": 1,
-          "summary": "Perform your domain's miracles and any common miracle with any prayer strip of the same or higher circle."
-        },
-        {
           "name": "Divine Miracles",
           "level": 1,
-          "summary": "Prepare miracles into prayer strips at sunrise and sunset; a strip burns to ash when used."
-        },
-        {
-          "name": "Preparing During Exploration",
-          "level": 1,
-          "summary": "Fill an empty preparation with Bearing checks equal to the miracle's circle, one exploration turn each."
+          "summary": "Prepare miracles into prayer strips at sunrise and sunset; a strip burns to ash when used. Perform your domain's miracles and any common miracle with a strip of the same or higher circle. Fill an empty preparation during exploration with Bearing checks equal to the miracle's circle, one turn each. Perform miracles from any domain up to half your level (round up) as rituals with Bearing checks. A focus blessing can be held by a sworn oath instead; breaking the oath turns it into a curse."
         },
         {
           "name": "Rebuke the Unholy",
           "level": 1,
           "summary": "Bearing check to drive back unholy creatures of your level or lower in a 5-pace cone. Destroys 1 HD foes from level 5, 2 HD at level 9."
-        },
-        {
-          "name": "Divine Rituals",
-          "level": 1,
-          "summary": "Perform miracles from any domain up to half your level (round up) as rituals with Bearing checks."
-        },
-        {
-          "name": "Sworn Oaths",
-          "level": 1,
-          "summary": "A focus blessing can be held by a sworn oath instead; breaking the oath turns it into a curse."
         }
       ]
     },
@@ -338,111 +292,8 @@
         {
           "name": "Dweomercraft",
           "level": 1,
-          "summary": "Craftbook with two alchemical formulae and two magic item blueprints; prepare dweomers at sunrise or sunset."
-        },
-        {
-          "name": "Dweomersmith Rituals",
-          "level": 1,
-          "summary": "Perform first-circle dweomers as rituals with Science checks."
+          "summary": "Craftbook with two alchemical formulae and two magic item blueprints; prepare dweomers at sunrise or sunset. Perform first-circle dweomers as rituals with Science checks."
         }
-      ],
-      "book": "Compendium"
-    },
-    {
-      "id": "champion",
-      "name": "Champion",
-      "kind": "fighter",
-      "page": 19,
-      "prime": "str",
-      "hitDieBonus": 2,
-      "martial": "All weapons and shields, light armor only",
-      "gear": "Greatsword, light armor",
-      "improvedCritical": true,
-      "features": [
-        {
-          "name": "Improved Critical Hit",
-          "level": 1,
-          "summary": "With an attack threshold of 9+ or better, beating it by 10 or more is a critical hit."
-        },
-        {
-          "name": "Battle-Trance",
-          "level": 2,
-          "summary": "Enter a trance on a melee attack; foes may be frightened, add level to melee damage."
-        },
-        {
-          "name": "Champion Initiation",
-          "level": 2,
-          "summary": "Choose an initiation (Mystic, Bear, Boar, Panther, Raven, Serpent, Shark, Wolf)."
-        }
-      ],
-      "book": "Compendium"
-    },
-    {
-      "id": "hunter",
-      "name": "Hunter",
-      "kind": "expert",
-      "page": 20,
-      "prime": "dex",
-      "hitDieBonus": 0,
-      "martial": "All weapons, simple (non-heavy) armor",
-      "gear": "Shortbow, two daggers, light armor",
-      "trainable": [
-        "agility",
-        "stealth",
-        "alertness",
-        "survival"
-      ],
-      "expertise": [
-        "survival"
-      ],
-      "features": [
-        {
-          "name": "Hunter's Expertise",
-          "level": 1,
-          "summary": "Tracking and navigating are easy; befriend and train wild animals."
-        },
-        {
-          "name": "Sneak Attack",
-          "level": 1,
-          "summary": "Use your ranged threshold against unaware targets; crit if every damage die beats your Stealth threshold."
-        }
-      ],
-      "anyTalentAt": [
-        5,
-        9
-      ],
-      "book": "Compendium"
-    },
-    {
-      "id": "bard",
-      "name": "Bard",
-      "kind": "expert",
-      "page": 20,
-      "prime": "cha",
-      "hitDieBonus": 0,
-      "martial": "No non-simple weapons or armor",
-      "gear": "Two daggers, quarterstaff, medium armor, musical instrument",
-      "trainable": [
-        "finesse",
-        "lore",
-        "charm",
-        "wit"
-      ],
-      "features": [
-        {
-          "name": "Magical Intuition",
-          "level": 1,
-          "summary": "Lore check to activate any magic item or prepared magic."
-        },
-        {
-          "name": "Bardsong",
-          "level": 2,
-          "summary": "Weave Dream or Song glamours into music with Charm checks."
-        }
-      ],
-      "anyTalentAt": [
-        5,
-        9
       ],
       "book": "Compendium"
     },
@@ -473,17 +324,12 @@
         {
           "name": "Primal Druidcraft",
           "level": 1,
-          "summary": "Start knowing four first-circle glamours or wild shapes; prepare from memory."
+          "summary": "Start knowing four first-circle glamours or wild shapes; prepare from memory. Perform any known glamour as a ritual with Survival checks."
         },
         {
           "name": "Wisps",
           "level": 1,
           "summary": "Invest a preparation in a wisp to cast an elemental glamour for you."
-        },
-        {
-          "name": "Primal Rituals",
-          "level": 1,
-          "summary": "Perform any known glamour as a ritual with Survival checks."
         }
       ],
       "book": "Compendium"

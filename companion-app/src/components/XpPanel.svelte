@@ -16,6 +16,11 @@
   let ownedFeats = $derived(new Set(c.data.class.levelups.map((l) => l.feat?.trim().toLowerCase()).filter(Boolean)));
   let freeFeats = $derived((cls.feats ?? []).filter((f) => !ownedFeats.has(f.toLowerCase())));
   let featTaken = $derived(hasKind(cls, 'fighter') && ownedFeats.has(levelFeat.trim().toLowerCase()));
+  // Some origins have their feat chosen for them at a level (an elf's Battle-Trance).
+  let forced = $derived(c.rules.getOrigin(c.origin).feats?.[c.level + 1]);
+  $effect(() => {
+    if (leveling && forced?.length === 1) levelFeat = forced[0];
+  });
 
   function addXp(delta: number) {
     c.data.class.xp = Math.max(0, c.data.class.xp + delta);
@@ -58,7 +63,12 @@
         return `${TALENTS.find((x) => x.id === t)!.name}${times > 1 ? ' twice' : ''}`;
       }).join(' and ')}.</p>
     {/if}
-    {#if hasKind(cls, 'fighter') && (c.level + 1) % 2 === 0}
+    {#if forced?.length}
+      <select bind:value={levelFeat} aria-label="Fighter feat">
+        {#if forced.length > 1}<option value="">Fighter feat…</option>{/if}
+        {#each forced as f}<option value={f}>{f}</option>{/each}
+      </select>
+    {:else if hasKind(cls, 'fighter') && (c.level + 1) % 2 === 0}
       <input bind:value={levelFeat} list="fighter-feats" placeholder="Fighter feat chosen" aria-label="Fighter feat" />
       {#if cls.feats}<datalist id="fighter-feats">{#each freeFeats as f}<option value={f}></option>{/each}</datalist>{/if}
       {#if featTaken}<p class="small failure">You already have {levelFeat.trim()}.</p>{/if}
@@ -66,7 +76,7 @@
       <input bind:value={levelFeat} placeholder="Other choice to note (optional)" aria-label="Level-up note" />
     {/if}
     <div class="row">
-      <button class="primary" disabled={(hasKind(cls, 'expert') && !levelTraining) || featTaken} onclick={doLevelUp}>Roll HP and level up</button>
+      <button class="primary" disabled={(hasKind(cls, 'expert') && !levelTraining) || featTaken || (!!forced?.length && !levelFeat)} onclick={doLevelUp}>Roll HP and level up</button>
       <button class="ghost" onclick={() => (leveling = false)}>Cancel</button>
     </div>
   </div>

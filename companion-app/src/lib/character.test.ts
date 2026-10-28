@@ -3,7 +3,7 @@ import {
   Character, freshState, attackThresholds, defaultTalents, quickFollower, rollAbilities, saveThreshold,
   talentSpreadValid, talentThreshold, xpToNext, zeroAbilities
 } from './character';
-import { createSheet, levelUp } from './sheet';
+import { createSheet, levelUp, readSheet } from './sheet';
 import { thresholdCheck } from './checks';
 import { abilityFromRoll, maxFollowers, rulesFor } from '../rules/rules';
 
@@ -191,9 +191,17 @@ describe('combined classes (E9 for Materia Mundi)', () => {
 
   it('gives each origin its fixed class bundle', () => {
     expect(e9mm.getOrigin('dwarf').classes).toEqual(['fighter+dweomersmith']);
-    expect(e9mm.getClass('champion+bard+druid').name).toBe('Champion / Bard / Druid');
-    expect(e9mm.hasClass('hunter+druid')).toBe(true);
-    expect(e9mm.hasClass('hunter+wizardry')).toBe(false);
+    expect(e9mm.getClass('fighter+expert+druid').name).toBe('Fighter / Expert / Druid');
+    expect(e9mm.hasClass('expert+druid')).toBe(true);
+    expect(e9mm.hasClass('expert+wizardry')).toBe(false);
+  });
+
+  it('turns the old hunter and bard parts into experts', () => {
+    expect(e9mm.getClass('hunter+druid').id).toBe('expert+druid');
+    const old = createSheet({ rules: 'e9mm', name: 'Ael', origin: 'elf', classId: 'fighter+expert+druid', abilities: a, talentBase: defaultTalents(a) });
+    expect(readSheet({ ...JSON.parse(JSON.stringify(old)), class: { ...old.class, name: 'champion+bard+druid' } }).class.name).toBe('fighter+expert+druid');
+    expect(e9mm.getClass('champion+druid').id).toBe('fighter+druid');
+    expect(e9mm.getOrigin('elf').feats?.['2']).toEqual(['Battle-Trance: Mystic initiation']);
   });
 
   it('levels every part together', () => {
@@ -210,25 +218,25 @@ describe('combined classes (E9 for Materia Mundi)', () => {
   });
 
   it('uses the worst prime for experience', () => {
-    const elfA = { ...zeroAbilities(), str: 1, cha: -1, wis: 1 };
-    const s = createSheet({ rules: 'e9mm', name: 'Ael', origin: 'elf', classId: 'champion+bard+druid', abilities: elfA, talentBase: defaultTalents(elfA), firstTraining: 'lore' });
-    // Level 2 costs 2 + 1 for Cha -1, paid once for each of the three classes.
+    const elfA = { ...zeroAbilities(), str: 1, dex: -1, wis: 1 };
+    const s = createSheet({ rules: 'e9mm', name: 'Ael', origin: 'elf', classId: 'fighter+expert+druid', abilities: elfA, talentBase: defaultTalents(elfA), firstTraining: 'lore' });
+    // Level 2 costs 2 + 1 for Dex -1, paid once for each of the three classes.
     expect(xpToNext(new Character(s, freshState()))).toBe(9);
   });
 
   it('costs twice the experience for two classes', () => {
     const gnomeA = { ...zeroAbilities(), wis: 1, int: 1 };
-    const s = createSheet({ rules: 'e9mm', name: 'Pip', origin: 'gnome', classId: 'hunter+druid', abilities: gnomeA, talentBase: defaultTalents(gnomeA), firstTraining: 'alertness' });
+    const s = createSheet({ rules: 'e9mm', name: 'Pip', origin: 'gnome', classId: 'expert+druid', abilities: gnomeA, talentBase: defaultTalents(gnomeA), firstTraining: 'alertness' });
     expect(xpToNext(new Character(s, freshState()))).toBe(4);
   });
 
   it('keeps both trainings when two classes train the same talent', () => {
     const gnomeA = { ...zeroAbilities(), wis: 1, int: 1 };
-    const s = createSheet({ rules: 'e9mm', name: 'Pip', origin: 'gnome', classId: 'hunter+druid', abilities: gnomeA, talentBase: defaultTalents(gnomeA), firstTraining: 'alertness' });
+    const s = createSheet({ rules: 'e9mm', name: 'Pip', origin: 'gnome', classId: 'expert+druid', abilities: gnomeA, talentBase: defaultTalents(gnomeA), firstTraining: 'alertness' });
     levelUp(s, { training: 'agility', hpRoll: 3 });
     levelUp(s, { training: 'agility', hpRoll: 3 });
     const before = new Character(s, freshState()).talents.survival;
-    // Level 4: the hunter picks Survival and the druid trains it on schedule.
+    // Level 4: the expert picks Survival and the druid trains it on schedule.
     const entry = levelUp(s, { training: 'survival', hpRoll: 3 });
     expect(entry.survival).toBe(2);
     expect(new Character(s, freshState()).talents.survival).toBe(Math.max(2, before - 2));
