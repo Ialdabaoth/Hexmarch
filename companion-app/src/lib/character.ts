@@ -191,14 +191,10 @@ export function equipment(c: Character) {
   const extra = c.magic.extraDamage(attack).map((x) => ({ ...x, type: x.types.map(damageTypeName).join(' or ') }));
   // A firearm-style "equal" effect deals the weapon's damage again: the roll counts twice.
   const equal = extra.filter((x) => x.dice === 'equal');
-  // Extra dice of the weapon's own kind (a keen blade) join its roll.
-  const same = extra.filter((x) => x.dice !== 'equal' && x.type === kind);
-  const dice = extra.filter((x) => x.dice !== 'equal' && x.type !== kind);
+  // Bonus dice from magic, rolled apart from the weapon's own (a keen blade's too).
+  const dice = extra.filter((x) => x.dice !== 'equal');
   const bonus = c.magic.amount('damage', attack);
-  const base =
-    damage(main, bothHands ? undefined : off, bothHands, c.abilities.str) +
-    same.map((x) => `+${x.dice}`).join('') +
-    (bonus ? `${bonus > 0 ? '+' : ''}${bonus}` : '');
+  const base = damage(main, bothHands ? undefined : off, bothHands, c.abilities.str) + (bonus ? `${bonus > 0 ? '+' : ''}${bonus}` : '');
   const set = c.magic.setDefense()?.amount ?? 0;
   return {
     worn,
@@ -209,7 +205,7 @@ export function equipment(c: Character) {
     // The same, kind by kind, for rolling.
     damageParts: [
       { expression: base, type: kind, ...(equal.length ? { equal: equal.map((x) => x.type) } : {}) },
-      ...dice.map((x) => ({ expression: x.dice, type: x.type }))
+      ...dice.map((x) => ({ expression: x.dice, type: x.type, bonus: true }))
     ] as DamagePart[],
     damage: twice(base + dice.map((x) => `+${x.dice}`).join(''), equal.length > 0),
     damageTypes: [kind, ...equal.map((x) => `equal ${x.type}`), ...dice.map((x) => `${x.dice} ${x.type}`)].join(', ')

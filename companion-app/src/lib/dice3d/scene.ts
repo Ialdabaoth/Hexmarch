@@ -33,11 +33,27 @@ export function setDiceColors(body: string, ink: string) {
   if (body.toLowerCase() === STYLES.die.body && ink.toLowerCase() === STYLES.die.ink) return;
   STYLES.die = { body: body.toLowerCase(), ink: ink.toLowerCase() };
   for (const [key, t] of textures) {
-    if (key.startsWith('tens:')) continue;
+    if (key.startsWith('tens:') || key.startsWith('tint-')) continue;
     t.dispose();
     textures.delete(key);
   }
 }
+
+// Bonus damage dice wear their damage type's colours; any other bonus die is bone.
+const TINTS: Record<string, { body: string; ink: string }> = {
+  fire: { body: '#d9531e', ink: '#fff4d6' },
+  cold: { body: '#9fd8f2', ink: '#0d2c45' },
+  lightning: { body: '#f4c430', ink: '#2a1f00' },
+  thunder: { body: '#4b2a86', ink: '#f1eaff' },
+  poison: { body: '#3f7d2a', ink: '#effbe6' },
+  acid: { body: '#a8d64b', ink: '#1d2a05' },
+  radiant: { body: '#f6e7b0', ink: '#7a5200' },
+  aetheric: { body: '#1f6f8b', ink: '#e8fbff' },
+  psychic: { body: '#c23a7a', ink: '#fff0f7' },
+  metal: { body: '#9aa1a8', ink: '#16191c' },
+  petrification: { body: '#7c746b', ink: '#f7f4ef' },
+  bonus: { body: '#ece4d4', ink: '#2b2118' }
+};
 
 const SIZE = 0.95; // circumradius of a die, in table units
 const ROLL_MS = 1400;
@@ -53,12 +69,12 @@ let current: Throw | null = null;
 const textures = new Map<string, Texture>();
 const geometries = new Map<DieKind, BufferGeometry>();
 
-function faceTexture(kind: DieKind, faceIndex: number): Texture {
-  const key = `${kind}:${faceIndex}`;
+function faceTexture(kind: DieKind, faceIndex: number, tint?: string): Texture {
+  const key = `${tint ? `tint-${tint}:` : ''}${kind}:${faceIndex}`;
   let t = textures.get(key);
   if (t) return t;
   const face = shape(kind).faces[faceIndex];
-  const style = STYLES[kind === 'tens' ? 'tens' : 'die'];
+  const style = tint ? TINTS[tint.split(' ')[0]] ?? TINTS.bonus : STYLES[kind === 'tens' ? 'tens' : 'die'];
   const px = 128;
   const canvas = document.createElement('canvas');
   canvas.width = canvas.height = px;
@@ -141,7 +157,7 @@ function setup(): boolean {
   document.body.appendChild(el);
 
   scene = new Scene();
-  camera = new PerspectiveCamera(35, 1, 0.1, 200);
+  camera = new PerspectiveCamera(22, 1, 0.1, 400);
   scene.add(new HemisphereLight(0xfff6e6, 0x3a2a1c, 1.6));
   const sun = new DirectionalLight(0xffffff, 2.2);
   sun.position.set(-4, 12, 6);
@@ -167,7 +183,7 @@ function restingOrientation(s: Shape, face: number): Quaternion {
   if (textUp) {
     const t = new Vector3(...textUp).applyQuaternion(q);
     // Turning about UP adds to atan2(x, z); straight up the screen is atan2(0, -1) = π.
-    yaw = Math.PI - Math.atan2(t.x, t.z) + (Math.random() - 0.5) * 0.6;
+    yaw = Math.PI - Math.atan2(t.x, t.z);
   }
   return new Quaternion().setFromAxisAngle(UP, yaw).multiply(q);
 }
@@ -177,6 +193,8 @@ interface Flight {
   materials: MeshStandardMaterial[];
   points: Vector3[];
   kept: boolean;
+  // Bonus dice pulse in their colour so they stand out from the base dice.
+  glow: boolean;
   from: Vector3;
   to: Vector3;
   axis: Vector3;
@@ -219,8 +237,17 @@ class Throw {
     const { spots, halfDepth } = this.layout(dice.length);
     dice.forEach((d, i) => {
       const s = shape(d.kind);
+      const tint = d.tint ? TINTS[d.tint.split(' ')[0]] ?? TINTS.bonus : undefined;
       const materials = s.faces.map(
-        (_, fi) => new MeshStandardMaterial({ map: faceTexture(d.kind, fi), roughness: 0.45, metalness: 0.05, transparent: true, flatShading: true })
+        (_, fi) =>
+          new MeshStandardMaterial({
+            map: faceTexture(d.kind, fi, d.tint),
+            roughness: 0.45,
+            metalness: 0.05,
+            transparent: true,
+            flatShading: true,
+            ...(tint ? { emissive: tint.body, emissiveIntensity: 0 } : {})
+          })
       );
       const mesh = new Mesh(geometry(d.kind), materials);
       mesh.castShadow = true;
@@ -234,6 +261,7 @@ class Throw {
         materials,
         points: s.vertices.map((v) => new Vector3(...v).multiplyScalar(SIZE)),
         kept: d.kept,
+        glow: !!tint,
         from,
         to,
         axis,
@@ -273,9 +301,12 @@ class Throw {
     const needH = Math.max(7 / Math.max(aspect, 0.5), rows * gap + 2.5);
     const tan = Math.tan((camera.fov * Math.PI) / 360);
     const dist = Math.max(needH / (2 * tan), needW / (2 * tan * aspect));
-    const tilt = 0.22;
+    // Straight down, so settled dice show their top faces square on.
+    const tilt = 0;
     camera.aspect = aspect;
     camera.position.set(0, dist * Math.cos(tilt), dist * Math.sin(tilt));
+    // Looking straight down, "up" on screen is away from the player (-z).
+    camera.up.set(0, 0, -1);
     camera.lookAt(0, 0, 0);
     camera.updateProjectionMatrix();
     renderer!.setSize(w, h, false);
@@ -298,6 +329,8 @@ class Throw {
       const p = this.landed ? 1 : Math.min(1, Math.max(0, (now - this.start - f.delay) / ROLL_MS));
       if (p < 1) all = false;
       this.place(f, p);
+      // One slow pulse every two seconds, so tinted dice stand out without flashing.
+      if (f.glow) for (const m of f.materials) m.emissiveIntensity = 0.45 + 0.45 * Math.sin(((now - this.start) * Math.PI) / 1000);
       if (p >= 1 && !f.kept) {
         const m = f.materials[0];
         const opacity = Math.max(0.35, m.opacity - 0.05);

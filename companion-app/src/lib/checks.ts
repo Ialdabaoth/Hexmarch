@@ -13,7 +13,8 @@ export interface LogEntry {
   // Easy or hard checks; older entries don't have it.
   difficulty?: Difficulty;
   // Each die rolled, for the 3D dice; older entries don't have it.
-  dice?: { sides: number; value: number; kept: boolean }[];
+  // `tint` marks bonus damage dice by damage type, so they show apart from the base dice.
+  dice?: { sides: number; value: number; kept: boolean; tint?: string }[];
   // Damage by type: "9 piercing + 9 thunder". Only damage rolls have it.
   parts?: { amount: number; type: string }[];
 }
@@ -24,6 +25,8 @@ export interface DamagePart {
   expression: string;
   type: string;
   equal?: string[];
+  // Bonus dice from magic, shown in their damage type's colours.
+  bonus?: boolean;
 }
 
 // "9 piercing + 9 thunder"
@@ -89,7 +92,14 @@ export function expressionRoll(opts: { who: string; label: string; expression: s
 // Rolls each kind of damage separately so the result can say how much of each.
 export function damageRoll(opts: { who: string; label: string; parts: DamagePart[] }, rng: Rng = Math.random): LogEntry {
   const rolled = opts.parts.map((p) => ({ part: p, r: roll(p.expression, rng) }));
-  const parts = rolled.flatMap(({ part, r }) => [part.type, ...(part.equal ?? [])].map((type) => ({ amount: r.total, type })));
+  // Amounts of the same type add up: "12 slashing", not "5 slashing + 7 slashing".
+  const parts: { amount: number; type: string }[] = [];
+  for (const { part, r } of rolled)
+    for (const type of [part.type, ...(part.equal ?? [])]) {
+      const same = parts.find((p) => p.type === type);
+      if (same) same.amount += r.total;
+      else parts.push({ amount: r.total, type });
+    }
   return {
     id: crypto.randomUUID(),
     at: new Date().toISOString(),
@@ -98,6 +108,8 @@ export function damageRoll(opts: { who: string; label: string; parts: DamagePart
     detail: rolled.map(({ part, r }) => `${part.expression} ${part.type}: ${describe(r)}`).join('; '),
     total: parts.reduce((s, p) => s + p.amount, 0),
     parts,
-    dice: rolled.flatMap(({ r }) => r.groups.flatMap((g) => g.rolls.map((value, i) => ({ sides: g.sides, value, kept: g.kept[i] }))))
+    dice: rolled.flatMap(({ part, r }) =>
+      r.groups.flatMap((g) => g.rolls.map((value, i) => ({ sides: g.sides, value, kept: g.kept[i], ...(part.bonus ? { tint: part.type } : {}) })))
+    )
   };
 }

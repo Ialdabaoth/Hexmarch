@@ -131,9 +131,14 @@ describe('magic item effects', () => {
     // The Compendium's version is unchanged for Materia Mundi characters.
     expect(rulesFor('mm').equipment.findMagic('Flametongue', 'dweomer')?.ref).toBe('mm:flametongue');
 
-    // Keen blade: more dice of the weapon's own kind, in the same roll.
+    // Keen blade: more dice of the weapon's own kind.
     sword.enchantment = { ref: 'e9mm:keen-blade', name: 'Keen Blade' };
-    expect(equipment(live(s)).damageParts).toEqual([{ expression: 'd6+2+2d6', type: 'slashing' }]);
+    const keen = equipment(live(s)).damageParts;
+    expect(keen).toEqual([{ expression: 'd6+2', type: 'slashing' }, { expression: '2d6', type: 'slashing', bonus: true }]);
+    // Bonus dice are marked so they show apart; same-type amounts add up.
+    const hit = damageRoll({ who: 'D', label: 'Damage', parts: keen }, () => 0);
+    expect(hit.parts).toEqual([{ amount: 5, type: 'slashing' }]);
+    expect(hit.dice?.map((d) => d.tint)).toEqual([undefined, 'slashing', 'slashing']);
 
     // A quiver charges ammunition by the bow's size.
     const bow = newWeapon(e9mm, 'Longbow');
