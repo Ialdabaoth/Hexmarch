@@ -114,9 +114,9 @@ level 1 `hp` can be left out (it is the starting HP from the rules).
 - `origin`: for `mm`, `human`, `barbarian`, `dwarf`, `elf`, `gnome` or `beastfolk`;
   for `e9`, `human`, `elf`, `dwarf` or `gnome`.
 - `class.name`: for `mm`, `warrior`, `scout`, `wizard`, `priest`, `stalwart`, `delver`,
-  `dweomersmith`, `champion`, `hunter`, `bard` or `druid`; for `e9`, `fighter`,
+  `dweomersmith`, `champion`, `hunter`, `bard` or `druid`; for `e9` and `e9mm`, `fighter`,
   `expert`, `wizard` or `priest`. A combined class joins its parts with `+`, as in
-  `fighter+dweomersmith`; `e9mm` dwarves, elves, gnomes and beastfolk always use one.
+  `fighter+dweomersmith`; `e9mm` dwarves, elves, gnomes and beastfolk always use one (also `dweomersmith` and `druid`; older `champion`, `hunter` and `bard` parts read as `fighter` and `expert`).
 - Magic-users carry their magic in `inventory`, since preparations are physical
   objects. `book` is the spellbook, prayer book or craftbook (a druid's known glamours),
   and `prepared` lists each preparation and what it holds. Magic from the equipment
