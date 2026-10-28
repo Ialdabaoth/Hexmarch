@@ -146,7 +146,13 @@ that file, and the sheet keeps only what is unique to this one:
 
 - `name`: what the player calls it ("Grandmother's dagger").
 - `bonus`: added to defense, melee damage or ranged attack throws (masterwork).
-- `enchantment`: free text for now; it will hold the item's dweomer.
+- `enchantment`: the dweomer that makes it a magic item, as `{ "ref": "mm:flametongue",
+  "name": "Flametongue", "rarity": "uncommon", "charges": 2, "quality": "fair",
+  "cursed": true }`. Only `ref` or `name` is needed: `rarity` only for a dweomer that
+  comes in several rarities, `quality` (`good`, `fair`, `poor`) for arcane items. Free
+  text such as `"Blessed by Saint Olaf"` is kept as written, and a bare `"mm:..."` ref
+  works too. Rings, amulets, potions and other carried magic items are items in
+  `inventory.items` with an `enchantment`.
 - `qty`: for other equipment, how many (1 if left out).
 
 On the sheet, **Customize** turns a referenced weapon or armor into a custom one whose

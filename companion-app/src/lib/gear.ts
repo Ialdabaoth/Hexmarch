@@ -5,7 +5,20 @@
 // file's numbers too, but a saved sheet keeps only the ref and what's unique to it.
 
 import type { ArmorType, Ruleset, WeaponSize } from '../rules/rules';
-import { resolveItem, type EquipmentItem } from '../equipment/equipment';
+import { magicLevel, resolveItem, resolveMagic, type EquipmentItem, type Rarity } from '../equipment/equipment';
+
+// A dweomer worked into an item, which makes it a magic item. `ref` points at the
+// dweomer in the equipment file; without one, `name` is whatever was written in.
+export interface Enchantment {
+  ref?: string;
+  name: string;
+  // Only when the dweomer can be made at several rarities.
+  rarity?: Rarity;
+  charges?: number;
+  // Arcane items wear from good to fair to poor without upkeep (Compendium p. 64).
+  quality?: 'good' | 'fair' | 'poor';
+  cursed?: boolean;
+}
 
 export interface ArmorItem {
   id: string;
@@ -16,8 +29,7 @@ export interface ArmorItem {
   encumbrance: number;
   // Masterwork or magic: added to the armor's defense.
   bonus: number;
-  // Reserved for magic armor; free text for now.
-  enchantment: string;
+  enchantment?: Enchantment;
 }
 
 export interface WeaponItem {
@@ -37,7 +49,7 @@ export interface WeaponItem {
   shield: boolean;
   // Masterwork or magic: added to melee damage, or to ranged attack throws.
   bonus: number;
-  enchantment: string;
+  enchantment?: Enchantment;
   properties: string[];
 }
 
@@ -47,6 +59,8 @@ export interface CarriedItem {
   ref?: string;
   name: string;
   qty: number;
+  // Rings, amulets, potions and other magic items carry their dweomer here.
+  enchantment?: Enchantment;
 }
 
 // Ids of the weapons in the main and off hands ("" for empty). A medium weapon held in
@@ -83,14 +97,13 @@ export function newArmor(rules: Ruleset, type: ArmorType, name?: string): ArmorI
     name: name ?? `${type[0].toUpperCase()}${type.slice(1)} armor`,
     type: kind.type,
     encumbrance: kind.encumbrance,
-    bonus: 0,
-    enchantment: ''
+    bonus: 0
   };
 }
 
 export function newWeapon(rules: Ruleset, type: string, name?: string): WeaponItem {
   const entry = rules.equipment.findItem(type, ['weapon']);
-  if (entry) return { id: itemId(), ref: entry.ref, name: name ?? entry.name, ...weaponStats(entry), bonus: 0, enchantment: '' };
+  if (entry) return { id: itemId(), ref: entry.ref, name: name ?? entry.name, ...weaponStats(entry), bonus: 0 };
   return {
     id: itemId(),
     name: name ?? type,
@@ -102,7 +115,6 @@ export function newWeapon(rules: Ruleset, type: string, name?: string): WeaponIt
     ranged: false,
     shield: false,
     bonus: 0,
-    enchantment: '',
     properties: []
   };
 }
@@ -129,18 +141,29 @@ export function matchesRef(w: WeaponItem): boolean {
 
 // What a saved sheet keeps of each item: with a reference that resolves, only the ref
 // and what's unique to this one; otherwise everything.
+export function compactEnchantment(e: Enchantment | undefined): object | undefined {
+  if (!e) return undefined;
+  const entry = resolveMagic(e.ref);
+  const fixed = entry && magicLevel(entry) !== undefined;
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(e)) if (v != null && v !== '' && v !== false && !(k === 'rarity' && fixed)) out[k] = v;
+  return out;
+}
+
+const withEnchantment = (e: Enchantment | undefined) => (e ? { enchantment: compactEnchantment(e) } : {});
+
 export function compactArmor(a: ArmorItem): object {
-  if (resolveItem(a.ref)?.kind !== 'armor') return a;
-  return { id: a.id, ref: a.ref, name: a.name, ...(a.bonus ? { bonus: a.bonus } : {}), ...(a.enchantment ? { enchantment: a.enchantment } : {}) };
+  if (resolveItem(a.ref)?.kind !== 'armor') return { ...a, ...withEnchantment(a.enchantment) };
+  return { id: a.id, ref: a.ref, name: a.name, ...(a.bonus ? { bonus: a.bonus } : {}), ...withEnchantment(a.enchantment) };
 }
 
 export function compactWeapon(w: WeaponItem): object {
-  if (resolveItem(w.ref)?.kind !== 'weapon') return w;
-  return { id: w.id, ref: w.ref, name: w.name, ...(w.bonus ? { bonus: w.bonus } : {}), ...(w.enchantment ? { enchantment: w.enchantment } : {}) };
+  if (resolveItem(w.ref)?.kind !== 'weapon') return { ...w, ...withEnchantment(w.enchantment) };
+  return { id: w.id, ref: w.ref, name: w.name, ...(w.bonus ? { bonus: w.bonus } : {}), ...withEnchantment(w.enchantment) };
 }
 
 export function compactItem(i: CarriedItem): object {
-  return { id: i.id, ...(i.ref ? { ref: i.ref } : {}), name: i.name, ...(i.qty !== 1 ? { qty: i.qty } : {}) };
+  return { id: i.id, ...(i.ref ? { ref: i.ref } : {}), name: i.name, ...(i.qty !== 1 ? { qty: i.qty } : {}), ...withEnchantment(i.enchantment) };
 }
 
 export function itemLabel(i: CarriedItem): string {

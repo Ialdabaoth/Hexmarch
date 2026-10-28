@@ -1,9 +1,9 @@
 # Equipment files
 
 Agreed with Heph 2026-10-28 and built in steps from 0.2.1 to 0.2.5 (see **Build
-order** at the end). As of 0.2.3 the equipment files hold the Compendium's armor,
-weapons, gear and magic, and sheets reference them; magic items on the sheet and
-campaigns are still to come.
+order** at the end). As of 0.2.4 the equipment files hold the Compendium's armor,
+weapons, gear and magic, sheets reference them, and magic items are items with a
+dweomer; dweomer `effects` and campaigns are still to come.
 
 ## The idea in one paragraph
 
@@ -262,8 +262,9 @@ to.
    and the equipment pickers. (Choosing a file per character waits for campaigns.)
 3. **0.2.3** Magic catalog: Compendium spells, miracles, glamours and dweomers
    entered from the book; `book` and `prepared` become references.
-4. **0.2.4** Magic items: the enchantment picker (item + dweomer), charges and
-   quality on the sheet, `effects` feeding attack, damage and defense.
+4. **0.2.4** Magic items: the enchantment picker (item + dweomer), rarity, charges,
+   quality and curses on the sheet. (`effects` feeding attack, damage and defense
+   waits until entries carry them; for now the bonus field is set by hand.)
 5. **0.2.5** Campaigns: campaign files and URLs for rules and equipment, offline
    caching, greyed-out incompatible characters, the custom equipment editor,
    "Publish as campaign", and bundling custom entries with character export.
