@@ -12,6 +12,10 @@
   let leveling = $state(false);
   let levelTraining = $state<TalentId | undefined>(undefined);
   let levelFeat = $state('');
+  // A fighter can't take a feat they already have.
+  let ownedFeats = $derived(new Set(c.data.class.levelups.map((l) => l.feat?.trim().toLowerCase()).filter(Boolean)));
+  let freeFeats = $derived((cls.feats ?? []).filter((f) => !ownedFeats.has(f.toLowerCase())));
+  let featTaken = $derived(hasKind(cls, 'fighter') && ownedFeats.has(levelFeat.trim().toLowerCase()));
 
   function addXp(delta: number) {
     c.data.class.xp = Math.max(0, c.data.class.xp + delta);
@@ -56,12 +60,13 @@
     {/if}
     {#if hasKind(cls, 'fighter') && (c.level + 1) % 2 === 0}
       <input bind:value={levelFeat} list="fighter-feats" placeholder="Fighter feat chosen" aria-label="Fighter feat" />
-      {#if cls.feats}<datalist id="fighter-feats">{#each cls.feats as f}<option value={f}></option>{/each}</datalist>{/if}
+      {#if cls.feats}<datalist id="fighter-feats">{#each freeFeats as f}<option value={f}></option>{/each}</datalist>{/if}
+      {#if featTaken}<p class="small failure">You already have {levelFeat.trim()}.</p>{/if}
     {:else}
       <input bind:value={levelFeat} placeholder="Other choice to note (optional)" aria-label="Level-up note" />
     {/if}
     <div class="row">
-      <button class="primary" disabled={hasKind(cls, 'expert') && !levelTraining} onclick={doLevelUp}>Roll HP and level up</button>
+      <button class="primary" disabled={(hasKind(cls, 'expert') && !levelTraining) || featTaken} onclick={doLevelUp}>Roll HP and level up</button>
       <button class="ghost" onclick={() => (leveling = false)}>Cancel</button>
     </div>
   </div>

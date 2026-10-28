@@ -8,6 +8,8 @@ export interface PrepCheck {
   maxCircle: number;
   // Indexes into the preparation list that don't fit the level's limits.
   over: number[];
+  // Slots of each circle still empty once the list is placed.
+  free: number[];
 }
 
 // `penalty` is taken off each circle's allowance, e.g. a wizard in light armor.
@@ -24,7 +26,7 @@ export function checkPreparations(slots: number[][], level: number, prepared: { 
     else free[slot]--;
   }
   const maxCircle = allowed.reduce((m, n, k) => (n > 0 ? k + 1 : m), 0);
-  return { allowed, maxCircle, over: over.sort((a, b) => a - b) };
+  return { allowed, maxCircle, over: over.sort((a, b) => a - b), free };
 }
 
 type ArmorRule = { light: number[]; blockedBy: string[] };
@@ -42,4 +44,9 @@ export function armorEffect(rule: ArmorRule | undefined, worn: string | undefine
 export function knownLimit(known: (number | null)[] | undefined, level: number): number | null | undefined {
   if (!known) return undefined;
   return known[Math.min(Math.max(level, 1), known.length) - 1] ?? null;
+}
+
+// The circle of each empty slot, lowest first, for showing blank preparations.
+export function emptySlots(check: PrepCheck): number[] {
+  return check.free.flatMap((n, k) => Array<number>(n).fill(k + 1));
 }

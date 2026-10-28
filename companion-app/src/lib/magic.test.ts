@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { armorEffect, checkPreparations, knownLimit } from './magic';
+import { armorEffect, checkPreparations, knownLimit, emptySlots } from './magic';
 
 const STD = [[1], [2], [2, 1], [2, 2], [2, 2, 1], [2, 2, 2], [0, 3, 2, 1], [0, 2, 2, 2], [0, 0, 3, 2, 1]];
 const c = (...circles: number[]) => circles.map((circle) => ({ circle }));
@@ -52,5 +52,14 @@ describe('knownLimit', () => {
     expect(knownLimit(KNOWN, 8)).toBe(30);
     expect(knownLimit(KNOWN, 9)).toBeNull();
     expect(knownLimit(undefined, 3)).toBeUndefined();
+  });
+});
+
+describe('emptySlots', () => {
+  it('lists the slots a level has left open, lowest circle first', () => {
+    const slots = [[1], [2], [2, 1], [2, 2]];
+    expect(emptySlots(checkPreparations(slots, 4, [{ circle: 1 }]))).toEqual([1, 2, 2]);
+    expect(emptySlots(checkPreparations(slots, 4, [{ circle: 2 }, { circle: 1 }]))).toEqual([1, 2]);
+    expect(emptySlots(checkPreparations(slots, 4, []))).toEqual([1, 1, 2, 2]);
   });
 });

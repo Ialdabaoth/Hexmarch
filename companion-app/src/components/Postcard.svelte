@@ -15,7 +15,8 @@
     onxp,
     ongear,
     oncarry,
-    onprep
+    onprep,
+    onprepslot
   }: {
     view: SheetView;
     onroll?: (r: RollRequest) => void;
@@ -33,10 +34,14 @@
     oncarry?: () => void;
     // Tapping a preparation calls this: use it, or prepare it again once spent.
     onprep?: (index: number) => void;
+    // Tapping an empty preparation slot, with the circle it holds.
+    onprepslot?: (circle: number) => void;
   } = $props();
   let data = $derived(v.c.data);
   let inv = $derived(data.inventory);
   let g = $derived(v.gear);
+  // How many preparation lines fit on the back of the card.
+  let prepRows = $derived(onprep ? 5 : 6);
 
   let scroller = $state<HTMLDivElement>();
 
@@ -164,7 +169,7 @@
           {#if v.cls.magic}
             <h2>{v.cls.magic.prepared}s</h2>
             <ul>
-              {#each inv.prepared.slice(0, onprep ? 4 : 5) as p, i}
+              {#each inv.prepared.slice(0, prepRows) as p, i}
                 {#if onprep}
                   <li><button type="button" class="prep tap" class:spent={p.spent} disabled={!p.spent && !!v.magicBlockedBy} onclick={() => onprep(i)}>
                     <span class="act">{p.spent ? 'Prepare' : 'Use'}</span><span class="what">{v.circle(p.circle)} {p.magic || '—'}</span>
@@ -173,8 +178,16 @@
                   <li>{p.spent ? '☒' : '☐'} {v.circle(p.circle)} {p.magic}</li>
                 {/if}
               {/each}
-              {#if inv.prepared.length > (onprep ? 4 : 5)}<li class="muted">+{inv.prepared.length - (onprep ? 4 : 5)} more</li>{/if}
-              {#if !inv.prepared.length}<li class="muted">☐ ________</li><li class="muted">☐ ________</li>{/if}
+              {#each v.emptySlots.slice(0, Math.max(0, prepRows - inv.prepared.length)) as circle}
+                {#if onprepslot}
+                  <li><button type="button" class="prep tap empty" disabled={!!v.magicBlockedBy} onclick={() => onprepslot(circle)}>
+                    <span class="act">Prepare</span><span class="what">{v.circle(circle)} ________</span>
+                  </button></li>
+                {:else}
+                  <li class="muted">☐ {v.circle(circle)} ________</li>
+                {/if}
+              {/each}
+              {#if inv.prepared.length + v.emptySlots.length > prepRows}<li class="muted">+{inv.prepared.length + v.emptySlots.length - prepRows} more</li>{/if}
             </ul>
           {:else}
             <h2>Gear</h2>
@@ -289,6 +302,8 @@
   .prep { display: flex; align-items: baseline; gap: 0.8cqw; width: 100%; margin-bottom: 0.6cqw; padding: 0.4cqw 0.8cqw; border: 0.15cqw solid #c9b896; border-radius: 0.8cqw; font-size: 2cqw; line-height: 1.3; }
   .prep .act { flex: none; font-size: 1.6cqw; text-transform: uppercase; letter-spacing: 0.06em; color: #8a2e1f; font-weight: 700; }
   .prep .what { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .prep.empty { border-style: dashed; color: #8a7a68; }
+  .prep.empty .act { color: #3f6f4f; }
   .prep.spent { border-style: dashed; color: #8a7a68; }
   .prep.spent .act { color: #3f6f4f; }
   .prep:disabled { opacity: 0.5; }
