@@ -5,6 +5,7 @@
   import { holdRoll } from '../lib/hold.svelte';
   import RollLog from './RollLog.svelte';
   import Bestiary from './Bestiary.svelte';
+  import Maps from './Maps.svelte';
 
   let expression = $state('');
   let who = $state('');
@@ -63,6 +64,10 @@
 </details>
 
 </details>
+
+<section style="margin-top:1rem">
+  <Maps />
+</section>
 
 <section style="margin-top:1rem">
   <Bestiary />
