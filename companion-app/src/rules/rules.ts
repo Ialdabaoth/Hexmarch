@@ -7,7 +7,7 @@
 import mmOptions from './options/mm-options.json';
 import e9Options from './options/e9-options.json';
 import e9mmOptions from './options/e9mm-options.json';
-import { equipmentFile, type EquipmentFile } from '../equipment/equipment';
+import { Catalog, equipmentFile, type MagicSystem } from '../equipment/equipment';
 
 export type AbilityId = 'con' | 'str' | 'dex' | 'int' | 'wis' | 'cha';
 
@@ -124,6 +124,8 @@ export interface CharacterClass {
   // Magic-users: what holds their known magic and what each preparation is, and how
   // many preparations of each circle (or rarity) they hold at each level, from level 1.
   magic?: {
+    // Which kind of magic, for picking from the equipment files.
+    system?: MagicSystem;
     book: string;
     prepared: string;
     circleWord: string;
@@ -257,8 +259,8 @@ export interface RulesetOptions {
   name: string;
   source: string;
   mechanics: Mechanics;
-  // The equipment file characters use by default (src/equipment/).
-  equipment: string;
+  // The equipment files characters use by default (src/equipment/), in priority order.
+  equipment: string | string[];
   originRoll: { start: string; tables: Record<string, RollTable> };
   origins: Origin[];
   classes: CharacterClass[];
@@ -274,8 +276,10 @@ export class Ruleset {
   get classes() { return this.options.classes; }
   get originRoll() { return this.options.originRoll; }
   get mechanics() { return this.options.mechanics; }
-  get equipment(): EquipmentFile {
-    return equipmentFile(this.options.equipment);
+  private _catalog?: Catalog;
+  get equipment(): Catalog {
+    const ids = this.options.equipment;
+    return (this._catalog ??= new Catalog((Array.isArray(ids) ? ids : [ids]).map(equipmentFile)));
   }
 
   private _gear?: GearCatalog;

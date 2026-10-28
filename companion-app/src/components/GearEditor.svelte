@@ -90,7 +90,7 @@
   const held = (id: string) => (inv.wielded[0] === id ? 'main hand' : inv.wielded[1] === id ? 'off hand' : '');
   const hands = (w: WeaponItem) => (grips(w).length > 1 ? 'one or two hands' : grips(w)[0] === 'two' ? 'two hands' : 'one hand');
   const weaponLabel = (k: EquipmentItem) => `${k.name} (${k.shield ? 'shield' : `${k.size}${k.ranged ? ' ranged' : ''}`})`;
-  const cost = (k: EquipmentItem) => (k.cost !== undefined ? ` · ${k.cost} ${file.data.currency ?? ''}`.trimEnd() : '');
+  const cost = (k: EquipmentItem) => (k.cost !== undefined ? ` · ${k.cost} ${file.currency ?? ''}`.trimEnd() : '');
 
   function weaponLine(w: WeaponItem): string {
     const parts: string[] = [w.shield ? 'shield' : `${w.size}${w.ranged ? ' ranged' : ''}`, hands(w)];
@@ -113,7 +113,7 @@
       <div class="fields">
         <label>Type
           <select value={a.ref} onchange={(e) => setArmorRef(a, (e.target as HTMLSelectElement).value)}>
-            {#each fileArmor as k}<option value={file.ref(k)}>{k.name}</option>{/each}
+            {#each fileArmor as k}<option value={k.ref}>{k.name}</option>{/each}
           </select>
         </label>
         <label>Enc. <output>{a.encumbrance}</output></label>
@@ -156,7 +156,7 @@
       <div class="fields">
         <label>Type
           <select value={w.ref} onchange={(e) => setWeaponRef(w, (e.target as HTMLSelectElement).value)}>
-            {#each fileWeapons as k}<option value={file.ref(k)}>{k.name}</option>{/each}
+            {#each fileWeapons as k}<option value={k.ref}>{k.name}</option>{/each}
           </select>
         </label>
         <label>Bonus <input type="number" inputmode="numeric" bind:value={w.bonus} onchange={save} /></label>
@@ -213,7 +213,7 @@
 <div class="row">
   <select bind:value={addItemRef} onchange={addItem} aria-label="Add equipment">
     <option value="">+ Add equipment…</option>
-    {#each fileGear as k}<option value={file.ref(k)}>{k.name}{k.stack ? ` (${k.stack})` : ''}{cost(k)}</option>{/each}
+    {#each fileGear as k}<option value={k.ref}>{k.name}{k.stack ? ` (${k.stack})` : ''}{cost(k)}</option>{/each}
     <option value="custom">Something else…</option>
   </select>
 </div>
