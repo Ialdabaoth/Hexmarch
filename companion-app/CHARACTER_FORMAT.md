@@ -137,7 +137,7 @@ level 1 `hp` can be left out (it is the starting HP from the rules).
 
 Each piece of armor and each weapon is an item with its own `id`, so the sheet can say
 which ones are worn and wielded. Only `type` is required when writing one by hand; the
-rest fills in from the ruleset's equipment list (Compendium p. 46–49, E9 p. 35–37).
+rest fills in from the ruleset's equipment file (Compendium p. 46–49, E9 p. 36–37).
 
 Armor:
 

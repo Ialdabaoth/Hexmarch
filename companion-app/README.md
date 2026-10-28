@@ -64,6 +64,15 @@ roll by editing only the JSON.
 When the revised edition arrives, add a new options file with its own id (say `mm2`) and
 register it in `RULESETS`, instead of editing the old one, so existing characters keep their rules.
 
+## Equipment data
+
+Armor, weapons, gear, mounts and services live in equipment files in `src/equipment/`:
+`mm-equipment.json` (Compendium, with prices in silver) and `e9-equipment.json` (E9, no
+prices). Each ruleset names its default file in `"equipment"`; `e9mm` uses the E9 file.
+`src/equipment/equipment.ts` loads them, and a test checks every entry. The format, and
+where it's going (references from sheets, magic, magic items, campaigns by URL), is in
+[EQUIPMENT_FORMAT.md](EQUIPMENT_FORMAT.md).
+
 ## Development
 
 ```sh

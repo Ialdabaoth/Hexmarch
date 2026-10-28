@@ -7,6 +7,7 @@
 import mmOptions from './options/mm-options.json';
 import e9Options from './options/e9-options.json';
 import e9mmOptions from './options/e9mm-options.json';
+import { equipmentFile } from '../equipment/equipment';
 
 export type AbilityId = 'con' | 'str' | 'dex' | 'int' | 'wis' | 'cha';
 
@@ -256,7 +257,8 @@ export interface RulesetOptions {
   name: string;
   source: string;
   mechanics: Mechanics;
-  gear: GearCatalog;
+  // The equipment file characters use by default (src/equipment/).
+  equipment: string;
   originRoll: { start: string; tables: Record<string, RollTable> };
   origins: Origin[];
   classes: CharacterClass[];
@@ -272,7 +274,10 @@ export class Ruleset {
   get classes() { return this.options.classes; }
   get originRoll() { return this.options.originRoll; }
   get mechanics() { return this.options.mechanics; }
-  get gear() { return this.options.gear; }
+  private _gear?: GearCatalog;
+  get gear(): GearCatalog {
+    return (this._gear ??= equipmentFile(this.options.equipment).catalog());
+  }
 
   armorKind(type: ArmorType): ArmorKind {
     return this.gear.armor.find((a) => a.type === type) ?? this.gear.armor[0];
