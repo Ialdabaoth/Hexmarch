@@ -17,10 +17,14 @@ export interface LogEntry {
 }
 
 // "Sapphire - Easy Save vs. Curse: 15 (success)"
-// The app shows the outcome separately in color, so it can leave it off.
-export function headline(e: LogEntry, withOutcome = true): string {
+export function headline(e: LogEntry): string {
+  return `${rollName(e)}: ${e.total}${e.outcome ? ` (${e.outcome})` : ''}`;
+}
+
+// "Sapphire - Easy Save vs. Curse", for the roll log, which styles the result itself.
+export function rollName(e: LogEntry): string {
   const diff = e.difficulty && e.difficulty !== 'normal' ? `${e.difficulty[0].toUpperCase()}${e.difficulty.slice(1)} ` : '';
-  return `${e.who} - ${diff}${e.label}: ${e.total}${withOutcome && e.outcome ? ` (${e.outcome})` : ''}`;
+  return `${e.who} - ${diff}${e.label}`;
 }
 
 // "(Rolled D20 vs. 11+: [15, 11] → 15)"

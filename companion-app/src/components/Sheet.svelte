@@ -6,7 +6,7 @@
   } from '../lib/character';
   import { expressionRoll, thresholdCheck } from '../lib/checks';
   import { downloadJson, slug } from '../lib/storage';
-  import { portraitFromFile } from '../lib/portrait';
+  import { isWebImageUrl } from '../lib/portraits';
   import { ABILITIES, TALENTS, type Difficulty } from '../rules/rules';
   import { holdRoll } from '../lib/hold.svelte';
   import Followers from './Followers.svelte';
@@ -27,17 +27,24 @@
   let c = $derived(app.character(id)) as Character | undefined;
   let cls = $derived(c ? c.rules.getClass(c.classId) : undefined);
   let confirmDelete = $state(false);
+  let portrait = $derived(c ? app.portraitSrc(c.data.portrait) : '');
+  let webUrl = $state<string | null>(null);
 
   async function setPortrait(e: Event) {
     const file = (e.target as HTMLInputElement).files?.[0];
     if (!file || !c) return;
     try {
-      c.data.portrait = await portraitFromFile(file);
-      save();
+      await app.setPortraitFile(c.data, file);
     } catch {
       app.notify("Couldn't read that image");
     }
     (e.target as HTMLInputElement).value = '';
+  }
+
+  async function useWebUrl() {
+    if (!c || webUrl === null || !isWebImageUrl(webUrl)) return;
+    await app.setPortrait(c.data, webUrl);
+    webUrl = null;
   }
 
   function save() {
@@ -96,7 +103,7 @@
   <div class="ident">
     <!-- A real file input under the finger: iOS won't always open a picker from a script. -->
     <label class="portrait">
-      {#if c.data.portrait}<img src={c.data.portrait} alt="Portrait of {c.name}" />{:else}<span>+ Portrait</span>{/if}
+      {#if portrait}<img src={portrait} alt="Portrait of {c.name}" />{:else}<span>+ Portrait</span>{/if}
       <input class="pick" type="file" accept="image/*" aria-label="Set portrait" onchange={setPortrait} />
     </label>
     <div class="grow">
@@ -104,7 +111,17 @@
       <p class="muted small">
         Level {c.level} {c.rules.getOrigin(c.origin).name} {cls.name} · Hit die {hitDieLabel(c)} · {cls.book ?? c.rules.name} p. {cls.page}
       </p>
-      {#if c.data.portrait}<button class="ghost small clear" onclick={() => { c!.data.portrait = ''; save(); }}>Remove portrait</button>{/if}
+      <div class="row portrait-actions">
+        {#if c.data.portrait}<button class="ghost small clear" onclick={() => app.setPortrait(c!.data, '')}>Remove portrait</button>{/if}
+        {#if webUrl === null}<button class="ghost small clear" onclick={() => (webUrl = c!.data.portrait.startsWith('https://') ? c!.data.portrait : '')}>Use a web link</button>{/if}
+      </div>
+      {#if webUrl !== null}
+        <form class="row" onsubmit={(e) => { e.preventDefault(); useWebUrl(); }}>
+          <input class="grow" bind:value={webUrl} placeholder="https://…/portrait.png" aria-label="Portrait web link" autocapitalize="off" autocomplete="off" inputmode="url" />
+          <button class="primary" type="submit" disabled={!isWebImageUrl(webUrl)}>Use</button>
+          <button class="ghost" type="button" onclick={() => (webUrl = null)}>Cancel</button>
+        </form>
+      {/if}
     </div>
   </div>
 
@@ -262,6 +279,7 @@
   .pick { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; font-size: 0; }
   .portrait img { width: 100%; height: 100%; object-fit: cover; display: block; }
   .clear { min-height: 28px; padding: 0; }
+  .portrait-actions { gap: 0.75rem; }
   .name { font-family: Georgia, serif; font-size: 1.5rem; font-weight: 700; border-color: transparent; background: transparent; padding-left: 0; }
   .vitals strong { font-size: 1.3rem; font-family: Georgia, serif; }
   .hp { gap: 0.35rem; flex-wrap: nowrap; }

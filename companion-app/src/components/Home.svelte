@@ -10,7 +10,6 @@
   import GearPicker from './GearPicker.svelte';
   import PrepPicker from './PrepPicker.svelte';
   import RollLog from './RollLog.svelte';
-  import { portraitFromFile } from '../lib/portrait';
 
   let fileInput = $state<HTMLInputElement>();
   let card = $state<ReturnType<typeof Postcard>>();
@@ -35,8 +34,7 @@
   async function setPortrait(file: File) {
     if (!active) return;
     try {
-      active.data.portrait = await portraitFromFile(file);
-      app.persist();
+      await app.setPortraitFile(active.data, file);
     } catch {
       app.notify("Couldn't read that image");
     }
@@ -116,7 +114,7 @@
 <nav class="party" aria-label="Party">
   {#each app.characters as c (c.id)}
     <button class="member" class:on={c.id === active?.id} onclick={() => select(c.id)} aria-label={c.name} title={c.name}>
-      {#if c.data.portrait}<img src={c.data.portrait} alt="" />{:else}<span>{initials(c.name)}</span>{/if}
+      {#if app.portraitSrc(c.data.portrait)}<img src={app.portraitSrc(c.data.portrait)} alt="" />{:else}<span>{initials(c.name)}</span>{/if}
     </button>
   {/each}
   <button class="member add" onclick={() => (app.view = { name: 'build' })} aria-label="New character">+</button>
