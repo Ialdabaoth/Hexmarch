@@ -77,6 +77,18 @@ npm run build    # production build in dist/
 Set `BASE_PATH` when the app is served from a subpath, e.g. `BASE_PATH=/MateriaMundiRPG/ npm run build`
 for GitHub Pages.
 
+## Versioning
+
+The version lives in `package.json` and shows under About in Settings.
+
+- Every merged PR bumps the patch number: 0.2.0, 0.2.1, 0.2.2, …
+- Each sprint (a planned set of features, such as the 0.2 equipment work) bumps the minor
+  number and resets the patch: 0.3.0. Saved sheets carry their own format `version`
+  (see CHARACTER_FORMAT.md), separate from the app's.
+- 1.0.0 is the first release announced to players.
+
+Bump `version` in both `package.json` and `package-lock.json` in the PR itself.
+
 ## Licensing
 
 The book includes material derived from the System Reference Document 5.2 by Wizards of the Coast LLC

@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { VitePWA } from 'vite-plugin-pwa';
+import pkg from './package.json' with { type: 'json' };
 
 // GitHub Pages serves the app from /<repo>/, so the workflow sets BASE_PATH.
 const base = process.env.BASE_PATH ?? '/';
@@ -9,6 +10,9 @@ const pwa = !process.env.PREVIEW;
 
 export default defineConfig({
   base,
+  define: {
+    __APP_VERSION__: JSON.stringify(pkg.version)
+  },
   plugins: [
     svelte(),
     pwa && VitePWA({
