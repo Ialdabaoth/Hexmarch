@@ -10,7 +10,7 @@ import {
   type Enchantment, armorStats, compactArmor, compactItem, compactWeapon, defaultLoadout, itemId, matchesRef, newArmor, newItem, newWeapon, parseKit,
   weaponStats, type ArmorItem, type CarriedItem, type Hands, type WeaponItem
 } from './gear';
-import { DAMAGE_TYPES, RARITIES, magicLevel, magicLevels, resolveMagic, resolveItem, type MagicEntry, type MagicSystem, type Rarity } from '../equipment/equipment';
+import { DAMAGE_TYPES, isBuiltIn, RARITIES, magicLevel, magicLevels, resolveMagic, resolveItem, type MagicEntry, type MagicSystem, type Rarity } from '../equipment/equipment';
 import {
   ABILITIES, DEFAULT_RULES, TALENTS, findRules, hasKind, normalizeRulesId, primesOf, rulesFor, scheduledTraining,
   type AbilityId, type Attitude, type ClassId, type OriginId, type Ruleset, type TalentId
@@ -420,6 +420,11 @@ function readEnchantment(rules: Ruleset, v: unknown): Enchantment | undefined {
   if (!ref && written) {
     const match = rules.equipment.findMagic(written, 'dweomer');
     if (match) [entry, ref] = [match, match.ref];
+  }
+  // A built-in dweomer this ruleset replaces with its own (e9mm's magic weapons) moves to it.
+  if (entry && isBuiltIn(ref.split(':')[0])) {
+    const own = rules.equipment.findMagic(entry.name, entry.system);
+    if (own && own.ref !== ref && isBuiltIn(own.ref.split(':')[0])) [entry, ref] = [own, own.ref];
   }
   const name = written || entry?.name || ref;
   if (!name) return undefined;

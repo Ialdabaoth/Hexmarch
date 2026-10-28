@@ -187,12 +187,18 @@ export function equipment(c: Character) {
   const off = inv.weapons.find((w) => w.id === inv.wielded[1]);
   const bothHands = usesBothHands(main, inv.wielded);
   const attack = main?.ranged ? 'ranged' : 'melee';
-  const extra = c.magic.extraDamage(attack);
-  // A firearm deals its damage again as thunder: the roll counts twice.
+  const kind = (c.magic.damageTypes() ?? [physicalType(main)]).map(damageTypeName).join(' or ');
+  const extra = c.magic.extraDamage(attack).map((x) => ({ ...x, type: x.types.map(damageTypeName).join(' or ') }));
+  // A firearm-style "equal" effect deals the weapon's damage again: the roll counts twice.
   const equal = extra.filter((x) => x.dice === 'equal');
-  const dice = extra.filter((x) => x.dice !== 'equal');
+  // Extra dice of the weapon's own kind (a keen blade) join its roll.
+  const same = extra.filter((x) => x.dice !== 'equal' && x.type === kind);
+  const dice = extra.filter((x) => x.dice !== 'equal' && x.type !== kind);
   const bonus = c.magic.amount('damage', attack);
-  const base = damage(main, bothHands ? undefined : off, bothHands, c.abilities.str);
+  const base =
+    damage(main, bothHands ? undefined : off, bothHands, c.abilities.str) +
+    same.map((x) => `+${x.dice}`).join('') +
+    (bonus ? `${bonus > 0 ? '+' : ''}${bonus}` : '');
   const set = c.magic.setDefense()?.amount ?? 0;
   return {
     worn,
@@ -202,19 +208,11 @@ export function equipment(c: Character) {
     bothHands,
     // The same, kind by kind, for rolling.
     damageParts: [
-      {
-        expression: base + (bonus ? `${bonus > 0 ? '+' : ''}${bonus}` : ''),
-        type: (c.magic.damageTypes() ?? [physicalType(main)]).map(damageTypeName).join(' or '),
-        ...(equal.length ? { equal: equal.map((x) => x.types.join(' or ')) } : {})
-      },
-      ...dice.map((x) => ({ expression: x.dice, type: x.types.join(' or ') }))
+      { expression: base, type: kind, ...(equal.length ? { equal: equal.map((x) => x.type) } : {}) },
+      ...dice.map((x) => ({ expression: x.dice, type: x.type }))
     ] as DamagePart[],
-    damage: twice(base + (bonus ? `${bonus > 0 ? '+' : ''}${bonus}` : '') + dice.map((x) => `+${x.dice}`).join(''), equal.length > 0),
-    damageTypes: [
-      (c.magic.damageTypes() ?? [physicalType(main)]).map(damageTypeName).join(' or '),
-      ...equal.map((x) => `equal ${x.types.join(' or ')}`),
-      ...dice.map((x) => `${x.dice} ${x.types.join(' or ')}`)
-    ].join(', ')
+    damage: twice(base + dice.map((x) => `+${x.dice}`).join(''), equal.length > 0),
+    damageTypes: [kind, ...equal.map((x) => `equal ${x.type}`), ...dice.map((x) => `${x.dice} ${x.type}`)].join(', ')
   };
 }
 

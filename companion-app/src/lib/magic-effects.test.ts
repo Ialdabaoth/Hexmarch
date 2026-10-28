@@ -115,6 +115,35 @@ describe('magic item effects', () => {
     expect(damageLine(hit)).toBe('4 piercing + 4 thunder');
   });
 
+  it("gives e9mm's magic weapons dice by size, uncommon only", () => {
+    const e9mm = rulesFor('e9mm');
+    const s = createSheet({ rules: 'e9mm', name: 'D', origin: 'human', classId: 'fighter', abilities: a, talentBase: defaultTalents(a) });
+    const sword = s.inventory.weapons.find((w) => w.type === 'Longsword')!;
+    // An older sheet points at the Compendium's Flametongue; it moves to e9mm's.
+    sword.enchantment = { ref: 'mm:flametongue', name: 'Flametongue', rarity: 'legendary' };
+    const back = readSheet(JSON.parse(JSON.stringify(s)));
+    expect(back.inventory.weapons.find((w) => w.id === sword.id)!.enchantment).toEqual({ ref: 'e9mm:flametongue', name: 'Flametongue' });
+    expect(e9mm.equipment.findMagic('Flametongue', 'dweomer')?.rarity).toBe('uncommon');
+    sword.enchantment = back.inventory.weapons.find((w) => w.id === sword.id)!.enchantment;
+    const g = equipment(live(s));
+    expect(g.damage).toBe('d6+2+2d6');
+    expect(g.damageTypes).toBe('slashing, 2d6 fire');
+    // The Compendium's version is unchanged for Materia Mundi characters.
+    expect(rulesFor('mm').equipment.findMagic('Flametongue', 'dweomer')?.ref).toBe('mm:flametongue');
+
+    // Keen blade: more dice of the weapon's own kind, in the same roll.
+    sword.enchantment = { ref: 'e9mm:keen-blade', name: 'Keen Blade' };
+    expect(equipment(live(s)).damageParts).toEqual([{ expression: 'd6+2+2d6', type: 'slashing' }]);
+
+    // A quiver charges ammunition by the bow's size.
+    const bow = newWeapon(e9mm, 'Longbow');
+    s.inventory.weapons.push(bow);
+    s.inventory.wielded = [bow.id, bow.id];
+    s.inventory.items.push({ id: itemId(), name: 'Quiver', qty: 1, enchantment: { ref: 'e9mm:quiver-of-elemental-bolts', name: 'Quiver', element: 'cold' } });
+    const q = equipment(live(s));
+    expect(q.damageTypes).toBe(`piercing, ${bow.size === 'heavy' ? 3 : 2}d6 cold`);
+  });
+
   it('turns damage into another type', () => {
     const s = warrior();
     s.inventory.weapons[0].enchantment = { ref: 'mm:aetheric-blade', name: 'Aetheric Blade' };

@@ -184,6 +184,20 @@ A dweomer's `effects` is a list; each effect has exactly one of these keys:
   weapon's own type comes from its properties: Blunt, Piercing (and bows and
   crossbows), otherwise slashing. Armor reduces only physical and metal damage.
   Spells and miracles use the same types and resistances.
+- `per`: `"level"` multiplies the dice by the rarity level; `"size"` by the wielded
+  weapon's size (light 1, medium 2, heavy 3). Carried ammunition such as a quiver
+  adds its damage when it names `when.attack`. A damage type of plain `physical` is
+  the weapon's own kind (Keen Blade).
+
+### E9 for Materia Mundi's magic weapons (`e9mm-equipment.json`)
+
+e9mm uses `["e9", "e9mm", "mm"]`. `e9mm-equipment.json` holds only magic: the weapon
+dweomers that scaled with rarity (Earthbreaker, Firearm, Flametongue, Flying Blade,
+Frostbrand, Keen Blade, Sparkwhip, Thunderhammer, Venom Scythe, Windbow, Quiver of
+Elemental Bolts), now always uncommon and adding 1d6/2d6/3d6 by weapon size (Heph,
+2026-10-28). The earlier file wins on a name, so e9mm characters get these and
+Materia Mundi characters keep the Compendium's. An e9mm sheet that still points at
+`mm:flametongue` moves to `e9mm:flametongue` when it loads.
 
 How the app applies them:
 

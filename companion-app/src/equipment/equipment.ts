@@ -5,6 +5,7 @@
 import type { ArmorKind, ArmorType, GearCatalog, WeaponKind, WeaponSize } from '../rules/rules';
 import mmEquipment from './mm-equipment.json';
 import e9Equipment from './e9-equipment.json';
+import e9mmEquipment from './e9mm-equipment.json';
 
 export type ItemKind = 'armor' | 'weapon' | 'gear' | 'mount' | 'service';
 
@@ -101,7 +102,8 @@ export type MagicEffect = EffectCommon &
     | { bonus: EffectTarget; amount: Amount }
     | { set: 'defense'; amount: Amount }
     // damage "equal": as much again as the weapon's own damage, of this type (Firearm).
-    | { damage: string; type: DamageKind | DamageKind[]; per?: 'rarity' | 'level' }
+    // per "size": that many times the dice for each size step of the weapon (light 1, medium 2, heavy 3).
+    | { damage: string; type: DamageKind | DamageKind[]; per?: 'rarity' | 'level' | 'size' }
     | { convert: DamageKind | DamageKind[] }
     | { resist: DamageKind | 'all'; mode: 'half' | 'immune' | 'vulnerable' | 'reduce' | 'armor'; amount?: Amount }
     | { easier: EffectTarget }
@@ -235,7 +237,8 @@ export class Catalog {
 // The built-in files.
 export const EQUIPMENT: EquipmentFile[] = [
   new EquipmentFile(mmEquipment as EquipmentFileData),
-  new EquipmentFile(e9Equipment as EquipmentFileData)
+  new EquipmentFile(e9Equipment as EquipmentFileData),
+  new EquipmentFile(e9mmEquipment as EquipmentFileData)
 ];
 
 // Every file this device knows: the built-in ones, its own custom file ("local"), and
