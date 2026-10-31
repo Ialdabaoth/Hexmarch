@@ -218,9 +218,13 @@
           <ul>
             {#each WORN_SLOTS as s}
               {@const worn = inv.items.find((i) => i.id === inv.equipped?.[s.id])}
-              <li class="tagged"><span class="tag">{s.label}</span><button type="button" class="prep tap" disabled={!onequip} onclick={() => onequip?.(s.id)}>
-                <span class="what">{worn?.name ?? '—'}</span>
-              </button></li>
+              {#if onequip}
+                <li class="tagged"><span class="tag">{s.label}</span><button type="button" class="prep tap" onclick={() => onequip(s.id)}>
+                  <span class="what">{worn?.name ?? '—'}</span>
+                </button></li>
+              {:else}
+                <li>{s.label} {worn?.name ?? '________'}</li>
+              {/if}
             {/each}
           </ul>
         </div>
