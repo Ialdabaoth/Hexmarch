@@ -43,6 +43,8 @@
     // Tapping a worn slot calls this (the home screen opens a picker for it).
     onequip?: (slot: WornSlot) => void;
   } = $props();
+  // Circles on the card are a single character: 1, 2, 3... (rarity letters are already one).
+  const circleTag = (n: number) => (v.cls.magic?.circleWord === 'Rarity' ? v.circle(n) : String(n));
   let data = $derived(v.c.data);
   let portrait = $derived(app.portraitSrc(data.portrait));
   let inv = $derived(data.inventory);
@@ -175,7 +177,7 @@
 
       <div class="cols">
         <div>
-          <h2>{v.cls.name}</h2>
+          <h2>Class Feats</h2>
           <ul>{#each v.features as f}<li>{f.name}</li>{/each}</ul>
           {#each v.levels.filter((l) => l.feat) as l}<div class="note">L{l.level}: {l.feat}</div>{/each}
         </div>
@@ -187,18 +189,18 @@
                 {#if line.p}
                   {@const p = line.p}
                   {#if onprep}
-                    <li class="tagged"><span class="tag">{v.circle(p.circle)}</span><button type="button" class="prep tap" class:spent={p.spent} disabled={!p.spent && !!v.magicBlockedBy} onclick={() => onprep(line.i)}>
+                    <li class="tagged"><span class="tag">{circleTag(p.circle)}</span><button type="button" class="prep tap" class:spent={p.spent} disabled={!p.spent && !!v.magicBlockedBy} onclick={() => onprep(line.i)}>
                       {#if p.spent}<span class="act">Prepare</span>{/if}<span class="what">{p.magic || '—'}</span>
                     </button></li>
                   {:else}
-                    <li>{p.spent ? '☒' : '☐'} {v.circle(p.circle)} {p.magic}</li>
+                    <li>{p.spent ? '☒' : '☐'} {circleTag(p.circle)} {p.magic}</li>
                   {/if}
                 {:else if onprepslot}
-                  <li class="tagged"><span class="tag">{v.circle(line.circle)}</span><button type="button" class="prep tap empty" disabled={!!v.magicBlockedBy} onclick={() => onprepslot(line.circle)}>
+                  <li class="tagged"><span class="tag">{circleTag(line.circle)}</span><button type="button" class="prep tap empty" disabled={!!v.magicBlockedBy} onclick={() => onprepslot(line.circle)}>
                     <span class="act">Prepare</span><span class="what">________</span>
                   </button></li>
                 {:else}
-                  <li class="muted">☐ {v.circle(line.circle)} ________</li>
+                  <li class="muted">☐ {circleTag(line.circle)} ________</li>
                 {/if}
               {/each}
               {#if prepLines.length > prepShown}<li class="muted">+{prepLines.length - prepShown} more</li>{/if}
@@ -314,7 +316,7 @@
   .tal span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .tal { align-items: center; }
   .tal b { font: 700 3.6cqw/1 Georgia, serif; }
-  .cols { display: grid; grid-template-columns: 1.2fr 1fr 1fr; gap: 2.4cqw; flex: 1; min-height: 0; }
+  .cols { display: grid; grid-template-columns: 1.2fr 0.9fr 1.1fr; gap: 2.4cqw; flex: 1; min-height: 0; }
   h2 { font: 700 2.4cqw/1.2 Georgia, serif; margin: 0 0 0.6cqw; border-bottom: 0.2cqw solid #1d1712; }
   ul { list-style: none; margin: 0; padding: 0; }
   .prep { display: flex; align-items: center; justify-content: center; text-align: center; gap: 0.8cqw; width: 100%; margin-bottom: 0.6cqw; padding: 0.4cqw 0.8cqw; border: 0.15cqw solid #c9b896; border-radius: 0.8cqw; font-size: 2cqw; line-height: 1.3; }
