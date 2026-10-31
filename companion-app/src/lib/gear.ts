@@ -270,3 +270,24 @@ export function defaultLoadout(armor: ArmorItem[], weapons: WeaponItem[]): { wor
     weapons.find((w) => !w.shield && fitsOffHand(main, hands, w));
   return { worn: armor[0]?.id ?? '', wielded: [hands[0], off?.id ?? (main?.size === 'medium' ? main.id : '')] };
 }
+
+// The six places a magic item is worn. Rings can go on either hand.
+export type WornSlot = 'crown' | 'amulet' | 'ringL' | 'ringR' | 'belt' | 'boots';
+export const WORN_SLOTS: { id: WornSlot; label: string; form: string }[] = [
+  { id: 'crown', label: 'Crown', form: 'crown' },
+  { id: 'amulet', label: 'Amulet', form: 'amulet' },
+  { id: 'ringL', label: 'L Ring', form: 'ring' },
+  { id: 'ringR', label: 'R Ring', form: 'ring' },
+  { id: 'belt', label: 'Belt', form: 'belt' },
+  { id: 'boots', label: 'Boots', form: 'boots' }
+];
+
+// The form of a carried item's dweomer ("ring", "amulet", ...), or undefined when it has none.
+export function magicFormOf(item: CarriedItem): string | undefined {
+  return resolveMagic(item.enchantment?.ref)?.form;
+}
+
+// Which worn slots a magic item of this form can go in.
+export function slotsFor(form: string | undefined): WornSlot[] {
+  return WORN_SLOTS.filter((s) => form !== undefined && s.form === form).map((s) => s.id);
+}

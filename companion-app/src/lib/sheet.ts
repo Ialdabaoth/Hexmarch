@@ -8,7 +8,7 @@
 import { rollDie, type Rng } from './dice';
 import {
   type Enchantment, armorStats, compactArmor, compactItem, compactWeapon, defaultLoadout, itemId, matchesRef, newArmor, newItem, newWeapon, parseKit,
-  weaponStats, type ArmorItem, type CarriedItem, type Hands, type WeaponItem
+  weaponStats, WORN_SLOTS, type ArmorItem, type CarriedItem, type Hands, type WeaponItem, type WornSlot
 } from './gear';
 import { DAMAGE_TYPES, isBuiltIn, RARITIES, magicLevel, magicLevels, resolveMagic, resolveItem, type MagicEntry, type MagicSystem, type Rarity } from '../equipment/equipment';
 import {
@@ -104,6 +104,8 @@ export interface SheetData {
     worn: string;
     wielded: Hands;
     items: CarriedItem[];
+    // Magic items worn, by slot: the id of the carried item. Missing when nothing is worn.
+    equipped?: Partial<Record<WornSlot, string>>;
     // Magic-users only. Preparations are physical objects, so they are inventory.
     book: BookEntry[];
     prepared: Preparation[];
@@ -442,6 +444,17 @@ function readEnchantment(rules: Ruleset, v: unknown): Enchantment | undefined {
   return e;
 }
 
+// Worn magic items: keep only the slots we know, and only ids that are strings.
+function readEquipped(raw: unknown): Partial<Record<WornSlot, string>> | undefined {
+  if (typeof raw !== 'object' || raw === null) return undefined;
+  const out: Partial<Record<WornSlot, string>> = {};
+  for (const s of WORN_SLOTS) {
+    const id = (raw as Record<string, unknown>)[s.id];
+    if (typeof id === 'string' && id) out[s.id] = id;
+  }
+  return out;
+}
+
 // Version 1 had armor as { rating, worn } and weapons as { name, damage, range };
 // those become items, worn and wielded as before.
 function readGear(rules: Ruleset, inv: any): Pick<SheetData['inventory'], 'armor' | 'weapons' | 'worn' | 'wielded'> {
@@ -567,6 +580,7 @@ export function readSheet(raw: unknown): SheetData {
     inventory: {
       ...readGear(rules, inv),
       items: (Array.isArray(inv.items) ? inv.items : []).flatMap((x: unknown) => readItem(rules, x)),
+      equipped: readEquipped(inv.equipped),
       book: (Array.isArray(inv.book) ? inv.book : []).map((b: any) => readMagic(rules, cls.magic?.system, b)),
       prepared: (Array.isArray(inv.prepared) ? inv.prepared : []).map((p: any) => ({ ...readMagic(rules, cls.magic?.system, p), spent: p?.spent === true }))
     },
@@ -597,6 +611,7 @@ export function writeSheet(d: SheetData): object {
       armor: inv.armor.map(compactArmor),
       weapons: inv.weapons.map(compactWeapon),
       items: inv.items.map(compactItem),
+      ...(inv.equipped ? { equipped: inv.equipped } : {}),
       book: inv.book.map(compactMagic),
       prepared: inv.prepared.map(compactMagic)
     }

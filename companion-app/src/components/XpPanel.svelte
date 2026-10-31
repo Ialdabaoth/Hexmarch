@@ -18,8 +18,10 @@
   let featTaken = $derived(hasKind(cls, 'fighter') && ownedFeats.has(levelFeat.trim().toLowerCase()));
   // Some origins have their feat chosen for them at a level (an elf's Battle-Trance).
   let forced = $derived(c.rules.getOrigin(c.origin).feats?.[c.level + 1]);
+  // Forced feats the character already has aren't offered again either.
+  let forcedFree = $derived((forced ?? []).filter((f) => !ownedFeats.has(f.toLowerCase())));
   $effect(() => {
-    if (leveling && forced?.length === 1) levelFeat = forced[0];
+    if (leveling && forcedFree.length === 1) levelFeat = forcedFree[0];
   });
 
   function addXp(delta: number) {
@@ -54,7 +56,7 @@
     {#if hasKind(cls, 'expert')}
       <select bind:value={levelTraining}>
         <option value={undefined}>Talent to train…</option>
-        {#each c.rules.trainableAt(cls, c.level + 1) as t}<option value={t}>{TALENTS.find((x) => x.id === t)!.name}</option>{/each}
+        {#each c.rules.trainableAt(cls, c.level + 1).filter((t) => c.talents[t] > 2) as t}<option value={t}>{TALENTS.find((x) => x.id === t)!.name}</option>{/each}
       </select>
     {/if}
     {#if scheduledTraining(cls, c.level + 1).length}
@@ -65,8 +67,8 @@
     {/if}
     {#if forced?.length}
       <select bind:value={levelFeat} aria-label="Fighter feat">
-        {#if forced.length > 1}<option value="">Fighter feat…</option>{/if}
-        {#each forced as f}<option value={f}>{f}</option>{/each}
+        {#if forcedFree.length > 1}<option value="">Fighter feat…</option>{/if}
+        {#each forcedFree as f}<option value={f}>{f}</option>{/each}
       </select>
     {:else if hasKind(cls, 'fighter') && (c.level + 1) % 2 === 0}
       <input bind:value={levelFeat} list="fighter-feats" placeholder="Fighter feat chosen" aria-label="Fighter feat" />
