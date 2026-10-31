@@ -187,15 +187,15 @@
                 {#if line.p}
                   {@const p = line.p}
                   {#if onprep}
-                    <li><button type="button" class="prep tap" class:spent={p.spent} disabled={!p.spent && !!v.magicBlockedBy} onclick={() => onprep(line.i)}>
-                      {#if p.spent}<span class="act">Prepare</span>{/if}<span class="what">{v.circle(p.circle)} {p.magic || '—'}</span>
+                    <li class="tagged"><span class="tag">{v.circle(p.circle)}</span><button type="button" class="prep tap" class:spent={p.spent} disabled={!p.spent && !!v.magicBlockedBy} onclick={() => onprep(line.i)}>
+                      {#if p.spent}<span class="act">Prepare</span>{/if}<span class="what">{p.magic || '—'}</span>
                     </button></li>
                   {:else}
                     <li>{p.spent ? '☒' : '☐'} {v.circle(p.circle)} {p.magic}</li>
                   {/if}
                 {:else if onprepslot}
-                  <li><button type="button" class="prep tap empty" disabled={!!v.magicBlockedBy} onclick={() => onprepslot(line.circle)}>
-                    <span class="act">Prepare</span><span class="what">{v.circle(line.circle)} ________</span>
+                  <li class="tagged"><span class="tag">{v.circle(line.circle)}</span><button type="button" class="prep tap empty" disabled={!!v.magicBlockedBy} onclick={() => onprepslot(line.circle)}>
+                    <span class="act">Prepare</span><span class="what">________</span>
                   </button></li>
                 {:else}
                   <li class="muted">☐ {v.circle(line.circle)} ________</li>
@@ -216,8 +216,8 @@
           <ul>
             {#each WORN_SLOTS as s}
               {@const worn = inv.items.find((i) => i.id === inv.equipped?.[s.id])}
-              <li><button type="button" class="prep tap" disabled={!onequip} onclick={() => onequip?.(s.id)}>
-                <span class="act">{s.label}</span><span class="what">{worn?.name ?? '—'}</span>
+              <li class="tagged"><span class="tag">{s.label}</span><button type="button" class="prep tap" disabled={!onequip} onclick={() => onequip?.(s.id)}>
+                <span class="what">{worn?.name ?? '—'}</span>
               </button></li>
             {/each}
           </ul>
@@ -319,6 +319,10 @@
   ul { list-style: none; margin: 0; padding: 0; }
   .prep { display: flex; align-items: center; justify-content: center; text-align: center; gap: 0.8cqw; width: 100%; margin-bottom: 0.6cqw; padding: 0.4cqw 0.8cqw; border: 0.15cqw solid #c9b896; border-radius: 0.8cqw; font-size: 2cqw; line-height: 1.3; }
   .prep .act { flex: none; font-size: 1.6cqw; text-transform: uppercase; letter-spacing: 0.06em; color: #8a2e1f; font-weight: 700; }
+  /* A label outside its button, to the left: circle or worn slot. */
+  .tagged { display: flex; align-items: center; gap: 0.6cqw; }
+  .tagged .prep { flex: 1; min-width: 0; }
+  .tag { flex: none; min-width: 5.5cqw; font-size: 1.6cqw; text-transform: uppercase; letter-spacing: 0.06em; color: #8a2e1f; font-weight: 700; }
   .prep .what { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center; }
   .prep.empty { border-style: dashed; color: #8a7a68; }
   .prep.empty .act { color: #3f6f4f; }
