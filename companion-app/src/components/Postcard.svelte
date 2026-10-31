@@ -324,7 +324,7 @@
   /* A label outside its button, to the left: circle or worn slot. */
   .tagged { display: flex; align-items: center; gap: 0.6cqw; }
   .tagged .prep { flex: 1; min-width: 0; height: 4.4cqw; box-sizing: border-box; }
-  .tag { flex: none; width: 8cqw; white-space: nowrap; font-size: 1.6cqw; text-transform: uppercase; letter-spacing: 0.06em; color: #8a2e1f; font-weight: 700; }
+  .tag { flex: none; width: 8cqw; white-space: nowrap; text-align: right; font-size: 1.6cqw; text-transform: uppercase; letter-spacing: 0.06em; color: #8a2e1f; font-weight: 700; }
   .prep .what { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center; }
   .prep.empty { border-style: dashed; color: #8a7a68; }
   .prep.empty .act { color: #3f6f4f; }
