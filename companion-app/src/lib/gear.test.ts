@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { damage, defaultLoadout, fitsOffHand, gearLoad, grips, newWeapon, parseKit, usesBothHands } from './gear';
+import { damage, defaultLoadout, fitsOffHand, gearLoad, grips, magicFormOf, newWeapon, parseKit, slotsFor, usesBothHands, type CarriedItem } from './gear';
 import { Character, carrying, defaultTalents, equipment, freshState } from './character';
 import { createSheet, readSheet } from './sheet';
 import { rulesFor } from '../rules/rules';
@@ -97,5 +97,26 @@ describe('gear', () => {
   it('round-trips worn and wielded items', () => {
     const s = createSheet({ name: 'W', origin: 'human', classId: 'warrior', abilities: a, talentBase: defaultTalents(a) });
     expect(readSheet(JSON.parse(JSON.stringify(s)))).toEqual(s);
+  });
+});
+
+describe('worn magic slots', () => {
+  it('puts rings on either hand and other forms in their one slot', () => {
+    expect(slotsFor('ring')).toEqual(['ringL', 'ringR']);
+    expect(slotsFor('amulet')).toEqual(['amulet']);
+    expect(slotsFor('crown')).toEqual(['crown']);
+    expect(slotsFor('belt')).toEqual(['belt']);
+    expect(slotsFor('boots')).toEqual(['boots']);
+  });
+  it('leaves wondrous items, potions and plain gear out of the worn slots', () => {
+    expect(slotsFor('wondrous')).toEqual([]);
+    expect(slotsFor('potion')).toEqual([]);
+    expect(slotsFor(undefined)).toEqual([]);
+  });
+  it('reads the form from the dweomer a carried item holds', () => {
+    const ring = { id: 'a', name: 'Ring of Protection', qty: 1, enchantment: { name: 'Ring of Protection', ref: 'mm:ring-of-protection' } } as CarriedItem;
+    const plain = { id: 'b', name: 'Rope', qty: 1 } as CarriedItem;
+    expect(magicFormOf(ring)).toBe('ring');
+    expect(magicFormOf(plain)).toBeUndefined();
   });
 });

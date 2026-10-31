@@ -3,6 +3,7 @@ import { readSheet, writeSheet, type SheetData } from './sheet';
 import type { LiveState } from './character';
 import type { LogEntry } from './checks';
 import { DEFAULT_DICE_COLOR, DEFAULT_DICE_INK, prefersReducedMotion } from './dice3d';
+import type { GameMap } from './maps';
 
 export interface Settings {
   webhookUrl: string;
@@ -98,4 +99,13 @@ export function downloadJson(filename: string, data: unknown): void {
 
 export function slug(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'character';
+}
+
+// Referee maps, kept on the device with their tokens.
+export async function loadMaps(): Promise<GameMap[]> {
+  return (await get<GameMap[]>('maps')) ?? [];
+}
+
+export async function saveMaps(maps: GameMap[]): Promise<void> {
+  await set('maps', JSON.parse(JSON.stringify(maps)));
 }

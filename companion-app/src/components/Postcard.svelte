@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { itemLabel } from '../lib/gear';
+  import { WORN_SLOTS, itemLabel, type WornSlot } from '../lib/gear';
   import type { RollRequest, SheetView } from '../lib/render';
   import { app } from '../lib/app.svelte';
   import { holdRoll } from '../lib/hold.svelte';
@@ -19,7 +19,8 @@
     ongear,
     oncarry,
     onprep,
-    onprepslot
+    onprepslot,
+    onequip
   }: {
     view: SheetView;
     onroll?: (r: RollRequest) => void;
@@ -39,6 +40,8 @@
     onprep?: (index: number) => void;
     // Tapping an empty preparation slot, with the circle it holds.
     onprepslot?: (circle: number) => void;
+    // Tapping a worn slot calls this (the home screen opens a picker for it).
+    onequip?: (slot: WornSlot) => void;
   } = $props();
   let data = $derived(v.c.data);
   let portrait = $derived(app.portraitSrc(data.portrait));
@@ -185,7 +188,7 @@
                   {@const p = line.p}
                   {#if onprep}
                     <li><button type="button" class="prep tap" class:spent={p.spent} disabled={!p.spent && !!v.magicBlockedBy} onclick={() => onprep(line.i)}>
-                      <span class="act">{p.spent ? 'Prepare' : 'Use'}</span><span class="what">{v.circle(p.circle)} {p.magic || '—'}</span>
+                      {#if p.spent}<span class="act">Prepare</span>{/if}<span class="what">{v.circle(p.circle)} {p.magic || '—'}</span>
                     </button></li>
                   {:else}
                     <li>{p.spent ? '☒' : '☐'} {v.circle(p.circle)} {p.magic}</li>
@@ -209,10 +212,14 @@
           {/if}
         </div>
         <div>
-          <h2>Retinue</h2>
+          <h2>Equipped Items</h2>
           <ul>
-            {#each data.followers.slice(0, 4) as f}<li>{f.name} <span class="muted">({f.attitude})</span></li>{/each}
-            {#if !data.followers.length}<li class="muted">—</li>{/if}
+            {#each WORN_SLOTS as s}
+              {@const worn = inv.items.find((i) => i.id === inv.equipped?.[s.id])}
+              <li><button type="button" class="prep tap" disabled={!onequip} onclick={() => onequip?.(s.id)}>
+                <span class="act">{s.label}</span><span class="what">{worn?.name ?? '—'}</span>
+              </button></li>
+            {/each}
           </ul>
         </div>
       </div>
@@ -310,9 +317,9 @@
   .cols { display: grid; grid-template-columns: 1.2fr 1fr 1fr; gap: 2.4cqw; flex: 1; min-height: 0; }
   h2 { font: 700 2.4cqw/1.2 Georgia, serif; margin: 0 0 0.6cqw; border-bottom: 0.2cqw solid #1d1712; }
   ul { list-style: none; margin: 0; padding: 0; }
-  .prep { display: flex; align-items: baseline; gap: 0.8cqw; width: 100%; margin-bottom: 0.6cqw; padding: 0.4cqw 0.8cqw; border: 0.15cqw solid #c9b896; border-radius: 0.8cqw; font-size: 2cqw; line-height: 1.3; }
+  .prep { display: flex; align-items: center; justify-content: center; text-align: center; gap: 0.8cqw; width: 100%; margin-bottom: 0.6cqw; padding: 0.4cqw 0.8cqw; border: 0.15cqw solid #c9b896; border-radius: 0.8cqw; font-size: 2cqw; line-height: 1.3; }
   .prep .act { flex: none; font-size: 1.6cqw; text-transform: uppercase; letter-spacing: 0.06em; color: #8a2e1f; font-weight: 700; }
-  .prep .what { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .prep .what { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center; }
   .prep.empty { border-style: dashed; color: #8a7a68; }
   .prep.empty .act { color: #3f6f4f; }
   .prep.spent { border-style: dashed; color: #8a7a68; }
