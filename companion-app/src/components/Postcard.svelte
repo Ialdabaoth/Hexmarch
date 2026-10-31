@@ -200,7 +200,7 @@
                     <span class="act">Prepare</span><span class="what">________</span>
                   </button></li>
                 {:else}
-                  <li class="muted">☐ {circleTag(line.circle)} ________</li>
+                  <li class="muted">☐ {circleTag(line.circle)}</li>
                 {/if}
               {/each}
               {#if prepLines.length > prepShown}<li class="muted">+{prepLines.length - prepShown} more</li>{/if}
@@ -223,7 +223,7 @@
                   <span class="what">{worn?.name ?? '—'}</span>
                 </button></li>
               {:else}
-                <li>{s.label} {worn?.name ?? '________'}</li>
+                <li>{s.label} {worn?.name ?? ''}</li>
               {/if}
             {/each}
           </ul>
