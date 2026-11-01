@@ -16,6 +16,16 @@ describe.each(EQUIPMENT.map((f) => [`${f.id}-equipment.json`, f] as const))('%s'
     for (const r of file.data.rules) expect(RULESETS.map((x) => x.id)).toContain(r);
   });
 
+  // Heph, 2026-11-01: weight is additive. Heavy +1, polearm +1 (so medium polearm 1,
+  // heavy polearm 2). Bows and shields have their own numbers.
+  it('melee weapons weigh heavy + polearm', () => {
+    for (const i of file.items) {
+      if (i.kind !== 'weapon' || i.shield || i.properties?.some((p) => /^Range/.test(p))) continue;
+      const want = (i.size === 'heavy' ? 1 : 0) + (i.properties?.includes('Polearm') ? 1 : 0);
+      expect([i.id, i.encumbrance ?? 0]).toEqual([i.id, want]);
+    }
+  });
+
   it('items are complete for their kind', () => {
     for (const i of file.items) {
       expect(['armor', 'weapon', 'gear', 'mount', 'service'], i.id).toContain(i.kind);
