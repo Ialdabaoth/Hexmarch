@@ -219,7 +219,7 @@
             {#each WORN_SLOTS as s}
               {@const worn = inv.items.find((i) => i.id === inv.equipped?.[s.id])}
               {#if onequip}
-                <li class="tagged"><span class="tag">{s.label}</span><button type="button" class="prep tap" onclick={() => onequip(s.id)}>
+                <li class="tagged"><span class="tag slot">{s.label}</span><button type="button" class="prep tap" onclick={() => onequip(s.id)}>
                   <span class="what">{worn?.name ?? '—'}</span>
                 </button></li>
               {:else}
@@ -327,8 +327,9 @@
   .prep .act { flex: none; font-size: 1.6cqw; text-transform: uppercase; letter-spacing: 0.06em; color: #8a2e1f; font-weight: 700; }
   /* A label outside its button, to the left: circle or worn slot. */
   .tagged { display: flex; align-items: center; gap: 0.6cqw; }
-  .tagged .prep { flex: 1; min-width: 0; height: 4.4cqw; box-sizing: border-box; }
+  .tagged .prep { flex: 1; min-width: 0; height: 3.6cqw; box-sizing: border-box; }
   .tag.circle { width: 3cqw; }
+  .tag.slot { font-size: 1.25cqw; }
   .tag { flex: none; width: 8cqw; white-space: nowrap; text-align: right; font-size: 1.6cqw; text-transform: uppercase; letter-spacing: 0.06em; color: #8a2e1f; font-weight: 700; }
   .prep .what { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center; }
   .prep.empty { border-style: dashed; color: #8a7a68; }
