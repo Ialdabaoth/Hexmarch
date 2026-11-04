@@ -68,7 +68,7 @@ for k in order:
          f'<rect x="{MX}" y="{MY}" width="{MW}" height="{MH}" fill="none" stroke="#2b2418" stroke-width="1.2"/>']
     y = MY + 14
     o.append(f'<text x="{LX}" y="{y}" font-size="11" letter-spacing=".08em" fill="#5b5040">{esc(TITLE.upper())}</text>'); y += 30
-    o.append(f'<text x="{LX}" y="{y}" font-size="24" font-weight="bold" fill="#2b2418">Hex {bid[k]}</text>'); y += 16
+    o.append(f'<text x="{LX}" y="{y}" font-size="24" font-weight="bold" fill="#2b2418">March {bid[k]}</text>'); y += 16
     o.append(f'<text x="{LX}" y="{y}" font-size="11" fill="#5b5040">Atlas page {page[k]} of {len(order)}</text>'); y += 14
     # locator
     lh = (max(ys) - min(ys) + 2 * AP) * sc; ly0 = y
@@ -99,7 +99,7 @@ for k in order:
             o.append(f'<use href="#i-{ic}" x="{LX+24}" y="{y-9}" width="13" height="11"/>' if ic else f'<text x="{LX+30}" y="{y}" text-anchor="middle" font-size="10">✝</text>')
             for n, ln in enumerate(lines): o.append(f'<text x="{LX+40}" y="{y + n*11}" font-size="9.5">{esc(ln)}</text>')
             y += 11 * len(lines) + 3
-    o.append(f'<text x="{LX}" y="{MY+MH-2}" font-size="8" fill="#8a7f66">Hex numbers are the season grid (CCRR). {esc(VER)}</text>')
+    o.append(f'<text x="{LX}" y="{MY+MH-2}" font-size="8" fill="#8a7f66">{esc(VER)}</text><text x="{LX}" y="{MY+MH-12}" font-size="8" fill="#8a7f66">3-mile hexes use the Region grid.</text>')
     o.append('</svg>')
     pages.append(''.join(o))
 doc = ('<!doctype html><meta charset="utf-8"><title>Season 1 Print Atlas</title><style>@page{size:11in 8.5in;margin:0}html,body{margin:0;background:#fff}'
