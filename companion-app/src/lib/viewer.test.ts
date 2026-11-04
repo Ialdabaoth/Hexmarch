@@ -1,0 +1,25 @@
+import { describe, expect, it } from 'vitest';
+import { isViewerMessage } from './viewer';
+
+const hex = {
+  type: 'mm-viewer', event: 'hex', module: 'season-1', version: 'v0.1.0', hash: '#world:0533', map: 'world', hex: '0533',
+  scale: '3-mile hex', terrain: 'grass', sites: [{ slug: 'callainn', name: 'Callainn', href: '#p-callainn--callainn' }]
+};
+
+describe('isViewerMessage', () => {
+  it('accepts view and hex messages', () => {
+    expect(isViewerMessage({ type: 'mm-viewer', event: 'view', module: 'season-1', hash: '#atlas-3', map: 'world' })).toBe(true);
+    expect(isViewerMessage(hex)).toBe(true);
+    expect(isViewerMessage({ ...hex, terrain: null, map: 'p-an-uaimh' })).toBe(true);
+  });
+
+  it('refuses anything else', () => {
+    expect(isViewerMessage(null)).toBe(false);
+    expect(isViewerMessage('mm-viewer')).toBe(false);
+    expect(isViewerMessage({ ...hex, type: 'other' })).toBe(false);
+    expect(isViewerMessage({ ...hex, hex: '53' })).toBe(false);
+    expect(isViewerMessage({ ...hex, map: '../x' })).toBe(false);
+    expect(isViewerMessage({ ...hex, sites: [{ name: 1 }] })).toBe(false);
+    expect(isViewerMessage({ ...hex, event: 'boom' })).toBe(false);
+  });
+});

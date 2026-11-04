@@ -91,7 +91,7 @@ M = {'format': 'mm-module/1', 'id': MOD['id'], 'title': MOD['title'], 'short': M
      'exploration': [dict(page=p['page'], key=p['key'], map=f"maps/{p['key']}.svg", title=p['lead'], book=p['book'], county=p['county'], lat=p['lat'], lon=p['lon'],
                           center_px=p['center_px'], sites=[dict(s_, slug=slug(s_['name'])) for s_ in p['sites']]) for p in PI],
      'sites': SITES,
-     'links': {'world': '#world', 'atlas': '#atlas-<page>', 'exploration': '#<key>', 'site': '#<key>--<slug>'},
+     'links': {'world': '#world', 'atlas': '#atlas-<page>', 'exploration': '#<key>', 'site': '#<key>--<slug>', 'hex': '#<map>:<hex>'},
      'print': {'atlas': 'print/atlas.pdf', 'exploration': 'print/exploration.pdf'} if PDF else {}}
 json.dump(M, open(out + '/module.json', 'w'), ensure_ascii=False, indent=1)
 tpl = open(TOOLS + '/viewer.html').read()

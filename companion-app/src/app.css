@@ -100,4 +100,4 @@ label.check input { width: 1.2rem; height: 1.2rem; min-height: 0; flex: none; }
 /* Collapsible sections on the Campaign and Rules tabs. */
 details.section { margin-top: 1rem; }
 details.section > summary { cursor: pointer; }
-details.section > summary h2 { display: inline; margin: 0 0 0.5rem; }
+details.section > summary h2, details.section > summary h3 { display: inline; margin: 0 0 0.5rem; }

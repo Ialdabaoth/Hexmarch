@@ -1,31 +1,19 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
-  import { loadModuleList, saveModuleList } from '../lib/storage';
-  import { loadRepo, viewerUrl, type SavedModule } from '../lib/modules';
+  import { app } from '../lib/app.svelte';
+  import { viewerUrl, type SavedModule } from '../lib/modules';
 
-  // Module repositories the referee has added. Each module's viewer opens in its own page.
-  let saved = $state<SavedModule[]>([]);
+  // Module repositories added on this device. Their maps open in Campaign › Maps;
+  // each module's viewer can also open in its own page.
   let address = $state('');
   let busy = $state(false);
   let problem = $state('');
-
-  onMount(async () => {
-    try {
-      saved = await loadModuleList();
-    } catch (e) {
-      problem = (e as Error).message;
-    }
-  });
 
   async function add() {
     busy = true;
     problem = '';
     try {
-      const { modules } = await loadRepo(address);
-      // Re-adding a repository replaces its modules, so updates arrive with a fresh fetch.
-      saved = [...saved.filter((m) => !modules.some((n) => n.id === m.id && n.base === m.base)), ...modules];
+      await app.addModuleRepo(address);
       address = '';
-      await saveModuleList(saved);
     } catch (e) {
       problem = (e as Error).message;
     }
@@ -33,9 +21,8 @@
   }
 
   async function remove(m: SavedModule) {
-    saved = saved.filter((x) => x !== m);
     try {
-      await saveModuleList(saved);
+      await app.saveModules(app.modules.filter((x) => x !== m));
     } catch (e) {
       problem = (e as Error).message;
     }
@@ -51,9 +38,9 @@
   </div>
   {#if problem}<p class="small failure" role="alert">{problem}</p>{/if}
 
-  {#if saved.length}
+  {#if app.modules.length}
     <ul class="modules">
-      {#each saved as m (m.base + m.id)}
+      {#each app.modules as m (m.base + m.id)}
         <li>
           <div>
             <strong>{m.manifest.title}</strong> <span class="small muted">v{m.manifest.version} · {m.manifest.license}</span>

@@ -20,9 +20,22 @@ export interface Settings {
   diceInk: string;
   // The campaign file's link, or '' for "This device".
   campaign: string;
+  // Where the party stands on a module's maps, or null when it hasn't been placed.
+  partyAt: PartyAt | null;
 }
 
-export const DEFAULT_SETTINGS: Settings = { webhookUrl: '', autoPost: false, activeId: '', rules: 'mm', dice3d: !prefersReducedMotion(), diceColor: DEFAULT_DICE_COLOR, diceInk: DEFAULT_DICE_INK, campaign: '' };
+// A hex on a module's maps: the module (its site and id), the map ("world" or an
+// exploration key) and the hex, as in the viewer's links (#world:0706).
+export interface PartyAt {
+  base: string;
+  module: string;
+  map: string;
+  hex: string;
+  // What the viewer said about the hex, for showing without opening the map.
+  label: string;
+}
+
+export const DEFAULT_SETTINGS: Settings = { webhookUrl: '', autoPost: false, activeId: '', rules: 'mm', dice3d: !prefersReducedMotion(), diceColor: DEFAULT_DICE_COLOR, diceInk: DEFAULT_DICE_INK, campaign: '', partyAt: null };
 
 // Saved sheets go through the same checks as imported files, so a sheet the
 // app can't read is skipped instead of breaking the whole list. Skipped sheets
