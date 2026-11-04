@@ -183,7 +183,7 @@ function combine(parts: CharacterClass[]): CharacterClass {
     expertise: union(parts.map((p) => p.expertise)),
     improvedCritical: parts.some((p) => p.improvedCritical),
     feats: union(parts.map((p) => p.feats)),
-    features: parts.flatMap((p) => p.features.map((f) => ({ ...f, name: `${f.name} (${p.name})` }))),
+    features: parts.flatMap((p) => p.features),
     magic: parts.find((p) => p.magic)?.magic,
     parts
   };

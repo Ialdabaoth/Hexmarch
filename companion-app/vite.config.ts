@@ -19,7 +19,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['icon.svg', 'apple-touch-icon.png'],
       // modules/ (map viewers, PDFs, module.json) is published beside the app; let it load as its own pages
-      workbox: { navigateFallbackDenylist: [/\/modules\//] },
+      // Module viewers are plain pages of their own; the app's offline shell must not take them over.
+      workbox: { navigateFallbackDenylist: [/^\/modules\//] },
       manifest: {
         name: 'Materia Mundi Companion',
         short_name: 'Materia Mundi',
