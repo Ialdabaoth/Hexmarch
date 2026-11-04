@@ -5,7 +5,8 @@ const {chromium} = require('playwright');
   const b = await chromium.launch();
   const p = await b.newPage({viewport: {width: 1056, height: 816}});
   const f = process.argv[2];
-  await p.goto('file://' + f);
+  // The exploration sheets are a large page; a slow CI runner needs more than the default 30 s to load it.
+  await p.goto('file://' + f, {waitUntil: 'load', timeout: 300000});
   await p.waitForTimeout(800);
   await p.pdf({path: f.replace('.html', '.pdf'), width: '11in', height: '8.5in', printBackground: true});
   if (process.argv[3] !== 'none') {
