@@ -98,6 +98,8 @@ def icon_defs():
         out.append(f'<symbol id="i-{n}" viewBox="0 0 {W} {H}" preserveAspectRatio="xMidYMid meet"><image width="{W}" height="{H}" href="data:image/png;base64,{b}"/></symbol>')
     return "".join(out)
 
+MI_KM = 1.524  # the game mile is exactly 5000 feet (Heph 2026-11-04)
+
 def slug(t):
     import unicodedata, re
     t = unicodedata.normalize("NFKD", t).encode("ascii", "ignore").decode().lower()
@@ -116,12 +118,16 @@ def make(key, R):
     lat0 = poly.centroid.y
     kx = 111.32 * math.cos(math.radians(lat0)); ky = 111.32
     minx, miny, maxx, maxy = poly.bounds
-    s = HEX_MI * 1.609344 / math.sqrt(3)  # side (km); flat-to-flat = HEX_MI
+    s = HEX_MI * MI_KM / math.sqrt(3)  # side (km); flat-to-flat = HEX_MI
     w, h = 1.5 * s, math.sqrt(3) * s
     pad = s if has_border else 0
     X0, Y0 = minx * kx - pad, maxy * ky + pad
     ncol = int(((maxx - minx) * kx + 2 * pad) / w) + (2 if has_border else 1)
     nrow = int(((maxy - miny) * ky + 2 * pad) / h) + (2 if has_border else 1)
+    if "anchor" in R:  # [lat, lon]: put a hex centre (in an even column) exactly here, e.g. a League's 3-mile hex centre
+        alat, alon = R["anchor"]; ax, ay = alon * kx, alat * ky
+        cc = math.ceil((ax - minx * kx) / w); cc += cc % 2; rc = math.ceil((maxy * ky - ay) / h)
+        X0, Y0 = ax - cc * w, ay + rc * h; ncol, nrow = 2 * cc + 1, 2 * rc + 1
     def center(col, row): return X0 + col * w, Y0 - row * h - (h / 2 if col % 2 else 0)
     def to_ll(x, y): return x / kx, y / ky
     # drainage window
@@ -168,10 +174,26 @@ def make(key, R):
                 # woods and the fringes of each patch are open woodland and scrub
                 if nz < pf: t = "forest" if (nz < pf - .12 or sd > 12) else "woods"
                 else: t = "woods" if nz < pf + .05 else "grass"
-            hexes.append(dict(col=col, row=row, x=x, y=y, corners=corners, inside=inside, t=t, lon=lon, lat=lat))
+            hexes.append(dict(col=col, row=row, x=x, y=y, corners=corners, inside=inside, t=t, lon=lon, lat=lat, mean=mean, sd=sd, nz=noise(x, y)))
+    # League maps follow their March hexes: parents [[lat, lon, terrain]] are the 3-mile hexes on the page. Each half-mile
+    # hex belongs to the nearest parent, and in each parent the best-suited share of hexes takes the parent's terrain.
+    PAR = R.get("parents", [])
+    if PAR:
+        groups = {}
+        for hx in hexes:
+            k = min(range(len(PAR)), key=lambda i: ((hx["lon"] - PAR[i][1]) * kx) ** 2 + ((hx["lat"] - PAR[i][0]) * ky) ** 2)
+            groups.setdefault(k, []).append(hx)
+        score = {"hills": lambda q: q["mean"] + 2 * q["sd"], "mount": lambda q: q["mean"] + 2 * q["sd"], "bog": lambda q: -q["sd"] - q["mean"] / 50,
+                 "forest": lambda q: -q["nz"] + q["sd"] / 40, "woods": lambda q: -q["nz"], "grass": lambda q: q["nz"] - q["sd"] / 40}
+        for k, grp in groups.items():
+            pt = PAR[k][2]
+            if pt not in score: continue
+            land = [q for q in grp if q["t"] != "sea"]; want = round(R.get("parent_share", .6) * len(land))
+            have = [q for q in land if q["t"] == pt]
+            for q in sorted((q for q in land if q["t"] != pt), key=score[pt], reverse=True)[:max(0, want - len(have))]: q["t"] = pt
     for plat, plon, rad, terr in R.get("patches", []):  # [[lat, lon, radius_miles, terrain]] named regions
         for hx in hexes:
-            if hx["inside"] and math.hypot((hx["lon"] - plon) * kx, (hx["lat"] - plat) * ky) / 1.609344 <= rad: hx["t"] = terr
+            if hx["inside"] and math.hypot((hx["lon"] - plon) * kx, (hx["lat"] - plat) * ky) / MI_KM <= rad: hx["t"] = terr
     for o_ in R.get("overrides", []):  # [[hex_id, terrain]] hand edits
         for hx in hexes:
             if f'{hx["col"]+1:02d}{hx["row"]+1:02d}' == o_[0]: hx["t"] = o_[1]
@@ -212,7 +234,7 @@ def make(key, R):
             if not hx["inside"]: continue
             best = None
             for i, (pn, pla, plo, prad, pside) in enumerate(POW):
-                dd = math.hypot((hx["lon"] - plo) * kx, (hx["lat"] - pla) * ky) / 1.609344 / prad
+                dd = math.hypot((hx["lon"] - plo) * kx, (hx["lat"] - pla) * ky) / MI_KM / prad
                 if dd <= 1 and (best is None or dd < best[0]): best = (dd, i)
             if best: owner[(hx["col"], hx["row"])] = best[1]
         for hx in hexes:
@@ -320,7 +342,7 @@ def make(key, R):
         keyed.append(dict(hex=hid, name=name, kind=kind, lat=it["lat"], lon=it["lon"], col=hx["col"], row=hx["row"], note=st[4] if len(st) > 4 else ""))
     if R.get("master"):  # print atlas: map only, plus a geometry dump for the page builder
         o.append("</svg>"); open(f"{OUT}/{key}.svg", "w").write("\n".join(o))
-        G = dict(W=Wpx, H=H, hex_px=h * PX, w_px=w * PX, hexes=[dict(col=hx["col"], row=hx["row"], px=[round(v, 2) for v in P(hx["x"], hx["y"])], inside=hx["inside"], t=hx["t"]) for hx in hexes],
+        G = dict(W=Wpx, H=H, hex_px=h * PX, w_px=w * PX, hexes=[dict(col=hx["col"], row=hx["row"], px=[round(v, 2) for v in P(hx["x"], hx["y"])], inside=hx["inside"], t=hx["t"], lat=round(hx["lat"], 6), lon=round(hx["lon"], 6)) for hx in hexes],
                  sites=[dict(name=k["name"], kind=k["kind"], hex=k["hex"], px=[round(it["x"], 2), round(it["y"], 2)]) for k, it in zip(keyed, items)])
         json.dump(G, open(f"{OUT}/{key}-grid.json", "w"), ensure_ascii=False)
         return keyed
@@ -331,7 +353,7 @@ def make(key, R):
     o.append(f'<text x="{lx}" y="{ly+38}" font-size="12" fill="#5b5040">1 hex = {HEX_MI:g} mile{"s" if HEX_MI != 1 else ""} (about {walk:.0f} minutes on foot)</text>')
     # scale bar: 1 mile per tick
     sbm = 5 if HEX_MI >= 1 else 2
-    o.append(f'<line x1="{lx}" y1="{ly+52}" x2="{lx+sbm*1.609344*PX:.1f}" y2="{ly+52}" stroke="#2b2418" stroke-width="3"/><text x="{lx}" y="{ly+66}" font-size="11">{sbm} miles</text>')
+    o.append(f'<line x1="{lx}" y1="{ly+52}" x2="{lx+sbm*MI_KM*PX:.1f}" y2="{ly+52}" stroke="#2b2418" stroke-width="3"/><text x="{lx}" y="{ly+66}" font-size="11">{sbm} miles</text>')
     ly += 90
     for k, (fill, lab) in TERRAIN.items():
         if TILES and k in T_BG:
@@ -365,7 +387,7 @@ def make(key, R):
     # distances
     def miles(a, b):
         dx = (a["lon"] - b["lon"]) * kx; dy = (a["lat"] - b["lat"]) * ky
-        return math.hypot(dx, dy) / 1.609344
+        return math.hypot(dx, dy) / MI_KM
     def hexdist(a, b):  # flat-top, odd columns shifted down
         def cube(c, r):
             x = c
