@@ -54,10 +54,20 @@ aside li a.on span:last-child { color: #3d4a37 }
 #lists { display: grid; gap: 14px }
 .note { font-size: 13px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 10px; margin: 0 }
 .note code { font-size: 12.5px; background: var(--bg); padding: 1px 4px; border-radius: 3px; word-break: break-all }
+/* ?mode=map shows only the map (with zoom buttons); ?mode=atlas only the page list. An app can show each in its own frame. */
+html[data-mode="map"] body::before, [data-mode="map"] .crumb, [data-mode="map"] #prev, [data-mode="map"] #next, [data-mode="map"] aside { display: none }
+[data-mode="map"] header { position: fixed; top: 8px; right: 8px; padding: 0; border: 0; background: transparent }
+[data-mode="map"] .tools { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 4px; box-shadow: 0 2px 8px rgb(0 0 0 / .15) }
+html[data-mode="map"] body { height: 100% }
+html[data-mode="map"] main { flex: 1; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) }
+[data-mode="atlas"] header, [data-mode="atlas"] #stage, [data-mode="atlas"] #hexinfo { display: none !important }
+html[data-mode="atlas"] main { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto }
+[data-mode="atlas"] aside { border: 0 }
 @media (max-width: 760px) {
   main { grid-template-columns: minmax(0, 1fr); grid-template-rows: 68vh auto; flex: none } body { height: auto }
   aside { border-left: 0; border-top: 1px solid var(--line); padding-left: max(16px, env(safe-area-inset-left, 0px)) } }
 </style>
+<script>document.documentElement.dataset.mode = { map: 'map', atlas: 'atlas' }[new URLSearchParams(location.search).get('mode')] || 'full';</script>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs><!--SYMBOLS--></defs></svg>
 <header>
   <div class="crumb"><a class="up" id="up" href="#world" hidden></a><h1 id="title">Loading</h1></div>
@@ -170,8 +180,11 @@ function nav(prev, next) {
   $('prev').hidden = !prev; $('next').hidden = !next;
   if (prev) $('prev').href = prev; if (next) $('next').href = next;
 }
+const MODE = document.documentElement.dataset.mode;
+function hashOf(r) { return '#' + (r.view === 'world' ? (r.hex ? 'world:' + r.hex : 'world') : r.view === 'atlas' ? 'atlas-' + r.page : r.key + (r.hex ? ':' + r.hex : r.focus ? '--' + r.focus : '')); }
 async function route() {
   const r = parse();
+  if (MODE === 'atlas') { mark(hashOf(r)); return; }
   const path = r.view === 'expl' ? EX[r.key].map : D.world.map;
   let title, small, up = null;
   if (r.view === 'world') { title = D.title; small = r.hex ? 'hex ' + r.hex : D.scales.world_hex_mi + '-mile hexes'; nav(null, '#atlas-1'); }
@@ -200,7 +213,7 @@ async function route() {
     if (s) { ring(s.px[0], s.px[1], 34); setZoom(Math.max(fit(), .8), s.px[0] / natW, s.px[1] / natH); }
   }
   mark('#' + (r.view === 'world' ? 'world' : r.view === 'atlas' ? 'atlas-' + r.page : r.key + (r.focus ? '--' + r.focus : '')));
-  tell({ event: 'view', hash: location.hash || '#world', map: r.view === 'atlas' ? 'world' : mapOf(r) });
+  tell({ event: 'view', hash: location.hash || '#world', map: r.view === 'atlas' ? 'world' : mapOf(r), title, small });
 }
 function item(href, name, tag) {
   const a = document.createElement('a'); a.href = href; a.dataset.h = href;
@@ -224,6 +237,14 @@ $('q').addEventListener('input', e => {
   lists.querySelectorAll('li').forEach(li => { const h = li.firstChild.dataset.h.slice(1); li.hidden = q && !li.dataset.q.includes(q) && !hit.has(h); });
   lists.querySelectorAll('section').forEach(s => s.hidden = ![...s.querySelectorAll('li')].some(li => !li.hidden));
 });
+// In atlas mode a chosen page goes to the app around it, which shows it in its map frame;
+// opened on its own, the full viewer opens at that page.
+lists.addEventListener('click', e => {
+  const a = e.target.closest('a[data-h]');
+  if (MODE !== 'atlas' || !a) return;
+  e.preventDefault();
+  if (parent !== window) { mark(a.dataset.h); tell({ event: 'select', hash: a.dataset.h }); } else location.href = './' + a.dataset.h;
+});
 $('zi').onclick = () => setZoom(z * 1.25); $('zo').onclick = () => setZoom(z / 1.25); $('zf').onclick = () => setZoom(fit(), .5, 0);
 // Tapping a hex selects it (#world:0706, #p-key:0304). On the season overview a tap opens that atlas page; site icons keep their links.
 stage.addEventListener('click', e => {
@@ -240,6 +261,7 @@ stage.addEventListener('click', e => {
 addEventListener('message', e => {
   if (e.source !== parent || parent === window || !e.data || e.data.type !== 'mm-viewer') return;
   if (Array.isArray(e.data.marks)) { marks = e.data.marks.filter(m => m && typeof m.map === 'string' && /^\d{4}$/.test(m.hex)).slice(0, 50); if (svg) drawMarks(parse()); }
+  if (typeof e.data.current === 'string' && /^#[a-z0-9:-]*$/.test(e.data.current)) mark(e.data.current);
   if (typeof e.data.show === 'string' && /^#[a-z0-9:-]*$/.test(e.data.show) && e.data.show !== location.hash) location.hash = e.data.show;
 });
 addEventListener('hashchange', route);

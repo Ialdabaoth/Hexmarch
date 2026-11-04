@@ -11,6 +11,8 @@ describe('isViewerMessage', () => {
     expect(isViewerMessage({ type: 'mm-viewer', event: 'view', module: 'season-1', hash: '#atlas-3', map: 'world' })).toBe(true);
     expect(isViewerMessage(hex)).toBe(true);
     expect(isViewerMessage({ ...hex, terrain: null, map: 'p-an-uaimh' })).toBe(true);
+    expect(isViewerMessage({ type: 'mm-viewer', event: 'select', module: 'season-1', hash: '#p-an-uaimh' })).toBe(true);
+    expect(isViewerMessage({ type: 'mm-viewer', event: 'view', module: 'season-1', hash: '#atlas-3', map: 'world', title: 'Atlas page 3', small: 'hex 0105' })).toBe(true);
   });
 
   it('refuses anything else', () => {
@@ -21,5 +23,7 @@ describe('isViewerMessage', () => {
     expect(isViewerMessage({ ...hex, map: '../x' })).toBe(false);
     expect(isViewerMessage({ ...hex, sites: [{ name: 1 }] })).toBe(false);
     expect(isViewerMessage({ ...hex, event: 'boom' })).toBe(false);
+    expect(isViewerMessage({ type: 'mm-viewer', event: 'select', module: 'season-1', hash: 'javascript:alert(1)' })).toBe(false);
+    expect(isViewerMessage({ type: 'mm-viewer', event: 'view', module: 'season-1', hash: '#world', map: 'world', title: 7 })).toBe(false);
   });
 });
