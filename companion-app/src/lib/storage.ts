@@ -4,6 +4,7 @@ import type { LiveState } from './character';
 import type { LogEntry } from './checks';
 import { DEFAULT_DICE_COLOR, DEFAULT_DICE_INK, prefersReducedMotion } from './dice3d';
 import type { GameMap } from './maps';
+import type { SavedModule } from './modules';
 
 export interface Settings {
   webhookUrl: string;
@@ -108,4 +109,13 @@ export async function loadMaps(): Promise<GameMap[]> {
 
 export async function saveMaps(maps: GameMap[]): Promise<void> {
   await set('maps', JSON.parse(JSON.stringify(maps)));
+}
+
+// Module repositories the referee has added, with each module's manifest as last fetched.
+export async function loadModuleList(): Promise<SavedModule[]> {
+  return (await get<SavedModule[]>('modules')) ?? [];
+}
+
+export async function saveModuleList(list: SavedModule[]): Promise<void> {
+  await set('modules', JSON.parse(JSON.stringify(list)));
 }
