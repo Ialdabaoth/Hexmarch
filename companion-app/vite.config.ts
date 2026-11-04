@@ -18,6 +18,8 @@ export default defineConfig({
     pwa && VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['icon.svg', 'apple-touch-icon.png'],
+      // Module viewers are plain pages of their own; the app's offline shell must not take them over.
+      workbox: { navigateFallbackDenylist: [/^\/modules\//] },
       manifest: {
         name: 'Materia Mundi Companion',
         short_name: 'Materia Mundi',

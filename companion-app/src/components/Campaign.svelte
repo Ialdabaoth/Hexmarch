@@ -1,5 +1,6 @@
 <script lang="ts">
   import { app } from '../lib/app.svelte';
+  import Modules from './Modules.svelte';
 
   let campaignUrl = $state(app.settings.campaign);
   let busy = $state(false);
@@ -74,6 +75,8 @@
   </p>
   <button onclick={() => (app.view = { name: 'equipment', publish: true })}>Publish as campaign</button>
 </section>
+
+<Modules />
 
 <style>
   .saved { align-items: center; flex-wrap: nowrap; }

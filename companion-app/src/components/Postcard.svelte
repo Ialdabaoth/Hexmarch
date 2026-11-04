@@ -219,7 +219,7 @@
             {#each WORN_SLOTS as s}
               {@const worn = inv.items.find((i) => i.id === inv.equipped?.[s.id])}
               {#if onequip}
-                <li class="tagged"><span class="tag">{s.label}</span><button type="button" class="prep tap" onclick={() => onequip(s.id)}>
+                <li class="tagged"><span class="tag slot">{s.label}</span><button type="button" class="prep tap" onclick={() => onequip(s.id)}>
                   <span class="what">{worn?.name ?? '—'}</span>
                 </button></li>
               {:else}
@@ -320,16 +320,17 @@
   .tal span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .tal { align-items: center; }
   .tal b { font: 700 3.6cqw/1 Georgia, serif; }
-  .cols { display: grid; grid-template-columns: 1.2fr 0.8fr 1.2fr; gap: 2.4cqw; flex: 1; min-height: 0; }
+  .cols { display: grid; grid-template-columns: 0.9fr 0.95fr 1.35fr; gap: 2.4cqw; flex: 1; min-height: 0; }
   h2 { font: 700 2.4cqw/1.2 Georgia, serif; margin: 0 0 0.6cqw; border-bottom: 0.2cqw solid #1d1712; }
   ul { list-style: none; margin: 0; padding: 0; }
   .prep { display: flex; align-items: center; justify-content: center; text-align: center; gap: 0.8cqw; width: 100%; margin-bottom: 0.6cqw; padding: 0.4cqw 0.8cqw; border: 0.15cqw solid #c9b896; border-radius: 0.8cqw; font-size: 2cqw; line-height: 1.3; }
   .prep .act { flex: none; font-size: 1.6cqw; text-transform: uppercase; letter-spacing: 0.06em; color: #8a2e1f; font-weight: 700; }
   /* A label outside its button, to the left: circle or worn slot. */
   .tagged { display: flex; align-items: center; gap: 0.6cqw; }
-  .tagged .prep { flex: 1; min-width: 0; height: 4.4cqw; box-sizing: border-box; }
+  .tagged .prep { flex: 1; min-width: 0; height: 3.6cqw; box-sizing: border-box; }
   .tag.circle { width: 3cqw; }
-  .tag { flex: none; width: 8cqw; white-space: nowrap; text-align: right; font-size: 1.6cqw; text-transform: uppercase; letter-spacing: 0.06em; color: #8a2e1f; font-weight: 700; }
+  .tag.slot { width: 9.2cqw; text-transform: none; }
+  .tag { flex: none; width: 8cqw; white-space: nowrap; text-align: right; overflow: hidden; text-overflow: clip; font-size: 1.6cqw; text-transform: uppercase; letter-spacing: 0.06em; color: #8a2e1f; font-weight: 700; }
   .prep .what { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center; }
   .prep.empty { border-style: dashed; color: #8a7a68; }
   .prep.empty .act { color: #3f6f4f; }
