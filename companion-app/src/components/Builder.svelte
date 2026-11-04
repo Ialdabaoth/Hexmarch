@@ -26,6 +26,8 @@
   let rolls = $state<Partial<Record<AbilityId, number[]>>>({});
   let rolled = $state(false);
   let manual = $state(false);
+  // A talent roll is a d6 that needs this number or more: 6+ is 17%, 5+ 33%, 4+ 50%.
+  const d6Chance = (need: number) => Math.round((100 * Math.min(6, Math.max(0, 7 - need))) / 6);
   let talentBase = $state<Record<TalentId, number>>(defaultTalents(zeroAbilities()));
   let classId = $state<ClassId>(startRules.origins[0].classes[0]);
   let firstTraining = $state<TalentId | undefined>(undefined);
@@ -204,7 +206,7 @@
           {#each TALENTS.filter((t) => t.ability === a.id) as t}
             {@const odd = choose && talentBase[t.id] === oddValues(a.id)[0]}
             <button class="tal" class:moved={talentBase[t.id] !== 5} class:odd disabled={!choose} aria-pressed={choose ? odd : undefined}
-              onclick={() => setOdd(a.id, t.id)}>{t.name} <b>{talentBase[t.id]}+</b></button>
+              onclick={() => setOdd(a.id, t.id)}>{t.name} <span class="need"><b>{talentBase[t.id]}+</b> <span class="chance">({d6Chance(talentBase[t.id])}%)</span></span></button>
           {/each}
         </div>
       {/each}
@@ -248,7 +250,9 @@
   .talentrow { display: flex; gap: 0.35rem; align-items: stretch; margin: 0.4rem 0; }
   .talentrow > span { width: 3.2rem; flex: none; align-self: center; }
   .tal { flex: 1; min-width: 0; min-height: 44px; padding: 0.25rem 0.3rem; font-size: 0.85rem; line-height: 1.2; color: var(--muted); }
-  .tal b { display: block; font-size: 0.95rem; }
+  .tal .need { display: block; }
+  .tal b { font-size: 0.95rem; color: var(--accent); }
+  .tal .chance { font-weight: 400; font-size: 0.8rem; color: var(--ink); }
   .tal:disabled { opacity: 1; background: transparent; border-color: transparent; }
   .tal.moved { color: var(--accent); }
   .tal.odd { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); font-weight: 600; }
