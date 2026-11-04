@@ -320,7 +320,7 @@
   .tal span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .tal { align-items: center; }
   .tal b { font: 700 3.6cqw/1 Georgia, serif; }
-  .cols { display: grid; grid-template-columns: 1.2fr 0.8fr 1.2fr; gap: 2.4cqw; flex: 1; min-height: 0; }
+  .cols { display: grid; grid-template-columns: 0.9fr 0.95fr 1.35fr; gap: 2.4cqw; flex: 1; min-height: 0; }
   h2 { font: 700 2.4cqw/1.2 Georgia, serif; margin: 0 0 0.6cqw; border-bottom: 0.2cqw solid #1d1712; }
   ul { list-style: none; margin: 0; padding: 0; }
   .prep { display: flex; align-items: center; justify-content: center; text-align: center; gap: 0.8cqw; width: 100%; margin-bottom: 0.6cqw; padding: 0.4cqw 0.8cqw; border: 0.15cqw solid #c9b896; border-radius: 0.8cqw; font-size: 2cqw; line-height: 1.3; }
