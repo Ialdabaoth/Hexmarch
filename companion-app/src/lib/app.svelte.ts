@@ -16,10 +16,11 @@ export type View =
   | { name: 'list' }
   | { name: 'build' }
   | { name: 'sheet'; id: string; section?: string }
-  | { name: 'dice' }
-  | { name: 'settings' }
   | { name: 'campaign' }
-  | { name: 'equipment'; publish?: boolean }
+  | { name: 'rules' }
+  | { name: 'inbox' }
+  | { name: 'settings' }
+  | { name: 'equipment' }
   | { name: 'render'; id: string; mode: RenderMode };
 
 export type RenderMode = 'postcard' | 'page';

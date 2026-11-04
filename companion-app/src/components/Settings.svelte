@@ -80,7 +80,7 @@
     E9 System Reference Handbook; page numbers point to whichever book the character uses.
   </p>
   <p class="small muted">
-    Everything stays on this device. Install it to your home screen (Share, then Add to Home Screen on iPhone) so your browser keeps your characters, and export a backup from the Characters tab.
+    Everything stays on this device. Install it to your home screen (Share, then Add to Home Screen on iPhone) so your browser keeps your characters, and export a backup from the Party tab.
   </p>
   <p class="small muted">
     Includes material derived from the System Reference Document 5.2 by Wizards of the Coast LLC, licensed under

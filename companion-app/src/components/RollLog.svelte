@@ -2,7 +2,7 @@
   import { app } from '../lib/app.svelte';
   import { damageLine, rollName, rolledLine } from '../lib/checks';
 
-  // Every roll made on this device, newest first, from the dice page and from sheets.
+  // Every roll made on this device, newest first, from the dice button and from sheets.
   function time(iso: string) {
     return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   }
@@ -11,7 +11,7 @@
 {#if app.log.length}
   <div class="row end"><button class="ghost" onclick={() => app.clearLog()}>Clear</button></div>
 {:else}
-  <p class="muted small">Rolls from the dice page and from character sheets show up here.</p>
+  <p class="muted small">Rolls from the dice button and from character sheets show up here.</p>
 {/if}
 <ul class="log">
   {#each app.log as e (e.id)}

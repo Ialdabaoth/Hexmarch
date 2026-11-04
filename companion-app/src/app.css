@@ -97,3 +97,7 @@ label.check input { width: 1.2rem; height: 1.2rem; min-height: 0; flex: none; }
 /* The button being held, matching the Easy/Hard choices it opened. */
 .holdable.held { background: #111 !important; border-color: #111 !important; color: #fff !important; }
 .holdable.held * { color: inherit !important; }
+/* Collapsible sections on the Campaign and Rules tabs. */
+details.section { margin-top: 1rem; }
+details.section > summary { cursor: pointer; }
+details.section > summary h2 { display: inline; margin: 0 0 0.5rem; }

@@ -1,83 +1,125 @@
 <script lang="ts">
   import { app } from '../lib/app.svelte';
+  import Maps from './Maps.svelte';
   import Modules from './Modules.svelte';
 
-  let campaignUrl = $state(app.settings.campaign);
+  // The game being played: which campaign, its parties, maps, events, history and
+  // procedures, and who is in it. Shared campaigns arrive with sign-in; for now
+  // everything lives on this device.
   let busy = $state(false);
-  let campaignError = $state('');
-  let saved = $derived(Object.values(app.campaigns).filter((c) => c.url !== app.settings.campaign));
-  let customCount = $derived(app.local.items.length + app.local.magic.length);
 
-  async function openCampaign(action: () => Promise<void>) {
+  async function choose(url: string) {
     busy = true;
-    campaignError = '';
     try {
-      await action();
-      campaignUrl = app.settings.campaign;
+      if (url) await app.switchCampaign(url);
+      else await app.leaveCampaign();
     } catch (e) {
-      campaignError = (e as Error).message;
+      app.notify((e as Error).message);
     }
     busy = false;
+  }
+
+  async function refresh() {
+    busy = true;
+    try {
+      await app.useCampaign(app.settings.campaign);
+    } catch (e) {
+      app.notify((e as Error).message);
+    }
+    busy = false;
+  }
+
+  function className(c: (typeof app.characters)[number]): string {
+    try {
+      return c.rules.getClass(c.classId).name;
+    } catch {
+      return c.classId;
+    }
+  }
+
+  function open(id: string) {
+    app.updateSettings({ activeId: id });
+    app.view = { name: 'list' };
   }
 </script>
 
 <h1>Campaign</h1>
 
 <section class="card">
-  <h3>Your game</h3>
+  <label for="which" style="margin-top:0">Campaign</label>
+  <select id="which" value={app.campaign ? app.settings.campaign : ''} disabled={busy}
+    onchange={(e) => choose((e.target as HTMLSelectElement).value)}>
+    <option value="">This device</option>
+    {#each Object.values(app.campaigns) as c (c.url)}<option value={c.url}>{c.campaign.name}</option>{/each}
+  </select>
   {#if app.campaign}
-    <p class="small">
-      Playing in <strong>{app.campaign.campaign.name}</strong>{app.campaign.campaign.referee ? `, run by ${app.campaign.campaign.referee}` : ''}.
-      New characters use its rules and equipment. Checked {new Date(app.campaign.fetchedAt).toLocaleDateString()}.
+    <p class="small muted">
+      Run by {app.campaign.campaign.referee || 'your referee'}. Checked {new Date(app.campaign.fetchedAt).toLocaleDateString()}.
+      <button class="link" disabled={busy} onclick={refresh}>Check for changes</button>
     </p>
   {:else}
-    <p class="small muted">
-      Playing on <strong>This device</strong>: the app's own rules and equipment, plus your custom equipment. If your referee
-      gave you a campaign link, paste it here; it sets the rules and equipment for their game.
-    </p>
-  {/if}
-  <label for="campaign">Campaign link</label>
-  <input id="campaign" bind:value={campaignUrl} placeholder="https://…/campaign.json" autocapitalize="off" autocomplete="off" inputmode="url" />
-  {#if campaignError}<p class="small failure">{campaignError}</p>{/if}
-  <div class="row" style="margin-top:0.5rem">
-    <button class="primary" disabled={busy || !campaignUrl.trim()} onclick={() => openCampaign(() => app.useCampaign(campaignUrl))}>
-      {busy ? 'Opening…' : app.campaign && campaignUrl.trim() === app.settings.campaign ? 'Check for changes' : 'Use campaign'}
-    </button>
-    {#if app.campaign}<button disabled={busy} onclick={() => openCampaign(() => app.leaveCampaign())}>Play on This device</button>{/if}
-  </div>
-  {#if saved.length}
-    <p class="small muted" style="margin:0.75rem 0 0.25rem">Opened before:</p>
-    {#each saved as c (c.url)}
-      <div class="row saved">
-        <span class="grow small">{c.campaign.name}</span>
-        <button disabled={busy} onclick={() => openCampaign(() => app.switchCampaign(c.url))}>Use</button>
-        <button class="ghost" aria-label="Forget {c.campaign.name}" onclick={() => app.forgetCampaign(c.url)}>✕</button>
-      </div>
-    {/each}
+    <p class="small muted">Your characters, maps and notes on this phone. Joining a referee's campaign arrives with sign-in.</p>
   {/if}
 </section>
 
-<section class="card" style="margin-top:0.75rem">
-  <h3>Custom equipment</h3>
-  <p class="small muted">
-    Items, spells and dweomers your referee has approved that aren't in the book. {customCount
-      ? `${customCount} entr${customCount === 1 ? 'y' : 'ies'} on this device.`
-      : 'None yet.'}
-  </p>
-  <button onclick={() => (app.view = { name: 'equipment' })}>Edit custom equipment</button>
-</section>
+<details class="section" open>
+  <summary><h2>Parties</h2></summary>
+  {#if app.characters.length}
+    <ul class="tree">
+      <li>
+        <strong>Party</strong> <span class="small muted">· active</span>
+        <ul>
+          {#each app.characters as c (c.id)}
+            <li>
+              <button class="link" onclick={() => open(c.id)}>{c.name}</button>
+              <span class="small muted">{className(c)} {c.level}</span>
+              {#if c.data.followers.length}
+                <ul>
+                  {#each c.data.followers as f (f.id)}
+                    <li class="small">{f.name} <span class="muted">· {f.kind === 'beast' ? 'beast' : 'follower'}, level {f.level}</span></li>
+                  {/each}
+                </ul>
+              {/if}
+            </li>
+          {/each}
+        </ul>
+      </li>
+    </ul>
+  {:else}
+    <p class="small muted">No characters yet. Roll one up in the Party tab.</p>
+  {/if}
+</details>
 
-<section class="card" style="margin-top:0.75rem">
-  <h3>Running a game</h3>
-  <p class="small muted">
-    Referees: pick the rules, add your custom equipment, then publish it as a campaign. You get two files to put online;
-    players paste the link to <code>campaign.json</code> above.
-  </p>
-  <button onclick={() => (app.view = { name: 'equipment', publish: true })}>Publish as campaign</button>
-</section>
+<Maps />
 
-<Modules />
+<details class="section">
+  <summary><h2>Procedures</h2></summary>
+  <p class="small muted">Buttons for travel, wandering monsters, weather and the like will run here, step by step, using the tables defined in the Rules tab.</p>
+</details>
+
+<details class="section">
+  <summary><h2>Events</h2></summary>
+  <p class="small muted">What happened this session: encounters, discoveries, loot. Nothing logged yet.</p>
+</details>
+
+<details class="section">
+  <summary><h2>History</h2></summary>
+  <p class="small muted">The campaign's chronicle, one entry per session, with the option to undo back to any of them. Nothing recorded yet.</p>
+</details>
+
+<details class="section">
+  <summary><h2>Manage</h2></summary>
+  <section class="card">
+    <h3>Members</h3>
+    <p class="small muted">Just you, on this device. Inviting players and co-referees arrives with sign-in.</p>
+  </section>
+  <Modules />
+</details>
 
 <style>
-  .saved { align-items: center; flex-wrap: nowrap; }
+  .tree, .tree ul { list-style: none; margin: 0.25rem 0 0; padding-left: 1rem; }
+  .tree { padding-left: 0; }
+  .tree li { margin: 0.3rem 0; }
+  .tree ul { border-left: 1px solid var(--line); }
+  .link { background: none; border: 0; padding: 0; min-height: 0; color: var(--accent); text-decoration: underline; font: inherit; }
 </style>

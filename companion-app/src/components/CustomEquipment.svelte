@@ -1,18 +1,13 @@
 <script lang="ts">
-  import { untrack } from 'svelte';
   import { app } from '../lib/app.svelte';
   import { downloadJson } from '../lib/storage';
-  import { publishCampaign } from '../lib/campaign';
   import {
     EquipmentError, LOCAL_ID, RARITIES, checkEquipment,
     type EquipmentFileData, type EquipmentItem, type ItemKind, type MagicEntry, type MagicSystem, type Rarity
   } from '../equipment/equipment';
-  import { RULESETS, isBuiltInRules } from '../rules/rules';
 
   // This device's custom equipment file ("local"): referee-approved items, spells and
-  // dweomers that aren't in the book. Referees can publish it as a campaign.
-
-  let { publishing: startPublishing = false }: { publishing?: boolean } = $props();
+  // dweomers that aren't in the book.
 
   type Kind = Exclude<ItemKind, 'armor'> | MagicSystem;
   const KINDS: { kind: Kind; label: string }[] = [
@@ -62,9 +57,6 @@
   let draft = $state<Draft | null>(null);
   let error = $state('');
   let jsonText = $state<string | null>(null);
-  let publishing = $state<{ name: string; id: string; referee: string; rules: string } | null>(
-    untrack(() => startPublishing) ? { name: '', id: '', referee: '', rules: 'mm' } : null
-  );
   let fileInput: HTMLInputElement | undefined = $state();
 
   const text = (v: unknown) => (v === undefined || v === null ? '' : String(v));
@@ -233,32 +225,10 @@
     }
   }
 
-  function startPublish() {
-    publishing = { name: '', id: '', referee: '', rules: 'mm' };
-  }
-
-  function publish() {
-    const p = publishing!;
-    const id = slugify(p.id || p.name);
-    if (!p.name.trim() || !id) {
-      error = 'Give the campaign a name';
-      return;
-    }
-    const rules = RULESETS.find((r) => r.id === p.rules)!;
-    const ids = rules.options.equipment;
-    const out = publishCampaign(
-      { id, name: p.name.trim(), referee: p.referee.trim(), rules: p.rules, base: Array.isArray(ids) ? ids : [ids] },
-      copyLocal()
-    );
-    downloadJson('campaign.json', out.campaign);
-    if (out.equipment) setTimeout(() => downloadJson(out.equipment!.fileName, out.equipment!.data), 300);
-    publishing = null;
-    app.notify('Downloaded the campaign files');
-  }
 </script>
 
 <div class="row">
-  <button class="ghost" onclick={() => (app.view = { name: 'campaign' })}>‹ Campaign</button>
+  <button class="ghost" onclick={() => (app.view = { name: 'rules' })}>‹ Rules</button>
   <h1 class="grow">Custom equipment</h1>
 </div>
 
@@ -339,26 +309,6 @@
       <button onclick={() => { jsonText = null; error = ''; }}>Cancel</button>
     </div>
   </section>
-{:else if publishing}
-  {@const p = publishing}
-  <section class="card form">
-    <h3>Publish as campaign</h3>
-    <p class="small muted">
-      This downloads <code>campaign.json</code>{entries.length ? ' and your custom equipment file' : ''}. Put them in the same folder on a
-      site anyone can read, such as GitHub Pages or a GitHub gist, and give your players the link to <code>campaign.json</code>.
-      Their app then uses these rules and this equipment for your game.
-    </p>
-    <label>Campaign name <input bind:value={p.name} placeholder="The Pale Keep" /></label>
-    <label>Referee <input bind:value={p.referee} placeholder="Your name" /></label>
-    <label>Short id <input bind:value={p.id} placeholder={slugify(p.name) || 'pale-keep'} autocapitalize="off" /></label>
-    <label>Rules
-      <select bind:value={p.rules}>{#each RULESETS.filter((r) => isBuiltInRules(r.id)) as r}<option value={r.id}>{r.name}</option>{/each}</select>
-    </label>
-    <div class="row">
-      <button class="primary" onclick={publish}>Download files</button>
-      <button onclick={() => { publishing = null; error = ''; }}>Cancel</button>
-    </div>
-  </section>
 {:else}
   <section class="card">
     {#if entries.length}
@@ -392,7 +342,6 @@
       <input bind:this={fileInput} type="file" accept="application/json,.json" hidden onchange={onImport} />
       <button onclick={() => (jsonText = JSON.stringify(app.local, null, 2))}>Edit as JSON</button>
     </div>
-    <p class="small muted">Referees: <button class="link" onclick={startPublish}>publish this as a campaign</button> so players' apps use your rules and equipment.</p>
   </section>
 {/if}
 
@@ -409,5 +358,4 @@
   .grow { flex: 1; min-width: 0; }
   .add { display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; }
   .json { width: 100%; box-sizing: border-box; height: 20rem; font: 0.75rem/1.35 ui-monospace, Menlo, monospace; }
-  .link { background: none; border: 0; padding: 0; min-height: 0; color: var(--accent); text-decoration: underline; font: inherit; }
 </style>
