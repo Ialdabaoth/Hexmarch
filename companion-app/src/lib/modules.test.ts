@@ -28,8 +28,10 @@ describe('normaliseBase', () => {
 
 describe('parsing', () => {
   it('builds the module and viewer links', () => {
-    expect(moduleUrl('https://a.io/mm/', 'season-1')).toBe('https://a.io/mm/season-1/module.json');
-    expect(viewerUrl('https://a.io/mm/', 'season-1')).toBe('https://a.io/mm/season-1/');
+    expect(moduleUrl('https://a.io/mm/', 'modules/season-1/')).toBe('https://a.io/mm/modules/season-1/module.json');
+    expect(viewerUrl('https://a.io/mm/', 'modules/season-1')).toBe('https://a.io/mm/modules/season-1/');
+    expect(() => viewerUrl('https://a.io/mm/', '../secrets')).toThrow();
+    expect(() => viewerUrl('https://a.io/mm/', '/etc/')).toThrow();
   });
   it('rejects the wrong repository format and empty module lists', () => {
     expect(() => parseRepo({ ...repo, format: 'other' })).toThrow(/mm-repo\/1/);
@@ -46,14 +48,14 @@ describe('loadRepo', () => {
   it('reads mm.json and each module manifest from the site', async () => {
     const fetcher = site({
       'https://a.io/mm/mm.json': repo,
-      'https://a.io/mm/season-1/module.json': manifest,
+      'https://a.io/mm/modules/season-1/module.json': manifest,
     });
     const out = await loadRepo('https://a.io/mm/', fetcher, () => 42);
     expect(out.base).toBe('https://a.io/mm/');
-    expect(out.modules).toEqual([{ base: 'https://a.io/mm/', id: 'season-1', fetchedAt: 42, manifest }]);
+    expect(out.modules).toEqual([{ base: 'https://a.io/mm/', id: 'season-1', path: 'modules/season-1/', fetchedAt: 42, manifest }]);
   });
   it('reports a missing module clearly', async () => {
     const fetcher = site({ 'https://a.io/mm/mm.json': repo });
-    await expect(loadRepo('https://a.io/mm/', fetcher)).rejects.toThrow(/season-1\/module.json \(404\)/);
+    await expect(loadRepo('https://a.io/mm/', fetcher)).rejects.toThrow(/modules\/season-1\/module.json \(404\)/);
   });
 });

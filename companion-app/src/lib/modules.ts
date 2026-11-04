@@ -1,6 +1,7 @@
 // Open module protocol mm-module/1 (modules/MODULE_FORMAT.md). A repository publishes
-// mm.json for discovery, and each module's built manifest sits at <base><id>/module.json,
-// next to its viewer at <base><id>/.
+// mm.json for discovery. Each entry's path says where the module's built site sits,
+// relative to the repository's base: its manifest is at <base><path>module.json and its
+// viewer at <base><path>.
 
 export interface RepoEntry {
   id: string;
@@ -36,9 +37,11 @@ export interface ModuleManifest {
 }
 
 export interface SavedModule {
-  // The published site's base URL, ending in "/", and the module's id within it.
+  // The published site's base URL, ending in "/", the module's id, and its path under the base
+  // (ending in "/"). Lists saved before paths were read have no path; the id is used instead.
   base: string;
   id: string;
+  path?: string;
   fetchedAt: number;
   manifest: ModuleManifest;
 }
@@ -64,12 +67,22 @@ export function normaliseBase(input: string): string {
   return url.toString();
 }
 
-export function moduleUrl(base: string, id: string): string {
-  return `${base}${id}/module.json`;
+// A module path from mm.json, as a relative folder ending in "/". Paths that leave the
+// repository (absolute, or with "..") are refused.
+export function normalisePath(path: string): string {
+  const p = path.trim().replace(/^\.\//, '');
+  if (!p || p.startsWith('/') || p.includes('..') || p.includes('://') || p.includes('\\')) {
+    throw new Error(`Module path "${path}" must be a folder inside the repository.`);
+  }
+  return p.endsWith('/') ? p : `${p}/`;
 }
 
-export function viewerUrl(base: string, id: string): string {
-  return `${base}${id}/`;
+export function moduleUrl(base: string, path: string): string {
+  return `${base}${normalisePath(path)}module.json`;
+}
+
+export function viewerUrl(base: string, path: string): string {
+  return `${base}${normalisePath(path)}`;
 }
 
 export function parseRepo(data: unknown): RepoFile {
@@ -104,8 +117,9 @@ export async function loadRepo(
   const repo = parseRepo(await getJson(fetcher, `${base}mm.json`));
   const modules: SavedModule[] = [];
   for (const entry of repo.modules) {
-    const manifest = parseModule(await getJson(fetcher, moduleUrl(base, entry.id)), entry.id);
-    modules.push({ base, id: entry.id, fetchedAt: now(), manifest });
+    const path = normalisePath(entry.path);
+    const manifest = parseModule(await getJson(fetcher, moduleUrl(base, path)), entry.id);
+    modules.push({ base, id: entry.id, path, fetchedAt: now(), manifest });
   }
   return { base, repo, modules };
 }

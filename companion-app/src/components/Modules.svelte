@@ -60,7 +60,7 @@
             <div class="small muted">{m.manifest.books?.length ?? 0} books</div>
           </div>
           <div class="row">
-            <a class="button-like" href={viewerUrl(m.base, m.id)} target="_blank" rel="noopener">Open</a>
+            <a class="button-like" href={viewerUrl(m.base, m.path ?? `${m.id}/`)} target="_blank" rel="noopener">Open</a>
             <button class="ghost" onclick={() => remove(m)} aria-label="Remove {m.manifest.title}">Remove</button>
           </div>
         </li>
