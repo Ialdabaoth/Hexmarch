@@ -34,6 +34,11 @@ main { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1
 #stage .pagehex:hover polygon { fill-opacity: .08 } #stage .pagehex.on polygon { stroke-width: 6; stroke-dasharray: none }
 #stage .pagehex text { font: bold 22px Georgia, serif; fill: #7a2e2e; stroke: #f4efe1; stroke-width: 4; paint-order: stroke }
 .msg { padding: 24px; color: #5b5040; font-style: italic }
+#stage .sel { fill: #f2d66b; fill-opacity: .35; stroke: #7a2e2e; stroke-width: 5; pointer-events: none }
+#stage .mark circle { fill: #7a2e2e; stroke: #f4efe1; stroke-width: 4 } #stage .mark { pointer-events: none }
+#stage .mark text { font: bold 20px Georgia, serif; fill: #f4efe1; text-anchor: middle; dominant-baseline: central }
+#hexinfo { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; display: grid; gap: 4px }
+#hexinfo h2 { margin: 0 } #hexinfo p { margin: 0; font-size: 14px } #hexinfo a { color: var(--accent) }
 .ring { fill: none; stroke: #c0392b; stroke-width: 4; animation: pulse 1.6s ease-in-out infinite }
 @keyframes pulse { 50% { stroke-opacity: .25; stroke-width: 9 } }
 @media (prefers-reduced-motion: reduce) { .ring { animation: none } }
@@ -64,6 +69,7 @@ aside li a.on span:last-child { color: #3d4a37 }
 <main>
   <div id="stage"><p class="msg">Loading the map…</p></div>
   <aside>
+    <section id="hexinfo" hidden aria-live="polite"></section>
     <input id="q" type="search" placeholder="Find a site or page" aria-label="Find a site or page">
     <div id="lists"></div>
     <p class="note" id="foot"></p>
@@ -81,6 +87,8 @@ function parse() {
   const raw = decodeURIComponent(location.hash.replace(/^#/, ''));
   const m = raw.match(/^atlas-(\d+)$/);
   if (m && D.atlas[+m[1] - 1]) return { view: 'atlas', page: +m[1] };
+  const h = raw.match(/^([a-z0-9-]+):(\d{4})$/);
+  if (h && (h[1] === 'world' || EX[h[1]])) return h[1] === 'world' ? { view: 'world', hex: h[2] } : { view: 'expl', key: h[1], hex: h[2] };
   const [k, f] = raw.split('--');
   if (EX[k]) return { view: 'expl', key: k, focus: f };
   return { view: 'world' };
@@ -108,6 +116,55 @@ function pageHexes() {
   const ref = first ? (first.parentNode.localName === 'a' ? first.parentNode : first) : null;
   if (ref) ref.parentNode.insertBefore(g, ref); else svg.append(g);
 }
+// Every map shares the world map's hex geometry: flat-top, odd columns shifted down, ids CCRR from 0101.
+const G = D.world, R = G.col_px / 1.5;
+function hexCenter(id) { const c = +id.slice(0, 2) - 1, r = +id.slice(2) - 1; return [G.origin_px[0] + c * G.col_px, G.origin_px[1] + r * G.hex_px + (c & 1 ? G.hex_px / 2 : 0)]; }
+function hexAt(x, y) {
+  let best = null, bd = Infinity; const c0 = Math.round((x - G.origin_px[0]) / G.col_px);
+  for (let c = c0 - 1; c <= c0 + 1; c++) {
+    if (c < 0 || c > 98) continue;
+    const r0 = Math.round((y - G.origin_px[1] - (c & 1 ? G.hex_px / 2 : 0)) / G.hex_px);
+    for (let r = r0 - 1; r <= r0 + 1; r++) {
+      if (r < 0 || r > 98) continue;
+      const id = String(c + 1).padStart(2, '0') + String(r + 1).padStart(2, '0'), [cx, cy] = hexCenter(id), d = (cx - x) ** 2 + (cy - y) ** 2;
+      if (d < bd) { bd = d; best = id; }
+    }
+  }
+  return best && hexIds.has(best) ? best : null;
+}
+let hexIds = new Set(), marks = [], terrain = null;
+const TERRAIN = { grass: 'open grassland', forest: 'forest (double travel time)', woods: 'light woods (double travel time)', hills: 'hills', mount: 'mountains', sea: 'sea', bog: 'bog' };
+async function loadTerrain() {
+  if (!terrain) terrain = fetch('module.json').then(r => r.json()).then(m => Object.fromEntries(m.world.hexes.map(h => [h.id, h.t]))).catch(() => ({}));
+  return terrain;
+}
+function poly(cls, id) { const p = document.createElementNS(NS, 'polygon'); const [x, y] = hexCenter(id); p.setAttribute('points', hexPts(x, y, R)); p.setAttribute('class', cls); svg.append(p); }
+function mapOf(r) { return r.view === 'expl' ? r.key : 'world'; }
+function drawMarks(r) {
+  svg.querySelectorAll('.mark').forEach(e => e.remove());
+  for (const m of marks) {
+    if (m.map !== mapOf(r) || !hexIds.has(m.hex)) continue;
+    const [x, y] = hexCenter(m.hex), g = document.createElementNS(NS, 'g'), c = document.createElementNS(NS, 'circle'), t = document.createElementNS(NS, 'text');
+    g.setAttribute('class', 'mark'); c.setAttribute('cx', x); c.setAttribute('cy', y - R * .35); c.setAttribute('r', 22);
+    t.setAttribute('x', x); t.setAttribute('y', y - R * .35); t.textContent = (m.label || '•').slice(0, 2);
+    const tip = document.createElementNS(NS, 'title'); tip.textContent = m.label || ''; g.append(c, t, tip); svg.append(g);
+  }
+}
+// Tells the app around an embedded viewer what the reader is looking at (mm-viewer/1).
+function tell(msg) { if (parent !== window) parent.postMessage({ type: 'mm-viewer', module: D.id, version: D.version, ...msg }, '*'); }
+async function hexInfo(r) {
+  const box = $('hexinfo');
+  if (!r.hex) { box.hidden = true; return; }
+  const map = mapOf(r), sites = r.view === 'expl' ? EX[r.key].sites.filter(s => s.hex === r.hex).map(s => ({ slug: s.slug, name: s.name, href: '#' + r.key + '--' + s.slug }))
+    : D.sites.filter(s => s.world_hex === r.hex).map(s => ({ slug: s.slug, name: s.name, href: '#' + s.exploration + '--' + s.slug }));
+  const t = r.view === 'world' ? (await loadTerrain())[r.hex] : undefined;
+  const scale = r.view === 'world' ? D.scales.world_hex_mi + '-mile hex' : D.scales.exploration_hex_mi + '-mile hex on ' + EX[r.key].title;
+  box.replaceChildren(Object.assign(document.createElement('h2'), { textContent: 'Hex ' + r.hex }),
+    Object.assign(document.createElement('p'), { textContent: scale + (t ? ' · ' + (TERRAIN[t] || t) : '') }));
+  if (sites.length) { const p = document.createElement('p'); p.append('Sites: '); sites.forEach((s, i) => { if (i) p.append(', '); p.append(Object.assign(document.createElement('a'), { href: s.href, textContent: s.name })); }); box.append(p); }
+  box.hidden = false;
+  tell({ event: 'hex', map, hex: r.hex, hash: location.hash, terrain: t || null, terrainName: t ? TERRAIN[t] || t : null, scale, sites });
+}
 function ring(x, y, r) { const c = document.createElementNS(NS, 'circle'); c.setAttribute('cx', x); c.setAttribute('cy', y); c.setAttribute('r', r); c.setAttribute('class', 'ring'); svg.append(c); }
 function nav(prev, next) {
   $('prev').hidden = !prev; $('next').hidden = !next;
@@ -117,7 +174,7 @@ async function route() {
   const r = parse();
   const path = r.view === 'expl' ? EX[r.key].map : D.world.map;
   let title, small, up = null;
-  if (r.view === 'world') { title = D.title; small = D.scales.world_hex_mi + '-mile hexes'; nav(null, '#atlas-1'); }
+  if (r.view === 'world') { title = D.title; small = r.hex ? 'hex ' + r.hex : D.scales.world_hex_mi + '-mile hexes'; nav(null, '#atlas-1'); }
   else if (r.view === 'atlas') { const a = D.atlas[r.page - 1]; title = 'Atlas page ' + a.page; small = 'hex ' + a.id; up = ['#world', '← ' + D.short]; nav(a.page > 1 && '#atlas-' + (a.page - 1), a.page < D.atlas.length && '#atlas-' + (a.page + 1)); }
   else { const p = EX[r.key]; title = p.title; small = 'exploration map ' + p.page; up = ['#world', '← ' + D.short]; const i = p.page - 1;
          nav(i > 0 && '#' + D.exploration[i - 1].key, i < D.exploration.length - 1 && '#' + D.exploration[i + 1].key); }
@@ -129,10 +186,13 @@ async function route() {
     try { stage.innerHTML = await load(path); } catch (e) { stage.innerHTML = '<p class="msg">This map could not be loaded. Reload the page to try again.</p>'; return; }
     svg = stage.querySelector('svg'); natW = svg.viewBox.baseVal.width; natH = svg.viewBox.baseVal.height;
     svg.removeAttribute('width'); svg.removeAttribute('height'); cur = path; z = 1;
+    hexIds = new Set([...svg.querySelectorAll('text')].map(t => t.textContent).filter(t => /^\d{4}$/.test(t)));
     if (path === D.world.map) pageHexes();
     setZoom(fit(), 0, 0); stage.scrollLeft = 0; stage.scrollTop = 0;
   }
-  svg.querySelectorAll('.ring').forEach(e => e.remove());
+  svg.querySelectorAll('.ring, .sel').forEach(e => e.remove());
+  if (r.hex && hexIds.has(r.hex)) { poly('sel', r.hex); const [x, y] = hexCenter(r.hex); if (z < .7) setZoom(Math.max(fit(), .8), x / natW, y / natH); }
+  drawMarks(r); hexInfo(r);
   svg.querySelectorAll('.pagehex').forEach(e => e.classList.toggle('on', r.view === 'atlas' && +e.dataset.page === r.page));
   if (r.view === 'atlas') { const a = D.atlas[r.page - 1]; setZoom(Math.max(fit(), Math.min(1, stage.clientHeight / (a.radius_px * 1.9))), a.center_px[0] / natW, a.center_px[1] / natH); }
   if (r.view === 'expl') {
@@ -140,6 +200,7 @@ async function route() {
     if (s) { ring(s.px[0], s.px[1], 34); setZoom(Math.max(fit(), .8), s.px[0] / natW, s.px[1] / natH); }
   }
   mark('#' + (r.view === 'world' ? 'world' : r.view === 'atlas' ? 'atlas-' + r.page : r.key + (r.focus ? '--' + r.focus : '')));
+  tell({ event: 'view', hash: location.hash || '#world', map: r.view === 'atlas' ? 'world' : mapOf(r) });
 }
 function item(href, name, tag) {
   const a = document.createElement('a'); a.href = href; a.dataset.h = href;
@@ -154,9 +215,9 @@ function build() {
     if (ps.length) lists.append(sec(b.id + ' · ' + b.title, ps.map(p => item('#' + p.key, p.title, 'p. ' + p.page))));
   }
   const pr = D.print && D.print.atlas ? `Print: <a href="${D.print.atlas}">atlas PDF</a> · <a href="${D.print.exploration}">exploration PDF</a>. ` : '';
-  $('foot').innerHTML = pr + `Links for the companion app: <code>#world</code>, <code>#atlas-7</code>, <code>#&lt;map&gt;--&lt;site&gt;</code>; data in <code>module.json</code>. ${D.version} · ${D.license}.`;
+  $('foot').innerHTML = pr + `Links for the companion app: <code>#world</code>, <code>#atlas-7</code>, <code>#&lt;map&gt;--&lt;site&gt;</code>, <code>#&lt;map&gt;:&lt;hex&gt;</code>; data in <code>module.json</code>. ${D.version} · ${D.license}.`;
 }
-function mark(h) { lists.querySelectorAll('a').forEach(a => a.classList.toggle('on', a.dataset.h === h || h.startsWith(a.dataset.h + '--'))); }
+function mark(h) { lists.querySelectorAll('a').forEach(a => a.classList.toggle('on', a.dataset.h === h || h.startsWith(a.dataset.h + '--') || h.startsWith(a.dataset.h + ':'))); }
 $('q').addEventListener('input', e => {
   const q = e.target.value.trim().toLowerCase();
   const hit = new Set(D.sites.filter(s => s.name.toLowerCase().includes(q)).map(s => s.exploration));
@@ -164,6 +225,23 @@ $('q').addEventListener('input', e => {
   lists.querySelectorAll('section').forEach(s => s.hidden = ![...s.querySelectorAll('li')].some(li => !li.hidden));
 });
 $('zi').onclick = () => setZoom(z * 1.25); $('zo').onclick = () => setZoom(z / 1.25); $('zf').onclick = () => setZoom(fit(), .5, 0);
+// Tapping a hex selects it (#world:0706, #p-key:0304). On the season overview a tap opens that atlas page; site icons keep their links.
+stage.addEventListener('click', e => {
+  if (!svg) return;
+  const a = e.target.closest('a'), r = parse();
+  if (a && !a.classList.contains('pagehex')) return;
+  if (r.view === 'world' && !r.hex && a) return;
+  const pt = svg.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY;
+  const p = pt.matrixTransform(svg.getScreenCTM().inverse()), id = hexAt(p.x, p.y);
+  if (!id) return;
+  e.preventDefault(); location.hash = '#' + mapOf(r) + ':' + id;
+});
+// The app around an embedded viewer can open a link ({show: "#world:0706"}) and place markers ({marks: [{map, hex, label}]}).
+addEventListener('message', e => {
+  if (e.source !== parent || parent === window || !e.data || e.data.type !== 'mm-viewer') return;
+  if (Array.isArray(e.data.marks)) { marks = e.data.marks.filter(m => m && typeof m.map === 'string' && /^\d{4}$/.test(m.hex)).slice(0, 50); if (svg) drawMarks(parse()); }
+  if (typeof e.data.show === 'string' && /^#[a-z0-9:-]*$/.test(e.data.show) && e.data.show !== location.hash) location.hash = e.data.show;
+});
 addEventListener('hashchange', route);
 build(); route();
 </script>

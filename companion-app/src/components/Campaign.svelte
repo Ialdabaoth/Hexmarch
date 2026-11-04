@@ -1,6 +1,7 @@
 <script lang="ts">
   import { app } from '../lib/app.svelte';
   import Maps from './Maps.svelte';
+  import ModuleMaps from './ModuleMaps.svelte';
   import Modules from './Modules.svelte';
 
   // The game being played: which campaign, its parties, maps, events, history and
@@ -67,7 +68,7 @@
   {#if app.characters.length}
     <ul class="tree">
       <li>
-        <strong>Party</strong> <span class="small muted">· active</span>
+        <strong>Party</strong> <span class="small muted">· active{app.settings.partyAt ? ` · hex ${app.settings.partyAt.label}` : ''}</span>
         <ul>
           {#each app.characters as c (c.id)}
             <li>
@@ -90,7 +91,11 @@
   {/if}
 </details>
 
-<Maps />
+<details class="section" open>
+  <summary><h2>Maps</h2></summary>
+  <ModuleMaps />
+  <Maps />
+</details>
 
 <details class="section">
   <summary><h2>Procedures</h2></summary>

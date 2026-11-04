@@ -175,7 +175,7 @@
 </script>
 
 <details class="section">
-  <summary><h2>Maps</h2></summary>
+  <summary><h3>Your own maps</h3></summary>
 
   {#if !ready}
     <p class="small muted">Loading maps…</p>

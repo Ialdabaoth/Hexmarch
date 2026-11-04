@@ -2,7 +2,11 @@ import { Character, freshState, type LiveState } from './character';
 import { importFile, type SheetData } from './sheet';
 import type { LogEntry } from './checks';
 import { postToDiscord, isWebhookUrl } from './discord';
-import { DEFAULT_SETTINGS, loadLive, loadLog, loadSettings, loadSheets, saveLive, saveLog, saveSettings, saveSheets, unreadableSheets, type Settings } from './storage';
+import {
+  DEFAULT_SETTINGS, loadLive, loadLog, loadModuleList, loadSettings, loadSheets, saveLive, saveLog, saveModuleList, saveSettings, saveSheets,
+  unreadableSheets, type Settings
+} from './storage';
+import { loadRepo, type SavedModule } from './modules';
 import {
   absorbCustom, activateCampaign, blankLocal, fetchCampaign, loadCampaigns, loadFallbacks, loadLocal, registerCampaign, saveCampaigns,
   saveLocal, type CampaignCache
@@ -42,6 +46,8 @@ class AppState {
   // Campaigns this device has opened, by link, and its own custom equipment file.
   campaigns = $state<Record<string, CampaignCache>>({});
   local = $state<EquipmentFileData>(blankLocal());
+  // Module repositories added on this device (maps and adventures, mm-module/1).
+  modules = $state<SavedModule[]>([]);
   // Saved characters the app can't read (kept, not shown).
   unreadable = $state(0);
   private toastTimer: ReturnType<typeof setTimeout> | undefined;
@@ -68,6 +74,11 @@ class AppState {
       this.notify("This browser won't let the app save. Export characters to keep them.");
     }
     for (const s of this.sheets) this.live[s.id] ??= freshState();
+    try {
+      this.modules = await loadModuleList();
+    } catch (e) {
+      console.warn('Modules unavailable', e);
+    }
     try {
       this.portraits = await loadPortraits();
     } catch (e) {
@@ -110,6 +121,19 @@ class AppState {
   // Views read catalogs through characters, so new characters make them redraw.
   private equipmentChanged() {
     this.sheets = [...this.sheets];
+  }
+
+  async saveModules(list: SavedModule[]) {
+    this.modules = list;
+    await saveModuleList($state.snapshot(list));
+  }
+
+  // Adds every module a repository publishes. Re-adding a repository replaces its
+  // modules, so updates arrive with a fresh fetch. Throws with a message for the reader.
+  async addModuleRepo(address: string): Promise<SavedModule[]> {
+    const { modules } = await loadRepo(address);
+    await this.saveModules([...this.modules.filter((m) => !modules.some((n) => n.id === m.id && n.base === m.base)), ...modules]);
+    return modules;
   }
 
   // Opens a campaign by its link. Throws with a message for the player.
