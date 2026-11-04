@@ -329,8 +329,8 @@
   .tagged { display: flex; align-items: center; gap: 0.6cqw; }
   .tagged .prep { flex: 1; min-width: 0; height: 3.6cqw; box-sizing: border-box; }
   .tag.circle { width: 3cqw; }
-  .tag.slot { font-size: 1.25cqw; }
-  .tag { flex: none; width: 8cqw; white-space: nowrap; text-align: right; font-size: 1.6cqw; text-transform: uppercase; letter-spacing: 0.06em; color: #8a2e1f; font-weight: 700; }
+  .tag.slot { font-size: 1.1cqw; letter-spacing: 0.02em; }
+  .tag { flex: none; width: 8cqw; white-space: nowrap; text-align: right; overflow: hidden; text-overflow: clip; font-size: 1.6cqw; text-transform: uppercase; letter-spacing: 0.06em; color: #8a2e1f; font-weight: 700; }
   .prep .what { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center; }
   .prep.empty { border-style: dashed; color: #8a7a68; }
   .prep.empty .act { color: #3f6f4f; }
