@@ -5,7 +5,9 @@
   import Home from './components/Home.svelte';
   import Builder from './components/Builder.svelte';
   import Sheet from './components/Sheet.svelte';
-  import Dice from './components/Dice.svelte';
+  import DicePanel from './components/DicePanel.svelte';
+  import Rules from './components/Rules.svelte';
+  import Inbox from './components/Inbox.svelte';
   import Settings from './components/Settings.svelte';
   import Campaign from './components/Campaign.svelte';
   import CustomEquipment from './components/CustomEquipment.svelte';
@@ -19,13 +21,15 @@
   });
 
   const tabs = [
-    { name: 'list', label: 'Characters' },
+    { name: 'list', label: 'Party' },
     { name: 'campaign', label: 'Campaign' },
-    { name: 'dice', label: 'Referee' },
+    { name: 'rules', label: 'Rules' },
+    { name: 'inbox', label: 'Inbox' },
     { name: 'settings', label: '⚙️' }
   ] as const;
 
-  let active = $derived(['build', 'sheet', 'render'].includes(app.view.name) ? 'list' : app.view.name === 'equipment' ? 'campaign' : app.view.name);
+  let active = $derived(['build', 'sheet', 'render'].includes(app.view.name) ? 'list' : app.view.name === 'equipment' ? 'rules' : app.view.name);
+  let diceOpen = $state(false);
 </script>
 
 <main class:printable={app.view.name === 'render'}>
@@ -41,16 +45,25 @@
     {/key}
   {:else if app.view.name === 'render'}
     <Render id={app.view.id} mode={app.view.mode} />
-  {:else if app.view.name === 'dice'}
-    <Dice />
+  {:else if app.view.name === 'rules'}
+    <Rules />
+  {:else if app.view.name === 'inbox'}
+    <Inbox />
   {:else if app.view.name === 'settings'}
     <Settings />
   {:else if app.view.name === 'campaign'}
     <Campaign />
   {:else if app.view.name === 'equipment'}
-    <CustomEquipment publishing={app.view.publish} />
+    <CustomEquipment />
   {/if}
 </main>
+
+{#if diceOpen}<DicePanel onclose={() => (diceOpen = false)} />{/if}
+{#if app.view.name !== 'render' && !diceOpen}
+  <button class="dice-fab no-print" onclick={() => (diceOpen = true)} aria-label="Dice and roll history" title="Dice">
+    <svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><path d="M12 2 21 7v10l-9 5-9-5V7z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M12 2 7.5 12 12 22M12 2l4.5 10L12 22M3 7l4.5 5L3 17M21 7l-4.5 5L21 17M7.5 12h9" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linejoin="round"/></svg>
+  </button>
+{/if}
 
 <RollResult />
 <HoldMenu />
@@ -93,6 +106,23 @@
   nav button.on {
     color: var(--accent);
     font-weight: 600;
+  }
+  .dice-fab {
+    position: fixed;
+    right: max(16px, calc(50% - 320px + 16px));
+    bottom: calc(72px + env(safe-area-inset-bottom));
+    width: 56px;
+    height: 56px;
+    min-height: 0;
+    padding: 0;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    background: var(--accent);
+    color: var(--accent-ink);
+    border: 0;
+    box-shadow: 0 4px 14px rgb(0 0 0 / 0.25);
+    z-index: 12;
   }
   .toast {
     position: fixed;

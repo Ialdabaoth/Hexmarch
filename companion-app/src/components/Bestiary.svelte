@@ -73,8 +73,6 @@
 </details>
 
 <style>
-  .section > summary { cursor: pointer; }
-  .section > summary h2 { display: inline; margin: 0; }
   .head { width: 100%; display: flex; align-items: center; border: 0; background: transparent; padding: 0; text-align: left; min-height: 0; }
   .head .grow { display: flex; flex-direction: column; }
   .monster { margin-bottom: 0.5rem; padding: 0.6rem; }
