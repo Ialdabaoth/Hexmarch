@@ -228,7 +228,7 @@ function build() {
     if (ps.length) lists.append(sec(b.id + ' · ' + b.title, ps.map(p => item('#' + p.key, p.title, 'p. ' + p.page))));
   }
   const pr = D.print && D.print.atlas ? `Print: <a href="${D.print.atlas}">atlas PDF</a> · <a href="${D.print.exploration}">exploration PDF</a>. ` : '';
-  $('foot').innerHTML = pr + `Links for the companion app: <code>#world</code>, <code>#atlas-7</code>, <code>#&lt;map&gt;--&lt;site&gt;</code>, <code>#&lt;map&gt;:&lt;hex&gt;</code>; data in <code>module.json</code>. ${D.version} · ${D.license}.`;
+  $('foot').innerHTML = pr + `Links for the companion app: <code>#world</code>, <code>#atlas-7</code>, <code>#&lt;map&gt;--&lt;site&gt;</code>, <code>#&lt;map&gt;:&lt;hex&gt;</code>; data in <code>module.json</code>. ${D.version} · ${D.license}. Map icons: <a href="https://cmartins.itch.io/hex-tiles-fantasy">Hex Tiles: Fantasy</a> by cmartins, <a href="https://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a>.`;
 }
 function mark(h) { lists.querySelectorAll('a').forEach(a => a.classList.toggle('on', a.dataset.h === h || h.startsWith(a.dataset.h + '--') || h.startsWith(a.dataset.h + ':'))); }
 $('q').addEventListener('input', e => {

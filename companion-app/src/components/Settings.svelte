@@ -87,6 +87,10 @@
     <a href="https://creativecommons.org/licenses/by/4.0/legalcode">CC BY 4.0</a>. E9 rules material is from the E9
     System Reference Handbook, licensed under <a href="https://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a>.
   </p>
+  <p class="small muted">
+    Map icons and hex tiles: <a href="https://cmartins.itch.io/hex-tiles-fantasy">Hex Tiles: Fantasy</a> by cmartins, licensed under
+    <a href="https://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a>.
+  </p>
 </section>
 
 <style>
