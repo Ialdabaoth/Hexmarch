@@ -18,6 +18,8 @@ export default defineConfig({
     pwa && VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['icon.svg', 'apple-touch-icon.png'],
+      // modules/ (map viewers, PDFs, module.json) is published beside the app; let it load as its own pages
+      workbox: { navigateFallbackDenylist: [/\/modules\//] },
       manifest: {
         name: 'Materia Mundi Companion',
         short_name: 'Materia Mundi',
