@@ -6,7 +6,7 @@
 # plus bg-blue.png (the grey texture recoloured as water) for sea hexes.
 import sys, os
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageFilter
 ICONS, MASKS = sys.argv[1:3]
 RANK = ['blue', 'brown', 'green', 'grey']          # a colour bleeds into every colour before it in this list
 def bg(c): return Image.open(os.path.join(ICONS, f'bg-{c}.png')).convert('RGBA')
@@ -16,11 +16,24 @@ lo, hi = np.array([92, 146, 168]), np.array([172, 210, 222])
 t = (L - L.min()) / max(1, L.max() - L.min())
 Image.fromarray(np.concatenate([lo + (hi - lo) * t, a[..., 3:]], -1).astype('uint8')).save(os.path.join(ICONS, 'bg-blue.png'))
 edge, corner = (Image.open(os.path.join(MASKS, n)).getchannel('A') for n in ('edge.png', 'corner.png'))
+# "-x" twins without the painted hex rim, for the viewer's Hex Edges box: the texture zoomed past its rim, keeping the hex's own alpha
+RIMLESS = 1.12
+def rimless(im):
+    W, H = im.size; z = im.resize((round(W * RIMLESS), round(H * RIMLESS)), Image.LANCZOS)
+    P = PAD; l, t = (z.width - W) // 2 - P, (z.height - H) // 2 - P; out = z.crop((l, t, l + W + 2 * P, t + H + 2 * P))
+    a = Image.new('L', out.size, 0); a.paste(im.getchannel('A'), (P, P))
+    out.putalpha(a.filter(ImageFilter.MaxFilter(2 * P - 1))); return out  # alpha grown past the hex so neighbours overlap: no seams
+PAD = 4  # the twins carry this margin; hexmap.py icon_defs gives them a viewBox that hides it again
+for c in RANK:
+    rimless(bg(c)).save(os.path.join(ICONS, f'bg-{c}-x.png'), optimize=True)
 for c in RANK[1:]:
-    src = bg(c); sa = np.asarray(src.getchannel('A')).astype(float)
-    for kind, m in (('e', edge), ('c', corner)):
-        for k in range(6):
-            r = m.rotate(-60 * k, resample=Image.BICUBIC, center=(m.width / 2, m.height / 2))
-            out = src.copy(); out.putalpha(Image.fromarray((np.asarray(r).astype(float) * sa / 255).astype('uint8')))
-            out.save(os.path.join(ICONS, f'bleed-{c}-{kind}{k}.png'), optimize=True)
+    for sfx, src in (('', bg(c)), ('-x', rimless(bg(c)))):
+        sa = np.asarray(src.getchannel('A')).astype(float)
+        for kind, m in (('e', edge), ('c', corner)):
+            for k in range(6):
+                r = m.rotate(-60 * k, resample=Image.BICUBIC, center=(m.width / 2, m.height / 2))
+                ra = np.asarray(r).astype(float)
+                if sfx: ra = np.pad(ra, PAD, mode='edge')  # the -x twin's margin
+                out = src.copy(); out.putalpha(Image.fromarray((ra * sa / 255).astype('uint8')))
+                out.save(os.path.join(ICONS, f'bleed-{c}-{kind}{k}{sfx}.png'), optimize=True)
 print('blend tiles written to', ICONS)
