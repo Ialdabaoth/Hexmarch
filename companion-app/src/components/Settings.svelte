@@ -1,6 +1,7 @@
 <script lang="ts">
   import { app } from '../lib/app.svelte';
   import { isWebhookUrl } from '../lib/discord';
+  import { DEFAULT_RULES, RULESETS, findRules } from '../rules/rules';
   import { DEFAULT_DICE_COLOR, DEFAULT_DICE_INK, showDice } from '../lib/dice3d';
 
   const d20 = () => ({ sides: 20, value: 1 + Math.floor(Math.random() * 20), kept: true });
@@ -55,6 +56,15 @@
 <h1>Settings</h1>
 
 <section class="card">
+  <h3>Rules</h3>
+  <select aria-label="Rules" value={findRules(app.settings.rules)?.id ?? DEFAULT_RULES}
+    onchange={(e) => app.updateSettings({ rules: (e.target as HTMLSelectElement).value })}>
+    {#each RULESETS as r (r.id)}<option value={r.id}>{r.name}</option>{/each}
+  </select>
+  <p class="small muted">What the Rules tab shows, and where new characters start.</p>
+</section>
+
+<section class="card" style="margin-top:0.75rem">
   <h3>Campaign</h3>
   <select aria-label="Campaign" value={app.campaign ? app.settings.campaign : ''} disabled={busy}
     onchange={(e) => choose((e.target as HTMLSelectElement).value)}>
