@@ -10,15 +10,22 @@ h1{font-size:16px;margin:0;font-weight:normal;flex:1 1 320px}
 h1 a{color:var(--red);text-decoration:none;white-space:nowrap}h1 a:hover{text-decoration:underline}h1 b{white-space:nowrap}
 .ctl{display:flex;gap:6px;align-items:center;font-size:14px}
 button,select{font:inherit;font-size:14px;background:#fffaf0;border:1px solid #b8ab8c;border-radius:4px;padding:2px 8px;color:var(--ink)}
-#map{flex:1;position:relative;min-height:0}canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor:pointer}
+#main{flex:1;display:flex;min-height:0;position:relative}#map{flex:1;position:relative;min-height:0}
+#key{width:250px;overflow:auto;border-left:1px solid #d8cfb8;padding:8px 12px;font-size:13px;background:var(--bg)}
+#key h2{font-size:13px;margin:10px 0 4px;color:var(--dim);font-weight:normal;text-transform:uppercase;letter-spacing:.05em}
+#key .row{display:flex;align-items:center;gap:8px;padding:2px 0}#key .pl{cursor:pointer;border-radius:4px}#key .pl:hover{background:#ebe3cf}
+#key .sw{width:30px;height:26px;flex:none;background-size:cover;background-position:center;display:flex;align-items:center;justify-content:center}
+#key .sw img{max-width:26px;max-height:22px}#key small{color:var(--dim)}
+body.nokey #key{display:none}@media(max-width:700px){#key{position:absolute;right:0;top:0;bottom:0;box-shadow:-2px 0 8px #0003}}
+canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor:pointer}
 footer{display:flex;justify-content:space-between;gap:12px;padding:4px 16px;font-size:12px;color:var(--dim);border-top:1px solid #d8cfb8}
 #hover{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 </style></head><body>
 <header><h1 id="crumbs"></h1>
 <div class="ctl"><select id="lang"><option value="ga">Gaeilge</option><option value="en">English</option></select>
 <label><input type="checkbox" id="edges" checked> Hex Edges</label>
-<button id="out" title="Zoom out">−</button><button id="in" title="Zoom in">+</button><button id="fit">Fit</button></div></header>
-<div id="map"><canvas id="cv"></canvas></div>
+<button id="out" title="Zoom out">−</button><button id="in" title="Zoom in">+</button><button id="fit">Fit</button><button id="keybtn">Key</button></div></header>
+<div id="main"><div id="map"><canvas id="cv"></canvas></div><aside id="key"></aside></div>
 <footer><span id="hover">Click a hex to zoom in.</span><span>E9 Atlas {{ATLAS}} · dynamic preview</span></footer>
 <script>
 "use strict";
@@ -191,20 +198,52 @@ function draw() {
   // points of interest
   const isz = { region: 16, march: 30, league: 44, field: 56 }[V.lvl], fs = { region: 10, march: 12, league: 13, field: 14 }[V.lvl];
   ctx.font = `bold ${fs}px Georgia`;
+  const KP = [];
   for (const p of D.pois) {
     const [x, y] = ft(...p.hex), o = p.ft || [0, 0], [sx, sy] = S(x + o[0], y + o[1]);
     if (sx < -100 || sy < -100 || sx > W + 100 || sy > H + 100) continue;
+    if (sx >= 0 && sy >= 0 && sx <= W && sy <= H) KP.push(p);
     const im = p.icon && tile(p.icon);
     if (im) { const a = Math.max(.87, im.naturalHeight / im.naturalWidth); ctx.drawImage(im, sx - isz / 2, sy - isz * a / 2, isz, isz * a); }
     else { ctx.beginPath(); ctx.arc(sx, sy, 4, 0, 7); ctx.fillStyle = '#2b2418'; ctx.fill(); }
     if (V.lvl !== 'region') { const ty = sy + isz * .55 + fs; ctx.strokeStyle = '#f4efe1'; ctx.lineWidth = 3.5; ctx.strokeText(name(p.name), sx, ty); ctx.fillStyle = '#2b2418'; ctx.fillText(name(p.name), sx, ty); }
   }
+  key(new Set(vis.map(v => v[2])), KP);
   // the hex being looked at, and the picked 100-ft hex
   const own = LV[V.lvl].own;
   if (own) { const [sx, sy] = S(...hexFt(V.i, V.j, own)); hexPath(sx, sy, own * 100 * cam.s / SQ3); ctx.setLineDash([9, 5]); ctx.strokeStyle = '#b3261e'; ctx.lineWidth = 2.5; ctx.stroke(); ctx.setLineDash([]); }
   if (V.sel) { const [sx, sy] = S(...ft(...V.sel)); hexPath(sx, sy, 100 * cam.s / SQ3); ctx.strokeStyle = '#b3261e'; ctx.lineWidth = 3; ctx.stroke(); }
 }
 
+// the map key (Heph 2026-11-05: "get the map keys back"): terrain in view, then the places in view; a place zooms in like a click
+let KEYHTML = '';
+const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+function key(ts, ps) {
+  let h = '<h2>Terrain</h2>';
+  TYPES.forEach((t, k) => { if (!ts.has(k + 1)) return;
+    h += `<div class="row"><span class="sw" style="background-color:${t.color};background-image:url(tiles/${t.tile}.png)">${t.icon ? `<img src="tiles/${t.icon}.png" alt="">` : ''}</span>${esc(t.name)}</div>`; });
+  if (ps.length) {
+    h += '<h2>Places</h2>';
+    for (const p of ps.slice().sort((a, b) => name(a.name).localeCompare(name(b.name))))
+      h += `<div class="row pl" data-id="${esc(p.id)}"><span class="sw">${p.icon ? `<img src="tiles/${p.icon}.png" alt="">` : ''}</span><span>${esc(name(p.name))}<br><small>${esc(p.kind)}${p.book ? ' · ' + esc(p.book) : ''}</small></span></div>`;
+  }
+  if (h !== KEYHTML) document.getElementById('key').innerHTML = KEYHTML = h;
+}
+document.getElementById('key').addEventListener('click', e => {
+  const r = e.target.closest('.pl'); if (!r) return; const p = D.pois.find(q => q.id === r.dataset.id); if (!p) return;
+  const [x, y] = ft(...p.hex), o = p.ft || [0, 0]; goDown(x + o[0], y + o[1]);
+});
+document.getElementById('keybtn').onclick = () => { document.body.classList.toggle('nokey'); redraw(); };
+if (matchMedia('(max-width:700px)').matches) document.body.classList.add('nokey');
+function goDown(x, y) {  // Heph's rule: anything clicked zooms in one level, centred on it; Field level waits for Encounter maps
+  const N = LV[V.lvl].draw, [i, j] = hexAt(x, y, N);
+  if (!T(i, j, N) || V.lvl === 'field') return;
+  const [C, R] = N === 1 ? [i, j] : centre(i, j, N);
+  AIM = hexFt(i, j, N);
+  if (V.lvl === 'region') { const [mi, mj] = nearest(C, R, 1200); location.hash = marchAddr(mi, mj); }
+  else if (V.lvl === 'march') location.hash = leagueAddr(i, j);
+  else location.hash = addr(C, R);
+}
 function crumbs() {
   const out = [`<b>${D.title}</b>`, `<a href="#world">Region</a>`];
   let C, R;
@@ -232,14 +271,7 @@ cv.addEventListener('pointermove', e => {
 });
 cv.addEventListener('pointerup', e => {
   if (!drag) return; const moved = drag.moved; drag = null; if (moved) return;
-  const b = cv.getBoundingClientRect(), [x, y] = F(e.clientX - b.left, e.clientY - b.top), N = LV[V.lvl].draw, [i, j] = hexAt(x, y, N);
-  if (!T(i, j, N) || V.lvl === 'field') return;
-  const [C, R] = N === 1 ? [i, j] : centre(i, j, N);
-  AIM = hexFt(i, j, N);  // every click: down one level, centred on the hex clicked
-  if (V.lvl === 'region') { const [mi, mj] = nearest(C, R, 1200); location.hash = marchAddr(mi, mj); }
-  else if (V.lvl === 'march') location.hash = leagueAddr(i, j);
-  else if (V.lvl === 'league') location.hash = addr(C, R);
-  // Field view: a click goes down to an Encounter map only where there is a point of interest (Heph 2026-11-05); those come later, so nothing yet
+  const b = cv.getBoundingClientRect(); goDown(...F(e.clientX - b.left, e.clientY - b.top));
 });
 cv.addEventListener('wheel', e => { e.preventDefault(); zoom(e.deltaY < 0 ? 1.25 : .8, e); }, { passive: false });
 function zoom(f, e) {
