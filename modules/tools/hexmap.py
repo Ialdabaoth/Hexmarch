@@ -91,7 +91,7 @@ T_BG = {"grass": "bg-green", "forest": "bg-green", "woods": "bg-green", "hills":
 BLEED_RANK = {"bg-blue": 0, "bg-brown": 1, "bg-green": 2, "bg-grey": 3}
 BLEED = os.environ.get("HEXBLEND", "1") != "0"
 USED_BLEED = set()
-S_ICON = {"castle": "keep", "town": "village", "tomb": "stones", "hill": "hills", "cave": "cave", "ruin": "ruins", "grove": "great-tree", "camp": "community", "lair": "hole", "mist": "fog", "dead": "graveyard"}  # Heph 2026-11-05: great tree for groves
+S_ICON = {"castle": "keep", "town": "village", "abbey": "church", "tomb": "stones", "hill": "hills", "cave": "cave", "ruin": "ruins", "grove": "great-tree", "camp": "community", "lair": "hole", "mist": "fog", "dead": "graveyard"}  # Heph 2026-11-05: great tree for groves, church for abbeys
 SITE_ICONS = json.loads(os.environ.get("HEXSITEICONS") or "{}")  # per-site icon overrides {site name: icon}, from module.json "site_icons"
 def site_icon(name, kind): return SITE_ICONS.get(name) or S_ICON.get(kind)
 # Heph 2026-11-05: these hex-sized features replace the terrain icon of the site's hex instead of sitting on top of it
