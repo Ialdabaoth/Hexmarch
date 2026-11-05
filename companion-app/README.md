@@ -1,6 +1,6 @@
-# Materia Mundi Companion
+# E9 Companion
 
-A small installable web app (PWA) for players of the Materia Mundi RPG: roll up and keep characters,
+A small installable web app (PWA) for players of E9 and its settings, Materia Mundi among them: roll up and keep characters,
 manage a retinue of followers and beast companions, tap any stat to roll it, and send rolls to Discord.
 
 Everything is stored on the device. There are no accounts and no server.

@@ -125,8 +125,8 @@
   <h3>About</h3>
   <p class="small muted">Version {__APP_VERSION__}</p>
   <p class="small">
-    A companion for the Materia Mundi RPG. Characters can use the Materia Mundi Compendium (first edition) or the
-    E9 System Reference Handbook; page numbers point to whichever book the character uses.
+    A companion for E9 and its settings. Characters can use the Materia Mundi Compendium (first edition, a setting
+    within E9) or the E9 System Reference Handbook; page numbers point to whichever book the character uses.
   </p>
   <p class="small muted">
     Everything stays on this device. Install it to your home screen (Share, then Add to Home Screen on iPhone) so your browser keeps your characters, and export a backup from the Party tab.
