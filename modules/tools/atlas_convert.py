@@ -13,7 +13,7 @@ from shapely.geometry import shape
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from dymaxion import Face
 
-MODP, WORK, OUT = sys.argv[1:4]
+MODP, WORK, OUT = sys.argv[1:4]  # optional --real: terrain from real-world data (realmap.py)
 MOD = json.load(open(MODP)); MDIR = os.path.dirname(os.path.abspath(MODP))
 A = MOD['atlas']
 CW = 100 * math.sqrt(3) / 2  # feet between lattice columns
@@ -70,7 +70,7 @@ TYPES = [  # colour, id, name, tile, icon, travel (cost per mile, grass = 1; a d
     ('#dfe8b5', 'grass', 'Grassland', 'bg-green', None, 1), ('#bcd69e', 'woods', 'Light woods', 'bg-green', 'trees', 1),
     ('#9cc28a', 'forest', 'Forest', 'bg-green', 'forest', 1.5), ('#d9c08c', 'hills', 'Hills', 'bg-green', 'hills', 1.5),
     ('#b49a78', 'mount', 'Mountains', 'bg-brown', 'mountains', 2), ('#c9b98f', 'bog', 'Bog', 'bg-grey', 'swamp', 2),
-    ('#b9d3e0', 'sea', 'Sea', 'bg-blue', None, None)]
+    ('#b9d3e0', 'sea', 'Sea', 'bg-blue', None, None), ('#a3c8dc', 'lake', 'Lake or river', 'bg-blue', None, None)]
 TID = {t[1]: k + 1 for k, t in enumerate(TYPES)}  # palette index; 0 = none
 PAL = [0, 0, 0] + [int(t[0][k:k + 2], 16) for t in TYPES for k in (1, 3, 5)]
 
@@ -101,10 +101,15 @@ WARP = 900  # feet: how far a border may wander from the source map's hex edge
 MIX = {  # parent terrain -> [(share, child)], read in order on a 0..1 noise; the parent keeps the rest
     'grass': [(.07, 'woods'), (.02, 'forest')], 'woods': [(.18, 'grass'), (.17, 'forest')],
     'forest': [(.05, 'grass'), (.13, 'woods')], 'hills': [(.18, 'grass'), (.08, 'woods')],
-    'mount': [(.25, 'hills')], 'bog': [(.12, 'grass'), (.08, 'woods')], 'sea': []}
+    'mount': [(.25, 'hills')], 'bog': [(.12, 'grass'), (.08, 'woods')], 'sea': [], 'lake': []}
+
+REAL = None
+if '--real' in sys.argv:  # real-world land cover and elevation pushed back to about 1420 (realmap.py) instead of the old hex maps
+    import realmap; REAL = realmap.Real(os.path.dirname(MDIR), MOD, face, TID, fbm, uni)
 
 def terrain(C, R):
     x, y = ft(C, R)
+    if REAL: lat, lon = face.inverse(x, y); return REAL(C, R, x, y, lat, lon)
     wx, wy = x + (fbm(x, y, 2) - .5) * 2 * WARP, y + (fbm(x, y, 3) - .5) * 2 * WARP
     lat, lon = face.inverse(wx, wy)
     t = world.look(lat, lon); best = np.full(C.shape, PAGE_R ** 2)
