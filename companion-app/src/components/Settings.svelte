@@ -8,6 +8,28 @@
     showDice({ dice: [d20(), d20()] }, app.diceColors);
   }
 
+  // Which campaign this device plays in.
+  let busy = $state(false);
+  async function choose(link: string) {
+    busy = true;
+    try {
+      if (link) await app.switchCampaign(link);
+      else await app.leaveCampaign();
+    } catch (e) {
+      app.notify((e as Error).message);
+    }
+    busy = false;
+  }
+  async function refresh() {
+    busy = true;
+    try {
+      await app.useCampaign(app.settings.campaign);
+    } catch (e) {
+      app.notify((e as Error).message);
+    }
+    busy = false;
+  }
+
   let url = $state(app.settings.webhookUrl);
   let valid = $derived(!url.trim() || isWebhookUrl(url));
 
@@ -33,6 +55,23 @@
 <h1>Settings</h1>
 
 <section class="card">
+  <h3>Campaign</h3>
+  <select aria-label="Campaign" value={app.campaign ? app.settings.campaign : ''} disabled={busy}
+    onchange={(e) => choose((e.target as HTMLSelectElement).value)}>
+    <option value="">This device</option>
+    {#each Object.values(app.campaigns) as c (c.url)}<option value={c.url}>{c.campaign.name}</option>{/each}
+  </select>
+  {#if app.campaign}
+    <p class="small muted">
+      Run by {app.campaign.campaign.referee || 'your referee'}. Checked {new Date(app.campaign.fetchedAt).toLocaleDateString()}.
+      <button class="link" disabled={busy} onclick={refresh}>Check for changes</button>
+    </p>
+  {:else}
+    <p class="small muted">Your characters, maps and notes on this phone. Joining a referee's campaign arrives with sign-in.</p>
+  {/if}
+</section>
+
+<section class="card" style="margin-top:0.75rem">
   <h3>Discord</h3>
   <p class="small muted">
     In Discord, open your channel's settings, then Integrations, Webhooks, New Webhook, and Copy Webhook URL. Paste it here.
@@ -94,6 +133,7 @@
 </section>
 
 <style>
+  .link { background: none; border: 0; padding: 0; min-height: 0; color: var(--accent); text-decoration: underline; font: inherit; }
   .dice-color { margin-top: 0.75rem; }
   .dice-color label { display: flex; align-items: center; gap: 0.35rem; margin: 0; }
   .swatch { display: inline-grid; place-items: center; width: 2.2rem; height: 2.2rem; border-radius: 6px; font: 700 0.95rem Georgia, serif; }

@@ -24,6 +24,8 @@ export interface CampaignData {
   rules: string;
   // Built-in equipment file ids and/or links to equipment files, in priority order.
   equipment: string[];
+  // Link to the campaign's art file (portraits); art.json beside this file if left out.
+  art?: string;
 }
 
 // A campaign as fetched: the campaign file and every file it links to.

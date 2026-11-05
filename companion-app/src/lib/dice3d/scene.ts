@@ -60,6 +60,9 @@ const ROLL_MS = 1400;
 const STAGGER_MS = 70;
 const LINGER_MS = 1800;
 const FADE_MS = 400;
+// After lingering, the dice shrink, turn square to the screen and fly into the
+// roll result's dice row ([data-die-slot]), staying there until it closes.
+const DOCK_MS = 550;
 
 let renderer: WebGLRenderer | null = null;
 let scene: Scene;
@@ -157,7 +160,7 @@ function setup(): boolean {
   document.body.appendChild(el);
 
   scene = new Scene();
-  camera = new PerspectiveCamera(22, 1, 0.1, 400);
+  camera = new PerspectiveCamera(35, 1, 0.1, 200);
   scene.add(new HemisphereLight(0xfff6e6, 0x3a2a1c, 1.6));
   const sun = new DirectionalLight(0xffffff, 2.2);
   sun.position.set(-4, 12, 6);
@@ -174,8 +177,9 @@ function setup(): boolean {
 
 const UP = new Vector3(0, 1, 0);
 
-// Orientation that leaves `face` on top with its number reading up the screen.
-function restingOrientation(s: Shape, face: number): Quaternion {
+// Orientation that leaves `face` on top with its number reading up the screen,
+// give or take a slight twist (`twist` radians either way).
+function restingOrientation(s: Shape, face: number, twist = 0): Quaternion {
   const up = new Vector3(...s.up.get(face)!);
   const q = new Quaternion().setFromUnitVectors(up, UP);
   const textUp = s.textUp.get(face);
@@ -183,7 +187,7 @@ function restingOrientation(s: Shape, face: number): Quaternion {
   if (textUp) {
     const t = new Vector3(...textUp).applyQuaternion(q);
     // Turning about UP adds to atan2(x, z); straight up the screen is atan2(0, -1) = π.
-    yaw = Math.PI - Math.atan2(t.x, t.z);
+    yaw = Math.PI - Math.atan2(t.x, t.z) + (Math.random() - 0.5) * 2 * twist;
   }
   return new Quaternion().setFromAxisAngle(UP, yaw).multiply(q);
 }
@@ -200,6 +204,8 @@ interface Flight {
   axis: Vector3;
   spin: number;
   rest: Quaternion;
+  // The same face on top with no twist, used once the die is docked.
+  straight: Quaternion;
   delay: number;
   height: number;
 }
@@ -266,7 +272,8 @@ class Throw {
         to,
         axis,
         spin: Math.PI * 2 * (2 + Math.random() * 1.5),
-        rest: restingOrientation(s, d.face),
+        rest: restingOrientation(s, d.face, 0.3),
+        straight: restingOrientation(s, d.face),
         delay: i * STAGGER_MS,
         height: 2.5 + Math.random() * 1.5
       });
@@ -301,12 +308,11 @@ class Throw {
     const needH = Math.max(7 / Math.max(aspect, 0.5), rows * gap + 2.5);
     const tan = Math.tan((camera.fov * Math.PI) / 360);
     const dist = Math.max(needH / (2 * tan), needW / (2 * tan * aspect));
-    // Straight down, so settled dice show their top faces square on.
-    const tilt = 0;
+    // A little tilt toward the player, so settled dice sit slightly askew.
+    const tilt = 0.22;
     camera.aspect = aspect;
     camera.position.set(0, dist * Math.cos(tilt), dist * Math.sin(tilt));
-    // Looking straight down, "up" on screen is away from the player (-z).
-    camera.up.set(0, 0, -1);
+    camera.up.set(0, 1, 0);
     camera.lookAt(0, 0, 0);
     camera.updateProjectionMatrix();
     renderer!.setSize(w, h, false);
@@ -324,6 +330,7 @@ class Throw {
   }
 
   tick(now: number) {
+    if (this.dock) return this.dockTick(now);
     let all = true;
     for (const f of this.flights) {
       const p = this.landed ? 1 : Math.min(1, Math.max(0, (now - this.start - f.delay) / ROLL_MS));
@@ -346,7 +353,58 @@ class Throw {
     this.landed = true;
     this.resolveLanded();
     renderer!.domElement.style.pointerEvents = 'none';
-    this.hideTimer = setTimeout(() => this.hide(), LINGER_MS);
+    this.hideTimer = setTimeout(() => this.settle(), LINGER_MS);
+  }
+
+  private dock: { start: number; from: { pos: Vector3; quat: Quaternion }[]; to: { pos: Vector3; quat: Quaternion; scale: number }[] } | null = null;
+  docked = false;
+
+  // Into the result's dice row if it's showing, otherwise fade away.
+  private settle() {
+    const slots = [...document.querySelectorAll<HTMLElement>('[data-die-slot]')];
+    if (current !== this || slots.length < this.flights.length) return this.hide();
+    const el = renderer!.domElement;
+    const w = el.clientWidth || window.innerWidth;
+    const h = el.clientHeight || window.innerHeight;
+    const tan = Math.tan((camera.fov * Math.PI) / 360);
+    const forward = camera.getWorldDirection(new Vector3());
+    // Halfway to the table: above where the dice lay, so they rise toward the player.
+    const reach = camera.position.length() * 0.5;
+    // Square to the screen: the top face looks at the camera, its number reads up.
+    const facing = camera.quaternion.clone().multiply(new Quaternion().setFromAxisAngle(new Vector3(1, 0, 0), Math.PI / 2));
+    this.dock = {
+      start: performance.now(),
+      from: this.flights.map((f) => ({ pos: f.mesh.position.clone(), quat: f.mesh.quaternion.clone() })),
+      to: this.flights.map((f, i) => {
+        const r = slots[i].getBoundingClientRect();
+        const ndc = new Vector3(((r.left + r.width / 2) / w) * 2 - 1, -(((r.top + r.height / 2) / h) * 2 - 1), 0.5);
+        const ray = ndc.unproject(camera).sub(camera.position).normalize();
+        const pos = camera.position.clone().addScaledVector(ray, reach);
+        const depth = reach * ray.dot(forward);
+        // A die's circumradius SIZE*scale should fill most of the slot's half-width.
+        const scale = (Math.min(r.width, r.height) * 0.5 * 1.05 * 2 * depth * tan) / (h * SIZE);
+        f.mesh.castShadow = false;
+        // Turned to look straight back along the ray, so even off-centre dice show no sides.
+        const toward = new Quaternion().setFromUnitVectors(forward, ray);
+        return { pos, quat: toward.multiply(facing).multiply(f.straight), scale };
+      })
+    };
+    this.frame = requestAnimationFrame(this.tick);
+  }
+
+  private dockTick(now: number) {
+    const d = this.dock!;
+    const p = Math.min(1, (now - d.start) / DOCK_MS);
+    const e = p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
+    this.flights.forEach((f, i) => {
+      f.mesh.position.lerpVectors(d.from[i].pos, d.to[i].pos, e);
+      f.mesh.quaternion.slerpQuaternions(d.from[i].quat, d.to[i].quat, e);
+      f.mesh.scale.setScalar(1 + (d.to[i].scale - 1) * e);
+    });
+    renderer!.render(scene, camera);
+    // Once docked the picture holds still, so stop drawing until the result closes.
+    if (p < 1) this.frame = requestAnimationFrame(this.tick);
+    else this.docked = true;
   }
 
   skip() {
@@ -377,13 +435,20 @@ class Throw {
 }
 
 // Shows the dice and resolves once they have settled (or the player taps to skip).
-export function throwDice(dice: ShownDie[]): Promise<void> {
-  if (!dice.length || !setup()) return Promise.resolve();
+// Resolves true once they have, or false when there's nothing to draw them with.
+export function throwDice(dice: ShownDie[]): Promise<boolean> {
+  if (!dice.length || !setup()) return Promise.resolve(false);
   current?.stop();
   const el = renderer!.domElement;
   el.style.display = 'block';
   el.style.opacity = '1';
   el.style.pointerEvents = 'auto';
   current = new Throw(dice);
-  return current.landedPromise;
+  return current.landedPromise.then(() => true);
+}
+
+// The roll result closed: put away dice that have landed (docked or not yet).
+// A throw still in the air is left alone.
+export function releaseDice(): void {
+  if (current?.landed) current.hide();
 }

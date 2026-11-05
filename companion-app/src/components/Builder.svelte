@@ -167,7 +167,7 @@
       <h3 class="grow">2. Abilities</h3>
       <button class="primary" onclick={doRollAbilities}>{rolled ? 'Reroll' : 'Roll in order'}</button>
     </div>
-    <label class="check small"><input type="checkbox" bind:checked={manual} /> Enter scores by hand (for an existing character)</label>
+    <label class="check small"><input type="checkbox" bind:checked={manual} /> Edit/Keep these abilities (for an existing character)</label>
     <div class="abilities">
       {#each ABILITIES as a}
         <div class="ab">

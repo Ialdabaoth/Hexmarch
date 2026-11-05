@@ -20,13 +20,14 @@
     requestPersistence();
   });
 
-  const tabs = [
+  // The Inbox shows as an envelope: 📩 when something is waiting, ✉️ when not.
+  let tabs = $derived([
+    { name: 'inbox', label: app.unread ? '📩' : '✉️', aria: app.unread ? `Inbox, ${app.unread} unread` : 'Inbox' },
     { name: 'list', label: 'Party' },
     { name: 'campaign', label: 'Campaign' },
     { name: 'rules', label: 'Rules' },
-    { name: 'inbox', label: 'Inbox' },
-    { name: 'settings', label: '⚙️' }
-  ] as const;
+    { name: 'settings', label: '⚙️', aria: 'Settings' }
+  ] as const);
 
   let active = $derived(['build', 'sheet', 'render'].includes(app.view.name) ? 'list' : app.view.name === 'equipment' ? 'rules' : app.view.name);
   let diceOpen = $state(false);
@@ -74,7 +75,7 @@
 
 <nav class="no-print">
   {#each tabs as t}
-    <button class:on={active === t.name} aria-label={t.name === 'settings' ? 'Settings' : undefined} onclick={() => (app.view = { name: t.name })}>{t.label}</button>
+    <button class:on={active === t.name} class:icon={'aria' in t} aria-label={'aria' in t ? t.aria : undefined} title={'aria' in t ? t.aria : undefined} onclick={() => (app.view = { name: t.name })}>{t.label}</button>
   {/each}
 </nav>
 
@@ -102,6 +103,9 @@
     background: transparent;
     color: var(--muted);
     min-height: 56px;
+  }
+  nav button.icon {
+    font-size: 1.35rem;
   }
   nav button.on {
     color: var(--accent);
