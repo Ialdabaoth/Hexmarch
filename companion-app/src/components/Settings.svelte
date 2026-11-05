@@ -124,6 +124,9 @@
 <section class="card" style="margin-top:0.75rem">
   <h3>About</h3>
   <p class="small muted">Version {__APP_VERSION__}</p>
+  {#if __PATREON_URL__}
+    <p class="small">Enjoying E9? <a href={__PATREON_URL__} target="_blank" rel="noopener">Support it on Patreon</a> for new modules every month.</p>
+  {/if}
   <p class="small">
     A companion for E9 and its settings. Characters can use the Materia Mundi Compendium (first edition, a setting
     within E9) or the E9 System Reference Handbook; page numbers point to whichever book the character uses.
