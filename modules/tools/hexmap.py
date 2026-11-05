@@ -320,6 +320,14 @@ def make(key, R):
             if main.get(p) != ch[-2]: break  # joined a bigger river
         chains.append(ch)
     chains.sort(key=lambda ch: -max(acc[c] for c in ch[:-1]))  # big rivers first, so tributaries can join their smoothed line
+    if os.environ.get("HEXDUMP"):  # raw geometry for the E9 Atlas converter (atlas_convert.py): grid, terrain, river cells, sites
+        def ll(i):
+            r, c = divmod(int(i), SNC); return [round(LON_LEFT + (c0 + c + .5) * cell, 6), round(LAT_TOP - (r0 + r + .5) * cell, 6)]
+        json.dump(dict(key=key, hex_mi=HEX_MI, X0=X0, Y0=Y0, s=s, w=w, h=h, kx=kx, ky=ky, ncol=ncol, nrow=nrow, anchor=R.get("anchor"),
+                       counties=R.get("counties") or ([R["county"]] if "county" in R else []),
+                       hexes=[[hx["col"], hx["row"], hx["t"], hx["inside"]] for hx in hexes],
+                       rivers=[dict(width=round(max(width(c) for c in ch[:-1]), 2), points=[ll(c) for c in ch]) for ch in chains],
+                       labels=R.get("rivers", []), sites=R.get("sites", [])), open(f"{OUT}/{key}-atlas.json", "w"), ensure_ascii=False)
     SM = {}
     def sp(a, b, c, d):  # centripetal Catmull-Rom from b to c as Bezier control points
         def t(u, v): return max(1e-6, math.hypot(v[0] - u[0], v[1] - u[1]) ** .5)

@@ -31,11 +31,11 @@ for la in range(la0, la1 + 1):
             print('fetching', t); urllib.request.urlretrieve(f'https://s3.amazonaws.com/elevation-tiles-prod/skadi/{t[:3]}/{t}.hgt.gz', f)
 try: sha = subprocess.run(['git', 'rev-parse', '--short', 'HEAD'], capture_output=True, text=True, cwd=ROOT).stdout.strip()
 except Exception: sha = ''
-ATLAS = '0.2.1'  # version of the atlas tools and viewer themselves (Heph 2026-11-05); patch per PR, separate from each module's version
+ATLAS = '0.2.2'  # version of the atlas tools and viewer themselves (Heph 2026-11-05); patch per PR, separate from each module's version
 VER = f"v{MOD['version']}" + (f"+{os.environ.get('GITHUB_SHA', sha)[:7]}" if (os.environ.get('GITHUB_SHA') or sha) else '') + ' · ' + datetime.date.today().isoformat()
 ENV = dict(os.environ, HEXDEM=','.join(map(str, MOD['dem'])), HEXADMIN=os.path.normpath(os.path.join(mdir, MOD['admin'])),
            HEXTILES=os.path.join(ROOT, 'assets', 'tiles', 'icons'), HEXGEO=geo, MODVER=VER, MODATLAS=ATLAS, MODTITLE=MOD.get('short', MOD['title']),
-           HEXSITEICONS=json.dumps(MOD.get('site_icons', {}), ensure_ascii=False))
+           HEXSITEICONS=json.dumps(MOD.get('site_icons', {}), ensure_ascii=False), HEXDUMP='1')
 def run(*a): subprocess.run(list(a), check=True, env=ENV, stdout=subprocess.DEVNULL)
 
 # 1. the world map: every book's county sites on one 3-mile grid, at print scale (1 in per hex)
@@ -51,6 +51,8 @@ run(*PY, TOOLS + '/hexmap.py', geo, work, work + '/world.json')
 # 2. March pages (the print atlas: one 24-mile hex per page), 3. League pages (one 3-mile hex per page)
 run(*PY, TOOLS + '/atlas_pages.py', work + '/world.svg', work + '/world-grid.json', work + '/atlas.html')
 run(*PY, TOOLS + '/league_pages.py', os.path.join(mdir, 'module.json'), work + '/atlas-index.json', work + '/world-grid.json', work + '/league')
+# E9 Atlas format (ATLAS_FORMAT.md): the same terrain as one map JSON + one PNG per March, for the dynamic renderer
+if 'centroid' in MOD['atlas']: run(*PY, TOOLS + '/atlas_convert.py', os.path.join(mdir, 'module.json'), work, out + '/atlas')
 # 4. PDFs
 if PDF:
     os.makedirs(out + '/print', exist_ok=True)
