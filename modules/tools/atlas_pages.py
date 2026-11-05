@@ -1,7 +1,7 @@
 # Print atlas: a 24-mile hex grid over the 3-mile master map; one 11x8.5in page per 24-mile hex.
 # usage: python3 -I atlas_pages.py <master.svg> <master-grid.json> <out.html>
 import json, math, re, sys, html, os
-TITLE = os.environ.get('MODTITLE', 'Season 1 · Leinster, 1422'); VER = os.environ.get('MODVER', 'dev')
+TITLE = os.environ.get('MODTITLE', 'Beyond the Pale · Leinster, 1422'); VER = os.environ.get('MODVER', 'dev')
 svg_path, grid_path, out = sys.argv[1:4]
 G = json.load(open(grid_path)); S = open(svg_path).read()
 DPI = 96; MX, MY, MW, MH = 24, 24, 840, 768          # map frame: 8.75 x 8 in inside the 0.25 in border
@@ -103,7 +103,7 @@ for k in order:
     o.append(f'<text x="{LX}" y="{MY+MH-2}" font-size="8" fill="#8a7f66">{esc(VER)}</text><text x="{LX}" y="{MY+MH-12}" font-size="8" fill="#8a7f66">3-mile hexes use the Region grid.</text>')
     o.append('</svg>')
     pages.append(''.join(o))
-doc = ('<!doctype html><meta charset="utf-8"><title>Season 1 Print Atlas</title><style>@page{size:11in 8.5in;margin:0}html,body{margin:0;background:#fff}'
+doc = ('<!doctype html><meta charset="utf-8"><title>Beyond the Pale Print Atlas</title><style>@page{size:11in 8.5in;margin:0}html,body{margin:0;background:#fff}'
        'svg.pg{display:block;width:11in;height:8.5in;break-after:page}</style>'
        f'<svg width="0" height="0" style="position:absolute"><defs><g id="master">{inner}</g></defs></svg>' + ''.join(pages))
 open(out, 'w').write(doc)
