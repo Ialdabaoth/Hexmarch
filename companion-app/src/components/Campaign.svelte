@@ -4,6 +4,7 @@
   import ModuleMaps from './ModuleMaps.svelte';
   import Modules from './Modules.svelte';
   import Art from './Art.svelte';
+  import Creatures from './Creatures.svelte';
 
   // The game being played (the campaign itself is chosen in Settings): its parties, maps, events, history and
   // procedures, and who is in it. Shared campaigns arrive with sign-in; for now
@@ -55,6 +56,11 @@
   {:else}
     <p class="small muted">No characters yet. Roll one up in the Party tab.</p>
   {/if}
+</details>
+
+<details class="section" open>
+  <summary><h2>Creatures</h2></summary>
+  <Creatures />
 </details>
 
 <details class="section" open>

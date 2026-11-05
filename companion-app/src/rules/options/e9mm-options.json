@@ -4,7 +4,13 @@
   "source": "E9 core rules with Materia Mundi origins as race-as-class. E9 classes cite the E9 handbook; classes marked \"book\": \"Compendium\" cite the Materia Mundi Compendium.",
   "mechanics": {
     "attackProgression": "fighters",
-    "throwMin": 5
+    "throwMin": 5,
+    "npcTalentThresholds": [
+      { "from": 0, "threshold": 5 },
+      { "from": 3, "threshold": 4 },
+      { "from": 6, "threshold": 3 },
+      { "from": 9, "threshold": 2 }
+    ]
   },
   "equipment": ["e9", "e9mm", "mm"],
   "originRoll": {

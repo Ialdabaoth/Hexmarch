@@ -223,6 +223,8 @@ export interface Mechanics {
   attackProgression: 'all' | 'fighters';
   // Best possible saving or attack throw threshold.
   throwMin: number;
+  // NPC talent thresholds by level band: the last row whose "from" is at or below the level.
+  npcTalentThresholds?: { from: number; threshold: number }[];
 }
 
 export type ArmorType = 'light' | 'medium' | 'heavy';
@@ -326,6 +328,14 @@ export class Ruleset {
     const o = this.origins.find((x) => x.id === id);
     if (!o) throw new Error(`${this.name} has no origin "${id}"`);
     return o;
+  }
+
+  // An NPC's talent threshold by level, from the ruleset's NPC table (5+ at levels 0 to 2 by default).
+  npcTalentThreshold(level: number): number {
+    const table = this.mechanics.npcTalentThresholds ?? [{ from: 0, threshold: 5 }, { from: 3, threshold: 4 }, { from: 6, threshold: 3 }, { from: 9, threshold: 2 }];
+    let t = table[0]?.threshold ?? 5;
+    for (const row of table) if (level >= row.from) t = row.threshold;
+    return t;
   }
 
   // Saving throw threshold from ability + level (p. 10, E9 p. 11).
