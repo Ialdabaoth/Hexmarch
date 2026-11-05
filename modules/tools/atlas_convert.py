@@ -4,7 +4,7 @@
 usage: python3 -I atlas_convert.py <module.json> <work dir> <out dir>
   <work dir> is build.py's _work folder after a run with HEXDUMP=1 (world-atlas.json, league/l-*-atlas.json).
 Terrain for each 100-ft hex comes from the half-mile League page hex under it where a page exists, otherwise from the
-3-mile world hex under it. Rivers come from the world map's drainage, sites become points of interest, counties become regions.
+3-mile world hex under it, with seeded 100-ft detail on top (see MIX). Rivers come from the world map's drainage, sites become points of interest, counties become regions.
 """
 import glob, json, math, os, re, sys, unicodedata
 import numpy as np
@@ -79,15 +79,47 @@ pages = [Grid(json.load(open(p))) for p in sorted(glob.glob(f'{WORK}/league/l-*-
 for g in pages: g.cx, g.cy = (float(v) for v in face.forward(*g.d['anchor']))
 PAGE_R = 1.75 * 5000  # a League page's own 3-mile hex reaches 1.73 miles from its centre
 
+# 100-ft detail (Heph 2026-11-05: "get the 100ft-level maps working"): the source maps stop at half-mile hexes, so each
+# 100-ft hex gets seeded, repeatable detail from value noise on the global lattice (the same hex always gets the same
+# answer, across March borders too). Borders between parent hexes are domain-warped so they wander instead of following
+# the old hex edges, and each terrain becomes a natural mix (glades in forest, copses in grassland, pools in bog...).
+SEED = int.from_bytes(MOD['id'].encode()[:8].ljust(8, b'\0'), 'little') & 0xFFFFFFFF
+def _hash(i, j, s):
+    h = (i.astype(np.uint64) * np.uint64(0x9E3779B1) ^ j.astype(np.uint64) * np.uint64(0x85EBCA77) ^ np.uint64((SEED + s * 0x27D4EB2F) & 0xFFFFFFFF)) & np.uint64(0xFFFFFFFF)
+    h ^= h >> np.uint64(15); h = (h * np.uint64(0x2C1B3C6D)) & np.uint64(0xFFFFFFFF); h ^= h >> np.uint64(12)
+    h = (h * np.uint64(0x297A2D39)) & np.uint64(0xFFFFFFFF); h ^= h >> np.uint64(15)
+    return h.astype(np.float64) / 4294967296.0
+def vnoise(x, y, L, s):  # smooth value noise, cell size L feet
+    fx, fy = x / L, y / L; i, j = np.floor(fx), np.floor(fy); u, v = fx - i, fy - j
+    u, v = u * u * (3 - 2 * u), v * v * (3 - 2 * v); i, j = i.astype(np.int64), j.astype(np.int64)
+    return (_hash(i, j, s) * (1 - u) + _hash(i + 1, j, s) * u) * (1 - v) + (_hash(i, j + 1, s) * (1 - u) + _hash(i + 1, j + 1, s) * u) * v
+def fbm(x, y, s, L=1500):
+    return .5 * vnoise(x, y, L, s) + .3 * vnoise(x, y, L / 2.6, s + 7) + .2 * vnoise(x, y, L / 7, s + 13)
+_q = np.random.default_rng(1).uniform(-3e6, 3e6, (2, 400000)); QS = np.quantile(fbm(_q[0], _q[1], 1), np.linspace(0, 1, 101))
+def uni(f): return np.interp(f, QS, np.linspace(0, 1, 101))  # fbm -> about uniform 0..1, so the shares below are true shares
+WARP = 900  # feet: how far a border may wander from the source map's hex edge
+MIX = {  # parent terrain -> [(share, child)], read in order on a 0..1 noise; the parent keeps the rest
+    'grass': [(.07, 'woods'), (.02, 'forest')], 'woods': [(.18, 'grass'), (.17, 'forest')],
+    'forest': [(.05, 'grass'), (.13, 'woods')], 'hills': [(.18, 'grass'), (.08, 'woods')],
+    'mount': [(.25, 'hills')], 'bog': [(.12, 'grass'), (.08, 'woods')], 'sea': []}
+
 def terrain(C, R):
-    x, y = ft(C, R); lat, lon = face.inverse(x, y)
+    x, y = ft(C, R)
+    wx, wy = x + (fbm(x, y, 2) - .5) * 2 * WARP, y + (fbm(x, y, 3) - .5) * 2 * WARP
+    lat, lon = face.inverse(wx, wy)
     t = world.look(lat, lon); best = np.full(C.shape, PAGE_R ** 2)
     for g in pages:
-        d2 = (x - g.cx) ** 2 + (y - g.cy) ** 2; near = d2 < best
+        d2 = (wx - g.cx) ** 2 + (wy - g.cy) ** 2; near = d2 < best
         if not near.any(): continue
         tt = g.look(lat[near], lon[near]); sel = np.flatnonzero(near)[tt >= 0]
         t.flat[sel] = tt[tt >= 0]; best.flat[sel] = d2.flat[sel]
-    return np.maximum(t, 0).astype(np.uint8)
+    t = np.maximum(t, 0).astype(np.uint8); out = t.copy()
+    u = uni(fbm(x, y, 4, 700))  # the mix noise: patches a few hundred feet across
+    for pt, mix in MIX.items():
+        on = t == TID[pt]; lo = 0.0
+        for share, child in mix:  # rare children at the high end of the noise, so they come in patches, not speckle
+            out[on & (u >= 1 - lo - share) & (u < 1 - lo)] = TID[child]; lo += share
+    return out
 
 # label origins: the region's top-left March and League, from the module's fixed extent so addresses never shift
 lo0, la0, lo1, la1 = A['extent']
