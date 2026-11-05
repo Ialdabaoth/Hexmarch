@@ -298,23 +298,51 @@ def make(key, R):
             o.append(f'<text x="{x:.1f}" y="{y+22:.1f}" text-anchor="middle" font-size="12.5" font-style="italic" font-weight="bold" fill="{SD[pside][2]}" stroke="#f4efe1" stroke-width="3.5" paint-order="stroke">{pn}</text>')
     thr = R.get("river_km2", 120)
     segs, edge = [], []
-    SNR = sub.shape[0]
+    SNR = sub.shape[0]; N = SNR * SNC
     def ok(i): return acc[i] >= thr and parent[i] >= 0 and flat[i] > 0
     def xy(i):
         r, c = divmod(int(i), SNC); return PLL(LON_LEFT + (c0 + c + .5) * cell, LAT_TOP - (r0 + r + .5) * cell)
-    def mid(p, q): return ((p[0] + q[0]) / 2, (p[1] + q[1]) / 2)
-    fed = set(int(parent[i]) for i in range(SNR * SNC) if ok(i))  # cells some river flows into
-    # one smoothing pass (Heph 2026-11-05): each step i->p is drawn from the middle of i->p, bending through p, to the middle of p->next,
-    # so the grid's stair steps become curves; a river's first step starts at its source cell and its last step ends in the sea.
-    for i in range(SNR * SNC):
-        if not ok(i): continue
-        p = int(parent[i]); A, B = xy(i), xy(p); m1 = mid(A, B)
-        wdt = min(4.5, 0.8 + 2 * math.log10(acc[i] / thr + 1))
-        d = (f"M{A[0]:.1f},{A[1]:.1f} L{m1[0]:.1f},{m1[1]:.1f}" if i not in fed else f"M{m1[0]:.1f},{m1[1]:.1f}")
-        if ok(p): m2 = mid(B, xy(parent[p])); d += f" Q{B[0]:.1f},{B[1]:.1f} {m2[0]:.1f},{m2[1]:.1f}"
-        else: d += f" L{B[0]:.1f},{B[1]:.1f}"
-        edge.append(f'<path d="{d}" stroke-width="{wdt + 2:.2f}"/>')  # 1 px dark border each side, drawn under the water
-        segs.append(f'<path d="{d}" stroke-width="{wdt:.2f}"/>')
+    def width(i): return min(4.5, 0.8 + 2 * math.log10(acc[i] / thr + 1))
+    # Rivers as splines (Heph 2026-11-05). The flow grid gives one step per cell, so a river is a chain of cell centres.
+    # Each river is split into chains: a chain follows the biggest inflow downstream and ends where it joins a bigger river
+    # (at that river's smoothed point) or reaches the sea. Each chain's points get a light moving average (ends pinned),
+    # then a centripetal Catmull-Rom spline (no loops or cusps at sharp bends) drawn as cubic Beziers, one per step so the
+    # width can grow downstream.
+    main = {}  # cell -> its largest inflowing river cell
+    for i in range(N):
+        if ok(i):
+            p = int(parent[i])
+            if p not in main or acc[i] > acc[main[p]]: main[p] = i
+    chains = []
+    for i in range(N):
+        if not ok(i) or i in main: continue  # every chain starts at a source (a cell nothing flows into)
+        ch = [i]
+        while ok(ch[-1]):
+            p = int(parent[ch[-1]]); ch.append(p)
+            if main.get(p) != ch[-2]: break  # joined a bigger river
+        chains.append(ch)
+    chains.sort(key=lambda ch: -max(acc[c] for c in ch[:-1]))  # big rivers first, so tributaries can join their smoothed line
+    SM = {}
+    def sp(a, b, c, d):  # centripetal Catmull-Rom from b to c as Bezier control points
+        def t(u, v): return max(1e-6, math.hypot(v[0] - u[0], v[1] - u[1]) ** .5)
+        t1, t2, t3 = t(a, b), t(b, c), t(c, d)
+        m1 = [(c[k] - b[k]) / t2 - (c[k] - a[k]) / (t1 + t2) + (b[k] - a[k]) / t1 for k in (0, 1)]
+        m2 = [(c[k] - b[k]) / t2 - (d[k] - b[k]) / (t2 + t3) + (d[k] - c[k]) / t3 for k in (0, 1)]
+        return [b[k] + m1[k] * t2 / 3 for k in (0, 1)], [c[k] - m2[k] * t2 / 3 for k in (0, 1)]
+    for ch in chains:
+        raw = [xy(c) for c in ch]; n = len(raw)
+        pts = [raw[0]] + [tuple(sum(raw[j][k] for j in range(max(0, q - 2), min(n, q + 3))) / (min(n, q + 3) - max(0, q - 2)) for k in (0, 1)) for q in range(1, n - 1)] + [raw[-1]]
+        if ch[-1] in SM: pts[-1] = SM[ch[-1]]
+        for q, c in enumerate(ch): SM.setdefault(c, pts[q])
+        for q in range(n - 1):
+            A, B, C, D = pts[max(0, q - 1)], pts[q], pts[q + 1], pts[min(n - 1, q + 2)]
+            if A == B: A = (2 * B[0] - C[0], 2 * B[1] - C[1])
+            if D == C: D = (2 * C[0] - B[0], 2 * C[1] - B[1])
+            c1, c2 = sp(A, B, C, D)
+            d = f"M{B[0]:.1f},{B[1]:.1f} C{c1[0]:.1f},{c1[1]:.1f} {c2[0]:.1f},{c2[1]:.1f} {C[0]:.1f},{C[1]:.1f}"
+            rw = width(ch[q])  # (not "w": that is the hex column width, used below)
+            edge.append(f'<path d="{d}" stroke-width="{rw + 2:.2f}"/>')  # 1 px dark border each side, drawn under the water
+            segs.append(f'<path d="{d}" stroke-width="{rw:.2f}"/>')
     segs = ['<g fill="none" stroke-linecap="round" stroke-linejoin="round"><g stroke="#1b2a33" stroke-opacity=".85">'] + edge + ['</g><g stroke="#3f7fa8">'] + segs + ['</g></g>']
     if OUTSIDE_FULL: o.append('<g>' + "".join(segs) + '</g>')
     else:
