@@ -32,3 +32,9 @@ export function wikiPageOf(ref: string): string | null {
 
 // A table or section of the Compendium with no app reference of its own.
 export const wikiPage = (page: string) => WIKI_BASE + page;
+
+// A cantrip by name; variants like "Magic Missile (Fire)" share their cantrip's entry.
+export function wikiForCantrip(name: string): string {
+  const base = name.replace(/\s*\(.*\)\s*$/, '').trim().toLowerCase().replace(/\s+/g, '-');
+  return url(`mm:cantrip:${base}`) ?? WIKI_BASE + 'Arcane-Spells#cantrips';
+}

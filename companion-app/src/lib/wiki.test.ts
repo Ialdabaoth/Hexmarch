@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { RULESETS } from '../rules/rules';
-import { wikiForClass, wikiForEntry, wikiForMonster, WIKI_BASE } from './wiki';
+import { wikiForCantrip, wikiForClass, wikiForEntry, wikiForMonster, WIKI_BASE } from './wiki';
 import mmBestiary from '../bestiary/mm-bestiary.json';
 
 describe('wiki links', () => {
@@ -9,6 +9,11 @@ describe('wiki links', () => {
     expect(wikiForClass('mm', 'warrior')).toBe(`${WIKI_BASE}Warrior`);
     expect(wikiForClass('e9mm', 'druid')).toBe(`${WIKI_BASE}Druid`);
     expect(wikiForMonster('mm:giant-rat')).toBe(`${WIKI_BASE}Bestiary-Animals#giant-rat`);
+  });
+
+  it('links cantrips by their base name', () => {
+    expect(wikiForCantrip('Magic Missile (Fire)')).toBe(`${WIKI_BASE}Arcane-Spells#magic-missile`);
+    expect(wikiForCantrip('Blade Ward')).toBe(`${WIKI_BASE}Arcane-Spells#cantrips`);
   });
 
   it('has nothing for custom entries', () => {
