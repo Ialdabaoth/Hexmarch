@@ -64,11 +64,6 @@
 </details>
 
 <details class="section">
-  <summary><h2>Art</h2></summary>
-  <Art />
-</details>
-
-<details class="section">
   <summary><h2>Procedures</h2></summary>
   <p class="small muted">Buttons for travel, wandering monsters, weather and the like will run here, step by step, using the tables defined in the Rules tab.</p>
 </details>
@@ -81,6 +76,11 @@
 <details class="section">
   <summary><h2>History</h2></summary>
   <p class="small muted">The campaign's chronicle, one entry per session, with the option to undo back to any of them. Nothing recorded yet.</p>
+</details>
+
+<details class="section">
+  <summary><h2>Art</h2></summary>
+  <Art />
 </details>
 
 <details class="section">
