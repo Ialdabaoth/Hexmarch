@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { wikiForEntry } from '../lib/wiki';
+  import PageRef from './PageRef.svelte';
   import { app } from '../lib/app.svelte';
   import type { Ruleset } from '../rules/rules';
 
@@ -38,7 +40,7 @@
     {#each shown.slice(0, 60) as e (e.ref)}
       <li>
         <strong>{e.name}</strong>
-        <span class="small muted">· {e.what}{e.page ? ` · p. ${e.page}` : ''}{e.ref.startsWith('local:') ? ' · custom' : ''}</span>
+        <span class="small muted">· {e.what}{#if e.page} · <PageRef page={e.page} href={wikiForEntry(e.ref)} />{/if}{e.ref.startsWith('local:') ? ' · custom' : ''}</span>
         {#if e.summary}<div class="small">{e.summary}</div>{/if}
       </li>
     {:else}

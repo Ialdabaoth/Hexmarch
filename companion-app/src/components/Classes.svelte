@@ -1,5 +1,7 @@
 <script lang="ts">
   import type { Ruleset } from '../rules/rules';
+  import { wikiForClass } from '../lib/wiki';
+  import PageRef from './PageRef.svelte';
 
   // The chosen rules' classes, with their features by level and book pages.
   let { rules }: { rules: Ruleset } = $props();
@@ -10,10 +12,13 @@
   <summary><h2>Classes</h2></summary>
   {#each rules.classes as c (c.id)}
     <div class="card cls">
-      <button class="head" onclick={() => (open = open === c.id ? null : c.id)} aria-expanded={open === c.id}>
-        <strong class="grow">{c.name}</strong>
-        <span class="small muted">{c.kind.replace('-', ' ')} · p. {c.page}</span>
-      </button>
+      <div class="row top">
+        <button class="head grow" onclick={() => (open = open === c.id ? null : c.id)} aria-expanded={open === c.id}>
+          <strong class="grow">{c.name}</strong>
+          <span class="small muted">{c.kind.replace('-', ' ')}</span>
+        </button>
+        <span class="small muted">{#if c.book}{c.book} {/if}<PageRef page={c.page} href={wikiForClass(rules.id, c.id)} /></span>
+      </div>
       {#if open === c.id}
         <ul class="features">
           {#each c.features as f}
@@ -28,6 +33,7 @@
 
 <style>
   .cls { margin-top: 0.5rem; padding: 0.6rem; }
+  .top { flex-wrap: nowrap; align-items: center; gap: 0.5rem; }
   .head { width: 100%; display: flex; align-items: center; gap: 0.5rem; border: 0; background: transparent; padding: 0; text-align: left; min-height: 0; }
   .features { list-style: none; padding: 0; margin: 0.5rem 0 0; }
   .features li { margin: 0.4rem 0; }
