@@ -106,18 +106,15 @@ def icon_defs():
     import base64
     from PIL import Image
     out = []
-    for n in sorted(set(T_ICON.values()) | set(S_ICON.values()) | set(SITE_ICONS.values()) | set(T_BG.values()) | USED_BLEED):
+    base = set(T_BG.values()) | USED_BLEED
+    for n in sorted(set(T_ICON.values()) | set(S_ICON.values()) | set(SITE_ICONS.values()) | base | {b + "-x" for b in base}):  # "-x": rimless twins for the viewer's Hex Edges box (tools/tiles_blend.py)
         f = os.path.join(TILES, n + ".png")
         if not os.path.exists(f): continue
         W, H = Image.open(f).size
         b = base64.b64encode(open(f, "rb").read()).decode()
-        out.append(f'<symbol id="i-{n}" viewBox="0 0 {W} {H}" preserveAspectRatio="xMidYMid meet"><image width="{W}" height="{H}" href="data:image/png;base64,{b}"/></symbol>')
-        if n.startswith(("bg-", "bleed-")):  # "-x" twin without the painted hex rim: the same image zoomed past its rim and clipped to the hex; the viewer's "Hex edges" box swaps to it
-            if not any(x.startswith('<clipPath id="hexclip"') for x in out[:1]):
-                out.insert(0, f'<clipPath id="hexclip"><polygon points="-2,{H/2} {W/4-1},-2 {W*3/4+1},-2 {W+2},{H/2} {W*3/4+1},{H+2} {W/4-1},{H+2}"/></clipPath>')  # 2 px past the hex so neighbours overlap and no seam shows
-            out.append(f'<symbol id="i-{n}-x" viewBox="0 0 {W} {H}"><g clip-path="url(#hexclip)"><use href="#i-{n}" width="{W}" height="{H}" transform="translate({W/2} {H/2}) scale({RIMLESS}) translate({-W/2} {-H/2})"/></g></symbol>')
+        vb, ov = (f"0 0 {W} {H}", "") if not n.endswith("-x") else (f"4 4 {W-8} {H-8}", ' overflow="visible"')  # -x twins have a 4 px margin (tiles_blend.py PAD) that overlaps the neighbours
+        out.append(f'<symbol id="i-{n}" viewBox="{vb}"{ov} preserveAspectRatio="xMidYMid meet"><image width="{W}" height="{H}" href="data:image/png;base64,{b}"/></symbol>')
     return "".join(out)
-RIMLESS = 1.12  # zoom that pushes the bg tiles' ~10 px painted rim outside the hex
 
 MI_KM = 1.524  # the game mile is exactly 5000 feet (Heph 2026-11-04)
 
