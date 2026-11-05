@@ -53,7 +53,7 @@ function tile(n) {
   if (bl) {  // a blend tile, made here: the colour's own tile times Heph's greyscale mask (as tiles_blend.py makes them)
     if (IMG[n]) return IMG[n];
     const bg = tile('bg-' + bl[1] + (bl[3] || '')), mk = tile('mask-' + bl[2] + (bl[3] || '')); if (!bg || !mk) return null;
-    const c = document.createElement('canvas'); c.width = bg.naturalWidth; c.height = bg.naturalHeight; const g = c.getContext('2d');
+    const c = document.createElement('canvas'); c.width = bg.width; c.height = bg.height; const g = c.getContext('2d');
     const m = document.createElement('canvas'); m.width = c.width; m.height = c.height; const h = m.getContext('2d');
     h.drawImage(mk, 0, 0, c.width, c.height); const d = h.getImageData(0, 0, c.width, c.height), p = d.data;
     for (let q = 0; q < p.length; q += 4) { p[q + 3] = p[q]; p[q] = p[q + 1] = p[q + 2] = 0; } h.putImageData(d, 0, 0);
@@ -61,7 +61,13 @@ function tile(n) {
     return IMG[n] = c;
   }
   let im = IMG[n]; if (!im) { im = IMG[n] = new Image(); im.onload = redraw; im.src = 'tiles/' + n + '.png'; }
-  return im.complete && im.naturalWidth ? im : null;
+  if (!(im instanceof HTMLImageElement)) return im;
+  if (!im.complete || !im.naturalWidth) return null;
+  if (n.startsWith('bg-')) {  // background tiles become canvases too, so they are resampled exactly like the blend tiles drawn over them
+    const c = document.createElement('canvas'); c.width = im.naturalWidth; c.height = im.naturalHeight; c.getContext('2d').drawImage(im, 0, 0);
+    return IMG[n] = c;
+  }
+  return im;
 }
 async function loadMarch(m) {
   const blob = await (await fetch(m.png)).blob();
@@ -151,7 +157,9 @@ function draw() {
   const sfx = EDGES ? '' : '-x', pad = EDGES ? 0 : 4 / 238;
   for (const [i, j, t] of vis) {
     const [sx, sy] = S(...hexFt(i, j, N)), bg = T_BG[t];
-    const X = sx - bw / 2 - pad * bw, Y = sy - hh / 2 - pad * bw, w_ = bw * (1 + 2 * pad), h_ = hh + 2 * pad * bw;
+    // one rect for the tile and its blends, snapped to device pixels so they can never resample differently
+    const sn = v => Math.round(v * dpr) / dpr, X = sn(sx - bw / 2 - pad * bw), Y = sn(sy - hh / 2 - pad * bw);
+    const w_ = sn(sx + bw / 2 + pad * bw) - X, h_ = sn(sy + hh / 2 + pad * bw) - Y;
     const im = bg && tile(bg + sfx);
     if (im) ctx.drawImage(im, X, Y, w_, h_); else { hexPath(sx, sy, r); ctx.fillStyle = TYPES[t - 1].color; ctx.fill(); }
     if (bg) {  // blends: each border bleeds both ways at 40% (hexmap.py BLEED_ALPHA)
