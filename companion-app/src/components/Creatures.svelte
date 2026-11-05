@@ -12,6 +12,7 @@
     type Attack, type Creature, type CreatureKind, type TemplateSources
   } from '../bestiary/creature';
   import PageRef from './PageRef.svelte';
+  import { creatureNotes, creatureTemplate, loadModuleCreatures, usualCount, type ModuleCreature } from '../lib/module-creatures';
 
   // The referee's creatures for the active campaign (CREATURES_FORMAT.md): monsters, NPCs
   // and beasts built from a template, each a copy with its own hit points per member.
@@ -33,7 +34,26 @@
     });
   });
 
-  let rules = $derived(findRules(app.campaign ? campaignRulesId(app.campaign) : app.settings.rules) ?? rulesFor('mm'));
+  let rulesId = $derived(app.campaign ? campaignRulesId(app.campaign) : app.settings.rules);
+  let rules = $derived(findRules(rulesId) ?? rulesFor('mm'));
+
+  // Creatures from the saved modules (Settings › Modules), with stats for the campaign's rules.
+  let fromModules = $state.raw<ModuleCreature[]>([]);
+  $effect(() => {
+    const mods = app.modules, rid = rulesId;
+    Promise.allSettled(mods.map((m) => loadModuleCreatures(m, rid))).then((rs) => {
+      fromModules = rs.flatMap((r) => (r.status === 'fulfilled' ? r.value : []));
+      for (const r of rs) if (r.status === 'rejected') console.warn('Module creatures', r.reason);
+    });
+  });
+  let moduleGroups = $derived.by(() => {
+    const by = new Map<string, { title: string; list: ModuleCreature[] }>();
+    for (const c of fromModules) {
+      if (!by.has(c.moduleId)) by.set(c.moduleId, { title: c.moduleTitle, list: [] });
+      by.get(c.moduleId)!.list.push(c);
+    }
+    return [...by.values()];
+  });
   let shown = $derived(list.filter((c) => filter === 'all' || c.kind === filter));
 
   function save() {
@@ -55,6 +75,7 @@
   }
 
   function add(from: string, sheet?: string) {
+    if (from.startsWith('mod:')) return addFromModule(from.slice(4));
     try {
       const c = newCreature({ from, ...(sheet ? { sheet } : {}) }, sheet ? 1 : count, sources());
       list.push(c);
@@ -64,6 +85,31 @@
       app.notify(e instanceof TemplateError ? e.message : `Couldn't add: ${(e as Error).message}`);
     }
     pick = '';
+  }
+
+  function addFromModule(key: string) {
+    const m = fromModules.find((x) => x.key === key);
+    pick = '';
+    if (!m) return;
+    if (!m.template) return app.notify(`${m.moduleTitle} has no ${rules.name} stats for ${m.name}`);
+    try {
+      const others = m.others;
+      const c = newCreature(creatureTemplate(m), count, { ...sources(), creature: (id) => others[id] });
+      c.kind = m.kind;
+      c.notes = creatureNotes(m);
+      list.push(c);
+      open = c.id;
+      save();
+    } catch (e) {
+      app.notify(e instanceof TemplateError ? e.message : `Couldn't add: ${(e as Error).message}`);
+    }
+  }
+
+  // Picking a module creature sets the count to its usual troupe size.
+  function picked(e: Event) {
+    const v = (e.currentTarget as HTMLSelectElement).value;
+    const m = v.startsWith('mod:') ? fromModules.find((x) => x.key === v.slice(4)) : undefined;
+    count = (m && usualCount(m)) ?? 1;
   }
 
   function remove(c: Creature) {
@@ -197,7 +243,7 @@
 <p class="small muted">Monsters, NPCs and beasts you run, for {app.campaign ? app.campaign.campaign.name : 'this device'} ({rules.name}). Each is a copy of its bestiary entry, so changing it here never changes the book.</p>
 
 <div class="row add">
-  <select aria-label="Monster from the bestiary" bind:value={pick} class="grow">
+  <select aria-label="Monster from the bestiary" bind:value={pick} onchange={picked} class="grow">
     <option value="">Add from the bestiary…</option>
     <optgroup label="NPCs ({rules.name})">
       <option value="npc">Quick NPC (rolled)</option>
@@ -206,6 +252,11 @@
     <optgroup label="Bestiary">
       {#each monsters as m (m.ref)}<option value={m.ref}>{m.name}{m.page ? ` · p. ${m.page}` : ''}</option>{/each}
     </optgroup>
+    {#each moduleGroups as g (g.list[0].moduleId)}
+      <optgroup label={g.title}>
+        {#each g.list as m (m.key)}<option value="mod:{m.key}">{m.name}{m.home ? ` · ${m.home}` : ''}{m.template ? '' : ' (no stats)'}</option>{/each}
+      </optgroup>
+    {/each}
   </select>
   <label class="count">× <input type="number" min="1" max="99" bind:value={count} aria-label="How many" /></label>
   <button disabled={!pick} onclick={() => add(pick)}>Add</button>

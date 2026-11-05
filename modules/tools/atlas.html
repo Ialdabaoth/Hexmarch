@@ -28,6 +28,7 @@ footer{display:flex;justify-content:space-between;gap:12px;padding:4px 16px;font
 <button id="out" title="Zoom out">−</button><button id="in" title="Zoom in">+</button><button id="fit">Fit</button><button id="keybtn">Key</button></div></header>
 <div id="main"><div id="map"><canvas id="cv"></canvas></div><aside id="key"></aside></div>
 <footer><span id="hover">Click a hex to zoom in.</span><span>E9 Atlas {{ATLAS}} · dynamic preview</span></footer>
+<!--CARD-->
 <script>
 "use strict";
 const CW = 50 * Math.sqrt(3), SQ3 = Math.sqrt(3), LAB = '0123456789ABCDEFGHJKLMNPRSTUVWXYZ';
@@ -51,7 +52,7 @@ function hexAt(x, y, N) {  // level-N hex (i, j) under a point in feet: the leve
 }
 const hexFt = (i, j, N) => { const [C, R] = centre(i, j, N); return N === 25 ? [C * CW, (R + 0.5 * (i & 1)) * 100] : ft(C, R); };
 const T_BG = {}, T_ICON = {}, HEX_FEATURES = new Set(['clearing', 'bushes', 'thorns', 'spider', 'great-tree', 'mushrooms', 'forest-cave', 'forest-hill', 'stone-circle']);
-let D, TYPES = [], M = {}, LBL, lang = 'ga', EDGES = true;
+let D, TYPES = [], M = {}, LBL, lang = 'ga', EDGES = true, CR = [];  // CR: the module's creatures (creatures.json from build.py)
 const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
 
 // ---- data ----
@@ -229,15 +230,32 @@ function key(ts, ps) {
     for (const p of ps.slice().sort((a, b) => name(a.name).localeCompare(name(b.name))))
       h += `<div class="row pl" data-id="${esc(p.id)}"><span class="sw">${p.icon ? `<img src="tiles/${p.icon}.png" alt="">` : ''}</span><span>${esc(name(p.name))}<br><small>${esc(p.kind)}${p.book ? ' · ' + esc(p.book) : ''}</small></span></div>`;
   }
+  // creatures in the hex being looked at (the dashed one): their lair is a place in it, or a 100-ft hex address in it
+  const here = creaturesHere();
+  if (here.length) {
+    h += `<h2>Creatures here</h2>`;
+    for (const c of here) { const n = c.troupe && Object.values(c.troupe)[0];
+      h += `<div class="row pl cr" data-cr="${esc(c.id)}"><span>${esc(c.name)}${n ? ' <small>×' + esc(n) + '</small>' : ''}<br><small>${esc(c.kind === 'npc' ? 'NPC' : c.kind)}${c.is ? ' · ' + esc(c.is) : ''}${c.site_name ? ' · ' + esc(name(c.site_name)) : ''}</small></span></div>`; }
+  }
   if (PATREON) h += `<p class="support">Enjoying E9? <a href="${esc(PATREON)}" target="_blank" rel="noopener">Support it on Patreon</a></p>`;
   if (h !== KEYHTML) document.getElementById('key').innerHTML = KEYHTML = h;
 }
 document.getElementById('key').addEventListener('click', e => {
+  const cr = e.target.closest('.cr'); if (cr) { const c = CR.find(x => x.id === cr.dataset.cr); if (c && window.E9Card) E9Card.show(c); return; }
   const r = e.target.closest('.pl'); if (!r) return; const p = D.pois.find(q => q.id === r.dataset.id); if (!p) return;
   const [x, y] = ft(...p.hex), o = p.ft || [0, 0]; goDown(x + o[0], y + o[1]);
 });
 document.getElementById('keybtn').onclick = () => { document.body.classList.toggle('nokey'); redraw(); };
 if (matchMedia('(max-width:700px)').matches) document.body.classList.add('nokey');
+function creaturesHere() {
+  const own = LV[V.lvl].own; if (!own || !CR.length) return [];
+  const inHex = (C, R) => { const [i, j] = own === 1200 ? nearest(C, R, 1200) : nearest(C, R, own); return i === V.i && j === V.j; };
+  return CR.filter(c => {
+    if (c.site) { const p = D.pois.find(q => q.id === c.site); return p ? inHex(...p.hex) : false; }
+    if (c.hex && /^world:/i.test(c.hex)) { const q = parse('#' + c.hex); return q.sel ? inHex(...q.sel) : false; }
+    return false;
+  }).sort((a, b) => a.name.localeCompare(b.name));
+}
 function goDown(x, y) {  // Heph's rule: anything clicked zooms in one level, centred on it; Field level waits for Encounter maps
   const N = LV[V.lvl].draw, [i, j] = hexAt(x, y, N);
   if (!T(i, j, N) || V.lvl === 'field') return;
@@ -291,6 +309,7 @@ addEventListener('hashchange', go); addEventListener('resize', redraw);
   D = await (await fetch('map.json')).json(); TYPES = D.terrain.types; LBL = D.labels;
   TYPES.forEach((t, k) => { T_BG[k + 1] = t.tile; if (t.icon) T_ICON[k + 1] = t.icon; });
   await Promise.all(D.terrain.marches.map(loadMarch));
+  try { CR = (await (await fetch('creatures.json')).json()).creatures || []; } catch (e) { CR = []; }  // a module without creatures has no file
   smoothRivers(); go();
 })();
 </script></body></html>

@@ -92,6 +92,7 @@ html[data-mode="atlas"] main { grid-template-columns: minmax(0, 1fr); grid-templ
     <p class="ver" id="ver"></p>
   </aside>
 </main>
+<!--CARD-->
 <script type="application/json" id="module-data">/*DATA*/</script>
 <script>
 const D = JSON.parse(document.getElementById('module-data').textContent);
@@ -202,6 +203,9 @@ async function hexInfo(r) {
   box.replaceChildren(Object.assign(document.createElement('h2'), { textContent: 'Hex ' + r.hex }),
     Object.assign(document.createElement('p'), { textContent: scale + (t ? ' · ' + (TERRAIN[t] || t) : '') }));
   if (sites.length) { const p = document.createElement('p'); p.append('Sites: '); sites.forEach((s, i) => { if (i) p.append(', '); p.append(Object.assign(document.createElement('a'), { href: s.href, textContent: L(s.name) })); }); box.append(p); }
+  // creatures who live here (CREATURES_FORMAT.md lair): a site in this hex, or a hex address on this map; each opens its index card
+  const slugs = new Set(sites.map(s => s.slug)), here = (D.creatures || []).filter(c => slugs.has(c.site) || c.hex === map + ':' + r.hex);
+  if (here.length && window.E9Card) { const p = document.createElement('p'); p.append('Creatures:'); box.append(p, E9Card.list(here)); }
   box.hidden = false;
   tell({ event: 'hex', map, hex: r.hex, hash: location.hash, terrain: t || null, terrainName: t ? TERRAIN[t] || t : null, scale, sites });
 }
