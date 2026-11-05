@@ -49,6 +49,17 @@ const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
 // ---- data ----
 const IMG = {};
 function tile(n) {
+  const bl = n.match(/^bleed-(\w+)-([ec]\d)(-x)?$/);
+  if (bl) {  // a blend tile, made here: the colour's own tile times Heph's greyscale mask (as tiles_blend.py makes them)
+    if (IMG[n]) return IMG[n];
+    const bg = tile('bg-' + bl[1] + (bl[3] || '')), mk = tile('mask-' + bl[2] + (bl[3] || '')); if (!bg || !mk) return null;
+    const c = document.createElement('canvas'); c.width = bg.naturalWidth; c.height = bg.naturalHeight; const g = c.getContext('2d');
+    const m = document.createElement('canvas'); m.width = c.width; m.height = c.height; const h = m.getContext('2d');
+    h.drawImage(mk, 0, 0, c.width, c.height); const d = h.getImageData(0, 0, c.width, c.height), p = d.data;
+    for (let q = 0; q < p.length; q += 4) { p[q + 3] = p[q]; p[q] = p[q + 1] = p[q + 2] = 0; } h.putImageData(d, 0, 0);
+    g.drawImage(bg, 0, 0); g.globalCompositeOperation = 'destination-in'; g.drawImage(m, 0, 0);
+    return IMG[n] = c;
+  }
   let im = IMG[n]; if (!im) { im = IMG[n] = new Image(); im.onload = redraw; im.src = 'tiles/' + n + '.png'; }
   return im.complete && im.naturalWidth ? im : null;
 }
