@@ -85,12 +85,20 @@ TILES = os.environ.get("HEXTILES")  # folder of outline-free icon PNGs (maps/til
 OUTSIDE_FULL = os.environ.get("HEXFADE") is None  # Heph 2026-11-04: hexes beyond the county border render fully; HEXFADE=1 restores the fade
 T_ICON = {"forest": "forest", "woods": "trees", "hills": "hills", "mount": "mountains", "bog": "swamp"}
 T_BG = {"grass": "bg-green", "forest": "bg-green", "woods": "bg-green", "hills": "bg-green", "mount": "bg-brown", "bog": "bg-grey"}  # Heph 2026-11-04
-S_ICON = {"castle": "keep", "town": "village", "tomb": "stones", "hill": "hills", "cave": "cave", "ruin": "ruins", "grove": "trees", "camp": "community", "lair": "hole", "mist": "fog", "dead": "graveyard"}
+S_ICON = {"castle": "keep", "town": "village", "tomb": "stones", "hill": "hills", "cave": "cave", "ruin": "ruins", "grove": "great-tree", "camp": "community", "lair": "hole", "mist": "fog", "dead": "graveyard"}  # Heph 2026-11-05: great tree for groves
+SITE_ICONS = json.loads(os.environ.get("HEXSITEICONS") or "{}")  # per-site icon overrides {site name: icon}, from module.json "site_icons"
+def site_icon(name, kind): return SITE_ICONS.get(name) or S_ICON.get(kind)
+def icon_aspect(n):  # height / width of an icon file, so tall icons are drawn at full width
+    from PIL import Image
+    f = os.path.join(TILES, n + ".png") if TILES else ""
+    if not os.path.exists(f): return .87
+    W, H = Image.open(f).size
+    return max(.87, H / W)
 def icon_defs():
     import base64
     from PIL import Image
     out = []
-    for n in sorted(set(T_ICON.values()) | set(S_ICON.values()) | set(T_BG.values())):
+    for n in sorted(set(T_ICON.values()) | set(S_ICON.values()) | set(SITE_ICONS.values()) | set(T_BG.values())):
         f = os.path.join(TILES, n + ".png")
         if not os.path.exists(f): continue
         W, H = Image.open(f).size
@@ -292,9 +300,9 @@ def make(key, R):
     for st in R["sites"]:
         name, lat, lon, kind = st[:4]
         x, y = PLL(lon, lat)
-        tile = bool(TILES and kind in S_ICON)
+        tile = bool(TILES and site_icon(name, kind))
         iw = max(26, min(46, 2 * s * PX * .55)) if tile else 16
-        items.append(dict(st=st, name=name, lat=lat, lon=lon, kind=kind, x=x, y=y, tile=tile, iw=iw, ih=iw * .87 if tile else 16))
+        items.append(dict(st=st, name=name, lat=lat, lon=lon, kind=kind, x=x, y=y, tile=tile, iw=iw, ih=iw * icon_aspect(site_icon(name, kind)) if tile else 16))
     for _ in range(60):  # icon repulsion: keep centres at least ~one icon apart
         moved = False
         for i, A in enumerate(items):
@@ -332,7 +340,7 @@ def make(key, R):
         o.append((f'<a href="{lk}">' if lk else "") + f'<g class="site" data-site="{slug(name)}" data-x="{x:.1f}" data-y="{y:.1f}">')
         col = "#7a2e2e" if kind in ("castle", "town") else "#2b2b2b"
         if it["tile"]:
-            o.append(f'<use href="#i-{S_ICON[kind]}" x="{x-it["iw"]/2:.1f}" y="{y-it["ih"]/2:.1f}" width="{it["iw"]:.1f}" height="{it["ih"]:.1f}"/>')
+            o.append(f'<use href="#i-{site_icon(name, kind)}" x="{x-it["iw"]/2:.1f}" y="{y-it["ih"]/2:.1f}" width="{it["iw"]:.1f}" height="{it["ih"]:.1f}"/>')
         else: o.append(f'<text x="{x:.1f}" y="{y+5:.1f}" text-anchor="middle" font-size="15" fill="{col}">{ICONS[kind]}</text>')
         r = it["lab"]
         o.append(f'<text x="{r[0]+2:.1f}" y="{r[3]-3:.1f}" font-size="{FS}" font-weight="bold" fill="#2b2418" stroke="#f4efe1" stroke-width="3" paint-order="stroke">{name}</text>')
@@ -379,7 +387,7 @@ def make(key, R):
     for k in sorted(keyed, key=lambda k: k["hex"]):
         kd = k["kind"]
         o.append(f'<text x="{lx}" y="{ly}" font-size="11" font-weight="bold">{k["hex"]}</text>')
-        if TILES and kd in S_ICON: o.append(f'<use href="#i-{S_ICON[kd]}" x="{lx+30}" y="{ly-12}" width="18" height="16"/>')
+        if TILES and site_icon(k["name"], kd): o.append(f'<use href="#i-{site_icon(k["name"], kd)}" x="{lx+30}" y="{ly-12}" width="18" height="16"/>')
         else: o.append(f'<text x="{lx+39}" y="{ly}" text-anchor="middle" font-size="12">{ICONS[kd]}</text>')
         o.append(f'<text x="{lx+52}" y="{ly}" font-size="11">{k["name"]}</text>'); ly += 18
     o.append("</svg>")

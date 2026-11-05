@@ -33,7 +33,8 @@ try: sha = subprocess.run(['git', 'rev-parse', '--short', 'HEAD'], capture_outpu
 except Exception: sha = ''
 VER = f"v{MOD['version']}" + (f"+{os.environ.get('GITHUB_SHA', sha)[:7]}" if (os.environ.get('GITHUB_SHA') or sha) else '') + ' · ' + datetime.date.today().isoformat()
 ENV = dict(os.environ, HEXDEM=','.join(map(str, MOD['dem'])), HEXADMIN=os.path.normpath(os.path.join(mdir, MOD['admin'])),
-           HEXTILES=os.path.join(ROOT, 'assets', 'tiles', 'icons'), HEXGEO=geo, MODVER=VER, MODTITLE=MOD.get('short', MOD['title']))
+           HEXTILES=os.path.join(ROOT, 'assets', 'tiles', 'icons'), HEXGEO=geo, MODVER=VER, MODTITLE=MOD.get('short', MOD['title']),
+           HEXSITEICONS=json.dumps(MOD.get('site_icons', {}), ensure_ascii=False))
 def run(*a): subprocess.run(list(a), check=True, env=ENV, stdout=subprocess.DEVNULL)
 
 # 1. the world map: every book's county sites on one 3-mile grid, at print scale (1 in per hex)
