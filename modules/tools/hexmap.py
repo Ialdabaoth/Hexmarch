@@ -88,7 +88,8 @@ T_BG = {"grass": "bg-green", "forest": "bg-green", "woods": "bg-green", "hills":
 # Blends (Heph 2026-11-05): a higher colour bleeds across the edge into a lower neighbour: grey > green > brown > blue.
 # Tiles from tools/tiles_blend.py: bleed-<colour>-e<k> for edge k (0 N, 1 NE, 2 SE, 3 S, 4 SW, 5 NW) and -c<k> for the
 # vertex between edges k-1 and k, used where both of those neighbours bleed the same colour. HEXBLEND=0 turns it off.
-BLEED_RANK = {"bg-blue": 0, "bg-brown": 1, "bg-green": 2, "bg-grey": 3}
+BLEED_RANK = {"bg-blue": 0, "bg-brown": 1, "bg-green": 2, "bg-grey": 3}  # colours that bleed (rank no longer matters)
+BLEED_ALPHA = .4  # Heph 2026-11-05: every border blends both ways at 40%, so each hex slightly favours its own colour
 BLEED = os.environ.get("HEXBLEND", "1") != "0"
 USED_BLEED = set()
 S_ICON = {"castle": "keep", "town": "village", "abbey": "church", "tomb": "stones", "hill": "hills", "cave": "cave", "ruin": "ruins", "grove": "great-tree", "camp": "community", "lair": "hole", "mist": "fog", "dead": "graveyard"}  # Heph 2026-11-05: great tree for groves, church for abbeys
@@ -246,11 +247,11 @@ def make(key, R):
                 ring = []  # the colour bleeding in across each edge, or None
                 for dc, dr in ((0, -1), (1, -1 + odd), (1, odd), (0, 1), (-1, odd), (-1, -1 + odd)):
                     nh = BY_CR.get((hx["col"] + dc, hx["row"] + dr)); nb_ = T_BG.get(nh["t"]) if nh else None
-                    ring.append(nb_[3:] if nb_ and BLEED_RANK.get(nb_, -1) > mine else None)
+                    ring.append(nb_[3:] if nb_ and nb_ != T_BG[hx["t"]] and nb_ in BLEED_RANK else None)  # both sides of every border, at half strength
                 for k, c in enumerate(ring):
                     for nm in ([f"bleed-{c}-e{k}"] if c else []) + ([f"bleed-{c}-c{k}"] if c and ring[k - 1] == c else []):
                         USED_BLEED.add(nm)
-                        o.append(f'<use href="#i-{nm}" x="{cx-bw/2:.1f}" y="{cy-bh/2:.1f}" width="{bw:.1f}" height="{bh:.1f}" opacity="{op}"/>')
+                        o.append(f'<use href="#i-{nm}" x="{cx-bw/2:.1f}" y="{cy-bh/2:.1f}" width="{bw:.1f}" height="{bh:.1f}" opacity="{op * BLEED_ALPHA}"/>')
             fill, op = "none", 1
         o.append(f'<polygon class="hx" points="{pts}" fill="{fill}" fill-opacity="{op}" stroke="#8a7f66" stroke-width="{0.6*min(1,sc):.2f}"/>')
         if hx["inside"] or OUTSIDE_FULL:
