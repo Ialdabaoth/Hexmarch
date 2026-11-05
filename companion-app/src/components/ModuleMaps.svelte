@@ -105,7 +105,7 @@
       </section>
     {/if}
     <details class="atlas" open>
-      <summary class="small muted">Atlas and exploration pages</summary>
+      <summary class="small muted">Marches and leagues pages</summary>
       <div class="frame">
         <iframe bind:this={atlasFrame} class="list" src="{base}?mode=atlas{start}" title="{current.manifest.title}: atlas"></iframe>
       </div>
@@ -114,9 +114,9 @@
 {:else}
   <section class="card">
     <p class="small muted" style="margin-top:0">
-      No module maps on this device yet. Add the Season 1 maps (Leinster, 1422), or add another module's site under Manage › Modules.
+      No module maps on this device yet. Add the Beyond the Pale maps (Leinster, 1422), or add another module's site under Manage › Modules.
     </p>
-    <button class="primary" onclick={addSeason1} disabled={busy}>{busy ? 'Adding…' : 'Add Season 1 maps'}</button>
+    <button class="primary" onclick={addSeason1} disabled={busy}>{busy ? 'Adding…' : 'Add Beyond the Pale maps'}</button>
     {#if problem}<p class="small failure" role="alert">{problem}</p>{/if}
   </section>
 {/if}
