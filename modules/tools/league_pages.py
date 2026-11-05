@@ -65,7 +65,7 @@ site_pg = {n: v['page'] for v in AI.values() for n in v['sites']}
 march_of = {}
 for v in AI.values():
     for n in v['sites']: march_of[n] = v['page']
-SI = {"castle": "keep", "town": "village", "tomb": "stones", "hill": "hills", "cave": "cave", "ruin": "ruins", "grove": "great-tree", "camp": "community", "lair": "hole", "mist": "fog", "dead": "graveyard"}  # keep in step with hexmap.py
+SI = {"castle": "keep", "town": "village", "abbey": "church", "tomb": "stones", "hill": "hills", "cave": "cave", "ruin": "ruins", "grove": "great-tree", "camp": "community", "lair": "hole", "mist": "fog", "dead": "graveyard"}  # keep in step with hexmap.py
 SITE_ICONS = json.loads(os.environ.get("HEXSITEICONS") or "{}")
 T = [('Grassland', 'bg-green', None), ('Forest', 'bg-green', 'forest'), ('Light woods', 'bg-green', 'trees'), ('Bog', 'bg-grey', 'swamp'), ('Hills', 'bg-green', 'hills'), ('Mountains', 'bg-brown', 'mountains')]
 TN = {'grass': 'grassland', 'forest': 'forest', 'woods': 'light woods', 'bog': 'bog', 'hills': 'hills', 'mount': 'mountains', 'sea': 'sea'}

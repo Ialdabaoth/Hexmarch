@@ -36,7 +36,7 @@ def site_page(st):
 T = [('grass', 'Grassland', 'bg-green', None), ('forest', 'Forest', 'bg-green', 'forest'), ('woods', 'Light woods', 'bg-green', 'trees'),
      ('bog', 'Bog', 'bg-grey', 'swamp'), ('hills', 'Hills', 'bg-green', 'hills'), ('mount', 'Mountains', 'bg-brown', 'mountains')]
 T = list(T)
-SI = {"castle": "keep", "town": "village", "tomb": "stones", "hill": "hills", "cave": "cave", "ruin": "ruins", "grove": "great-tree", "camp": "community", "lair": "hole", "mist": "fog", "dead": "graveyard"}  # keep in step with hexmap.py
+SI = {"castle": "keep", "town": "village", "abbey": "church", "tomb": "stones", "hill": "hills", "cave": "cave", "ruin": "ruins", "grove": "great-tree", "camp": "community", "lair": "hole", "mist": "fog", "dead": "graveyard"}  # keep in step with hexmap.py
 SITE_ICONS = json.loads(os.environ.get("HEXSITEICONS") or "{}")
 def esc(t): return html.escape(t, quote=True)
 def wrap(t, n):
