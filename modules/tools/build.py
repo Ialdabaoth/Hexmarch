@@ -31,7 +31,7 @@ for la in range(la0, la1 + 1):
             print('fetching', t); urllib.request.urlretrieve(f'https://s3.amazonaws.com/elevation-tiles-prod/skadi/{t[:3]}/{t}.hgt.gz', f)
 try: sha = subprocess.run(['git', 'rev-parse', '--short', 'HEAD'], capture_output=True, text=True, cwd=ROOT).stdout.strip()
 except Exception: sha = ''
-ATLAS = '0.2.2'  # version of the atlas tools and viewer themselves (Heph 2026-11-05); patch per PR, separate from each module's version
+ATLAS = '0.2.3'  # version of the atlas tools and viewer themselves (Heph 2026-11-05); patch per PR, separate from each module's version
 VER = f"v{MOD['version']}" + (f"+{os.environ.get('GITHUB_SHA', sha)[:7]}" if (os.environ.get('GITHUB_SHA') or sha) else '') + ' · ' + datetime.date.today().isoformat()
 ENV = dict(os.environ, HEXDEM=','.join(map(str, MOD['dem'])), HEXADMIN=os.path.normpath(os.path.join(mdir, MOD['admin'])),
            HEXTILES=os.path.join(ROOT, 'assets', 'tiles', 'icons'), HEXGEO=geo, MODVER=VER, MODATLAS=ATLAS, MODTITLE=MOD.get('short', MOD['title']),
@@ -52,7 +52,16 @@ run(*PY, TOOLS + '/hexmap.py', geo, work, work + '/world.json')
 run(*PY, TOOLS + '/atlas_pages.py', work + '/world.svg', work + '/world-grid.json', work + '/atlas.html')
 run(*PY, TOOLS + '/league_pages.py', os.path.join(mdir, 'module.json'), work + '/atlas-index.json', work + '/world-grid.json', work + '/league')
 # E9 Atlas format (ATLAS_FORMAT.md): the same terrain as one map JSON + one PNG per March, for the dynamic renderer
-if 'centroid' in MOD['atlas']: run(*PY, TOOLS + '/atlas_convert.py', os.path.join(mdir, 'module.json'), work, out + '/atlas')
+if 'centroid' in MOD['atlas']:
+    run(*PY, TOOLS + '/atlas_convert.py', os.path.join(mdir, 'module.json'), work, out + '/atlas')
+    # the dynamic renderer (preview): atlas/index.html draws every level from map.json + the March PNGs, with the shared tiles
+    AJ = json.load(open(out + '/atlas/map.json')); os.makedirs(out + '/atlas/tiles', exist_ok=True)
+    TD = os.path.join(ROOT, 'assets', 'tiles', 'icons')
+    want = {t['icon'] for t in AJ['terrain']['types'] if t.get('icon')} | {p['icon'] for p in AJ['pois'] if p.get('icon')}
+    want |= {f for t in AJ['terrain']['types'] for f in [t['tile']] + [f"bleed-{t['tile'][3:]}-{e}{k}" for e in 'ec' for k in range(6)]}
+    for n in sorted(want | {n + '-x' for n in want if n.startswith(('bg-', 'bleed-'))}):
+        if os.path.exists(f'{TD}/{n}.png'): shutil.copy(f'{TD}/{n}.png', f'{out}/atlas/tiles/{n}.png')
+    open(out + '/atlas/index.html', 'w').write(open(TOOLS + '/atlas.html').read().replace('{{TITLE}}', MOD['title']).replace('{{ATLAS}}', ATLAS))
 # 4. PDFs
 if PDF:
     os.makedirs(out + '/print', exist_ok=True)

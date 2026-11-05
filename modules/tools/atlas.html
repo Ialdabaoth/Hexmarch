@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{{TITLE}} · E9 Atlas</title>
+<style>
+:root{--bg:#f4efe1;--ink:#2b2418;--dim:#6b604c;--line:#8a7f66;--red:#7a2e2e}
+*{box-sizing:border-box}html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:Georgia,serif}
+body{display:flex;flex-direction:column}
+header{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;padding:8px 16px;border-bottom:1px solid #d8cfb8}
+h1{font-size:16px;margin:0;font-weight:normal;flex:1 1 320px}
+h1 a{color:var(--red);text-decoration:none;white-space:nowrap}h1 a:hover{text-decoration:underline}h1 b{white-space:nowrap}
+.ctl{display:flex;gap:6px;align-items:center;font-size:14px}
+button,select{font:inherit;font-size:14px;background:#fffaf0;border:1px solid #b8ab8c;border-radius:4px;padding:2px 8px;color:var(--ink)}
+#map{flex:1;position:relative;min-height:0}canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor:pointer}
+footer{display:flex;justify-content:space-between;gap:12px;padding:4px 16px;font-size:12px;color:var(--dim);border-top:1px solid #d8cfb8}
+#hover{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+</style></head><body>
+<header><h1 id="crumbs"></h1>
+<div class="ctl"><select id="lang"><option value="ga">Gaeilge</option><option value="en">English</option></select>
+<label><input type="checkbox" id="edges" checked> Hex Edges</label>
+<button id="out" title="Zoom out">−</button><button id="in" title="Zoom in">+</button><button id="fit">Fit</button></div></header>
+<div id="map"><canvas id="cv"></canvas></div>
+<footer><span id="hover">Click a hex to zoom in.</span><span>E9 Atlas {{ATLAS}} · dynamic preview</span></footer>
+<script>
+"use strict";
+const CW = 50 * Math.sqrt(3), SQ3 = Math.sqrt(3), LAB = '0123456789ABCDEFGHJKLMNPRSTUVWXYZ';
+const lab = n => n < 100 ? String(n).padStart(2, '0') : LAB[10 + Math.floor((n - 100) / 10)] + (n % 10);
+const unlab = s => { const a = LAB.indexOf(s[0]); return a < 10 ? +s : 100 + (a - 10) * 10 + +s[1]; };
+const centre = (i, j, N) => [N * i, N * j + (N >> 1) * (i & 1)];
+const ft = (C, R) => [C * CW, (R + 0.5 * (C & 1)) * 100];
+function nearest(C, R, N) {  // owner of lattice hex (C, R) at spacing N: nearest centre, ties to higher i then j (ATLAS_FORMAT.md)
+  const off = N >> 1, i0 = Math.floor(C / N); let b = null;
+  for (let di = -1; di <= 2; di++) { const i = i0 + di, Cc = N * i, j0 = Math.floor((R - off * (i & 1)) / N);
+    for (let dj = -1; dj <= 2; dj++) { const j = j0 + dj, Rc = N * j + off * (i & 1), d = 3 * (C - Cc) ** 2 + (2 * (R - Rc) + (C & 1) - (Cc & 1)) ** 2;
+      if (!b || d < b[0] || (d === b[0] && (i > b[1] || (i === b[1] && j > b[2])))) b = [d, i, j]; } }
+  return [b[1], b[2]];
+}
+function hexAt(x, y, N) {  // level-N hex (i, j) under a point in feet: the level-N centres form a regular odd-q grid N times the lattice
+  const s = 100 / SQ3, px = x / N, py = y / N, q = (2 / 3 * px) / s, r = (-px / 3 + SQ3 / 3 * py) / s;
+  let rx = Math.round(q), rz = Math.round(r), ry = Math.round(-q - r);
+  const dx = Math.abs(rx - q), dy = Math.abs(ry + q + r), dz = Math.abs(rz - r);
+  if (dx > dy && dx > dz) rx = -ry - rz; else if (dz >= dy) rz = -rx - ry;
+  return [rx, rz + (rx - (rx & 1)) / 2];
+}
+const hexFt = (i, j, N) => { const [C, R] = centre(i, j, N); return N === 25 ? [C * CW, (R + 0.5 * (i & 1)) * 100] : ft(C, R); };
+const T_BG = {}, T_ICON = {}, HEX_FEATURES = new Set(['clearing', 'bushes', 'thorns', 'spider', 'great-tree', 'mushrooms', 'forest-cave', 'forest-hill', 'stone-circle']);
+let D, TYPES = [], M = {}, LBL, lang = 'ga', EDGES = true;
+const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+
+// ---- data ----
+const IMG = {};
+function tile(n) {
+  let im = IMG[n]; if (!im) { im = IMG[n] = new Image(); im.onload = redraw; im.src = 'tiles/' + n + '.png'; }
+  return im.complete && im.naturalWidth ? im : null;
+}
+async function loadMarch(m) {
+  const blob = await (await fetch(m.png)).blob();
+  const bm = await createImageBitmap(blob, { colorSpaceConversion: 'none', premultiplyAlpha: 'none' });
+  const c = new OffscreenCanvas(1600, 1200), g = c.getContext('2d'); g.drawImage(bm, 0, 0);
+  const px = g.getImageData(0, 0, 1600, 1200).data, a = new Uint8Array(1600 * 1200), key = {};
+  TYPES.forEach((t, k) => key[parseInt(t.color.slice(1), 16)] = k + 1);
+  for (let p = 0, q = 0; q < a.length; p += 4, q++) { const v = (px[p] << 16) | (px[p + 1] << 8) | px[p + 2]; if (v) a[q] = key[v] || 0; }
+  const [Cm, Rm] = centre(m.i, m.j, 1200);
+  M[m.i + ',' + m.j] = { a, Cm, Rm, L: nearest(Cm, Rm, 150), F: nearest(Cm, Rm, 25), m };
+}
+function marchOf(C, R) { const [i, j] = nearest(C, R, 1200); return M[i + ',' + j]; }
+function T(i, j, N) {  // terrain index (0 = none) of hex (i, j) at level N: 1 (100-ft), 25 (Field), 150 (League) or 1200 (March)
+  if (N === 1) { const m = marchOf(i, j); return m ? m.a[(j - m.Rm + 600) * 1600 + (i - m.Cm + 800)] : 0; }
+  if (N === 1200) { const m = M[i + ',' + j]; return m ? m.a[0] : 0; }
+  const [C, R] = centre(i, j, N), m = marchOf(C, R); if (!m) return 0;
+  if (N === 150) return m.a[(2 + j - m.L[1] + 4) * 1600 + 2 + i - m.L[0] + 5];
+  return m.a[(1149 + j - m.F[1] + 24) * 1600 + 1533 + i - m.F[0] + 32];
+}
+
+// ---- addresses: #world:LLLL[:HHHH] (ATLAS_FORMAT.md), #world, #march:MMMM ----
+function addr(C, R) {
+  const [li, lj] = nearest(C, R, 150), [Cl, Rl] = centre(li, lj, 150);
+  return '#world:' + lab(li - LBL.league[0]) + lab(lj - LBL.league[1]) + ':' + lab(C - Cl + 100) + lab(R - Rl + 75);
+}
+const leagueAddr = (i, j) => '#world:' + lab(i - LBL.league[0]) + lab(j - LBL.league[1]);
+const marchAddr = (i, j) => '#march:' + lab(i - LBL.march[0]) + lab(j - LBL.march[1]);
+function parse(h) {
+  h = decodeURIComponent(h).replace(/^#/, '').toUpperCase(); let m;
+  if ((m = h.match(/^MARCH:(..)(..)$/))) return { lvl: 'march', i: unlab(m[1]) + LBL.march[0], j: unlab(m[2]) + LBL.march[1] };
+  if ((m = h.match(/^WORLD:(..)(..)(?::(..)(..))?$/))) {
+    const li = unlab(m[1]) + LBL.league[0], lj = unlab(m[2]) + LBL.league[1];
+    if (!m[3]) return { lvl: 'league', i: li, j: lj };
+    const [Cl, Rl] = centre(li, lj, 150), C = Cl - 100 + unlab(m[3]), R = Rl - 75 + unlab(m[4]), [fi, fj] = nearest(C, R, 25);
+    return { lvl: 'field', i: fi, j: fj, sel: [C, R] };
+  }
+  return { lvl: 'region' };
+}
+
+// ---- view ----
+const LV = { region: { draw: 150, own: 0, fit: 0 }, march: { draw: 150, own: 1200, fit: 1350 }, league: { draw: 25, own: 150, fit: 175 }, field: { draw: 1, own: 25, fit: 32 } };
+let V = { lvl: 'region' }, cam = { x: 0, y: 0, s: 1 }, W = 0, H = 0, dpr = 1, AIM = null;  // AIM: feet to centre on after a click (Heph: a click always zooms in one level, centred on the hex clicked)
+function focusFt() { return V.lvl === 'region' ? null : hexFt(V.i, V.j, LV[V.lvl].own); }
+function fit() {
+  W = cv.clientWidth; H = cv.clientHeight; const f = focusFt();
+  if (f) { [cam.x, cam.y] = AIM || (V.sel ? ft(...V.sel) : f); AIM = null; cam.s = Math.min(H / (LV[V.lvl].fit * 100), W / (LV[V.lvl].fit * 100 * 1.16)); return; }
+  let x0 = 1e12, y0 = 1e12, x1 = -1e12, y1 = -1e12;
+  for (const k in M) { const [x, y] = ft(M[k].Cm, M[k].Rm); x0 = Math.min(x0, x - 800 * CW); x1 = Math.max(x1, x + 800 * CW); y0 = Math.min(y0, y - 60000); y1 = Math.max(y1, y + 60000); }
+  cam.x = (x0 + x1) / 2; cam.y = (y0 + y1) / 2; cam.s = Math.min(W / (x1 - x0), H / (y1 - y0)) * .96;
+}
+const S = (x, y) => [W / 2 + (x - cam.x) * cam.s, H / 2 + (y - cam.y) * cam.s];
+const F = (sx, sy) => [cam.x + (sx - W / 2) / cam.s, cam.y + (sy - H / 2) / cam.s];
+const name = n => lang === 'en' && D.names[n] && D.names[n].en ? D.names[n].en : n;
+function hexPath(sx, sy, r) { ctx.beginPath(); for (let k = 0; k < 6; k++) { const a = Math.PI / 3 * k; ctx.lineTo(sx + r * Math.cos(a), sy + r * Math.sin(a)); } ctx.closePath(); }
+const DIRS = odd => [[0, -1], [1, -1 + odd], [1, odd], [0, 1], [-1, odd], [-1, -1 + odd]];
+
+let RIV = null;
+function smoothRivers() {  // moving average (+-2, ends pinned), then centripetal Catmull-Rom, as in hexmap.py
+  RIV = D.rivers.map(rv => {
+    const r = rv.points, n = r.length, p = r.map((q, k) => {
+      if (k === 0 || k === n - 1) return q; let sx = 0, sy = 0, c = 0;
+      for (let t = Math.max(0, k - 2); t < Math.min(n, k + 3); t++) { sx += r[t][0]; sy += r[t][1]; c++; } return [sx / c, sy / c]; });
+    const segs = [];
+    for (let q = 0; q < n - 1; q++) {
+      let A = p[Math.max(0, q - 1)], B = p[q], C = p[q + 1], E = p[Math.min(n - 1, q + 2)];
+      if (A === B) A = [2 * B[0] - C[0], 2 * B[1] - C[1]]; if (E === C) E = [2 * C[0] - B[0], 2 * C[1] - B[1]];
+      const t = (u, v) => Math.max(1e-6, Math.hypot(v[0] - u[0], v[1] - u[1]) ** .5), t1 = t(A, B), t2 = t(B, C), t3 = t(C, E);
+      const m1 = [0, 1].map(k => (C[k] - B[k]) / t2 - (C[k] - A[k]) / (t1 + t2) + (B[k] - A[k]) / t1);
+      const m2 = [0, 1].map(k => (C[k] - B[k]) / t2 - (E[k] - B[k]) / (t2 + t3) + (E[k] - C[k]) / t3);
+      segs.push([B, [B[0] + m1[0] * t2 / 3, B[1] + m1[1] * t2 / 3], [C[0] - m2[0] * t2 / 3, C[1] - m2[1] * t2 / 3], C]);
+    }
+    return { cls: rv['class'], segs: segs.filter(([B]) => T(...hexAt(B[0], B[1], 150), 150)) };  // only over mapped land
+  });
+}
+
+function redraw() { if (!D || redraw.q) return; redraw.q = requestAnimationFrame(() => { redraw.q = 0; draw(); }); }
+function draw() {
+  dpr = window.devicePixelRatio || 1; W = cv.clientWidth; H = cv.clientHeight;
+  if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)) { cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.fillStyle = '#f4efe1'; ctx.fillRect(0, 0, W, H);
+  const N = LV[V.lvl].draw, hh = N * 100 * cam.s, r = hh / SQ3, bw = 2 * r;  // hex height (flat to flat) and corner radius in px
+  const [x0, y0] = F(0, 0), [x1, y1] = F(W, H);
+  const i0 = Math.floor(x0 / (N * CW)) - 1, i1 = Math.ceil(x1 / (N * CW)) + 1, j0 = Math.floor(y0 / (N * 100)) - 2, j1 = Math.ceil(y1 / (N * 100)) + 1;
+  if ((i1 - i0) * (j1 - j0) > 40000) return;
+  const vis = [], top = [];
+  for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) { const t = T(i, j, N); if (t) vis.push([i, j, t]); }
+  const sfx = EDGES ? '' : '-x', pad = EDGES ? 0 : 4 / 238;
+  for (const [i, j, t] of vis) {
+    const [sx, sy] = S(...hexFt(i, j, N)), bg = T_BG[t];
+    const X = sx - bw / 2 - pad * bw, Y = sy - hh / 2 - pad * bw, w_ = bw * (1 + 2 * pad), h_ = hh + 2 * pad * bw;
+    const im = bg && tile(bg + sfx);
+    if (im) ctx.drawImage(im, X, Y, w_, h_); else { hexPath(sx, sy, r); ctx.fillStyle = TYPES[t - 1].color; ctx.fill(); }
+    if (bg) {  // blends: each border bleeds both ways at 40% (hexmap.py BLEED_ALPHA)
+      const ring = DIRS(i & 1).map(([di, dj]) => { const nb = T_BG[T(i + di, j + dj, N)]; return nb && nb !== bg ? nb.slice(3) : null; });
+      ctx.globalAlpha = .4;
+      ring.forEach((c, k) => { if (!c) return;
+        for (const n of ['bleed-' + c + '-e' + k].concat(ring[(k + 5) % 6] === c ? ['bleed-' + c + '-c' + k] : [])) { const b = tile(n + sfx); if (b) ctx.drawImage(b, X, Y, w_, h_); } });
+      ctx.globalAlpha = 1;
+    }
+    if (EDGES && r > 3) { hexPath(sx, sy, r); ctx.strokeStyle = '#8a7f66'; ctx.lineWidth = .6; ctx.stroke(); }
+    if (T_ICON[t] && r > 5) top.push([T_ICON[t], sx, sy]);
+  }
+  // rivers: realistic width in feet once zoomed in, never thinner than a map line
+  ctx.save(); ctx.setTransform(dpr * cam.s, 0, 0, dpr * cam.s, dpr * (W / 2 - cam.x * cam.s), dpr * (H / 2 - cam.y * cam.s)); ctx.lineCap = ctx.lineJoin = 'round';
+  for (const pass of [0, 1]) for (const rv of RIV) {
+    const px = Math.max((V.lvl === 'region' ? .4 : 1) * (0.8 + rv.cls * 0.6), [0, 15, 30, 60, 120, 200][rv.cls] * cam.s);  // map line, or true width (ft) once zoomed in
+    ctx.lineWidth = (px + (pass ? 0 : V.lvl === 'region' ? 1 : 2)) / cam.s; ctx.strokeStyle = pass ? '#3f7fa8' : 'rgba(27,42,51,.85)';
+    ctx.beginPath(); for (const [B, c1, c2, C] of rv.segs) { ctx.moveTo(B[0], B[1]); ctx.bezierCurveTo(c1[0], c1[1], c2[0], c2[1], C[0], C[1]); } ctx.stroke();
+  }
+  ctx.restore();
+  for (const [n, sx, sy] of top) { const im = tile(n); if (im) ctx.drawImage(im, sx - bw * .39, sy - hh * .39, bw * .78, hh * .78); }
+  // county lines and names
+  ctx.setLineDash([7, 4]); ctx.strokeStyle = '#7a2e2e'; ctx.lineWidth = 2;
+  for (const g of D.regions) { ctx.beginPath(); for (const p of g.outline) ctx.lineTo(...S(p[0], p[1])); ctx.closePath(); ctx.stroke(); }
+  ctx.setLineDash([]);
+  ctx.textAlign = 'center'; ctx.lineJoin = 'round';
+  if (V.lvl === 'region' || V.lvl === 'march') for (const g of D.regions) {
+    const [sx, sy] = S(...g.label); ctx.font = 'italic bold 15px Georgia'; ctx.strokeStyle = '#f4efe1'; ctx.lineWidth = 4; ctx.strokeText(name(g.name), sx, sy); ctx.fillStyle = '#7a2e2e'; ctx.fillText(name(g.name), sx, sy); }
+  // points of interest
+  const isz = { region: 16, march: 30, league: 44, field: 56 }[V.lvl], fs = { region: 10, march: 12, league: 13, field: 14 }[V.lvl];
+  ctx.font = `bold ${fs}px Georgia`;
+  for (const p of D.pois) {
+    const [x, y] = ft(...p.hex), o = p.ft || [0, 0], [sx, sy] = S(x + o[0], y + o[1]);
+    if (sx < -100 || sy < -100 || sx > W + 100 || sy > H + 100) continue;
+    const im = p.icon && tile(p.icon);
+    if (im) { const a = Math.max(.87, im.naturalHeight / im.naturalWidth); ctx.drawImage(im, sx - isz / 2, sy - isz * a / 2, isz, isz * a); }
+    else { ctx.beginPath(); ctx.arc(sx, sy, 4, 0, 7); ctx.fillStyle = '#2b2418'; ctx.fill(); }
+    if (V.lvl !== 'region') { const ty = sy + isz * .55 + fs; ctx.strokeStyle = '#f4efe1'; ctx.lineWidth = 3.5; ctx.strokeText(name(p.name), sx, ty); ctx.fillStyle = '#2b2418'; ctx.fillText(name(p.name), sx, ty); }
+  }
+  // the hex being looked at, and the picked 100-ft hex
+  const own = LV[V.lvl].own;
+  if (own) { const [sx, sy] = S(...hexFt(V.i, V.j, own)); hexPath(sx, sy, own * 100 * cam.s / SQ3); ctx.setLineDash([9, 5]); ctx.strokeStyle = '#b3261e'; ctx.lineWidth = 2.5; ctx.stroke(); ctx.setLineDash([]); }
+  if (V.sel) { const [sx, sy] = S(...ft(...V.sel)); hexPath(sx, sy, 100 * cam.s / SQ3); ctx.strokeStyle = '#b3261e'; ctx.lineWidth = 3; ctx.stroke(); }
+}
+
+function crumbs() {
+  const out = [`<b>${D.title}</b>`, `<a href="#world">Region</a>`];
+  let C, R;
+  if (V.lvl !== 'region') [C, R] = V.lvl === 'march' ? centre(V.i, V.j, 1200) : V.sel || centre(V.i, V.j, LV[V.lvl].own);
+  if (V.lvl === 'field' && !V.sel) [C, R] = centre(V.i, V.j, 25), C = C, R = R;
+  if (C !== undefined) {
+    const [mi, mj] = V.lvl === 'march' ? [V.i, V.j] : nearest(C, R, 1200); out.push(`<a href="${marchAddr(mi, mj)}">March ${marchAddr(mi, mj).slice(7)}</a>`);
+    if (V.lvl !== 'march') { const [li, lj] = nearest(C, R, 150); out.push(`<a href="${leagueAddr(li, lj)}">League ${leagueAddr(li, lj).slice(7)}</a>`); }
+    if (V.lvl === 'field') { const [fc, fr] = centre(V.i, V.j, 25); out.push(`<a href="${addr(fc, fr)}">Field ${addr(fc, fr).slice(12)}</a>`); }
+  }
+  out.push({ region: '1 hex = 1 league (3 miles)', march: '1 hex = 1 league (3 miles)', league: '1 hex = 1 field (½ mile)', field: '1 hex = 100 ft' }[V.lvl]);
+  document.getElementById('crumbs').innerHTML = out.join(' · ');
+}
+function go() { V = parse(location.hash); fit(); crumbs(); redraw(); }
+
+// ---- input: drag to pan, wheel or buttons to zoom, click a hex to go down a level ----
+let drag = null;
+cv.addEventListener('pointerdown', e => { drag = { x: e.clientX, y: e.clientY, cx: cam.x, cy: cam.y, moved: false }; cv.setPointerCapture(e.pointerId); });
+cv.addEventListener('pointermove', e => {
+  const b = cv.getBoundingClientRect(), [x, y] = F(e.clientX - b.left, e.clientY - b.top);
+  if (drag) { const dx = e.clientX - drag.x, dy = e.clientY - drag.y; if (Math.hypot(dx, dy) > 5) drag.moved = true;
+    if (drag.moved) { cam.x = drag.cx - dx / cam.s; cam.y = drag.cy - dy / cam.s; redraw(); } return; }
+  const N = LV[V.lvl].draw, [i, j] = hexAt(x, y, N), t = T(i, j, N), [C, R] = N === 1 ? [i, j] : centre(i, j, N);
+  document.getElementById('hover').textContent = t ? `${N === 1 ? addr(C, R) : N === 25 ? 'Field ' + addr(C, R).slice(12) : leagueAddr(i, j)} · ${TYPES[t - 1].name}` : '';
+});
+cv.addEventListener('pointerup', e => {
+  if (!drag) return; const moved = drag.moved; drag = null; if (moved) return;
+  const b = cv.getBoundingClientRect(), [x, y] = F(e.clientX - b.left, e.clientY - b.top), N = LV[V.lvl].draw, [i, j] = hexAt(x, y, N);
+  if (!T(i, j, N) || V.lvl === 'field') return;
+  const [C, R] = N === 1 ? [i, j] : centre(i, j, N);
+  AIM = hexFt(i, j, N);  // every click: down one level, centred on the hex clicked
+  if (V.lvl === 'region') { const [mi, mj] = nearest(C, R, 1200); location.hash = marchAddr(mi, mj); }
+  else if (V.lvl === 'march') location.hash = leagueAddr(i, j);
+  else if (V.lvl === 'league') location.hash = addr(C, R);
+  // Field view: a click goes down to an Encounter map only where there is a point of interest (Heph 2026-11-05); those come later, so nothing yet
+});
+cv.addEventListener('wheel', e => { e.preventDefault(); zoom(e.deltaY < 0 ? 1.25 : .8, e); }, { passive: false });
+function zoom(f, e) {
+  const b = cv.getBoundingClientRect(), px = e ? e.clientX - b.left : W / 2, py = e ? e.clientY - b.top : H / 2, [x, y] = F(px, py);
+  cam.s *= f; cam.x = x - (px - W / 2) / cam.s; cam.y = y - (py - H / 2) / cam.s; redraw();
+}
+document.getElementById('in').onclick = () => zoom(1.25); document.getElementById('out').onclick = () => zoom(.8);
+document.getElementById('fit').onclick = () => { fit(); redraw(); };
+document.getElementById('edges').onchange = e => { EDGES = e.target.checked; redraw(); };
+document.getElementById('lang').onchange = e => { lang = e.target.value; crumbs(); redraw(); };
+addEventListener('hashchange', go); addEventListener('resize', redraw);
+
+(async () => {
+  D = await (await fetch('map.json')).json(); TYPES = D.terrain.types; LBL = D.labels;
+  TYPES.forEach((t, k) => { T_BG[k + 1] = t.tile; if (t.icon) T_ICON[k + 1] = t.icon; });
+  await Promise.all(D.terrain.marches.map(loadMarch));
+  smoothRivers(); go();
+})();
+</script></body></html>
