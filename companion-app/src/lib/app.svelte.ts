@@ -36,6 +36,8 @@ class AppState {
   sheets = $state<SheetData[]>([]);
   live = $state<Record<string, LiveState>>({});
   characters: Character[] = $derived(this.sheets.map((s) => new Character(s, this.live[s.id] ?? freshState())));
+  // The players' characters: everyone but the referee's full-sheet NPCs.
+  party: Character[] = $derived(this.characters.filter((c) => c.data.owner !== 'referee'));
   log = $state<LogEntry[]>([]);
   settings = $state<Settings>({ ...DEFAULT_SETTINGS });
   view = $state<View>({ name: 'list' });

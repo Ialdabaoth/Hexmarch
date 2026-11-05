@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { rulesFor } from '../rules/rules';
+import { readSheet, writeSheet } from '../lib/sheet';
+import { Character, freshState, saveThreshold } from '../lib/character';
 import {
-  applyAdjust, damageRollEntry, newCreature, parseAttacks, reactionBands, reactionEntry, resolveTemplate,
-  TemplateError, type CreatureTemplate
+  applyAdjust, creatureFollower, damageRollEntry, newCreature, parseAttacks, reactionBands, reactionEntry, resolveTemplate,
+  rollNpcSheet, saveTarget, sheetStats, TemplateError, type CreatureTemplate
 } from './creature';
 
 const MAX = () => 0.99; // every die shows its top face
@@ -101,5 +103,64 @@ describe('creatures in play', () => {
     expect(mm.npcTalentThreshold(0)).toBe(5);
     expect(mm.npcTalentThreshold(4)).toBe(4);
     expect(mm.npcTalentThreshold(9)).toBe(2);
+  });
+});
+
+describe('NPCs', () => {
+  const mm = rulesFor('mm');
+
+  it('builds a classed NPC, then levels it with replace', () => {
+    const cls = mm.classes[0];
+    const s = resolveTemplate({ from: `npc:${cls.id}`, replace: { level: 4, name: 'Sergeant' } }, { rules: mm });
+    expect(s.name).toBe('Sergeant');
+    expect(s.classId).toBe(cls.id);
+    expect(s.level).toBe(4);
+    expect(s.hp).toBe('per level');
+    // Saves the book doesn't give come from ability + level, as for characters.
+    expect(saveTarget(s, 'doom', mm)).toBe(mm.throw(s.abilities.con + 4));
+    expect(saveTarget(s, 'fear', mm)).toBe(mm.throw(s.abilities.cha + 4));
+    const c = newCreature({ from: `npc:${cls.id}`, replace: { level: 3 } }, 1, { rules: mm }, MIN);
+    expect(c.kind).toBe('npc');
+    expect(c.hpMax[0]).toBe(Math.max(1, 3 + 3 * (c.stats.abilities.con + (cls.hitDieBonus ?? 0))));
+  });
+
+  it('rolls a quick NPC from the table', () => {
+    const s = resolveTemplate({ from: 'npc' }, { rules: mm, rng: MIN });
+    expect(mm.hasClass(s.classId)).toBe(true);
+    expect(Object.values(s.abilities).some((v) => v === 1)).toBe(true);
+    expect(() => resolveTemplate({ from: 'npc' })).toThrow(/rules/);
+    expect(() => resolveTemplate({ from: 'npc:not-a-class' }, { rules: mm })).toThrow(/no class/);
+  });
+
+  it('keeps bestiary saves and gives none it does not know', () => {
+    const wolf = resolveTemplate({ from: 'mm:wolf-mastiff' });
+    expect(saveTarget(wolf, 'doom', mm)).toBe(11);
+    expect(saveTarget(resolveTemplate({ from: 'blank' }), 'doom', mm)).toBeUndefined();
+  });
+
+  it('rolls a full NPC sheet owned by the referee', () => {
+    const sheet = rollNpcSheet(mm, 'leinster', MIN);
+    expect(sheet.owner).toBe('referee');
+    expect(sheet.campaign).toBe('leinster');
+    const back = readSheet(JSON.parse(JSON.stringify(writeSheet(sheet))));
+    expect(back.owner).toBe('referee');
+    const ch = new Character(sheet, freshState());
+    const s = resolveTemplate({ from: 'pc', sheet: sheet.id }, { sheet: (id) => (id === sheet.id ? sheetStats(ch) : undefined) });
+    expect(s.name).toBe(sheet.name);
+    expect(s.saves.doom).toBe(saveThreshold(ch, 'con'));
+    expect(() => resolveTemplate({ from: 'pc', sheet: 'gone' }, { sheet: () => undefined })).toThrow(/No character sheet/);
+  });
+
+  it('moves one member of a troupe into a retinue', () => {
+    const wolves = newCreature({ from: 'mm:wolf-mastiff' }, 2, undefined, MAX);
+    wolves.notes = 'Found at the ford';
+    const f = creatureFollower(wolves, 1);
+    expect(f.kind).toBe('beast');
+    expect(f.ref).toBe('mm:wolf-mastiff');
+    expect(f.name).toBe('Wolf / Mastiff 2');
+    expect(f.hp).toBe(wolves.hp[1]);
+    expect(f.notes).toBe('Found at the ford');
+    const one = newCreature({ from: 'mm:wolf-mastiff' }, 1);
+    expect(creatureFollower(one).id).toBe(one.id);
   });
 });

@@ -6,6 +6,9 @@
 import { roll, rollDie, describe as describeRoll, type Rng } from '../lib/dice';
 import type { LogEntry } from '../lib/checks';
 import { BESTIARY, levelOf, rollHp, type AbilityKey, type Monster, type SaveKind, type WithRef } from './bestiary';
+import { ABILITIES, primesOf, type Ruleset } from '../rules/rules';
+import { FORMAT, readSheet, type Follower, type SheetData } from '../lib/sheet';
+import { saveThreshold, type Character } from '../lib/character';
 
 export const SAVE_KINDS: SaveKind[] = ['doom', 'hold', 'blast', 'trick', 'curse', 'fear'];
 export const ABILITY_KEYS: AbilityKey[] = ['con', 'str', 'dex', 'int', 'wis', 'cha'];
@@ -30,8 +33,15 @@ export interface CreatureStats {
   size: string;
   movement: string;
   armor: string;
-  // Hit points as a formula ("(3d6+6)x2", "per hd") or a number.
+  // Hit points as a formula ("(3d6+6)x2", "per hd"), a number, or "per level" for a
+  // classed NPC (level d6, plus Con and the class's hit die bonus per level).
   hp: string;
+  hitDieBonus?: number;
+  // "abilities": saves the book doesn't give come from ability + level, as for characters.
+  saveFrom?: 'abilities';
+  // For classed NPCs.
+  classId?: string;
+  origin?: string;
   attacks: Attack[];
   saves: Partial<Record<SaveKind, number>>;
   abilities: Record<AbilityKey, number>;
@@ -48,6 +58,8 @@ export interface CreatureStats {
 // "Start with X, then replace or adjust as follows."
 export interface CreatureTemplate {
   from: string;
+  // For "pc": the id of the NPC's full character sheet.
+  sheet?: string;
   replace?: Record<string, unknown>;
   adjust?: Record<string, unknown>;
 }
@@ -57,6 +69,11 @@ export interface TemplateSources {
   bestiary?: (ref: string) => WithRef<Monster> | undefined;
   // Another creature's template by id, for variants.
   creature?: (id: string) => CreatureTemplate | undefined;
+  // The campaign's ruleset, for "npc" templates.
+  rules?: Ruleset;
+  // A full character sheet's stats by id, for "pc" templates.
+  sheet?: (id: string) => CreatureStats | undefined;
+  rng?: Rng;
 }
 
 const DEFAULT_SOURCES: TemplateSources = { bestiary: (ref) => BESTIARY.get(ref) };
@@ -135,15 +152,24 @@ export class TemplateError extends Error {}
 // Resolves "from", then applies "replace", then "adjust".
 export function resolveTemplate(t: CreatureTemplate, sources: TemplateSources = DEFAULT_SOURCES, depth = 0): CreatureStats {
   if (depth >= MAX_DEPTH) throw new TemplateError(`Templates nest deeper than ${MAX_DEPTH} at "${t.from}"`);
-  const base = baseStats(t.from, sources, depth);
+  const base = baseStats(t, sources, depth);
   if (t.replace) applyReplace(base, t.replace);
   if (t.adjust) applyAdjust(base as unknown as Record<string, unknown>, t.adjust, '');
   return base;
 }
 
-function baseStats(from: string, sources: TemplateSources, depth: number): CreatureStats {
+function baseStats(t: CreatureTemplate, sources: TemplateSources, depth: number): CreatureStats {
+  const from = t.from;
   if (!from || from === 'blank') return blankStats();
-  if (from === 'pc' || from.startsWith('npc:')) throw new TemplateError(`"${from}" templates arrive in a later version`);
+  if (from === 'pc') {
+    const s = t.sheet ? sources.sheet?.(t.sheet) : undefined;
+    if (!s) throw new TemplateError(`No character sheet "${t.sheet ?? ''}" for this NPC`);
+    return s;
+  }
+  if (from === 'npc' || from.startsWith('npc:')) {
+    if (!sources.rules) throw new TemplateError('NPC templates need the campaign\'s rules');
+    return npcStats(sources.rules, from.slice(4) || undefined, sources.rng);
+  }
   if (from.includes(':')) {
     const m = (sources.bestiary ?? DEFAULT_SOURCES.bestiary!)(from);
     if (!m) throw new TemplateError(`No bestiary entry "${from}"`);
@@ -224,6 +250,10 @@ export interface Creature {
 // Hit points for one member: the printed formula, or level d6 where the book says "per hd".
 export function rollMemberHp(stats: CreatureStats, rng: Rng = Math.random): number {
   const f = stats.hp.trim();
+  if (f === 'per level') {
+    const lvl = Math.max(1, Math.floor(stats.level));
+    return Math.max(1, roll(`${lvl}d6`, rng).total + lvl * (stats.abilities.con + (stats.hitDieBonus ?? 0)));
+  }
   if (/^\d+$/.test(f)) return Math.max(1, Number(f));
   if (/\dd\d|^d\d/i.test(f)) return rollHp(f, rng);
   return rollHp(`${Math.max(1, Math.round(stats.level))}d6`, rng);
@@ -270,5 +300,117 @@ export function reactionEntry(who: string, behavior: string, rng: Rng = Math.ran
     detail: `D6: ${value} (${behavior})`,
     total: value,
     dice: [{ sides: 6, value, kept: true }]
+  };
+}
+
+// ---- NPCs ----
+
+// The ability each save is made with, for characters and classed NPCs (p. 10).
+export const SAVE_ABILITY: Record<SaveKind, AbilityKey> = Object.fromEntries(
+  ABILITIES.map((a) => [a.save.toLowerCase(), a.id])
+) as Record<SaveKind, AbilityKey>;
+
+// A save's target: the book's number, or ability + level for classed NPCs.
+export function saveTarget(stats: CreatureStats, kind: SaveKind, rules: Ruleset): number | undefined {
+  const given = stats.saves[kind];
+  if (given !== undefined) return given;
+  if (stats.saveFrom !== 'abilities') return undefined;
+  return rules.throw(stats.abilities[SAVE_ABILITY[kind]] + Math.floor(stats.level));
+}
+
+// "npc:<class>" or "npc" (rolled on the ruleset's quick NPC table): a level 1 classed
+// person, primes at +1. Replace "level" and adjust "abilities" to make them more.
+export function npcStats(rules: Ruleset, classId?: string, rng: Rng = Math.random): CreatureStats {
+  let cls, origin: string | undefined, primes: AbilityKey[];
+  if (classId) {
+    if (!rules.hasClass(classId)) throw new TemplateError(`${rules.name} has no class "${classId}"`);
+    cls = rules.getClass(classId as never);
+    primes = primesOf(cls);
+  } else {
+    const row = rules.rollQuickNpc((sides) => rollDie(sides, rng));
+    cls = rules.getClass(row.classId);
+    origin = row.origin;
+    primes = row.primes;
+  }
+  const abilities = zeroAbilityAdjustments();
+  for (const p of primes) abilities[p] = 1;
+  const originName = origin ? rules.getOrigin(origin as never).name : '';
+  return {
+    ...blankStats(),
+    name: originName ? `${originName} ${cls.name}` : cls.name,
+    kind: 'mortal',
+    level: 1,
+    hp: 'per level',
+    hitDieBonus: cls.hitDieBonus,
+    saveFrom: 'abilities',
+    classId: cls.id,
+    ...(origin ? { origin } : {}),
+    abilities,
+    attacks: [{ name: 'Weapon', damage: 'd6', note: '' }],
+    summary: `${cls.name}${originName ? `, ${originName}` : ''}. Primes at +1.`
+  };
+}
+
+// A full-sheet NPC's stats, for the list and for moving it about.
+export function sheetStats(c: Character): CreatureStats {
+  const saves = Object.fromEntries(
+    (Object.entries(SAVE_ABILITY) as [SaveKind, AbilityKey][]).map(([k, a]) => [k, saveThreshold(c, a)])
+  ) as Record<SaveKind, number>;
+  let className: string = c.classId;
+  try { className = c.rules.getClass(c.classId).name; } catch { /* unknown class */ }
+  return {
+    ...blankStats(),
+    name: c.name,
+    kind: 'mortal',
+    level: c.level,
+    hp: String(c.hpMax),
+    saves,
+    classId: c.classId,
+    origin: c.origin,
+    abilities: { ...c.abilities },
+    summary: `${className} ${c.level}`
+  };
+}
+
+// A level 1 character sheet for an NPC the referee runs, from the quick NPC table.
+export function rollNpcSheet(rules: Ruleset, campaign: string, rng: Rng = Math.random): SheetData {
+  const row = rules.rollQuickNpc((sides) => rollDie(sides, rng));
+  const abilities: Record<string, unknown> = {};
+  for (const a of ABILITIES) abilities[a.id] = row.primes.includes(a.id) ? 1 : 0;
+  return readSheet({
+    format: FORMAT,
+    rules: rules.id,
+    ...(campaign ? { campaign } : {}),
+    owner: 'referee',
+    name: `${rules.getOrigin(row.origin).name} ${rules.getClass(row.classId).name}`,
+    origin: row.origin,
+    class: { name: row.classId, xp: 0, levelups: [{}] },
+    abilities,
+    inventory: {},
+    followers: [],
+    notes: ''
+  });
+}
+
+// One member of a creature, as a follower or beast companion in a character's retinue.
+export function creatureFollower(c: Creature, member = 0): Follower {
+  const s = c.stats;
+  const lvl = Math.max(0, Math.floor(s.level));
+  return {
+    id: c.hp.length > 1 ? crypto.randomUUID() : c.id,
+    name: c.hp.length > 1 ? `${c.name} ${member + 1}` : c.name,
+    kind: c.kind === 'beast' ? 'beast' : 'follower',
+    ...(s.ref ? { ref: s.ref } : {}),
+    ...(s.classId ? { classId: s.classId as never } : {}),
+    ...(s.origin ? { origin: s.origin as never } : {}),
+    level: lvl,
+    abilities: { ...s.abilities },
+    hitDice: Math.max(1, lvl),
+    hpMax: c.hpMax[member],
+    hp: c.hp[member],
+    attitude: (['Hostile', 'Unfriendly', 'Indifferent', 'Friendly', 'Helpful'].includes(c.attitude) ? c.attitude : 'Indifferent') as Follower['attitude'],
+    traits: [],
+    wage: '',
+    notes: c.notes
   };
 }

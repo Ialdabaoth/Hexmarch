@@ -32,12 +32,12 @@
 
 <details class="section" open>
   <summary><h2>Parties</h2></summary>
-  {#if app.characters.length}
+  {#if app.party.length}
     <ul class="tree">
       <li>
         <strong>Party</strong> <span class="small muted">· active{app.settings.partyAt ? ` · hex ${app.settings.partyAt.label}` : ''}</span>
         <ul>
-          {#each app.characters as c (c.id)}
+          {#each app.party as c (c.id)}
             <li>
               <button class="link" onclick={() => open(c.id)}>{c.name}</button>
               <span class="small muted">{className(c)} {c.level}</span>

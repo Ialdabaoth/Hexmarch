@@ -79,6 +79,8 @@ export interface SheetData {
   rules: string;
   // The campaign the character was made for (its id), if any; see campaign.ts.
   campaign?: string;
+  // "referee" for an NPC the referee runs with a full sheet; it stays out of the party.
+  owner?: 'referee';
   id: string;
   name: string;
   // An image: a data: URL (resized on the device) or an https:// link. Empty for none.
@@ -571,6 +573,7 @@ export function readSheet(raw: unknown): SheetData {
     version: FORMAT_VERSION,
     rules: normalizeRulesId(f.rules),
     ...(typeof f.campaign === 'string' && f.campaign ? { campaign: f.campaign } : {}),
+    ...(f.owner === 'referee' ? { owner: 'referee' as const } : {}),
     id: typeof f.id === 'string' && f.id ? f.id : newId(),
     name: name.trim() || 'Unnamed',
     portrait: portrait(f.portrait),
