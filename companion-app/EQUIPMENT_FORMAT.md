@@ -290,9 +290,14 @@ and their app uses that campaign. With no URL set, the app uses
   are a rule; weapons come from the first file plus any custom files (not from
   other built-in ones, so E9 keeps its own arms list). Gear and magic come from all
   of them, the first winning on a name. Put the rules' own file first.
+- `art` (optional, since 0.4.0): link to the campaign's art file, relative to the
+  campaign file; `art.json` beside it when left out. An art file is
+  `{"format": "materia-mundi-art", "version": 1, "pictures": {"<id>": "data:image/jpeg;base64,…"}}`,
+  keyed by the ids in sheets' `cache:<id>` portraits. Players' apps fill in any portrait
+  they're missing from it. Campaign › Art saves one from the device's portraits.
 - The app downloads the campaign and everything it names, keeps a copy for offline
   play, and checks for updates each time the app opens online. Campaigns opened
-  before are listed in the Campaign tab to switch between. The host has to allow
+  before are listed under Settings › Campaign to switch between. The host has to allow
   cross-site reads (CORS). GitHub Pages, raw GitHub files and gists do; Google Drive
   share links don't. The app says so when a URL can't be read.
 - A campaign from a URL is read-only in the app. The referee edits their own copy

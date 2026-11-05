@@ -14,6 +14,7 @@ import {
 import { hasEquipment, registerEquipment, type EquipmentFileData } from '../equipment/equipment';
 import { preloadDice, showDice } from './dice3d';
 import { portraitFromFile } from './portrait';
+import { artUrl, makeArt, missingFrom, readArt, type ArtFile } from './art';
 import { CACHE_PREFIX, cachedId, deletePortrait, isInline, loadPortraits, portraitId, portraitSrc, savePortrait } from './portraits';
 
 export type View =
@@ -41,6 +42,8 @@ class AppState {
   toast = $state('');
   loaded = $state(false);
   lastRoll = $state<LogEntry | null>(null);
+  // How many 3D dice the last roll threw; the result keeps a slot for each to rest in.
+  rolledDice = $state(0);
   // Cached portrait pictures by id (see portraits.ts).
   portraits = $state<Record<string, string>>({});
   // Campaigns this device has opened, by link, and its own custom equipment file.
@@ -57,6 +60,12 @@ class AppState {
   }
 
   // The active campaign's id; '' for "This device".
+  // Inbox items not yet opened: invitations, players' updates, sent-back notes.
+  // Shared campaigns (sign-in) fill the inbox; until then nothing arrives.
+  get unread(): number {
+    return 0;
+  }
+
   get campaignId(): string {
     return this.campaign?.campaign.id ?? '';
   }
@@ -178,6 +187,7 @@ class AppState {
     activateCampaign(c);
     await this.rereadSheets();
     this.equipmentChanged();
+    void this.syncArt().catch((e) => console.warn('Campaign art not read', e));
   }
 
   // The referee may have changed the campaign's files; pick that up quietly.
@@ -250,6 +260,7 @@ class AppState {
     }
     await this.persist();
     await this.prunePortraits();
+    if (this.missingArt.length) void this.syncArt().catch((e) => console.warn('Campaign art not read', e));
   }
 
   async remove(id: string) {
@@ -304,6 +315,41 @@ class AppState {
     return changed;
   }
 
+  // Cached picture ids characters use, and those this device doesn't have
+  // (as after importing a character made on another device).
+  get usedArt(): string[] {
+    return [...new Set(this.sheets.map((s) => cachedId(s.portrait)).filter((id): id is string => !!id))];
+  }
+
+  get missingArt(): string[] {
+    return this.usedArt.filter((id) => !this.portraits[id]);
+  }
+
+  // The art file for this device's characters, to save or put in the campaign's repository.
+  artFile(): ArtFile {
+    return makeArt(Object.fromEntries(this.usedArt.filter((id) => this.portraits[id]).map((id) => [id, this.portraits[id]])));
+  }
+
+  // Fills in missing portraits from an art file. Returns how many arrived.
+  async addArt(data: unknown): Promise<number> {
+    const found = missingFrom(readArt(data), this.missingArt, this.portraits);
+    for (const [id, pic] of Object.entries(found)) {
+      await savePortrait(id, pic).catch((e) => console.warn('Could not cache portrait', e));
+      this.portraits[id] = pic;
+    }
+    return Object.keys(found).length;
+  }
+
+  // Fills in missing portraits from the campaign's art file in its repository.
+  // Quietly does nothing when there's no campaign or it has no art file yet.
+  async syncArt(): Promise<number> {
+    const c = this.campaign;
+    if (!c || !this.missingArt.length) return 0;
+    const res = await fetch(artUrl(c.url, c.campaign.art), { cache: 'no-cache' });
+    if (!res.ok) return 0;
+    return this.addArt(await res.json());
+  }
+
   // Drops cached pictures no character uses any more.
   private async prunePortraits() {
     const used = new Set(this.sheets.map((s) => cachedId(s.portrait)));
@@ -329,9 +375,10 @@ class AppState {
 
   // The result shows once the dice have landed, so the dice don't give it away.
   async record(entry: LogEntry) {
+    this.rolledDice = 0;
     if (this.settings.dice3d) {
       this.lastRoll = null;
-      await showDice(entry, this.diceColors);
+      this.rolledDice = await showDice(entry, this.diceColors);
     }
     this.lastRoll = entry;
     this.log.unshift(entry);

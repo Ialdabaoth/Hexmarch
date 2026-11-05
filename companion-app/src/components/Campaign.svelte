@@ -3,33 +3,11 @@
   import Maps from './Maps.svelte';
   import ModuleMaps from './ModuleMaps.svelte';
   import Modules from './Modules.svelte';
+  import Art from './Art.svelte';
 
-  // The game being played: which campaign, its parties, maps, events, history and
+  // The game being played (the campaign itself is chosen in Settings): its parties, maps, events, history and
   // procedures, and who is in it. Shared campaigns arrive with sign-in; for now
   // everything lives on this device.
-  let busy = $state(false);
-
-  async function choose(url: string) {
-    busy = true;
-    try {
-      if (url) await app.switchCampaign(url);
-      else await app.leaveCampaign();
-    } catch (e) {
-      app.notify((e as Error).message);
-    }
-    busy = false;
-  }
-
-  async function refresh() {
-    busy = true;
-    try {
-      await app.useCampaign(app.settings.campaign);
-    } catch (e) {
-      app.notify((e as Error).message);
-    }
-    busy = false;
-  }
-
   function className(c: (typeof app.characters)[number]): string {
     try {
       return c.rules.getClass(c.classId).name;
@@ -46,22 +24,10 @@
 
 <h1>Campaign</h1>
 
-<section class="card">
-  <label for="which" style="margin-top:0">Campaign</label>
-  <select id="which" value={app.campaign ? app.settings.campaign : ''} disabled={busy}
-    onchange={(e) => choose((e.target as HTMLSelectElement).value)}>
-    <option value="">This device</option>
-    {#each Object.values(app.campaigns) as c (c.url)}<option value={c.url}>{c.campaign.name}</option>{/each}
-  </select>
-  {#if app.campaign}
-    <p class="small muted">
-      Run by {app.campaign.campaign.referee || 'your referee'}. Checked {new Date(app.campaign.fetchedAt).toLocaleDateString()}.
-      <button class="link" disabled={busy} onclick={refresh}>Check for changes</button>
-    </p>
-  {:else}
-    <p class="small muted">Your characters, maps and notes on this phone. Joining a referee's campaign arrives with sign-in.</p>
-  {/if}
-</section>
+<p class="small muted" style="margin-top:-0.5rem">
+  {app.campaign ? app.campaign.campaign.name : 'This device'} ·
+  <button class="link" onclick={() => (app.view = { name: 'settings' })}>Change campaign</button>
+</p>
 
 <details class="section" open>
   <summary><h2>Parties</h2></summary>
@@ -110,6 +76,11 @@
 <details class="section">
   <summary><h2>History</h2></summary>
   <p class="small muted">The campaign's chronicle, one entry per session, with the option to undo back to any of them. Nothing recorded yet.</p>
+</details>
+
+<details class="section">
+  <summary><h2>Art</h2></summary>
+  <Art />
 </details>
 
 <details class="section">

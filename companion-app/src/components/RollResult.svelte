@@ -1,9 +1,20 @@
 <script lang="ts">
   import { app } from '../lib/app.svelte';
   import { damageLine, rolledLine } from '../lib/checks';
+  import { releaseDice } from '../lib/dice3d';
 
   let entry = $derived(app.lastRoll);
   let box = $state<HTMLElement>();
+
+  // When the result goes, the dice resting in its tray go with it.
+  let hadEntry = false;
+  $effect(() => {
+    if (entry) hadEntry = true;
+    else if (hadEntry) {
+      hadEntry = false;
+      releaseDice();
+    }
+  });
 
   // Any tap outside the result, or Escape, puts it away.
   function outside(ev: PointerEvent) {
@@ -29,6 +40,12 @@
         </div>
         {#if entry.parts?.length}<div class="parts">{damageLine(entry)}</div>{/if}
         <div class="small muted"><em>{rolledLine(entry)}</em></div>
+        {#if app.rolledDice}
+          <!-- The 3D dice fly in here once they've had their moment on the table. -->
+          <div class="tray" aria-hidden="true">
+            {#each { length: app.rolledDice } as _}<span data-die-slot></span>{/each}
+          </div>
+        {/if}
       </div>
       {#if app.canPost && !app.settings.autoPost}
         <div class="actions">
@@ -61,6 +78,16 @@
   }
   .parts {
     font-weight: 600;
+  }
+  .tray {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 0.4rem;
+  }
+  .tray span {
+    width: 48px;
+    height: 48px;
   }
   .actions {
     display: flex;
