@@ -89,7 +89,7 @@ T_BG = {"grass": "bg-green", "forest": "bg-green", "woods": "bg-green", "hills":
 # Tiles from tools/tiles_blend.py: bleed-<colour>-e<k> for edge k (0 N, 1 NE, 2 SE, 3 S, 4 SW, 5 NW) and -c<k> for the
 # vertex between edges k-1 and k, used where both of those neighbours bleed the same colour. HEXBLEND=0 turns it off.
 BLEED_RANK = {"bg-blue": 0, "bg-brown": 1, "bg-green": 2, "bg-grey": 3}  # colours that bleed (rank no longer matters)
-BLEED_ALPHA = .5  # Heph 2026-11-05 experiment: every border blends both ways at 50%
+BLEED_ALPHA = .4  # Heph 2026-11-05: every border blends both ways at 40%, so each hex slightly favours its own colour
 BLEED = os.environ.get("HEXBLEND", "1") != "0"
 USED_BLEED = set()
 S_ICON = {"castle": "keep", "town": "village", "abbey": "church", "tomb": "stones", "hill": "hills", "cave": "cave", "ruin": "ruins", "grove": "great-tree", "camp": "community", "lair": "hole", "mist": "fog", "dead": "graveyard"}  # Heph 2026-11-05: great tree for groves, church for abbeys
