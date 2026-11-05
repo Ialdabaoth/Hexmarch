@@ -84,7 +84,13 @@ ICONS = {"castle": "♜", "town": "■", "abbey": "✝", "tomb": "◉", "hill": 
 TILES = os.environ.get("HEXTILES")  # folder of outline-free icon PNGs (maps/tiles/icons); unset = text symbols
 OUTSIDE_FULL = os.environ.get("HEXFADE") is None  # Heph 2026-11-04: hexes beyond the county border render fully; HEXFADE=1 restores the fade
 T_ICON = {"forest": "forest", "woods": "trees", "hills": "hills", "mount": "mountains", "bog": "swamp"}
-T_BG = {"grass": "bg-green", "forest": "bg-green", "woods": "bg-green", "hills": "bg-green", "mount": "bg-brown", "bog": "bg-grey"}  # Heph 2026-11-04
+T_BG = {"grass": "bg-green", "forest": "bg-green", "woods": "bg-green", "hills": "bg-green", "mount": "bg-brown", "bog": "bg-grey", "sea": "bg-blue"}  # Heph 2026-11-04
+# Blends (Heph 2026-11-05): a higher colour bleeds across the edge into a lower neighbour: grey > green > brown > blue.
+# Tiles from tools/tiles_blend.py: bleed-<colour>-e<k> for edge k (0 N, 1 NE, 2 SE, 3 S, 4 SW, 5 NW) and -c<k> for the
+# vertex between edges k-1 and k, used where both of those neighbours bleed the same colour. HEXBLEND=0 turns it off.
+BLEED_RANK = {"bg-blue": 0, "bg-brown": 1, "bg-green": 2, "bg-grey": 3}
+BLEED = os.environ.get("HEXBLEND", "1") != "0"
+USED_BLEED = set()
 S_ICON = {"castle": "keep", "town": "village", "tomb": "stones", "hill": "hills", "cave": "cave", "ruin": "ruins", "grove": "great-tree", "camp": "community", "lair": "hole", "mist": "fog", "dead": "graveyard"}  # Heph 2026-11-05: great tree for groves
 SITE_ICONS = json.loads(os.environ.get("HEXSITEICONS") or "{}")  # per-site icon overrides {site name: icon}, from module.json "site_icons"
 def site_icon(name, kind): return SITE_ICONS.get(name) or S_ICON.get(kind)
@@ -100,7 +106,7 @@ def icon_defs():
     import base64
     from PIL import Image
     out = []
-    for n in sorted(set(T_ICON.values()) | set(S_ICON.values()) | set(SITE_ICONS.values()) | set(T_BG.values())):
+    for n in sorted(set(T_ICON.values()) | set(S_ICON.values()) | set(SITE_ICONS.values()) | set(T_BG.values()) | USED_BLEED):
         f = os.path.join(TILES, n + ".png")
         if not os.path.exists(f): continue
         W, H = Image.open(f).size
@@ -218,13 +224,14 @@ def make(key, R):
     clip = " ".join("M" + " L".join(f"{PLL(*pt)[0]:.1f},{PLL(*pt)[1]:.1f}" for pt in g.exterior.coords) + "Z" for g in geoms)
     H = max(Hpx, 720)
     o = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{Wpx+LEG:.0f}" height="{H:.0f}" viewBox="0 0 {Wpx+LEG:.0f} {H:.0f}" font-family="Georgia, serif">',
-         '<rect width="100%" height="100%" fill="#f4efe1"/>', f'<defs><clipPath id="land"><path d="{clip}"/></clipPath>{icon_defs() if TILES else ""}</defs>']
+         '<rect width="100%" height="100%" fill="#f4efe1"/>', f'<defs><clipPath id="land"><path d="{clip}"/></clipPath><!--ICONDEFS--></defs>']
     TOP = []  # terrain icons, drawn above rivers (Heph 2026-11-04)
     def nearest_hex(lon, lat): return min(hexes, key=lambda hx: (hx["lon"] - lon) ** 2 * (kx / ky) ** 2 + (hx["lat"] - lat) ** 2)
     FEAT = {}  # id(hex) -> site name whose feature icon replaces that hex's terrain icon
     if TILES:
         for st in R["sites"]:
             if site_icon(st[0], st[3]) in HEX_FEATURES: FEAT.setdefault(id(nearest_hex(st[2], st[1])), st[0])
+    BY_CR = {(q["col"], q["row"]): q for q in hexes}
     for hx in hexes:
         pts = " ".join(f"{P(*c)[0]:.1f},{P(*c)[1]:.1f}" for c in hx["corners"])
         fill, op = ("#b9d3e0", 1) if hx["t"] == "sea" else (TERRAIN[hx["t"]][0], 1 if (hx["inside"] or OUTSIDE_FULL) else .35)
@@ -232,6 +239,16 @@ def make(key, R):
         if TILES and hx["t"] in T_BG:
             bw, bh = 2 * s * PX, h * PX
             o.append(f'<use href="#i-{T_BG[hx["t"]]}" x="{cx-bw/2:.1f}" y="{cy-bh/2:.1f}" width="{bw:.1f}" height="{bh:.1f}" opacity="{op}"/>')
+            if BLEED:
+                mine = BLEED_RANK.get(T_BG[hx["t"]], 9); odd = hx["col"] & 1
+                ring = []  # the colour bleeding in across each edge, or None
+                for dc, dr in ((0, -1), (1, -1 + odd), (1, odd), (0, 1), (-1, odd), (-1, -1 + odd)):
+                    nh = BY_CR.get((hx["col"] + dc, hx["row"] + dr)); nb_ = T_BG.get(nh["t"]) if nh else None
+                    ring.append(nb_[3:] if nb_ and BLEED_RANK.get(nb_, -1) > mine else None)
+                for k, c in enumerate(ring):
+                    for nm in ([f"bleed-{c}-e{k}"] if c else []) + ([f"bleed-{c}-c{k}"] if c and ring[k - 1] == c else []):
+                        USED_BLEED.add(nm)
+                        o.append(f'<use href="#i-{nm}" x="{cx-bw/2:.1f}" y="{cy-bh/2:.1f}" width="{bw:.1f}" height="{bh:.1f}" opacity="{op}"/>')
             fill, op = "none", 1
         o.append(f'<polygon points="{pts}" fill="{fill}" fill-opacity="{op}" stroke="#8a7f66" stroke-width="{0.6*min(1,sc):.2f}"/>')
         if hx["inside"] or OUTSIDE_FULL:
@@ -364,7 +381,7 @@ def make(key, R):
         st = it["st"]
         keyed.append(dict(hex=hid, name=name, kind=kind, lat=it["lat"], lon=it["lon"], col=hx["col"], row=hx["row"], note=st[4] if len(st) > 4 else ""))
     if R.get("master"):  # print atlas: map only, plus a geometry dump for the page builder
-        o.append("</svg>"); open(f"{OUT}/{key}.svg", "w").write("\n".join(o))
+        o.append("</svg>"); open(f"{OUT}/{key}.svg", "w").write("\n".join(o).replace("<!--ICONDEFS-->", icon_defs() if TILES else ""))
         G = dict(W=Wpx, H=H, hex_px=h * PX, w_px=w * PX, hexes=[dict(col=hx["col"], row=hx["row"], px=[round(v, 2) for v in P(hx["x"], hx["y"])], inside=hx["inside"], t=hx["t"], lat=round(hx["lat"], 6), lon=round(hx["lon"], 6)) for hx in hexes],
                  sites=[dict(name=k["name"], kind=k["kind"], hex=k["hex"], px=[round(it["x"], 2), round(it["y"], 2)]) for k, it in zip(keyed, items)])
         json.dump(G, open(f"{OUT}/{key}-grid.json", "w"), ensure_ascii=False)
@@ -406,7 +423,7 @@ def make(key, R):
         else: o.append(f'<text x="{lx+39}" y="{ly}" text-anchor="middle" font-size="12">{ICONS[kd]}</text>')
         o.append(f'<text x="{lx+52}" y="{ly}" font-size="11">{k["name"]}</text>'); ly += 18
     o.append("</svg>")
-    open(f"{OUT}/{key}.svg", "w").write("\n".join(o))
+    open(f"{OUT}/{key}.svg", "w").write("\n".join(o).replace("<!--ICONDEFS-->", icon_defs() if TILES else ""))
     # distances
     def miles(a, b):
         dx = (a["lon"] - b["lon"]) * kx; dy = (a["lat"] - b["lat"]) * ky
