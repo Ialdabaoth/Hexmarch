@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { wikiForEntry } from '../lib/wiki';
+  import PageRef from './PageRef.svelte';
   import { app } from '../lib/app.svelte';
   import { equipment, type Character } from '../lib/character';
   import { armorEffect, byCircle, checkPreparations, knownLimit } from '../lib/magic';
@@ -55,10 +57,7 @@
     const m = resolveMagic(ref);
     return m ? magicLevels(m) : circles;
   };
-  const about = (ref: string | undefined) => {
-    const m = resolveMagic(ref);
-    return m ? `${m.tags?.length ? `${m.tags.join(' ')} · ` : ''}p. ${m.page}. ${m.summary ?? ''}` : '';
-  };
+  const about = (ref: string | undefined) => resolveMagic(ref);
 
   function prepare(entry?: { ref?: string; magic: string; circle: number }) {
     const prepared = c.data.inventory.prepared;
@@ -141,7 +140,7 @@
       <button onclick={() => prepare(b)} disabled={!fits(b.circle)}>Prepare</button>
       <button class="ghost" aria-label="Remove" onclick={() => { c.data.inventory.book.splice(i, 1); save(); }}>✕</button>
     </div>
-    {#if about(b.ref)}<p class="small muted about">{about(b.ref)}</p>{/if}
+    {#if about(b.ref)}{@const m = about(b.ref)!}<p class="small muted about">{m.tags?.length ? `${m.tags.join(' ')} · ` : ''}<PageRef page={m.page} href={wikiForEntry(b.ref!)} />. {m.summary ?? ''}</p>{/if}
   {/each}
   {#if catalog.length}
     <select bind:value={addRef} onchange={addToBook} disabled={knownFull} aria-label="Add to {magic.book.toLowerCase()}">

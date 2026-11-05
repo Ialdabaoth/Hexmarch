@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { wikiPage } from '../lib/wiki';
+  import PageRef from './PageRef.svelte';
   import { app } from '../lib/app.svelte';
   import { beastFollower, blankFollower, quickFollower, talentThreshold, type Character, type Follower } from '../lib/character';
   import { BESTIARY, levelOf } from '../bestiary/bestiary';
@@ -159,7 +161,7 @@
   </select>
   <button onclick={() => add(blankFollower('beast'))}>Blank beast</button>
 </div>
-<p class="small muted">Rolled followers use the one-roll NPC table (p. 258). Morale and directing get harder as loyalty drops.</p>
+<p class="small muted">Rolled followers use the one-roll NPC table (<PageRef page={258} href={wikiPage('Tables-NPCs')} />). Morale and directing get harder as loyalty drops.</p>
 
 <style>
   .follower { margin-bottom: 0.5rem; padding: 0.6rem; }

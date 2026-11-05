@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { wikiPageOf } from '../lib/wiki';
+  import PageRef from './PageRef.svelte';
   import { app } from '../lib/app.svelte';
   import type { Character } from '../lib/character';
   import { armorStats, defense, grips, itemId, newArmor, newItem, newWeapon, weaponStats, type ArmorItem, type WeaponItem } from '../lib/gear';
@@ -115,7 +117,7 @@
   }
 </script>
 
-<h3>Armor <small class="muted">({file.name} p. {c.rules.gear.page})</small></h3>
+<h3>Armor <small class="muted">({file.name} <PageRef page={c.rules.gear.page} href={wikiPageOf(`${file.primary.data.id}:light-armor`)} />)</small></h3>
 {#each inv.armor as a (a.id)}
   <div class="item card">
     <div class="row top">

@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { wikiForClass } from '../lib/wiki';
+  import PageRef from './PageRef.svelte';
   import { app } from '../lib/app.svelte';
   import {
     attackThresholds, carrying, equipment, hasExpertise, hitDieLabel, saveThreshold, talentThreshold,
@@ -120,7 +122,7 @@
     <div class="grow">
       <input class="name" bind:value={c.data.name} onchange={save} aria-label="Character name" />
       <p class="muted small">
-        Level {c.level} {c.rules.getOrigin(c.origin).name} {cls.name} · Hit die {hitDieLabel(c)} · {cls.book ?? c.rules.name} p. {cls.page}
+        Level {c.level} {c.rules.getOrigin(c.origin).name} {cls.name} · Hit die {hitDieLabel(c)} · {cls.book ?? c.rules.name} <PageRef page={cls.page} href={wikiForClass(c.rules.id, c.classId.split('+')[0])} />
       </p>
       <div class="row portrait-actions">
         {#if c.data.portrait}<button class="ghost small clear" onclick={() => app.setPortrait(c!.data, '')}>Remove portrait</button>{/if}

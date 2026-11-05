@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { wikiForEntry } from '../lib/wiki';
+  import PageRef from './PageRef.svelte';
   import { app } from '../lib/app.svelte';
   import type { Enchantment } from '../lib/gear';
   import type { Catalog, MagicEntry, Rarity } from '../equipment/equipment';
@@ -55,7 +57,7 @@
       <span class="small muted">{label(e.rarity ?? entry.rarity)}{entry.origins?.length ? ` · ${entry.origins.join(' or ')}` : ''}</span>
       <button class="ghost" aria-label="Remove enchantment" onclick={() => pick('')}>✕</button>
     </div>
-    <p class="small muted note">p. {entry.page}. {entry.summary}</p>
+    <p class="small muted note"><PageRef page={entry.page} href={wikiForEntry(e.ref)} />. {entry.summary}</p>
     {#if effects.length}<p class="small note effects">{effects.join('. ')}.</p>{/if}
     <div class="fields">
       {#if levels.length > 1}
