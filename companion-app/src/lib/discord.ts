@@ -10,7 +10,7 @@ const COLORS = { success: 0x3f8f4f, failure: 0xa33b2b, critical: 0xd4a017 } as c
 
 export function webhookPayload(entry: LogEntry) {
   return {
-    username: entry.who.slice(0, 80) || 'Materia Mundi',
+    username: entry.who.slice(0, 80) || 'E9 Companion',
     allowed_mentions: { parse: [] },
     embeds: [
       {

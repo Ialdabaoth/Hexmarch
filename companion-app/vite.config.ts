@@ -23,9 +23,9 @@ export default defineConfig({
       // map viewer opens as another copy of the app.
       workbox: { navigateFallbackDenylist: [/\/modules\//] },
       manifest: {
-        name: 'Materia Mundi Companion',
-        short_name: 'Materia Mundi',
-        description: 'Characters, followers and dice for the Materia Mundi RPG.',
+        name: 'E9 Companion',
+        short_name: 'E9',
+        description: 'Characters, followers and dice for E9 and its settings, Materia Mundi among them.',
         theme_color: '#2b2118',
         background_color: '#f4ecdc',
         display: 'standalone',

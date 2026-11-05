@@ -157,7 +157,7 @@
       <p>{data.notes}</p>
     </section>
   </div>
-  <footer>Materia Mundi Companion · {v.c.rules.name} rules</footer>
+  <footer>E9 Companion · {v.c.rules.name} rules</footer>
 </article>
 
 <style>
