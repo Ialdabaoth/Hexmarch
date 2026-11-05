@@ -5,6 +5,7 @@ import type { LogEntry } from './checks';
 import { DEFAULT_DICE_COLOR, DEFAULT_DICE_INK, prefersReducedMotion } from './dice3d';
 import type { GameMap } from './maps';
 import type { SavedModule } from './modules';
+import type { Creature } from '../bestiary/creature';
 
 export interface Settings {
   webhookUrl: string;
@@ -131,4 +132,13 @@ export async function loadModuleList(): Promise<SavedModule[]> {
 
 export async function saveModuleList(list: SavedModule[]): Promise<void> {
   await set('modules', JSON.parse(JSON.stringify(list)));
+}
+
+// The referee's creatures, one list per campaign ("" is This device).
+export async function loadCreatures(campaign: string): Promise<Creature[]> {
+  return (await get<Creature[]>(`creatures:${campaign}`)) ?? [];
+}
+
+export async function saveCreatures(campaign: string, list: Creature[]): Promise<void> {
+  await set(`creatures:${campaign}`, JSON.parse(JSON.stringify(list)));
 }

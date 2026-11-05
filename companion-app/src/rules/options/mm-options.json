@@ -4,7 +4,13 @@
   "source": "Materia Mundi Compendium, first edition. Page numbers refer to the Compendium PDF.",
   "mechanics": {
     "attackProgression": "all",
-    "throwMin": 5
+    "throwMin": 5,
+    "npcTalentThresholds": [
+      { "from": 0, "threshold": 5 },
+      { "from": 3, "threshold": 4 },
+      { "from": 6, "threshold": 3 },
+      { "from": 9, "threshold": 2 }
+    ]
   },
   "equipment": "mm",
   "originRoll": {

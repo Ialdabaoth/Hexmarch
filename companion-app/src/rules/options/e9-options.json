@@ -4,7 +4,13 @@
   "source": "E9 System Reference Handbook (revised, 2026), CC BY-SA 4.0. Page numbers are the handbook's printed page numbers.",
   "mechanics": {
     "attackProgression": "fighters",
-    "throwMin": 5
+    "throwMin": 5,
+    "npcTalentThresholds": [
+      { "from": 0, "threshold": 5 },
+      { "from": 3, "threshold": 4 },
+      { "from": 6, "threshold": 3 },
+      { "from": 9, "threshold": 2 }
+    ]
   },
   "equipment": ["e9", "mm"],
   "originRoll": {
