@@ -68,7 +68,9 @@ for k in order:
          f'<polygon points="{hexpts}" fill="none" stroke="#7a2e2e" stroke-width="3" stroke-dasharray="12 6"/>', nb, '</svg>',
          f'<rect x="{MX}" y="{MY}" width="{MW}" height="{MH}" fill="none" stroke="#2b2418" stroke-width="1.2"/>']
     y = MY + 14
-    o.append(f'<text x="{LX}" y="{y}" font-size="11" letter-spacing=".08em" fill="#5b5040">{esc(TITLE.upper())}</text>'); y += 30
+    for ln in TITLE.upper().split(' · '):  # the module's short title, one part per line so it fits the legend
+        o.append(f'<text x="{LX}" y="{y}" font-size="11" letter-spacing=".08em" fill="#5b5040">{esc(ln)}</text>'); y += 13
+    y += 17
     o.append(f'<text x="{LX}" y="{y}" font-size="24" font-weight="bold" fill="#2b2418">March {bid[k]}</text>'); y += 16
     o.append(f'<text x="{LX}" y="{y}" font-size="11" fill="#5b5040">Atlas page {page[k]} of {len(order)}</text>'); y += 14
     # locator
