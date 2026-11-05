@@ -112,7 +112,12 @@ def icon_defs():
         W, H = Image.open(f).size
         b = base64.b64encode(open(f, "rb").read()).decode()
         out.append(f'<symbol id="i-{n}" viewBox="0 0 {W} {H}" preserveAspectRatio="xMidYMid meet"><image width="{W}" height="{H}" href="data:image/png;base64,{b}"/></symbol>')
+        if n.startswith(("bg-", "bleed-")):  # "-x" twin without the painted hex rim: the same image zoomed past its rim and clipped to the hex; the viewer's "Hex edges" box swaps to it
+            if not any(x.startswith('<clipPath id="hexclip"') for x in out[:1]):
+                out.insert(0, f'<clipPath id="hexclip"><polygon points="-2,{H/2} {W/4-1},-2 {W*3/4+1},-2 {W+2},{H/2} {W*3/4+1},{H+2} {W/4-1},{H+2}"/></clipPath>')  # 2 px past the hex so neighbours overlap and no seam shows
+            out.append(f'<symbol id="i-{n}-x" viewBox="0 0 {W} {H}"><g clip-path="url(#hexclip)"><use href="#i-{n}" width="{W}" height="{H}" transform="translate({W/2} {H/2}) scale({RIMLESS}) translate({-W/2} {-H/2})"/></g></symbol>')
     return "".join(out)
+RIMLESS = 1.12  # zoom that pushes the bg tiles' ~10 px painted rim outside the hex
 
 MI_KM = 1.524  # the game mile is exactly 5000 feet (Heph 2026-11-04)
 
@@ -250,7 +255,7 @@ def make(key, R):
                         USED_BLEED.add(nm)
                         o.append(f'<use href="#i-{nm}" x="{cx-bw/2:.1f}" y="{cy-bh/2:.1f}" width="{bw:.1f}" height="{bh:.1f}" opacity="{op}"/>')
             fill, op = "none", 1
-        o.append(f'<polygon points="{pts}" fill="{fill}" fill-opacity="{op}" stroke="#8a7f66" stroke-width="{0.6*min(1,sc):.2f}"/>')
+        o.append(f'<polygon class="hx" points="{pts}" fill="{fill}" fill-opacity="{op}" stroke="#8a7f66" stroke-width="{0.6*min(1,sc):.2f}"/>')
         if hx["inside"] or OUTSIDE_FULL:
             sym = {"forest": "♣", "woods": "♧", "hills": "⌒", "mount": "▲", "bog": "≈"}.get(hx["t"])
             if id(hx) in FEAT: pass  # the site's feature icon is drawn here instead, with the site
@@ -292,17 +297,25 @@ def make(key, R):
             x, y = PLL(plo, pla)
             o.append(f'<text x="{x:.1f}" y="{y+22:.1f}" text-anchor="middle" font-size="12.5" font-style="italic" font-weight="bold" fill="{SD[pside][2]}" stroke="#f4efe1" stroke-width="3.5" paint-order="stroke">{pn}</text>')
     thr = R.get("river_km2", 120)
-    segs = []
+    segs, edge = [], []
     SNR = sub.shape[0]
+    def ok(i): return acc[i] >= thr and parent[i] >= 0 and flat[i] > 0
+    def xy(i):
+        r, c = divmod(int(i), SNC); return PLL(LON_LEFT + (c0 + c + .5) * cell, LAT_TOP - (r0 + r + .5) * cell)
+    def mid(p, q): return ((p[0] + q[0]) / 2, (p[1] + q[1]) / 2)
+    fed = set(int(parent[i]) for i in range(SNR * SNC) if ok(i))  # cells some river flows into
+    # one smoothing pass (Heph 2026-11-05): each step i->p is drawn from the middle of i->p, bending through p, to the middle of p->next,
+    # so the grid's stair steps become curves; a river's first step starts at its source cell and its last step ends in the sea.
     for i in range(SNR * SNC):
-        a = acc[i]
-        if a < thr or parent[i] < 0 or flat[i] <= 0: continue
-        r, c = divmod(i, SNC); pr, pc = divmod(int(parent[i]), SNC)
-        la, lo = LAT_TOP - (r0 + r + .5) * cell, LON_LEFT + (c0 + c + .5) * cell
-        pla, plo = LAT_TOP - (r0 + pr + .5) * cell, LON_LEFT + (c0 + pc + .5) * cell
-        x1, y1 = PLL(lo, la); x2, y2 = PLL(plo, pla)
-        wdt = min(4.5, 0.8 + 2 * math.log10(a / thr + 1))
-        segs.append(f'<line x1="{x1:.1f}" y1="{y1:.1f}" x2="{x2:.1f}" y2="{y2:.1f}" stroke="#3f7fa8" stroke-width="{wdt:.2f}" stroke-linecap="round"/>')
+        if not ok(i): continue
+        p = int(parent[i]); A, B = xy(i), xy(p); m1 = mid(A, B)
+        wdt = min(4.5, 0.8 + 2 * math.log10(acc[i] / thr + 1))
+        d = (f"M{A[0]:.1f},{A[1]:.1f} L{m1[0]:.1f},{m1[1]:.1f}" if i not in fed else f"M{m1[0]:.1f},{m1[1]:.1f}")
+        if ok(p): m2 = mid(B, xy(parent[p])); d += f" Q{B[0]:.1f},{B[1]:.1f} {m2[0]:.1f},{m2[1]:.1f}"
+        else: d += f" L{B[0]:.1f},{B[1]:.1f}"
+        edge.append(f'<path d="{d}" stroke-width="{wdt + 2:.2f}"/>')  # 1 px dark border each side, drawn under the water
+        segs.append(f'<path d="{d}" stroke-width="{wdt:.2f}"/>')
+    segs = ['<g fill="none" stroke-linecap="round" stroke-linejoin="round"><g stroke="#1b2a33" stroke-opacity=".85">'] + edge + ['</g><g stroke="#3f7fa8">'] + segs + ['</g></g>']
     if OUTSIDE_FULL: o.append('<g>' + "".join(segs) + '</g>')
     else:
         if has_border: o.append('<g opacity=".35">' + "".join(segs) + '</g>')
