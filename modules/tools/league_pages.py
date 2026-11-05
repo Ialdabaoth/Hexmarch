@@ -65,7 +65,8 @@ site_pg = {n: v['page'] for v in AI.values() for n in v['sites']}
 march_of = {}
 for v in AI.values():
     for n in v['sites']: march_of[n] = v['page']
-SI = {"castle": "keep", "town": "village", "tomb": "stones", "hill": "hills", "cave": "cave", "ruin": "ruins", "grove": "trees", "camp": "community", "lair": "hole", "mist": "fog", "dead": "graveyard"}
+SI = {"castle": "keep", "town": "village", "tomb": "stones", "hill": "hills", "cave": "cave", "ruin": "ruins", "grove": "great-tree", "camp": "community", "lair": "hole", "mist": "fog", "dead": "graveyard"}  # keep in step with hexmap.py
+SITE_ICONS = json.loads(os.environ.get("HEXSITEICONS") or "{}")
 T = [('Grassland', 'bg-green', None), ('Forest', 'bg-green', 'forest'), ('Light woods', 'bg-green', 'trees'), ('Bog', 'bg-grey', 'swamp'), ('Hills', 'bg-green', 'hills'), ('Mountains', 'bg-brown', 'mountains')]
 TN = {'grass': 'grassland', 'forest': 'forest', 'woods': 'light woods', 'bog': 'bog', 'hills': 'hills', 'mount': 'mountains', 'sea': 'sea'}
 def esc(t): return html.escape(t, quote=True)
@@ -125,7 +126,7 @@ for n, m in enumerate(meta):
         for s in sorted(mine, key=lambda s: s['hex']):
             lines = wrap(s['name'], 19)
             o.append(f'<text x="{LX}" y="{y}" font-size="9" font-weight="bold">{s["hex"]}</text>')
-            ic = SI.get(s['kind'])
+            ic = SITE_ICONS.get(s['name']) or SI.get(s['kind'])
             o.append(f'<use href="#i-{ic}" x="{LX+24}" y="{y-9}" width="13" height="11"/>' if ic else f'<text x="{LX+30}" y="{y}" text-anchor="middle" font-size="10">✝</text>')
             for k_, ln in enumerate(lines): o.append(f'<text x="{LX+40}" y="{y + k_*11}" font-size="9.5">{esc(ln)}</text>')
             y += 11 * len(lines) + 3

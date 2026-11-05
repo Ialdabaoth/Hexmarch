@@ -36,7 +36,8 @@ def site_page(st):
 T = [('grass', 'Grassland', 'bg-green', None), ('forest', 'Forest', 'bg-green', 'forest'), ('woods', 'Light woods', 'bg-green', 'trees'),
      ('bog', 'Bog', 'bg-grey', 'swamp'), ('hills', 'Hills', 'bg-green', 'hills'), ('mount', 'Mountains', 'bg-brown', 'mountains')]
 T = list(T)
-SI = {"castle": "keep", "town": "village", "tomb": "stones", "hill": "hills", "cave": "cave", "ruin": "ruins", "grove": "trees", "camp": "community", "lair": "hole", "mist": "fog", "dead": "graveyard"}
+SI = {"castle": "keep", "town": "village", "tomb": "stones", "hill": "hills", "cave": "cave", "ruin": "ruins", "grove": "great-tree", "camp": "community", "lair": "hole", "mist": "fog", "dead": "graveyard"}  # keep in step with hexmap.py
+SITE_ICONS = json.loads(os.environ.get("HEXSITEICONS") or "{}")
 def esc(t): return html.escape(t, quote=True)
 def wrap(t, n):
     out, line = [], ''
@@ -95,7 +96,7 @@ for k in order:
         for s in mine:
             lines = wrap(s['name'], 19)
             o.append(f'<text x="{LX}" y="{y}" font-size="9" font-weight="bold">{s["hex"]}</text>')
-            ic = SI.get(s['kind'])
+            ic = SITE_ICONS.get(s['name']) or SI.get(s['kind'])
             o.append(f'<use href="#i-{ic}" x="{LX+24}" y="{y-9}" width="13" height="11"/>' if ic else f'<text x="{LX+30}" y="{y}" text-anchor="middle" font-size="10">✝</text>')
             for n, ln in enumerate(lines): o.append(f'<text x="{LX+40}" y="{y + n*11}" font-size="9.5">{esc(ln)}</text>')
             y += 11 * len(lines) + 3
