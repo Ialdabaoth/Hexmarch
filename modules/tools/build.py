@@ -31,7 +31,7 @@ for la in range(la0, la1 + 1):
             print('fetching', t); urllib.request.urlretrieve(f'https://s3.amazonaws.com/elevation-tiles-prod/skadi/{t[:3]}/{t}.hgt.gz', f)
 try: sha = subprocess.run(['git', 'rev-parse', '--short', 'HEAD'], capture_output=True, text=True, cwd=ROOT).stdout.strip()
 except Exception: sha = ''
-ATLAS = '0.2.3'  # version of the atlas tools and viewer themselves (Heph 2026-11-05); patch per PR, separate from each module's version
+ATLAS = '0.2.4'  # version of the atlas tools and viewer themselves (Heph 2026-11-05); patch per PR, separate from each module's version
 VER = f"v{MOD['version']}" + (f"+{os.environ.get('GITHUB_SHA', sha)[:7]}" if (os.environ.get('GITHUB_SHA') or sha) else '') + ' · ' + datetime.date.today().isoformat()
 ENV = dict(os.environ, HEXDEM=','.join(map(str, MOD['dem'])), HEXADMIN=os.path.normpath(os.path.join(mdir, MOD['admin'])),
            HEXTILES=os.path.join(ROOT, 'assets', 'tiles', 'icons'), HEXGEO=geo, MODVER=VER, MODATLAS=ATLAS, MODTITLE=MOD.get('short', MOD['title']),
@@ -58,9 +58,24 @@ if 'centroid' in MOD['atlas']:
     AJ = json.load(open(out + '/atlas/map.json')); os.makedirs(out + '/atlas/tiles', exist_ok=True)
     TD = os.path.join(ROOT, 'assets', 'tiles', 'icons')
     want = {t['icon'] for t in AJ['terrain']['types'] if t.get('icon')} | {p['icon'] for p in AJ['pois'] if p.get('icon')}
-    want |= {f for t in AJ['terrain']['types'] for f in [t['tile']] + [f"bleed-{t['tile'][3:]}-{e}{k}" for e in 'ec' for k in range(6)]}
-    for n in sorted(want | {n + '-x' for n in want if n.startswith(('bg-', 'bleed-'))}):
+    want |= {t['tile'] for t in AJ['terrain']['types']}
+    for n in sorted(want | {n + '-x' for n in want if n.startswith('bg-')}):  # full RGBA, as drawn
         if os.path.exists(f'{TD}/{n}.png'): shutil.copy(f'{TD}/{n}.png', f'{out}/atlas/tiles/{n}.png')
+    # blends: not the 96 bleed tiles (4 MB) but Heph's edge and corner masks, rotated, as 8-bit greyscale (Heph 2026-11-05);
+    # the renderer multiplies each into the colour's own tile on the phone, exactly as tiles_blend.py does
+    from PIL import Image
+    MD = os.path.join(ROOT, 'assets', 'tiles', 'masks')
+    for kind, f in (('e', 'edge.png'), ('c', 'corner.png')):
+        m = Image.open(os.path.join(MD, f)).getchannel('A')
+        for k in range(6):
+            r = m.rotate(-60 * k, resample=Image.BICUBIC, center=(m.width / 2, m.height / 2))
+            r.save(f'{out}/atlas/tiles/mask-{kind}{k}.png', optimize=True)
+            x = Image.new('L', (r.width + 8, r.height + 8)); x.paste(r, (4, 4))  # the -x twins' 4 px margin, edge pixels repeated
+            for p_ in range(4):
+                x.paste(r.crop((0, 0, r.width, 1)), (4, p_)); x.paste(r.crop((0, r.height - 1, r.width, r.height)), (4, r.height + 4 + p_))
+            for p_ in range(4):
+                x.paste(x.crop((4, 0, 5, x.height)), (p_, 0)); x.paste(x.crop((r.width + 3, 0, r.width + 4, x.height)), (r.width + 4 + p_, 0))
+            x.save(f'{out}/atlas/tiles/mask-{kind}{k}-x.png', optimize=True)
     open(out + '/atlas/index.html', 'w').write(open(TOOLS + '/atlas.html').read().replace('{{TITLE}}', MOD['title']).replace('{{ATLAS}}', ATLAS))
 # 4. PDFs
 if PDF:
