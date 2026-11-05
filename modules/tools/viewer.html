@@ -26,6 +26,7 @@ h1 small a { color: var(--accent); text-decoration: none; white-space: nowrap } 
 .tools { display: flex; gap: 6px; align-items: center; flex-wrap: wrap }
 button, .btn { font: 500 14px var(--body); color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 5px 11px; cursor: pointer; text-decoration: none }
 button:hover, .btn:hover { border-color: var(--accent) } button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px }
+.ver { font-size: 12px; color: var(--muted); margin: 10px 0 0; font-variant-numeric: tabular-nums }
 .chk { display: inline-flex; align-items: center; gap: 5px; font-size: 14px; color: var(--ink); cursor: pointer; margin-right: 4px } .chk input { accent-color: var(--accent); margin: 0 }
 #stage svg.noedges .hx, #stage svg.noedges .pagehex:not(.on) polygon, #stage svg.noedges .league-edge polygon { stroke: none }
 select { font: 500 14px var(--body); color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; cursor: pointer }
@@ -88,6 +89,7 @@ html[data-mode="atlas"] main { grid-template-columns: minmax(0, 1fr); grid-templ
     <input id="q" type="search" placeholder="Find a site or page" aria-label="Find a site or page">
     <div id="lists"></div>
     <p class="note" id="foot"></p>
+    <p class="ver" id="ver"></p>
   </aside>
 </main>
 <script type="application/json" id="module-data">/*DATA*/</script>
@@ -264,6 +266,7 @@ function build() {
     if (ps.length) lists.append(sec(b.id + ' · ' + b.title, ps.map(p => item('#' + p.key, L(p.title), 'L ' + p.hex, p.title))));
   }
   const pr = D.print && D.print.atlas ? `Print: <a href="${D.print.atlas}">atlas PDF</a> · <a href="${D.print.leagues}">league PDF</a>. ` : '';
+  $('ver').textContent = 'Atlas ' + (D.atlas || '?') + ' · ' + D.short + ' ' + D.version;
   $('foot').innerHTML = pr + `Links for the companion app: <code>#world</code>, <code>#march-7</code>, <code>#l-1330</code>, <code>#&lt;map&gt;--&lt;site&gt;</code>, <code>#&lt;map&gt;:&lt;hex&gt;</code>; data in <code>module.json</code>. ${D.version} · ${D.license}. Map icons: <a href="https://cmartins.itch.io/hex-tiles-fantasy">Hex Tiles: Fantasy</a> by cmartins, <a href="https://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a>; bonus art by C. Martins, CC BY.`;
 }
 function mark(h) { lists.querySelectorAll('a').forEach(a => a.classList.toggle('on', a.dataset.h === h || h.startsWith(a.dataset.h + '--') || h.startsWith(a.dataset.h + ':'))); }

@@ -31,9 +31,10 @@ for la in range(la0, la1 + 1):
             print('fetching', t); urllib.request.urlretrieve(f'https://s3.amazonaws.com/elevation-tiles-prod/skadi/{t[:3]}/{t}.hgt.gz', f)
 try: sha = subprocess.run(['git', 'rev-parse', '--short', 'HEAD'], capture_output=True, text=True, cwd=ROOT).stdout.strip()
 except Exception: sha = ''
+ATLAS = '0.2.0'  # version of the atlas tools and viewer themselves (Heph 2026-11-05); patch per PR, separate from each module's version
 VER = f"v{MOD['version']}" + (f"+{os.environ.get('GITHUB_SHA', sha)[:7]}" if (os.environ.get('GITHUB_SHA') or sha) else '') + ' · ' + datetime.date.today().isoformat()
 ENV = dict(os.environ, HEXDEM=','.join(map(str, MOD['dem'])), HEXADMIN=os.path.normpath(os.path.join(mdir, MOD['admin'])),
-           HEXTILES=os.path.join(ROOT, 'assets', 'tiles', 'icons'), HEXGEO=geo, MODVER=VER, MODTITLE=MOD.get('short', MOD['title']),
+           HEXTILES=os.path.join(ROOT, 'assets', 'tiles', 'icons'), HEXGEO=geo, MODVER=VER, MODATLAS=ATLAS, MODTITLE=MOD.get('short', MOD['title']),
            HEXSITEICONS=json.dumps(MOD.get('site_icons', {}), ensure_ascii=False))
 def run(*a): subprocess.run(list(a), check=True, env=ENV, stdout=subprocess.DEVNULL)
 
@@ -88,7 +89,7 @@ ALIASES = {}
 for s_ in SITES:
     for k in {'p-' + s_['slug'], 'p-' + slug(s_['name'].split(' (')[0])}: ALIASES.setdefault(k, s_['league'])
 H0 = next(h for h in G['hexes'] if h['col'] == 0 and h['row'] == 0)
-M = {'format': 'mm-module/1', 'id': MOD['id'], 'title': MOD['title'], 'short': MOD.get('short', MOD['title']), 'version': VER, 'license': MOD.get('license', 'CC0-1.0'),
+M = {'format': 'mm-module/1', 'id': MOD['id'], 'title': MOD['title'], 'short': MOD.get('short', MOD['title']), 'version': VER, 'atlas': ATLAS, 'license': MOD.get('license', 'CC0-1.0'),
      'scales': {'mile_ft': 5000, 'region_hex_mi': MOD['atlas']['page_hex_mi'], 'march_hex_mi': HX, 'league_hex_mi': MOD['league']['hex_mi'], 'field_hex_ft': 100, 'encounter_square_ft': 5},
      'books': MOD['books'],
      'world': {'map': 'maps/world.svg', 'width': round(G['W'], 1), 'height': round(G['H'], 1), 'hex_px': round(G['hex_px'], 3), 'col_px': round(G['w_px'], 3),
@@ -112,4 +113,4 @@ for old in MOD.get('moved_from', []):
     open(os.path.join(od, 'index.html'), 'w').write(f'<!doctype html><meta charset="utf-8"><title>{MOD["title"]}</title><meta name="robots" content="noindex">'
         f'<script>location.replace("../{MOD["id"]}/" + location.search + location.hash)</script><p>This module moved to <a href="../{MOD["id"]}/">{MOD["title"]}</a>.</p>')
 if os.environ.get('KEEP_WORK') is None: shutil.rmtree(work)
-print(f"{MOD['id']} {VER}: {len(M['marches'])} March pages, {len(M['leagues'])} League pages, {len(SITES)} sites -> {out}")
+print(f"Atlas {ATLAS} · {MOD['id']} {VER}: {len(M['marches'])} March pages, {len(M['leagues'])} League pages, {len(SITES)} sites -> {out}")
