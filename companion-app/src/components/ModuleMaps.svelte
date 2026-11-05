@@ -7,7 +7,7 @@
   // A module's maps in two frames: the map alone (?mode=map) and its atlas of pages
   // (?mode=atlas). A page picked in the atlas opens in the map; tapping a hex shows
   // what's there, and the party can be placed on it.
-  const SEASON_1 = 'https://ialdabaoth.github.io/MateriaMundiRPG/';
+  const HOME_MODULES = 'https://ialdabaoth.github.io/MateriaMundiRPG/';
 
   let mapFrame = $state<HTMLIFrameElement>();
   let atlasFrame = $state<HTMLIFrameElement>();
@@ -58,11 +58,11 @@
     app.notify(`Party moved to hex ${picked.hex}`);
   }
 
-  async function addSeason1() {
+  async function addBeyondThePale() {
     busy = true;
     problem = '';
     try {
-      await app.addModuleRepo(SEASON_1);
+      await app.addModuleRepo(HOME_MODULES);
     } catch (e) {
       problem = (e as Error).message;
     }
@@ -105,7 +105,7 @@
       </section>
     {/if}
     <details class="atlas" open>
-      <summary class="small muted">Marches and leagues pages</summary>
+      <summary class="small muted">Atlas and exploration pages</summary>
       <div class="frame">
         <iframe bind:this={atlasFrame} class="list" src="{base}?mode=atlas{start}" title="{current.manifest.title}: atlas"></iframe>
       </div>
@@ -116,7 +116,7 @@
     <p class="small muted" style="margin-top:0">
       No module maps on this device yet. Add the Beyond the Pale maps (Leinster, 1422), or add another module's site under Manage › Modules.
     </p>
-    <button class="primary" onclick={addSeason1} disabled={busy}>{busy ? 'Adding…' : 'Add Beyond the Pale maps'}</button>
+    <button class="primary" onclick={addBeyondThePale} disabled={busy}>{busy ? 'Adding…' : 'Add Beyond the Pale maps'}</button>
     {#if problem}<p class="small failure" role="alert">{problem}</p>{/if}
   </section>
 {/if}

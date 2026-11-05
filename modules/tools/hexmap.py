@@ -84,8 +84,15 @@ ICONS = {"castle": "♜", "town": "■", "abbey": "✝", "tomb": "◉", "hill": 
 TILES = os.environ.get("HEXTILES")  # folder of outline-free icon PNGs (maps/tiles/icons); unset = text symbols
 OUTSIDE_FULL = os.environ.get("HEXFADE") is None  # Heph 2026-11-04: hexes beyond the county border render fully; HEXFADE=1 restores the fade
 T_ICON = {"forest": "forest", "woods": "trees", "hills": "hills", "mount": "mountains", "bog": "swamp"}
-T_BG = {"grass": "bg-green", "forest": "bg-green", "woods": "bg-green", "hills": "bg-green", "mount": "bg-brown", "bog": "bg-grey"}  # Heph 2026-11-04
-S_ICON = {"castle": "keep", "town": "village", "tomb": "stones", "hill": "hills", "cave": "cave", "ruin": "ruins", "grove": "great-tree", "camp": "community", "lair": "hole", "mist": "fog", "dead": "graveyard"}  # Heph 2026-11-05: great tree for groves
+T_BG = {"grass": "bg-green", "forest": "bg-green", "woods": "bg-green", "hills": "bg-green", "mount": "bg-brown", "bog": "bg-grey", "sea": "bg-blue"}  # Heph 2026-11-04
+# Blends (Heph 2026-11-05): a higher colour bleeds across the edge into a lower neighbour: grey > green > brown > blue.
+# Tiles from tools/tiles_blend.py: bleed-<colour>-e<k> for edge k (0 N, 1 NE, 2 SE, 3 S, 4 SW, 5 NW) and -c<k> for the
+# vertex between edges k-1 and k, used where both of those neighbours bleed the same colour. HEXBLEND=0 turns it off.
+BLEED_RANK = {"bg-blue": 0, "bg-brown": 1, "bg-green": 2, "bg-grey": 3}  # colours that bleed (rank no longer matters)
+BLEED_ALPHA = .4  # Heph 2026-11-05: every border blends both ways at 40%, so each hex slightly favours its own colour
+BLEED = os.environ.get("HEXBLEND", "1") != "0"
+USED_BLEED = set()
+S_ICON = {"castle": "keep", "town": "village", "abbey": "church", "tomb": "stones", "hill": "hills", "cave": "cave", "ruin": "ruins", "grove": "great-tree", "camp": "community", "lair": "hole", "mist": "fog", "dead": "graveyard"}  # Heph 2026-11-05: great tree for groves, church for abbeys
 SITE_ICONS = json.loads(os.environ.get("HEXSITEICONS") or "{}")  # per-site icon overrides {site name: icon}, from module.json "site_icons"
 def site_icon(name, kind): return SITE_ICONS.get(name) or S_ICON.get(kind)
 # Heph 2026-11-05: these hex-sized features replace the terrain icon of the site's hex instead of sitting on top of it
@@ -100,12 +107,14 @@ def icon_defs():
     import base64
     from PIL import Image
     out = []
-    for n in sorted(set(T_ICON.values()) | set(S_ICON.values()) | set(SITE_ICONS.values()) | set(T_BG.values())):
+    base = set(T_BG.values()) | USED_BLEED
+    for n in sorted(set(T_ICON.values()) | set(S_ICON.values()) | set(SITE_ICONS.values()) | base | {b + "-x" for b in base}):  # "-x": rimless twins for the viewer's Hex Edges box (tools/tiles_blend.py)
         f = os.path.join(TILES, n + ".png")
         if not os.path.exists(f): continue
         W, H = Image.open(f).size
         b = base64.b64encode(open(f, "rb").read()).decode()
-        out.append(f'<symbol id="i-{n}" viewBox="0 0 {W} {H}" preserveAspectRatio="xMidYMid meet"><image width="{W}" height="{H}" href="data:image/png;base64,{b}"/></symbol>')
+        vb, ov = (f"0 0 {W} {H}", "") if not n.endswith("-x") else (f"4 4 {W-8} {H-8}", ' overflow="visible"')  # -x twins have a 4 px margin (tiles_blend.py PAD) that overlaps the neighbours
+        out.append(f'<symbol id="i-{n}" viewBox="{vb}"{ov} preserveAspectRatio="xMidYMid meet"><image width="{W}" height="{H}" href="data:image/png;base64,{b}"/></symbol>')
     return "".join(out)
 
 MI_KM = 1.524  # the game mile is exactly 5000 feet (Heph 2026-11-04)
@@ -218,13 +227,14 @@ def make(key, R):
     clip = " ".join("M" + " L".join(f"{PLL(*pt)[0]:.1f},{PLL(*pt)[1]:.1f}" for pt in g.exterior.coords) + "Z" for g in geoms)
     H = max(Hpx, 720)
     o = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{Wpx+LEG:.0f}" height="{H:.0f}" viewBox="0 0 {Wpx+LEG:.0f} {H:.0f}" font-family="Georgia, serif">',
-         '<rect width="100%" height="100%" fill="#f4efe1"/>', f'<defs><clipPath id="land"><path d="{clip}"/></clipPath>{icon_defs() if TILES else ""}</defs>']
+         '<rect width="100%" height="100%" fill="#f4efe1"/>', f'<defs><clipPath id="land"><path d="{clip}"/></clipPath><!--ICONDEFS--></defs>']
     TOP = []  # terrain icons, drawn above rivers (Heph 2026-11-04)
     def nearest_hex(lon, lat): return min(hexes, key=lambda hx: (hx["lon"] - lon) ** 2 * (kx / ky) ** 2 + (hx["lat"] - lat) ** 2)
     FEAT = {}  # id(hex) -> site name whose feature icon replaces that hex's terrain icon
     if TILES:
         for st in R["sites"]:
             if site_icon(st[0], st[3]) in HEX_FEATURES: FEAT.setdefault(id(nearest_hex(st[2], st[1])), st[0])
+    BY_CR = {(q["col"], q["row"]): q for q in hexes}
     for hx in hexes:
         pts = " ".join(f"{P(*c)[0]:.1f},{P(*c)[1]:.1f}" for c in hx["corners"])
         fill, op = ("#b9d3e0", 1) if hx["t"] == "sea" else (TERRAIN[hx["t"]][0], 1 if (hx["inside"] or OUTSIDE_FULL) else .35)
@@ -232,8 +242,18 @@ def make(key, R):
         if TILES and hx["t"] in T_BG:
             bw, bh = 2 * s * PX, h * PX
             o.append(f'<use href="#i-{T_BG[hx["t"]]}" x="{cx-bw/2:.1f}" y="{cy-bh/2:.1f}" width="{bw:.1f}" height="{bh:.1f}" opacity="{op}"/>')
+            if BLEED:
+                mine = BLEED_RANK.get(T_BG[hx["t"]], 9); odd = hx["col"] & 1
+                ring = []  # the colour bleeding in across each edge, or None
+                for dc, dr in ((0, -1), (1, -1 + odd), (1, odd), (0, 1), (-1, odd), (-1, -1 + odd)):
+                    nh = BY_CR.get((hx["col"] + dc, hx["row"] + dr)); nb_ = T_BG.get(nh["t"]) if nh else None
+                    ring.append(nb_[3:] if nb_ and nb_ != T_BG[hx["t"]] and nb_ in BLEED_RANK else None)  # both sides of every border, at half strength
+                for k, c in enumerate(ring):
+                    for nm in ([f"bleed-{c}-e{k}"] if c else []) + ([f"bleed-{c}-c{k}"] if c and ring[k - 1] == c else []):
+                        USED_BLEED.add(nm)
+                        o.append(f'<use href="#i-{nm}" x="{cx-bw/2:.1f}" y="{cy-bh/2:.1f}" width="{bw:.1f}" height="{bh:.1f}" opacity="{op * BLEED_ALPHA}"/>')
             fill, op = "none", 1
-        o.append(f'<polygon points="{pts}" fill="{fill}" fill-opacity="{op}" stroke="#8a7f66" stroke-width="{0.6*min(1,sc):.2f}"/>')
+        o.append(f'<polygon class="hx" points="{pts}" fill="{fill}" fill-opacity="{op}" stroke="#8a7f66" stroke-width="{0.6*min(1,sc):.2f}"/>')
         if hx["inside"] or OUTSIDE_FULL:
             sym = {"forest": "♣", "woods": "♧", "hills": "⌒", "mount": "▲", "bog": "≈"}.get(hx["t"])
             if id(hx) in FEAT: pass  # the site's feature icon is drawn here instead, with the site
@@ -275,17 +295,53 @@ def make(key, R):
             x, y = PLL(plo, pla)
             o.append(f'<text x="{x:.1f}" y="{y+22:.1f}" text-anchor="middle" font-size="12.5" font-style="italic" font-weight="bold" fill="{SD[pside][2]}" stroke="#f4efe1" stroke-width="3.5" paint-order="stroke">{pn}</text>')
     thr = R.get("river_km2", 120)
-    segs = []
-    SNR = sub.shape[0]
-    for i in range(SNR * SNC):
-        a = acc[i]
-        if a < thr or parent[i] < 0 or flat[i] <= 0: continue
-        r, c = divmod(i, SNC); pr, pc = divmod(int(parent[i]), SNC)
-        la, lo = LAT_TOP - (r0 + r + .5) * cell, LON_LEFT + (c0 + c + .5) * cell
-        pla, plo = LAT_TOP - (r0 + pr + .5) * cell, LON_LEFT + (c0 + pc + .5) * cell
-        x1, y1 = PLL(lo, la); x2, y2 = PLL(plo, pla)
-        wdt = min(4.5, 0.8 + 2 * math.log10(a / thr + 1))
-        segs.append(f'<line x1="{x1:.1f}" y1="{y1:.1f}" x2="{x2:.1f}" y2="{y2:.1f}" stroke="#3f7fa8" stroke-width="{wdt:.2f}" stroke-linecap="round"/>')
+    segs, edge = [], []
+    SNR = sub.shape[0]; N = SNR * SNC
+    def ok(i): return acc[i] >= thr and parent[i] >= 0 and flat[i] > 0
+    def xy(i):
+        r, c = divmod(int(i), SNC); return PLL(LON_LEFT + (c0 + c + .5) * cell, LAT_TOP - (r0 + r + .5) * cell)
+    def width(i): return min(4.5, 0.8 + 2 * math.log10(acc[i] / thr + 1))
+    # Rivers as splines (Heph 2026-11-05). The flow grid gives one step per cell, so a river is a chain of cell centres.
+    # Each river is split into chains: a chain follows the biggest inflow downstream and ends where it joins a bigger river
+    # (at that river's smoothed point) or reaches the sea. Each chain's points get a light moving average (ends pinned),
+    # then a centripetal Catmull-Rom spline (no loops or cusps at sharp bends) drawn as cubic Beziers, one per step so the
+    # width can grow downstream.
+    main = {}  # cell -> its largest inflowing river cell
+    for i in range(N):
+        if ok(i):
+            p = int(parent[i])
+            if p not in main or acc[i] > acc[main[p]]: main[p] = i
+    chains = []
+    for i in range(N):
+        if not ok(i) or i in main: continue  # every chain starts at a source (a cell nothing flows into)
+        ch = [i]
+        while ok(ch[-1]):
+            p = int(parent[ch[-1]]); ch.append(p)
+            if main.get(p) != ch[-2]: break  # joined a bigger river
+        chains.append(ch)
+    chains.sort(key=lambda ch: -max(acc[c] for c in ch[:-1]))  # big rivers first, so tributaries can join their smoothed line
+    SM = {}
+    def sp(a, b, c, d):  # centripetal Catmull-Rom from b to c as Bezier control points
+        def t(u, v): return max(1e-6, math.hypot(v[0] - u[0], v[1] - u[1]) ** .5)
+        t1, t2, t3 = t(a, b), t(b, c), t(c, d)
+        m1 = [(c[k] - b[k]) / t2 - (c[k] - a[k]) / (t1 + t2) + (b[k] - a[k]) / t1 for k in (0, 1)]
+        m2 = [(c[k] - b[k]) / t2 - (d[k] - b[k]) / (t2 + t3) + (d[k] - c[k]) / t3 for k in (0, 1)]
+        return [b[k] + m1[k] * t2 / 3 for k in (0, 1)], [c[k] - m2[k] * t2 / 3 for k in (0, 1)]
+    for ch in chains:
+        raw = [xy(c) for c in ch]; n = len(raw)
+        pts = [raw[0]] + [tuple(sum(raw[j][k] for j in range(max(0, q - 2), min(n, q + 3))) / (min(n, q + 3) - max(0, q - 2)) for k in (0, 1)) for q in range(1, n - 1)] + [raw[-1]]
+        if ch[-1] in SM: pts[-1] = SM[ch[-1]]
+        for q, c in enumerate(ch): SM.setdefault(c, pts[q])
+        for q in range(n - 1):
+            A, B, C, D = pts[max(0, q - 1)], pts[q], pts[q + 1], pts[min(n - 1, q + 2)]
+            if A == B: A = (2 * B[0] - C[0], 2 * B[1] - C[1])
+            if D == C: D = (2 * C[0] - B[0], 2 * C[1] - B[1])
+            c1, c2 = sp(A, B, C, D)
+            d = f"M{B[0]:.1f},{B[1]:.1f} C{c1[0]:.1f},{c1[1]:.1f} {c2[0]:.1f},{c2[1]:.1f} {C[0]:.1f},{C[1]:.1f}"
+            rw = width(ch[q])  # (not "w": that is the hex column width, used below)
+            edge.append(f'<path d="{d}" stroke-width="{rw + 2:.2f}"/>')  # 1 px dark border each side, drawn under the water
+            segs.append(f'<path d="{d}" stroke-width="{rw:.2f}"/>')
+    segs = ['<g fill="none" stroke-linecap="round" stroke-linejoin="round"><g stroke="#1b2a33" stroke-opacity=".85">'] + edge + ['</g><g stroke="#3f7fa8">'] + segs + ['</g></g>']
     if OUTSIDE_FULL: o.append('<g>' + "".join(segs) + '</g>')
     else:
         if has_border: o.append('<g opacity=".35">' + "".join(segs) + '</g>')
@@ -364,7 +420,7 @@ def make(key, R):
         st = it["st"]
         keyed.append(dict(hex=hid, name=name, kind=kind, lat=it["lat"], lon=it["lon"], col=hx["col"], row=hx["row"], note=st[4] if len(st) > 4 else ""))
     if R.get("master"):  # print atlas: map only, plus a geometry dump for the page builder
-        o.append("</svg>"); open(f"{OUT}/{key}.svg", "w").write("\n".join(o))
+        o.append("</svg>"); open(f"{OUT}/{key}.svg", "w").write("\n".join(o).replace("<!--ICONDEFS-->", icon_defs() if TILES else ""))
         G = dict(W=Wpx, H=H, hex_px=h * PX, w_px=w * PX, hexes=[dict(col=hx["col"], row=hx["row"], px=[round(v, 2) for v in P(hx["x"], hx["y"])], inside=hx["inside"], t=hx["t"], lat=round(hx["lat"], 6), lon=round(hx["lon"], 6)) for hx in hexes],
                  sites=[dict(name=k["name"], kind=k["kind"], hex=k["hex"], px=[round(it["x"], 2), round(it["y"], 2)]) for k, it in zip(keyed, items)])
         json.dump(G, open(f"{OUT}/{key}-grid.json", "w"), ensure_ascii=False)
@@ -406,7 +462,7 @@ def make(key, R):
         else: o.append(f'<text x="{lx+39}" y="{ly}" text-anchor="middle" font-size="12">{ICONS[kd]}</text>')
         o.append(f'<text x="{lx+52}" y="{ly}" font-size="11">{k["name"]}</text>'); ly += 18
     o.append("</svg>")
-    open(f"{OUT}/{key}.svg", "w").write("\n".join(o))
+    open(f"{OUT}/{key}.svg", "w").write("\n".join(o).replace("<!--ICONDEFS-->", icon_defs() if TILES else ""))
     # distances
     def miles(a, b):
         dx = (a["lon"] - b["lon"]) * kx; dy = (a["lat"] - b["lat"]) * ky

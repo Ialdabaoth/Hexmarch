@@ -21,11 +21,15 @@ header { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; backg
   padding-block: 10px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
   display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px; }
 .crumb { display: flex; flex-direction: column; min-width: 0; flex: 1 1 260px }
-.crumb .up { font-size: 13px; color: var(--muted); text-decoration: none } .crumb .up:hover { color: var(--accent) }
-h1 { font: 26px/1.1 var(--display); margin: 0; text-wrap: balance } h1 small { font: 14px var(--body); color: var(--muted); margin-left: 8px }
+h1 { font: 24px/1.2 var(--display); margin: 0; text-wrap: balance } h1 small { font: 15px var(--body); color: var(--muted) }
+h1 small a { color: var(--accent); text-decoration: none; white-space: nowrap } h1 small a:hover { text-decoration: underline } h1 .sep { margin: 0 6px; color: var(--muted) }
 .tools { display: flex; gap: 6px; align-items: center; flex-wrap: wrap }
 button, .btn { font: 500 14px var(--body); color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 5px 11px; cursor: pointer; text-decoration: none }
 button:hover, .btn:hover { border-color: var(--accent) } button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px }
+.ver { font-size: 12px; color: var(--muted); margin: 10px 0 0; font-variant-numeric: tabular-nums }
+.chk { display: inline-flex; align-items: center; gap: 5px; font-size: 14px; color: var(--ink); cursor: pointer; margin-right: 4px } .chk input { accent-color: var(--accent); margin: 0 }
+#stage svg.noedges .hx, #stage svg.noedges .pagehex:not(.on) polygon, #stage svg.noedges .league-edge polygon { stroke: none }
+select { font: 500 14px var(--body); color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; cursor: pointer }
 .zoom { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 13px; min-width: 3.5em; text-align: center }
 main { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 310px }
 #stage { overflow: auto; position: relative; background: var(--paper); min-height: 0 }
@@ -70,8 +74,10 @@ html[data-mode="atlas"] main { grid-template-columns: minmax(0, 1fr); grid-templ
 <script>document.documentElement.dataset.mode = { map: 'map', atlas: 'atlas' }[new URLSearchParams(location.search).get('mode')] || 'full';</script>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs><!--SYMBOLS--></defs></svg>
 <header>
-  <div class="crumb"><a class="up" id="up" href="#world" hidden></a><h1 id="title">Loading</h1></div>
+  <div class="crumb"><h1 id="title">Loading</h1></div>
   <div class="tools">
+    <select id="lang" aria-label="Language"><option value="ga">Gaeilge</option><option value="en">English</option></select>
+    <label class="chk"><input type="checkbox" id="edges" checked> Hex Edges</label>
     <a class="btn" id="prev" hidden>‹ Prev</a><a class="btn" id="next" hidden>Next ›</a>
     <button id="zo" aria-label="Zoom out">−</button><span class="zoom" id="zl">100%</span><button id="zi" aria-label="Zoom in">+</button><button id="zf">Fit</button>
   </div>
@@ -83,6 +89,7 @@ html[data-mode="atlas"] main { grid-template-columns: minmax(0, 1fr); grid-templ
     <input id="q" type="search" placeholder="Find a site or page" aria-label="Find a site or page">
     <div id="lists"></div>
     <p class="note" id="foot"></p>
+    <p class="ver" id="ver"></p>
   </aside>
 </main>
 <script type="application/json" id="module-data">/*DATA*/</script>
@@ -116,6 +123,25 @@ function setZoom(nz, fx, fy) {
   stage.scrollLeft = cx * natW * z - stage.clientWidth / 2; stage.scrollTop = cy * natH * z - stage.clientHeight / 2;
   $('zl').textContent = Math.round(z * 100) + '%';
 }
+// "Hex edges" box: off hides the hex outlines and swaps each background tile for its "-x" twin without the painted rim (hexmap.py icon_defs)
+try { $('edges').checked = localStorage.getItem('mm-hex-edges') !== 'off'; } catch (e) {}
+function edges() {
+  if (!svg) return; const on = $('edges').checked; svg.classList.toggle('noedges', !on);
+  const twins = new Set([...document.querySelectorAll('symbol[id$="-x"]')].map(e => '#' + e.id));
+  svg.querySelectorAll('use').forEach(u => {
+    const h = u.getAttribute('href'); if (!h || !/^#i-(bg|bleed)-/.test(h) || u.closest('symbol')) return;
+    const base = h.replace(/-x$/, ''); if (twins.has(base + '-x')) u.setAttribute('href', on ? base : base + '-x');
+  });
+}
+$('edges').addEventListener('change', () => { try { localStorage.setItem('mm-hex-edges', $('edges').checked ? 'on' : 'off'); } catch (e) {} edges(); });
+const SC_LEAGUE = '1 hex = 1 league (' + D.scales.march_hex_mi + ' miles)', SC_FIELD = '1 hex = 1 field (' + D.scales.league_hex_mi + ' miles)';
+// Language box: map labels, page titles and lists in Irish (the names as drawn) or English, from module.json "names"
+let LANG = 'ga'; try { LANG = localStorage.getItem('mm-lang') || 'ga'; } catch (e) {}
+$('lang').value = LANG;
+function L(s) { const n = D.names && D.names[s]; return (n && n[LANG]) || s; }
+function relabel() { if (svg) svg.querySelectorAll('text').forEach(t => { if (t.dataset.o === undefined) t.dataset.o = t.textContent; t.textContent = L(t.dataset.o); }); }
+$('lang').addEventListener('change', () => { LANG = $('lang').value; try { localStorage.setItem('mm-lang', LANG); } catch (e) {} lists.replaceChildren(); build(); route(); relabel(); });
+function marchOf(hex) { const [x, y] = hexCenter(hex); let best = null, bd = Infinity; for (const a of D.marches) { const d = (a.center_px[0] - x) ** 2 + (a.center_px[1] - y) ** 2; if (d < bd) { bd = d; best = a; } } return best; }
 function hexPts(cx, cy, r) { return [0, 60, 120, 180, 240, 300].map(a => [cx + r * Math.cos(a * Math.PI / 180), cy + r * Math.sin(a * Math.PI / 180)].map(v => v.toFixed(1)).join(',')).join(' '); }
 function pageHexes() {
   const g = document.createElementNS(NS, 'g');
@@ -175,7 +201,7 @@ async function hexInfo(r) {
   const scale = r.view === 'world' ? D.scales.march_hex_mi + '-mile hex' : D.scales.league_hex_mi + '-mile hex in League ' + EX[r.key].hex;
   box.replaceChildren(Object.assign(document.createElement('h2'), { textContent: 'Hex ' + r.hex }),
     Object.assign(document.createElement('p'), { textContent: scale + (t ? ' · ' + (TERRAIN[t] || t) : '') }));
-  if (sites.length) { const p = document.createElement('p'); p.append('Sites: '); sites.forEach((s, i) => { if (i) p.append(', '); p.append(Object.assign(document.createElement('a'), { href: s.href, textContent: s.name })); }); box.append(p); }
+  if (sites.length) { const p = document.createElement('p'); p.append('Sites: '); sites.forEach((s, i) => { if (i) p.append(', '); p.append(Object.assign(document.createElement('a'), { href: s.href, textContent: L(s.name) })); }); box.append(p); }
   box.hidden = false;
   tell({ event: 'hex', map, hex: r.hex, hash: location.hash, terrain: t || null, terrainName: t ? TERRAIN[t] || t : null, scale, sites });
 }
@@ -190,13 +216,19 @@ async function route() {
   const r = parse();
   if (MODE === 'atlas') { mark(hashOf(r)); return; }
   const path = r.view === 'expl' ? EX[r.key].map : D.world.map;
-  let title, small, up = null;
-  if (r.view === 'world') { title = D.title; small = r.hex ? 'hex ' + r.hex : 'Region · ' + D.scales.march_hex_mi + '-mile hexes'; nav(null, '#march-1'); }
-  else if (r.view === 'march') { const a = D.marches[r.page - 1]; title = 'March ' + a.id; small = 'atlas page ' + a.page; up = ['#world', '← ' + D.short]; nav(a.page > 1 && '#march-' + (a.page - 1), a.page < D.marches.length && '#march-' + (a.page + 1)); }
-  else { const p = EX[r.key]; title = p.title; small = 'League ' + p.hex + ' · page ' + p.page; up = ['#world', '← ' + D.short]; const i = p.page - 1;
+  // Header breadcrumb (Heph 2026-11-05): Title · Region · March 0301 · League 2107 · scale; each depth links to its own map
+  let title, crumbs, scale;
+  if (r.view === 'world') { title = D.title; crumbs = [['Region', '#world']]; scale = SC_LEAGUE; nav(null, '#march-1'); }
+  else if (r.view === 'march') { const a = D.marches[r.page - 1]; title = 'March ' + a.id; crumbs = [['Region', '#world'], [title, '#march-' + a.page]]; scale = SC_LEAGUE;
+         nav(a.page > 1 && '#march-' + (a.page - 1), a.page < D.marches.length && '#march-' + (a.page + 1)); }
+  else { const p = EX[r.key], a = marchOf(p.hex); title = L(p.title); scale = SC_FIELD;
+         crumbs = [['Region', '#world'], ...(a ? [['March ' + a.id, '#march-' + a.page]] : []), ['League ' + p.hex, '#' + p.key]]; const i = p.page - 1;
          nav(i > 0 && '#' + D.leagues[i - 1].key, i < D.leagues.length - 1 && '#' + D.leagues[i + 1].key); }
-  $('title').replaceChildren(title, Object.assign(document.createElement('small'), { textContent: small }));
-  $('up').hidden = !up; if (up) { $('up').href = up[0]; $('up').textContent = up[1]; }
+  const sm = document.createElement('small'), sep = () => Object.assign(document.createElement('span'), { className: 'sep', textContent: '·' });
+  for (const [t, h] of crumbs) sm.append(sep(), Object.assign(document.createElement('a'), { href: h, textContent: t }));
+  sm.append(sep(), scale);
+  $('title').replaceChildren(D.title, sm);
+  const small = crumbs.map(c => c[0]).join(' · ') + ' · ' + scale;
   document.title = r.view === 'world' ? D.title : title + ' · ' + D.short;
   if (cur !== path) {
     stage.innerHTML = '<p class="msg">Loading the map…</p>';
@@ -206,6 +238,7 @@ async function route() {
     hexIds = new Set([...svg.querySelectorAll('text')].map(t => t.textContent).filter(t => /^\d{4}$/.test(t)));
     if (path === D.world.map) pageHexes();
     setZoom(fit(), 0, 0); stage.scrollLeft = 0; stage.scrollTop = 0;
+    edges(); relabel();
   }
   svg.querySelectorAll('.ring, .sel').forEach(e => e.remove());
   if (r.hex && hexIds.has(r.hex)) { poly('sel', r.hex); const [x, y] = hexCenter(r.hex); if (z < .7) setZoom(Math.max(fit(), .8), x / natW, y / natH); }
@@ -220,25 +253,26 @@ async function route() {
   mark('#' + (r.view === 'world' ? 'world' : r.view === 'march' ? 'march-' + r.page : r.key + (r.focus ? '--' + r.focus : '')));
   tell({ event: 'view', hash: location.hash || '#world', map: r.view === 'march' ? 'world' : mapOf(r), title, small });
 }
-function item(href, name, tag) {
+function item(href, name, tag, alt = '') {
   const a = document.createElement('a'); a.href = href; a.dataset.h = href;
   a.append(Object.assign(document.createElement('span'), { textContent: name }), Object.assign(document.createElement('span'), { textContent: tag }));
-  const li = document.createElement('li'); li.append(a); li.dataset.q = (name + ' ' + tag).toLowerCase(); return li;
+  const li = document.createElement('li'); li.append(a); li.dataset.q = (name + ' ' + tag + ' ' + alt).toLowerCase(); return li;
 }
 function sec(title, lis) { const d = document.createElement('section'); const u = document.createElement('ul'); u.append(...lis); d.append(Object.assign(document.createElement('h2'), { textContent: title }), u); return d; }
 function build() {
   lists.append(sec('Marches', [item('#world', 'The whole region', D.scales.march_hex_mi + ' mi'), ...D.marches.map(a => item('#march-' + a.page, 'March ' + a.id, 'p. ' + a.page + ' · ' + a.sites.length + ' sites'))]));
   for (const b of D.books) {
     const ps = D.leagues.filter(p => p.book === b.id);
-    if (ps.length) lists.append(sec(b.id + ' · ' + b.title, ps.map(p => item('#' + p.key, p.title, 'L ' + p.hex))));
+    if (ps.length) lists.append(sec(b.id + ' · ' + b.title, ps.map(p => item('#' + p.key, L(p.title), 'L ' + p.hex, p.title))));
   }
   const pr = D.print && D.print.atlas ? `Print: <a href="${D.print.atlas}">atlas PDF</a> · <a href="${D.print.leagues}">league PDF</a>. ` : '';
+  $('ver').textContent = 'Atlas ' + (D.atlas || '?') + ' · ' + D.short + ' ' + D.version;
   $('foot').innerHTML = pr + `Links for the companion app: <code>#world</code>, <code>#march-7</code>, <code>#l-1330</code>, <code>#&lt;map&gt;--&lt;site&gt;</code>, <code>#&lt;map&gt;:&lt;hex&gt;</code>; data in <code>module.json</code>. ${D.version} · ${D.license}. Map icons: <a href="https://cmartins.itch.io/hex-tiles-fantasy">Hex Tiles: Fantasy</a> by cmartins, <a href="https://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a>; bonus art by C. Martins, CC BY.`;
 }
 function mark(h) { lists.querySelectorAll('a').forEach(a => a.classList.toggle('on', a.dataset.h === h || h.startsWith(a.dataset.h + '--') || h.startsWith(a.dataset.h + ':'))); }
 $('q').addEventListener('input', e => {
   const q = e.target.value.trim().toLowerCase();
-  const hit = new Set(D.sites.filter(s => s.name.toLowerCase().includes(q)).map(s => s.league));
+  const hit = new Set(D.sites.filter(s => (s.name + ' ' + L(s.name)).toLowerCase().includes(q)).map(s => s.league));
   lists.querySelectorAll('li').forEach(li => { const h = li.firstChild.dataset.h.slice(1); li.hidden = q && !li.dataset.q.includes(q) && !hit.has(h); });
   lists.querySelectorAll('section').forEach(s => s.hidden = ![...s.querySelectorAll('li')].some(li => !li.hidden));
 });

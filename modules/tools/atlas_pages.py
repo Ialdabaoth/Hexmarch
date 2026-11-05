@@ -1,7 +1,7 @@
 # Print atlas: a 24-mile hex grid over the 3-mile master map; one 11x8.5in page per 24-mile hex.
 # usage: python3 -I atlas_pages.py <master.svg> <master-grid.json> <out.html>
 import json, math, re, sys, html, os
-TITLE = os.environ.get('MODTITLE', 'Season 1 · Leinster, 1422'); VER = os.environ.get('MODVER', 'dev')
+TITLE = os.environ.get('MODTITLE', 'Beyond the Pale · Leinster, 1422'); VER = os.environ.get('MODVER', 'dev'); ATLAS = os.environ.get('MODATLAS', 'dev')
 svg_path, grid_path, out = sys.argv[1:4]
 G = json.load(open(grid_path)); S = open(svg_path).read()
 DPI = 96; MX, MY, MW, MH = 24, 24, 840, 768          # map frame: 8.75 x 8 in inside the 0.25 in border
@@ -36,7 +36,7 @@ def site_page(st):
 T = [('grass', 'Grassland', 'bg-green', None), ('forest', 'Forest', 'bg-green', 'forest'), ('woods', 'Light woods', 'bg-green', 'trees'),
      ('bog', 'Bog', 'bg-grey', 'swamp'), ('hills', 'Hills', 'bg-green', 'hills'), ('mount', 'Mountains', 'bg-brown', 'mountains')]
 T = list(T)
-SI = {"castle": "keep", "town": "village", "tomb": "stones", "hill": "hills", "cave": "cave", "ruin": "ruins", "grove": "great-tree", "camp": "community", "lair": "hole", "mist": "fog", "dead": "graveyard"}  # keep in step with hexmap.py
+SI = {"castle": "keep", "town": "village", "abbey": "church", "tomb": "stones", "hill": "hills", "cave": "cave", "ruin": "ruins", "grove": "great-tree", "camp": "community", "lair": "hole", "mist": "fog", "dead": "graveyard"}  # keep in step with hexmap.py
 SITE_ICONS = json.loads(os.environ.get("HEXSITEICONS") or "{}")
 def esc(t): return html.escape(t, quote=True)
 def wrap(t, n):
@@ -68,7 +68,9 @@ for k in order:
          f'<polygon points="{hexpts}" fill="none" stroke="#7a2e2e" stroke-width="3" stroke-dasharray="12 6"/>', nb, '</svg>',
          f'<rect x="{MX}" y="{MY}" width="{MW}" height="{MH}" fill="none" stroke="#2b2418" stroke-width="1.2"/>']
     y = MY + 14
-    o.append(f'<text x="{LX}" y="{y}" font-size="11" letter-spacing=".08em" fill="#5b5040">{esc(TITLE.upper())}</text>'); y += 30
+    for ln in TITLE.upper().split(' · '):  # the module's short title, one part per line so it fits the legend
+        o.append(f'<text x="{LX}" y="{y}" font-size="11" letter-spacing=".08em" fill="#5b5040">{esc(ln)}</text>'); y += 13
+    y += 17
     o.append(f'<text x="{LX}" y="{y}" font-size="24" font-weight="bold" fill="#2b2418">March {bid[k]}</text>'); y += 16
     o.append(f'<text x="{LX}" y="{y}" font-size="11" fill="#5b5040">Atlas page {page[k]} of {len(order)}</text>'); y += 14
     # locator
@@ -100,10 +102,10 @@ for k in order:
             o.append(f'<use href="#i-{ic}" x="{LX+24}" y="{y-9}" width="13" height="11"/>' if ic else f'<text x="{LX+30}" y="{y}" text-anchor="middle" font-size="10">✝</text>')
             for n, ln in enumerate(lines): o.append(f'<text x="{LX+40}" y="{y + n*11}" font-size="9.5">{esc(ln)}</text>')
             y += 11 * len(lines) + 3
-    o.append(f'<text x="{LX}" y="{MY+MH-2}" font-size="8" fill="#8a7f66">{esc(VER)}</text><text x="{LX}" y="{MY+MH-12}" font-size="8" fill="#8a7f66">3-mile hexes use the Region grid.</text>')
+    o.append(f'<text x="{LX}" y="{MY+MH-2}" font-size="8" fill="#8a7f66">{esc(VER)}</text><text x="{LX}" y="{MY+MH-12}" font-size="8" fill="#8a7f66">3-mile hexes use the Region grid.</text><text x="{LX}" y="{MY+MH-22}" font-size="8" fill="#8a7f66">Atlas {ATLAS}</text>')
     o.append('</svg>')
     pages.append(''.join(o))
-doc = ('<!doctype html><meta charset="utf-8"><title>Season 1 Print Atlas</title><style>@page{size:11in 8.5in;margin:0}html,body{margin:0;background:#fff}'
+doc = ('<!doctype html><meta charset="utf-8"><title>Beyond the Pale Print Atlas</title><style>@page{size:11in 8.5in;margin:0}html,body{margin:0;background:#fff}'
        'svg.pg{display:block;width:11in;height:8.5in;break-after:page}</style>'
        f'<svg width="0" height="0" style="position:absolute"><defs><g id="master">{inner}</g></defs></svg>' + ''.join(pages))
 open(out, 'w').write(doc)
