@@ -6,6 +6,8 @@ usage: python3 -I modules/tools/build.py <module dir> <out dir> [--no-pdf]
 
 Writes <out>/index.html (viewer), <out>/module.json (manifest for the companion app),
 <out>/maps/*.svg and <out>/print/{atlas,leagues}.pdf. See modules/MODULE_FORMAT.md.
+Creatures (CREATURES_FORMAT.md): every *.json with an "encounters" block merges into <out>/encounters.json,
+bestiary/<ruleset>.json files are copied, and the viewers get a resolved list of who lives at which site.
 """
 import datetime, json, os, re, shutil, subprocess, sys, unicodedata, urllib.request
 
@@ -33,7 +35,7 @@ try: sha = subprocess.run(['git', 'rev-parse', '--short', 'HEAD'], capture_outpu
 except Exception: sha = ''
 # links shared with the E9 Companion (repo-root links.json); an empty link is hidden
 PATREON = json.load(open(os.path.join(os.path.dirname(ROOT), 'links.json'))).get('patreon', '')
-ATLAS = '0.2.9'  # version of the atlas tools and viewer themselves (Heph 2026-11-05); patch per PR, separate from each module's version
+ATLAS = '0.2.10'  # version of the atlas tools and viewer themselves (Heph 2026-11-05); patch per PR, separate from each module's version
 VER = f"v{MOD['version']}" + (f"+{os.environ.get('GITHUB_SHA', sha)[:7]}" if (os.environ.get('GITHUB_SHA') or sha) else '') + ' · ' + datetime.date.today().isoformat()
 ENV = dict(os.environ, HEXDEM=','.join(map(str, MOD['dem'])), HEXADMIN=os.path.normpath(os.path.join(mdir, MOD['admin'])),
            HEXTILES=os.path.join(ROOT, 'assets', 'tiles', 'icons'), HEXGEO=geo, MODVER=VER, MODATLAS=ATLAS, MODTITLE=MOD.get('short', MOD['title']),
@@ -78,7 +80,7 @@ if 'centroid' in MOD['atlas']:
             for p_ in range(4):
                 x.paste(x.crop((4, 0, 5, x.height)), (p_, 0)); x.paste(x.crop((r.width + 3, 0, r.width + 4, x.height)), (r.width + 4 + p_, 0))
             x.save(f'{out}/atlas/tiles/mask-{kind}{k}-x.png', optimize=True)
-    open(out + '/atlas/index.html', 'w').write(open(TOOLS + '/atlas.html').read().replace('{{TITLE}}', MOD['title']).replace('{{ATLAS}}', ATLAS).replace('{{PATREON}}', json.dumps(PATREON)))
+    open(out + '/atlas/index.html', 'w').write(open(TOOLS + '/atlas.html').read().replace('{{TITLE}}', MOD['title']).replace('{{ATLAS}}', ATLAS).replace('<!--CARD-->', open(TOOLS + '/creature_card.html').read()).replace('{{PATREON}}', json.dumps(PATREON)))
 # 4. PDFs
 if PDF:
     os.makedirs(out + '/print', exist_ok=True)
@@ -116,6 +118,46 @@ for n, p in sorted(expl_of.items(), key=lambda kv: kv[0]):
 ALIASES = {}
 for s_ in SITES:
     for k in {'p-' + s_['slug'], 'p-' + slug(s_['name'].split(' (')[0])}: ALIASES.setdefault(k, s_['league'])
+# creatures (CREATURES_FORMAT.md): the fiction layer from every *.json with an "encounters" block, merged by block name,
+# and each ruleset's mechanics layer; both are published as they are, and the viewers get a resolved summary per creature
+def merge(a, b):
+    for k, v in b.items(): a[k] = merge(a.get(k, {}), v) if isinstance(v, dict) and isinstance(a.get(k), dict) else v
+    return a
+ENC = {}
+for f in sorted(os.listdir(mdir)):
+    if f.endswith('.json') and f != 'module.json':
+        j = json.load(open(os.path.join(mdir, f)))
+        if isinstance(j, dict) and 'encounters' in j: merge(ENC, j['encounters'])
+BEST = {}
+bdir = os.path.join(mdir, 'bestiary')
+for f in sorted(os.listdir(bdir)) if os.path.isdir(bdir) else []:
+    if f.endswith('.json'): BEST[f[:-5]] = json.load(open(os.path.join(bdir, f)))
+def resolve(rid, cid, depth=0):  # "blank" or another creature of this module, then replace (adjust adds numbers); bestiary refs stay unresolved here
+    e = BEST[rid]['creatures'].get(cid)
+    if not e or depth > 6: return None
+    base = {} if e.get('from', 'blank') == 'blank' else (resolve(rid, e['from'], depth + 1) or {'from': e['from']})
+    st = merge(json.loads(json.dumps(base)), e.get('replace', {}))
+    def adj(t, a):
+        for k, v in a.items():
+            if isinstance(v, (int, float)) and isinstance(t.get(k, 0), (int, float)): t[k] = t.get(k, 0) + v
+            elif isinstance(v, dict) and ('add' in v or 'remove' in v): t[k] = [x for x in t.get(k, []) if x not in v.get('remove', [])] + v.get('add', [])
+            elif isinstance(v, dict): t[k] = adj(t.get(k, {}), v)
+        return t
+    return adj(st, e.get('adjust', {}))
+site_of = {s_['slug']: s_ for s_ in SITES}
+CREATURES = []
+for cid, c in ENC.get('creatures', {}).items():
+    w = c.get('lair') or {}
+    s_ = site_of.get(w.get('site'))
+    CREATURES.append(dict(id=cid, name=c.get('name', cid), kind=c.get('kind', 'monster'), **{k: c[k] for k in ('is', 'troupe', 'faction', 'description', 'wants', 'knows') if k in c},
+                          site=w.get('site'), hex=w.get('hex'), site_name=s_['name'] if s_ else None, world_hex=s_['world_hex'] if s_ else None,
+                          league=s_['league'] if s_ else None, league_hex=s_['league_hex'] if s_ else None,
+                          stats={r: resolve(r, cid) for r in BEST if cid in BEST[r].get('creatures', {})}))
+if ENC:
+    json.dump({'encounters': ENC}, open(out + '/encounters.json', 'w'), ensure_ascii=False, indent=1)
+    os.makedirs(out + '/bestiary', exist_ok=True)
+    for r, b in BEST.items(): json.dump(b, open(f'{out}/bestiary/{r}.json', 'w'), ensure_ascii=False, indent=1)
+    if os.path.isdir(out + '/atlas'): json.dump({'creatures': CREATURES}, open(out + '/atlas/creatures.json', 'w'), ensure_ascii=False)
 H0 = next(h for h in G['hexes'] if h['col'] == 0 and h['row'] == 0)
 M = {'format': 'mm-module/1', 'id': MOD['id'], 'title': MOD['title'], 'short': MOD.get('short', MOD['title']), 'version': VER, 'atlas': ATLAS, 'license': MOD.get('license', 'CC0-1.0'),
      'scales': {'mile_ft': 5000, 'region_hex_mi': MOD['atlas']['page_hex_mi'], 'march_hex_mi': HX, 'league_hex_mi': MOD['league']['hex_mi'], 'field_hex_ft': 100, 'encounter_square_ft': 5},
@@ -127,13 +169,15 @@ M = {'format': 'mm-module/1', 'id': MOD['id'], 'title': MOD['title'], 'short': M
      'leagues': [dict(page=p['page'], key=p['key'], hex=p['hex'], map=f"maps/{p['key']}.svg", title=p['lead'], book=p['book'], county=p['county'], lat=p['lat'], lon=p['lon'], terrain=p['terrain'],
                       center_px=p['center_px'], sites=[dict(s_, slug=slug(s_['name'])) for s_ in p['sites']]) for p in PI],
      'sites': SITES, 'aliases': ALIASES,
+     **({'encounters': 'encounters.json', 'bestiary': {r: f'bestiary/{r}.json' for r in BEST}} if ENC else {}),
      'names': MOD.get('names', {}),  # label translations {name as on the map: {'en': ..., 'ga': ...}}; the viewer's Language box uses them
      'links': {'world': '#world', 'march': '#march-<page>', 'league': '#l-<march hex>', 'site': '#l-<march hex>--<slug>', 'hex': '#<map>:<hex>'},
      'print': {'atlas': 'print/atlas.pdf', 'leagues': 'print/leagues.pdf'} if PDF else {}}
 json.dump(M, open(out + '/module.json', 'w'), ensure_ascii=False, indent=1)
 tpl = open(TOOLS + '/viewer.html').read()
-lite = {k: v for k, v in M.items() if k != 'world'}; lite['world'] = {k: v for k, v in M['world'].items() if k != 'hexes'}
-html = tpl.replace('/*DATA*/', json.dumps(lite, ensure_ascii=False).replace('</', '<\\/')).replace('<!--SYMBOLS-->', ''.join(syms.values())).replace('{{TITLE}}', MOD['title'])
+lite = {k: v for k, v in M.items() if k != 'world'}; lite['world'] = {k: v for k, v in M['world'].items() if k != 'hexes'}; lite['creatures'] = CREATURES
+CARD = open(TOOLS + '/creature_card.html').read()
+html = tpl.replace('<!--CARD-->', CARD).replace('/*DATA*/', json.dumps(lite, ensure_ascii=False).replace('</', '<\\/')).replace('<!--SYMBOLS-->', ''.join(syms.values())).replace('{{TITLE}}', MOD['title'])
 open(out + '/index.html', 'w').write(html)
 # a module that changed its id leaves a page at each old address that forwards to the new one, keeping ?mode and #links
 for old in MOD.get('moved_from', []):
@@ -141,4 +185,4 @@ for old in MOD.get('moved_from', []):
     open(os.path.join(od, 'index.html'), 'w').write(f'<!doctype html><meta charset="utf-8"><title>{MOD["title"]}</title><meta name="robots" content="noindex">'
         f'<script>location.replace("../{MOD["id"]}/" + location.search + location.hash)</script><p>This module moved to <a href="../{MOD["id"]}/">{MOD["title"]}</a>.</p>')
 if os.environ.get('KEEP_WORK') is None: shutil.rmtree(work)
-print(f"Atlas {ATLAS} · {MOD['id']} {VER}: {len(M['marches'])} March pages, {len(M['leagues'])} League pages, {len(SITES)} sites -> {out}")
+print(f"Atlas {ATLAS} · {MOD['id']} {VER}: {len(M['marches'])} March pages, {len(M['leagues'])} League pages, {len(SITES)} sites, {len(CREATURES)} creatures -> {out}")
