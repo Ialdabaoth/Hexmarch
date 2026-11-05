@@ -112,7 +112,12 @@ def icon_defs():
         W, H = Image.open(f).size
         b = base64.b64encode(open(f, "rb").read()).decode()
         out.append(f'<symbol id="i-{n}" viewBox="0 0 {W} {H}" preserveAspectRatio="xMidYMid meet"><image width="{W}" height="{H}" href="data:image/png;base64,{b}"/></symbol>')
+        if n.startswith(("bg-", "bleed-")):  # "-x" twin without the painted hex rim: the same image zoomed past its rim and clipped to the hex; the viewer's "Hex edges" box swaps to it
+            if not any(x.startswith('<clipPath id="hexclip"') for x in out[:1]):
+                out.insert(0, f'<clipPath id="hexclip"><polygon points="-2,{H/2} {W/4-1},-2 {W*3/4+1},-2 {W+2},{H/2} {W*3/4+1},{H+2} {W/4-1},{H+2}"/></clipPath>')  # 2 px past the hex so neighbours overlap and no seam shows
+            out.append(f'<symbol id="i-{n}-x" viewBox="0 0 {W} {H}"><g clip-path="url(#hexclip)"><use href="#i-{n}" width="{W}" height="{H}" transform="translate({W/2} {H/2}) scale({RIMLESS}) translate({-W/2} {-H/2})"/></g></symbol>')
     return "".join(out)
+RIMLESS = 1.12  # zoom that pushes the bg tiles' ~10 px painted rim outside the hex
 
 MI_KM = 1.524  # the game mile is exactly 5000 feet (Heph 2026-11-04)
 
@@ -250,7 +255,7 @@ def make(key, R):
                         USED_BLEED.add(nm)
                         o.append(f'<use href="#i-{nm}" x="{cx-bw/2:.1f}" y="{cy-bh/2:.1f}" width="{bw:.1f}" height="{bh:.1f}" opacity="{op}"/>')
             fill, op = "none", 1
-        o.append(f'<polygon points="{pts}" fill="{fill}" fill-opacity="{op}" stroke="#8a7f66" stroke-width="{0.6*min(1,sc):.2f}"/>')
+        o.append(f'<polygon class="hx" points="{pts}" fill="{fill}" fill-opacity="{op}" stroke="#8a7f66" stroke-width="{0.6*min(1,sc):.2f}"/>')
         if hx["inside"] or OUTSIDE_FULL:
             sym = {"forest": "♣", "woods": "♧", "hills": "⌒", "mount": "▲", "bog": "≈"}.get(hx["t"])
             if id(hx) in FEAT: pass  # the site's feature icon is drawn here instead, with the site
@@ -292,17 +297,53 @@ def make(key, R):
             x, y = PLL(plo, pla)
             o.append(f'<text x="{x:.1f}" y="{y+22:.1f}" text-anchor="middle" font-size="12.5" font-style="italic" font-weight="bold" fill="{SD[pside][2]}" stroke="#f4efe1" stroke-width="3.5" paint-order="stroke">{pn}</text>')
     thr = R.get("river_km2", 120)
-    segs = []
-    SNR = sub.shape[0]
-    for i in range(SNR * SNC):
-        a = acc[i]
-        if a < thr or parent[i] < 0 or flat[i] <= 0: continue
-        r, c = divmod(i, SNC); pr, pc = divmod(int(parent[i]), SNC)
-        la, lo = LAT_TOP - (r0 + r + .5) * cell, LON_LEFT + (c0 + c + .5) * cell
-        pla, plo = LAT_TOP - (r0 + pr + .5) * cell, LON_LEFT + (c0 + pc + .5) * cell
-        x1, y1 = PLL(lo, la); x2, y2 = PLL(plo, pla)
-        wdt = min(4.5, 0.8 + 2 * math.log10(a / thr + 1))
-        segs.append(f'<line x1="{x1:.1f}" y1="{y1:.1f}" x2="{x2:.1f}" y2="{y2:.1f}" stroke="#3f7fa8" stroke-width="{wdt:.2f}" stroke-linecap="round"/>')
+    segs, edge = [], []
+    SNR = sub.shape[0]; N = SNR * SNC
+    def ok(i): return acc[i] >= thr and parent[i] >= 0 and flat[i] > 0
+    def xy(i):
+        r, c = divmod(int(i), SNC); return PLL(LON_LEFT + (c0 + c + .5) * cell, LAT_TOP - (r0 + r + .5) * cell)
+    def width(i): return min(4.5, 0.8 + 2 * math.log10(acc[i] / thr + 1))
+    # Rivers as splines (Heph 2026-11-05). The flow grid gives one step per cell, so a river is a chain of cell centres.
+    # Each river is split into chains: a chain follows the biggest inflow downstream and ends where it joins a bigger river
+    # (at that river's smoothed point) or reaches the sea. Each chain's points get a light moving average (ends pinned),
+    # then a centripetal Catmull-Rom spline (no loops or cusps at sharp bends) drawn as cubic Beziers, one per step so the
+    # width can grow downstream.
+    main = {}  # cell -> its largest inflowing river cell
+    for i in range(N):
+        if ok(i):
+            p = int(parent[i])
+            if p not in main or acc[i] > acc[main[p]]: main[p] = i
+    chains = []
+    for i in range(N):
+        if not ok(i) or i in main: continue  # every chain starts at a source (a cell nothing flows into)
+        ch = [i]
+        while ok(ch[-1]):
+            p = int(parent[ch[-1]]); ch.append(p)
+            if main.get(p) != ch[-2]: break  # joined a bigger river
+        chains.append(ch)
+    chains.sort(key=lambda ch: -max(acc[c] for c in ch[:-1]))  # big rivers first, so tributaries can join their smoothed line
+    SM = {}
+    def sp(a, b, c, d):  # centripetal Catmull-Rom from b to c as Bezier control points
+        def t(u, v): return max(1e-6, math.hypot(v[0] - u[0], v[1] - u[1]) ** .5)
+        t1, t2, t3 = t(a, b), t(b, c), t(c, d)
+        m1 = [(c[k] - b[k]) / t2 - (c[k] - a[k]) / (t1 + t2) + (b[k] - a[k]) / t1 for k in (0, 1)]
+        m2 = [(c[k] - b[k]) / t2 - (d[k] - b[k]) / (t2 + t3) + (d[k] - c[k]) / t3 for k in (0, 1)]
+        return [b[k] + m1[k] * t2 / 3 for k in (0, 1)], [c[k] - m2[k] * t2 / 3 for k in (0, 1)]
+    for ch in chains:
+        raw = [xy(c) for c in ch]; n = len(raw)
+        pts = [raw[0]] + [tuple(sum(raw[j][k] for j in range(max(0, q - 2), min(n, q + 3))) / (min(n, q + 3) - max(0, q - 2)) for k in (0, 1)) for q in range(1, n - 1)] + [raw[-1]]
+        if ch[-1] in SM: pts[-1] = SM[ch[-1]]
+        for q, c in enumerate(ch): SM.setdefault(c, pts[q])
+        for q in range(n - 1):
+            A, B, C, D = pts[max(0, q - 1)], pts[q], pts[q + 1], pts[min(n - 1, q + 2)]
+            if A == B: A = (2 * B[0] - C[0], 2 * B[1] - C[1])
+            if D == C: D = (2 * C[0] - B[0], 2 * C[1] - B[1])
+            c1, c2 = sp(A, B, C, D)
+            d = f"M{B[0]:.1f},{B[1]:.1f} C{c1[0]:.1f},{c1[1]:.1f} {c2[0]:.1f},{c2[1]:.1f} {C[0]:.1f},{C[1]:.1f}"
+            rw = width(ch[q])  # (not "w": that is the hex column width, used below)
+            edge.append(f'<path d="{d}" stroke-width="{rw + 2:.2f}"/>')  # 1 px dark border each side, drawn under the water
+            segs.append(f'<path d="{d}" stroke-width="{rw:.2f}"/>')
+    segs = ['<g fill="none" stroke-linecap="round" stroke-linejoin="round"><g stroke="#1b2a33" stroke-opacity=".85">'] + edge + ['</g><g stroke="#3f7fa8">'] + segs + ['</g></g>']
     if OUTSIDE_FULL: o.append('<g>' + "".join(segs) + '</g>')
     else:
         if has_border: o.append('<g opacity=".35">' + "".join(segs) + '</g>')
