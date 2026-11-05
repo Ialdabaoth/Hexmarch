@@ -23,3 +23,12 @@ export function wikiForMonster(ref: string): string | null {
   const i = ref.indexOf(':');
   return i < 0 ? null : url(`${ref.slice(0, i)}:bestiary:${ref.slice(i + 1)}`);
 }
+
+// The wiki page an entry sits on, without its heading ("Armor-and-Shields").
+export function wikiPageOf(ref: string): string | null {
+  const u = url(ref);
+  return u ? u.split('#')[0] : null;
+}
+
+// A table or section of the Compendium with no app reference of its own.
+export const wikiPage = (page: string) => WIKI_BASE + page;

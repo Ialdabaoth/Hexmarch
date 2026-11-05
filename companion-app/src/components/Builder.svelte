@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { wikiForClass } from '../lib/wiki';
+  import PageRef from './PageRef.svelte';
   import { app } from '../lib/app.svelte';
   import { createSheet } from '../lib/sheet';
   import {
@@ -222,7 +224,7 @@
       </select>
       <p class="small muted">
         Hit die {rules.hitDieLabel(classId, abilities.con)}, starting HP {rules.startingHp(classId, abilities.con)}.
-        {cls.martial ? `${cls.martial}.` : ''} See {cls.book ?? rules.name} p. {cls.page}.
+        {cls.martial ? `${cls.martial}.` : ''} See {cls.book ?? rules.name} <PageRef page={cls.page} href={wikiForClass(rules.id, classId.split('+')[0])} />.
       </p>
       {#if hasKind(cls, 'expert')}
         <label for="first-training">Level 1 talent training</label>
