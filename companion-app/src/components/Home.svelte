@@ -43,7 +43,7 @@
     }
   }
 
-  let active = $derived(app.characters.find((c) => c.id === app.settings.activeId) ?? app.characters[0]);
+  let active = $derived(app.characters.find((c) => c.id === app.settings.activeId) ?? app.party[0]);
   let view = $derived(active ? sheetView(active.data, active.state) : undefined);
 
   function select(id: string) {
@@ -124,7 +124,7 @@
 </script>
 
 <nav class="party" aria-label="Party">
-  {#each app.characters as c (c.id)}
+  {#each app.party as c (c.id)}
     <button class="member" class:on={c.id === active?.id} class:elsewhere={elsewhere(c)} onclick={() => select(c.id)} aria-label={c.name}
       title={elsewhere(c) ? `${c.name} (${campaignName(c.data.campaign)})` : c.name}>
       {#if app.portraitSrc(c.data.portrait)}<img src={app.portraitSrc(c.data.portrait)} alt="" />{:else}<span>{initials(c.name)}</span>{/if}
@@ -134,6 +134,7 @@
 </nav>
 
 {#if active && view}
+  {#if active.data.owner === 'referee'}<p class="small muted elsewhere-note">{active.name} is an NPC you run. <button class="link" onclick={() => (app.view = { name: 'campaign' })}>Back to Creatures</button></p>{/if}
   {#if elsewhere(active)}<p class="small muted elsewhere-note">From {campaignName(active.data.campaign)}, not the campaign you're in.</p>{/if}
   <Postcard bind:this={card} {view} layout="carousel" onroll={roll} onpage={(i) => (page = i)} onhp={() => (editingHp = true)} onportraitfile={setPortrait} onxp={() => (editingXp = true)} ongear={(slot) => (pickingGear = slot)} oncarry={() => (app.view = { name: 'sheet', id: active!.id, section: 'inventory' })} onprep={togglePrep} onprepslot={(n) => (preparingCircle = n)} onequip={(s) => (pickingWorn = s)} />
   {#if pickingGear}<GearPicker character={active} slot={pickingGear} onclose={() => (pickingGear = null)} />{/if}
@@ -234,4 +235,5 @@
   .tabs button.on { color: var(--ink); border-bottom-color: var(--accent); font-weight: 600; }
   .backup .row { flex-wrap: wrap; }
   .json { width: 100%; box-sizing: border-box; height: 14rem; margin: 0.5rem 0; font: 0.75rem/1.35 ui-monospace, Menlo, monospace; }
+  .link { background: none; border: 0; padding: 0; min-height: 0; color: var(--accent); text-decoration: underline; font: inherit; }
 </style>
