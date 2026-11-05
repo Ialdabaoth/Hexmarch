@@ -2,7 +2,7 @@
 """Build one module: print PDFs, web viewer and app manifest from the same maps.
 
 usage: python3 -I modules/tools/build.py <module dir> <out dir> [--no-pdf]
-  e.g. python3 -I modules/tools/build.py modules/season-1 dist/modules/season-1
+  e.g. python3 -I modules/tools/build.py modules/isle-of-mists dist/modules/isle-of-mists
 
 Writes <out>/index.html (viewer), <out>/module.json (manifest for the companion app),
 <out>/maps/*.svg and <out>/print/{atlas,leagues}.pdf. See modules/MODULE_FORMAT.md.
@@ -105,5 +105,10 @@ tpl = open(TOOLS + '/viewer.html').read()
 lite = {k: v for k, v in M.items() if k != 'world'}; lite['world'] = {k: v for k, v in M['world'].items() if k != 'hexes'}
 html = tpl.replace('/*DATA*/', json.dumps(lite, ensure_ascii=False).replace('</', '<\\/')).replace('<!--SYMBOLS-->', ''.join(syms.values())).replace('{{TITLE}}', MOD['title'])
 open(out + '/index.html', 'w').write(html)
+# a module that changed its id leaves a page at each old address that forwards to the new one, keeping ?mode and #links
+for old in MOD.get('moved_from', []):
+    od = os.path.join(os.path.dirname(out), old); os.makedirs(od, exist_ok=True)
+    open(os.path.join(od, 'index.html'), 'w').write(f'<!doctype html><meta charset="utf-8"><title>{MOD["title"]}</title><meta name="robots" content="noindex">'
+        f'<script>location.replace("../{MOD["id"]}/" + location.search + location.hash)</script><p>This module moved to <a href="../{MOD["id"]}/">{MOD["title"]}</a>.</p>')
 if os.environ.get('KEEP_WORK') is None: shutil.rmtree(work)
 print(f"{MOD['id']} {VER}: {len(M['marches'])} March pages, {len(M['leagues'])} League pages, {len(SITES)} sites -> {out}")

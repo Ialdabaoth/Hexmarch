@@ -141,7 +141,7 @@ class AppState {
   // modules, so updates arrive with a fresh fetch. Throws with a message for the reader.
   async addModuleRepo(address: string): Promise<SavedModule[]> {
     const { modules } = await loadRepo(address);
-    await this.saveModules([...this.modules.filter((m) => !modules.some((n) => n.id === m.id && n.base === m.base)), ...modules]);
+    await this.saveModules([...this.modules.filter((m) => !modules.some((n) => n.base === m.base)), ...modules]);
     return modules;
   }
 
