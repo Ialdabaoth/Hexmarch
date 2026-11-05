@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { wikiForMonster } from '../lib/wiki';
+  import PageRef from './PageRef.svelte';
   import { BESTIARY, levelOf, type MonsterKind, type SaveKind, type WithRef, type Monster } from '../bestiary/bestiary';
 
   // The printed stat blocks, searchable by name and kind (Bestiary, pp. 143-186).
@@ -45,12 +47,15 @@
 
 {#each shown as m (m.ref)}
   <div class="card monster">
-    <button class="head" onclick={() => (open = open === m.ref ? null : m.ref)} aria-expanded={open === m.ref}>
-      <span class="grow">
-        <strong>{m.name}</strong>
-        <span class="small muted">{levelText(m)} · {m.size} · p. {m.page}</span>
-      </span>
-    </button>
+    <div class="row top">
+      <button class="head grow" onclick={() => (open = open === m.ref ? null : m.ref)} aria-expanded={open === m.ref}>
+        <span class="grow">
+          <strong>{m.name}</strong>
+          <span class="small muted">{levelText(m)} · {m.size}</span>
+        </span>
+      </button>
+      <span class="small muted"><PageRef page={m.page} href={wikiForMonster(m.ref)} /></span>
+    </div>
     <p class="small">{m.summary}</p>
     {#if open === m.ref}
       <dl>
@@ -63,7 +68,7 @@
         {#if m.behavior}<dt>Behavior</dt><dd>{m.behavior}</dd>{/if}
         {#if m.abilities}<dt>Abilities</dt><dd>{m.abilities}</dd>{/if}
         {#if m.feat}<dt>Feats</dt><dd>{m.feat}</dd>{/if}
-        <dt>Book</dt><dd>Bestiary p. {m.page}</dd>
+        <dt>Book</dt><dd>Bestiary <PageRef page={m.page} href={wikiForMonster(m.ref)} /></dd>
       </dl>
     {/if}
   </div>
@@ -73,6 +78,7 @@
 </details>
 
 <style>
+  .top { flex-wrap: nowrap; align-items: center; gap: 0.5rem; }
   .head { width: 100%; display: flex; align-items: center; border: 0; background: transparent; padding: 0; text-align: left; min-height: 0; }
   .head .grow { display: flex; flex-direction: column; }
   .monster { margin-bottom: 0.5rem; padding: 0.6rem; }
