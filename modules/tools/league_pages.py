@@ -4,7 +4,7 @@
 import json, math, re, sys, os, subprocess, html, unicodedata
 MJ, AIDX, AGRID, OUT = sys.argv[1:5]
 MOD = json.load(open(MJ)); A = MOD['regions']; os.makedirs(OUT, exist_ok=True)
-TITLE = os.environ.get('MODTITLE', MOD.get('short', MOD['title'])); VER = os.environ.get('MODVER', 'dev')
+TITLE = os.environ.get('MODTITLE', MOD.get('short', MOD['title'])); VER = os.environ.get('MODVER', 'dev'); ATLAS = os.environ.get('MODATLAS', 'dev')
 EXP = MOD.get('league', MOD.get('exploration', {})); OVR = EXP.get('overrides', {})
 DPI = 96; MX, MY, MW, MH = 24, 24, 840, 768; LX = MX + MW + 14; LW = 1056 - 24 - LX
 HMI = .5; MI_PX = DPI / HMI                          # 192 px per mile
@@ -130,7 +130,7 @@ for n, m in enumerate(meta):
             o.append(f'<use href="#i-{ic}" x="{LX+24}" y="{y-9}" width="13" height="11"/>' if ic else f'<text x="{LX+30}" y="{y}" text-anchor="middle" font-size="10">✝</text>')
             for k_, ln in enumerate(lines): o.append(f'<text x="{LX+40}" y="{y + k_*11}" font-size="9.5">{esc(ln)}</text>')
             y += 11 * len(lines) + 3
-    o.append(f'<text x="{LX}" y="{MY+MH-2}" font-size="8" fill="#8a7f66">{esc(VER)}</text><text x="{LX}" y="{MY+MH-12}" font-size="8" fill="#8a7f66">Half-mile hexes are numbered per League.</text></svg>')
+    o.append(f'<text x="{LX}" y="{MY+MH-2}" font-size="8" fill="#8a7f66">{esc(VER)}</text><text x="{LX}" y="{MY+MH-12}" font-size="8" fill="#8a7f66">Half-mile hexes are numbered per League.</text><text x="{LX}" y="{MY+MH-22}" font-size="8" fill="#8a7f66">Atlas {ATLAS}</text></svg>')
     # the same veil, edge and neighbour labels for the web map, where each neighbour with a page is a link
     m['overlay'] = (f'<g class="league-edge"><path d="{veil}" fill="#f4efe1" fill-opacity=".6" fill-rule="evenodd" pointer-events="none"/>'
                     f'<polygon points="{" ".join(f"{x:.1f},{y:.1f}" for x, y in cor)}" fill="none" stroke="#7a2e2e" stroke-width="3" stroke-dasharray="12 6" pointer-events="none"/>{nbw}</g>')

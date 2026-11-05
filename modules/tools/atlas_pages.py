@@ -1,7 +1,7 @@
 # Print atlas: a 24-mile hex grid over the 3-mile master map; one 11x8.5in page per 24-mile hex.
 # usage: python3 -I atlas_pages.py <master.svg> <master-grid.json> <out.html>
 import json, math, re, sys, html, os
-TITLE = os.environ.get('MODTITLE', 'Beyond the Pale · Leinster, 1422'); VER = os.environ.get('MODVER', 'dev')
+TITLE = os.environ.get('MODTITLE', 'Beyond the Pale · Leinster, 1422'); VER = os.environ.get('MODVER', 'dev'); ATLAS = os.environ.get('MODATLAS', 'dev')
 svg_path, grid_path, out = sys.argv[1:4]
 G = json.load(open(grid_path)); S = open(svg_path).read()
 DPI = 96; MX, MY, MW, MH = 24, 24, 840, 768          # map frame: 8.75 x 8 in inside the 0.25 in border
@@ -102,7 +102,7 @@ for k in order:
             o.append(f'<use href="#i-{ic}" x="{LX+24}" y="{y-9}" width="13" height="11"/>' if ic else f'<text x="{LX+30}" y="{y}" text-anchor="middle" font-size="10">✝</text>')
             for n, ln in enumerate(lines): o.append(f'<text x="{LX+40}" y="{y + n*11}" font-size="9.5">{esc(ln)}</text>')
             y += 11 * len(lines) + 3
-    o.append(f'<text x="{LX}" y="{MY+MH-2}" font-size="8" fill="#8a7f66">{esc(VER)}</text><text x="{LX}" y="{MY+MH-12}" font-size="8" fill="#8a7f66">3-mile hexes use the Region grid.</text>')
+    o.append(f'<text x="{LX}" y="{MY+MH-2}" font-size="8" fill="#8a7f66">{esc(VER)}</text><text x="{LX}" y="{MY+MH-12}" font-size="8" fill="#8a7f66">3-mile hexes use the Region grid.</text><text x="{LX}" y="{MY+MH-22}" font-size="8" fill="#8a7f66">Atlas {ATLAS}</text>')
     o.append('</svg>')
     pages.append(''.join(o))
 doc = ('<!doctype html><meta charset="utf-8"><title>Beyond the Pale Print Atlas</title><style>@page{size:11in 8.5in;margin:0}html,body{margin:0;background:#fff}'
