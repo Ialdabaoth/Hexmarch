@@ -95,7 +95,16 @@ async function loadMarch(m) {
   M[m.i + ',' + m.j] = { a, Cm, Rm, L: nearest(Cm, Rm, 150), F: nearest(Cm, Rm, 25), m };
 }
 function marchOf(C, R) { const [i, j] = nearest(C, R, 1200); return M[i + ',' + j]; }
-function T(i, j, N) {  // terrain index (0 = none) of hex (i, j) at level N: 1 (100-ft), 25 (Field), 150 (League) or 1200 (March)
+const TF = new Map();  // Furlong terrain, worked out once per hex
+function T(i, j, N) {  // terrain index (0 = none) of hex (i, j) at level N: 1 (100-ft), 5 (Furlong), 25 (Field), 150 (League) or 1200 (March)
+  if (N === 5) {  // a Furlong (500 ft) has no stored summary: its most common terrain among its 100-ft hexes (ATLAS_FORMAT.md)
+    const k = i + ',' + j; if (TF.has(k)) return TF.get(k);
+    const [Cc, Rc] = centre(i, j, 5), n = {}; let best = 0, bn = 0;
+    for (let C = Cc - 3; C <= Cc + 3; C++) for (let R = Rc - 4; R <= Rc + 4; R++) {
+      const [a, b] = nearest(C, R, 5); if (a !== i || b !== j) continue; const t = T(C, R, 1); if (!t) continue;
+      n[t] = (n[t] || 0) + 1; if (n[t] > bn || (n[t] === bn && t < best)) { bn = n[t]; best = t; } }
+    TF.set(k, best); return best;
+  }
   if (N === 1) { const m = marchOf(i, j); return m ? m.a[(j - m.Rm + 600) * 1600 + (i - m.Cm + 800)] : 0; }
   if (N === 1200) { const m = M[i + ',' + j]; return m ? m.a[0] : 0; }
   const [C, R] = centre(i, j, N), m = marchOf(C, R); if (!m) return 0;
@@ -108,25 +117,28 @@ function addr(C, R) {
   const [li, lj] = nearest(C, R, 150), [Cl, Rl] = centre(li, lj, 150);
   return '#world:' + lab(li - LBL.league[0]) + lab(lj - LBL.league[1]) + ':' + lab(C - Cl + 100) + lab(R - Rl + 75);
 }
+const fieldAddr = (C, R) => '#field:' + addr(C, R).slice(7);  // a Field, named by any 100-ft hex in it
 const leagueAddr = (i, j) => '#world:' + lab(i - LBL.league[0]) + lab(j - LBL.league[1]);
 const marchAddr = (i, j) => '#march:' + lab(i - LBL.march[0]) + lab(j - LBL.march[1]);
 function parse(h) {
   h = decodeURIComponent(h).replace(/^#/, '').toUpperCase(); let m;
   if ((m = h.match(/^MARCH:(..)(..)$/))) return { lvl: 'march', i: unlab(m[1]) + LBL.march[0], j: unlab(m[2]) + LBL.march[1] };
-  if ((m = h.match(/^WORLD:(..)(..)(?::(..)(..))?$/))) {
-    const li = unlab(m[1]) + LBL.league[0], lj = unlab(m[2]) + LBL.league[1];
-    if (!m[3]) return { lvl: 'league', i: li, j: lj };
-    const [Cl, Rl] = centre(li, lj, 150), C = Cl - 100 + unlab(m[3]), R = Rl - 75 + unlab(m[4]), [fi, fj] = nearest(C, R, 25);
-    return { lvl: 'field', i: fi, j: fj, sel: [C, R] };
+  if ((m = h.match(/^(WORLD|FIELD):(..)(..)(?::(..)(..))?$/))) {
+    const li = unlab(m[2]) + LBL.league[0], lj = unlab(m[3]) + LBL.league[1];
+    if (!m[4]) return { lvl: 'league', i: li, j: lj };
+    const [Cl, Rl] = centre(li, lj, 150), C = Cl - 100 + unlab(m[4]), R = Rl - 75 + unlab(m[5]);
+    if (m[1] === 'FIELD') { const [fi, fj] = nearest(C, R, 25); return { lvl: 'field', i: fi, j: fj }; }
+    const [ui, uj] = nearest(C, R, 5);  // a 100-ft hex address opens its Furlong, with that hex picked
+    return { lvl: 'furlong', i: ui, j: uj, sel: [C, R] };
   }
   return { lvl: 'region' };
 }
 
 // ---- view ----
-const LV = { region: { draw: 150, own: 0, fit: 0 }, march: { draw: 150, own: 1200, fit: 1350 }, league: { draw: 25, own: 150, fit: 175 }, field: { draw: 1, own: 25, fit: 32 } };
+const LV = { region: { draw: 150, own: 0, fit: 0 }, march: { draw: 150, own: 1200, fit: 1350 }, league: { draw: 25, own: 150, fit: 175 }, field: { draw: 5, own: 25, fit: 32 }, furlong: { draw: 1, own: 5, fit: 7 } };
 let V = { lvl: 'region' }, cam = { x: 0, y: 0, s: 1 }, W = 0, H = 0, dpr = 1, AIM = null;  // AIM: feet to centre on after a click (Heph: a click always zooms in one level, centred on the hex clicked)
 function focusFt() { return V.lvl === 'region' ? null : hexFt(V.i, V.j, LV[V.lvl].own); }
-let STAY = false;  // true while a Field click picks a hex: keep the camera where it is
+let STAY = false;  // true while a Furlong click picks a hex: keep the camera where it is
 function fit() {
   W = cv.clientWidth; H = cv.clientHeight; if (STAY) { STAY = false; return; } const f = focusFt();
   if (f) { [cam.x, cam.y] = AIM || (V.sel ? ft(...V.sel) : f); AIM = null; cam.s = Math.min(H / (LV[V.lvl].fit * 100), W / (LV[V.lvl].fit * 100 * 1.16)); return; }
@@ -205,7 +217,7 @@ function draw() {
   if (V.lvl === 'region' || V.lvl === 'march') for (const g of D.regions) {
     const [sx, sy] = S(...g.label); ctx.font = 'italic bold 15px Georgia'; ctx.strokeStyle = '#f4efe1'; ctx.lineWidth = 4; ctx.strokeText(name(g.name), sx, sy); ctx.fillStyle = '#7a2e2e'; ctx.fillText(name(g.name), sx, sy); }
   // points of interest
-  const isz = { region: 16, march: 30, league: 44, field: 56 }[V.lvl], fs = { region: 10, march: 12, league: 13, field: 14 }[V.lvl];
+  const isz = { region: 16, march: 30, league: 44, field: 50, furlong: 56 }[V.lvl], fs = { region: 10, march: 12, league: 13, field: 13, furlong: 14 }[V.lvl];
   ctx.font = `bold ${fs}px Georgia`;
   const KP = [];
   for (const p of D.pois) {
@@ -213,7 +225,7 @@ function draw() {
     if (sx < -100 || sy < -100 || sx > W + 100 || sy > H + 100) continue;
     if (sx >= 0 && sy >= 0 && sx <= W && sy <= H) KP.push(p);
     const im = p.icon && tile(p.icon);
-    if (V.lvl === 'field') { fieldPoi(p, im, sx, sy); continue; }
+    if (V.lvl === 'furlong') { fieldPoi(p, im, sx, sy); continue; }
     if (im) { const a = Math.max(.87, im.naturalHeight / im.naturalWidth); ctx.drawImage(im, sx - isz / 2, sy - isz * a / 2, isz, isz * a); }
     else { ctx.beginPath(); ctx.arc(sx, sy, 4, 0, 7); ctx.fillStyle = '#2b2418'; ctx.fill(); }
     if (V.lvl !== 'region') { const ty = sy + isz * .55 + fs; ctx.strokeStyle = '#f4efe1'; ctx.lineWidth = 3.5; ctx.strokeText(name(p.name), sx, ty); ctx.fillStyle = '#2b2418'; ctx.fillText(name(p.name), sx, ty); }
@@ -266,7 +278,7 @@ function creaturesHere() {
   }).sort((a, b) => a.name.localeCompare(b.name));
 }
 function openMaps(p) { if (p && p.encounter && window.E9Map) E9Map.open(p.encounter, name(p.name)); }
-// at Field level a place fills its own 100-ft hex and never spills out of it (Heph 2026-11-06): the icon in the upper part,
+// at Furlong level (100-ft hexes) a place fills its own 100-ft hex and never spills out of it (Heph 2026-11-06): the icon in the upper part,
 // the name below it, shrunk to the hex's width there, or left to the key when the hex is too small to read it
 function fieldPoi(p, im, sx, sy) {
   const F = 100 * cam.s, R = F / SQ3, half = y => R - Math.abs(y) / SQ3;  // flat-top hex: half its width at height y from the centre
@@ -279,14 +291,14 @@ function fieldPoi(p, im, sx, sy) {
   if (fs < 8) return;
   ctx.textAlign = 'center'; ctx.strokeStyle = '#f4efe1'; ctx.lineWidth = 3; ctx.strokeText(label, sx, sy + ty + fs * .35); ctx.fillStyle = '#2b2418'; ctx.fillText(label, sx, sy + ty + fs * .35);
 }
-// the place with an encounter map under a point, at Field level (ENCOUNTER_FORMAT.md section 4): its icon, or its 100-ft hex
+// the place with an encounter map under a point, at Furlong level (ENCOUNTER_FORMAT.md section 4): its icon, or its 100-ft hex
 function mapPoiAt(x, y) {
-  if (V.lvl !== 'field') return null; const [C, R] = hexAt(x, y, 1);
+  if (V.lvl !== 'furlong') return null; const [C, R] = hexAt(x, y, 1);
   return D.pois.find(p => p.encounter && p.hex[0] === C && p.hex[1] === R) || null;  // a place is its whole 100-ft hex
 }
-function goDown(x, y) {  // Heph's rule: anything clicked zooms in one level, centred on it; at Field level a place opens its Encounter map
+function goDown(x, y) {  // Heph's rule: anything clicked zooms in one level, centred on it; at Furlong level a place opens its Encounter map
   const N = LV[V.lvl].draw, [i, j] = hexAt(x, y, N);
-  if (V.lvl === 'field') {  // a click picks that 100-ft hex without moving the map; a place with an encounter map also opens it
+  if (V.lvl === 'furlong') {  // a click picks that 100-ft hex without moving the map; a place with an encounter map also opens it
     if (T(i, j, 1)) { const h = addr(i, j); if (location.hash !== h) { STAY = true; location.hash = h; } }
     openMaps(mapPoiAt(x, y)); return; }
   if (!T(i, j, N)) return;
@@ -294,6 +306,7 @@ function goDown(x, y) {  // Heph's rule: anything clicked zooms in one level, ce
   AIM = hexFt(i, j, N);
   if (V.lvl === 'region') { const [mi, mj] = nearest(C, R, 1200); location.hash = marchAddr(mi, mj); }
   else if (V.lvl === 'march') location.hash = leagueAddr(i, j);
+  else if (V.lvl === 'league') location.hash = fieldAddr(C, R);
   else location.hash = addr(C, R);
 }
 function crumbs() {
@@ -303,9 +316,10 @@ function crumbs() {
   if (C !== undefined) {
     const [mi, mj] = V.lvl === 'march' ? [V.i, V.j] : nearest(C, R, 1200); out.push(`<a href="${marchAddr(mi, mj)}">March ${marchAddr(mi, mj).slice(7)}</a>`);
     if (V.lvl !== 'march') { const [li, lj] = nearest(C, R, 150); out.push(`<a href="${leagueAddr(li, lj)}">League ${leagueAddr(li, lj).slice(7)}</a>`); }
-    if (V.lvl === 'field') { const [fc, fr] = centre(V.i, V.j, 25); out.push(`<a href="${addr(fc, fr)}">Field ${addr(fc, fr).slice(12)}</a>`); }
+    if (V.lvl === 'field' || V.lvl === 'furlong') { const [fi, fj] = V.lvl === 'field' ? [V.i, V.j] : nearest(C, R, 25), [fc, fr] = centre(fi, fj, 25); out.push(`<a href="${fieldAddr(fc, fr)}">Field ${addr(fc, fr).slice(12)}</a>`); }
+    if (V.lvl === 'furlong') { const [uc, ur] = centre(V.i, V.j, 5); out.push(`<a href="${addr(uc, ur)}">Furlong ${addr(uc, ur).slice(12)}</a>`); }
   }
-  out.push({ region: '1 hex = 1 league (3 miles)', march: '1 hex = 1 league (3 miles)', league: '1 hex = 1 field (½ mile)', field: '1 hex = 100 ft' }[V.lvl]);
+  out.push({ region: '1 hex = 1 league (3 miles)', march: '1 hex = 1 league (3 miles)', league: '1 hex = 1 field (½ mile)', field: '1 hex = 1 furlong (500 ft)', furlong: '1 hex = 100 ft' }[V.lvl]);
   document.getElementById('crumbs').innerHTML = out.join(' · ');
 }
 function go() { V = parse(location.hash); fit(); crumbs(); redraw(); }
@@ -319,7 +333,7 @@ cv.addEventListener('pointermove', e => {
     if (drag.moved) { cam.x = drag.cx - dx / cam.s; cam.y = drag.cy - dy / cam.s; redraw(); } return; }
   const N = LV[V.lvl].draw, [i, j] = hexAt(x, y, N), t = T(i, j, N), [C, R] = N === 1 ? [i, j] : centre(i, j, N);
   const mp = mapPoiAt(x, y);
-  document.getElementById('hover').textContent = mp ? `${name(mp.name)} · click to open the encounter map` : t ? `${N === 1 ? addr(C, R) : N === 25 ? 'Field ' + addr(C, R).slice(12) : leagueAddr(i, j)} · ${TYPES[t - 1].name}` : '';
+  document.getElementById('hover').textContent = mp ? `${name(mp.name)} · click to open the encounter map` : t ? `${N === 1 ? addr(C, R) : N === 5 ? 'Furlong ' + addr(C, R).slice(12) : N === 25 ? 'Field ' + addr(C, R).slice(12) : leagueAddr(i, j)} · ${TYPES[t - 1].name}` : '';
 });
 cv.addEventListener('pointerup', e => {
   if (!drag) return; const moved = drag.moved; drag = null; if (moved) return;
