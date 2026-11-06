@@ -121,8 +121,9 @@ function parse(h) {
 const LV = { region: { draw: 150, own: 0, fit: 0 }, march: { draw: 150, own: 1200, fit: 1350 }, league: { draw: 25, own: 150, fit: 175 }, field: { draw: 1, own: 25, fit: 32 } };
 let V = { lvl: 'region' }, cam = { x: 0, y: 0, s: 1 }, W = 0, H = 0, dpr = 1, AIM = null;  // AIM: feet to centre on after a click (Heph: a click always zooms in one level, centred on the hex clicked)
 function focusFt() { return V.lvl === 'region' ? null : hexFt(V.i, V.j, LV[V.lvl].own); }
+let STAY = false;  // true while a Field click picks a hex: keep the camera where it is
 function fit() {
-  W = cv.clientWidth; H = cv.clientHeight; const f = focusFt();
+  W = cv.clientWidth; H = cv.clientHeight; if (STAY) { STAY = false; return; } const f = focusFt();
   if (f) { [cam.x, cam.y] = AIM || (V.sel ? ft(...V.sel) : f); AIM = null; cam.s = Math.min(H / (LV[V.lvl].fit * 100), W / (LV[V.lvl].fit * 100 * 1.16)); return; }
   let x0 = 1e12, y0 = 1e12, x1 = -1e12, y1 = -1e12;
   for (const k in M) { const [x, y] = ft(M[k].Cm, M[k].Rm); x0 = Math.min(x0, x - 800 * CW); x1 = Math.max(x1, x + 800 * CW); y0 = Math.min(y0, y - 60000); y1 = Math.max(y1, y + 60000); }
@@ -267,7 +268,9 @@ function mapPoiAt(x, y) {
 }
 function goDown(x, y) {  // Heph's rule: anything clicked zooms in one level, centred on it; at Field level a place opens its Encounter map
   const N = LV[V.lvl].draw, [i, j] = hexAt(x, y, N);
-  if (V.lvl === 'field') { openMaps(mapPoiAt(x, y)); return; }
+  if (V.lvl === 'field') {  // a click picks that 100-ft hex without moving the map; a place with an encounter map also opens it
+    if (T(i, j, 1)) { const h = addr(i, j); if (location.hash !== h) { STAY = true; location.hash = h; } }
+    openMaps(mapPoiAt(x, y)); return; }
   if (!T(i, j, N)) return;
   const [C, R] = N === 1 ? [i, j] : centre(i, j, N);
   AIM = hexFt(i, j, N);
@@ -298,7 +301,7 @@ cv.addEventListener('pointermove', e => {
   if (drag) { const dx = e.clientX - drag.x, dy = e.clientY - drag.y; if (Math.hypot(dx, dy) > 5) drag.moved = true;
     if (drag.moved) { cam.x = drag.cx - dx / cam.s; cam.y = drag.cy - dy / cam.s; redraw(); } return; }
   const N = LV[V.lvl].draw, [i, j] = hexAt(x, y, N), t = T(i, j, N), [C, R] = N === 1 ? [i, j] : centre(i, j, N);
-  const mp = mapPoiAt(x, y); cv.style.cursor = V.lvl === 'field' && !mp ? 'grab' : 'pointer';
+  const mp = mapPoiAt(x, y);
   document.getElementById('hover').textContent = mp ? `${name(mp.name)} · click to open the encounter map` : t ? `${N === 1 ? addr(C, R) : N === 25 ? 'Field ' + addr(C, R).slice(12) : leagueAddr(i, j)} · ${TYPES[t - 1].name}` : '';
 });
 cv.addEventListener('pointerup', e => {
