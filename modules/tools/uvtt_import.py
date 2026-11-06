@@ -6,7 +6,7 @@
 Writes encounter-maps/<id>/map.<png|jpg|webp> (the embedded picture, bytes unchanged) and encounter-maps/<id>.json:
 size and pixels per square from "resolution", walls from "line_of_sight" and "objects_line_of_sight", doors from
 "portals", lights and environment as they are. Points are moved by "map_origin" so the map starts at square 0, 0.
-A file that E9 exported carries an "e9" block; its title, grid, areas, links, anchor, secret and locked doors,
+A file that E9 exported carries an "e9" block; its title, grid, areas, links, anchor, spawns, secret and locked doors,
 licence and credit come back too. Anything else (areas, links, scenes, the site_encounters pointer) is the module
 author's to add. The licence is left empty for a file from elsewhere: set it before publishing.
 Run encounter_check.py on the module afterwards.
@@ -52,7 +52,7 @@ def main():
          'size': [res['map_size']['x'], res['map_size']['y']],
          'grid': dict(e9.get('grid') or {'ft': 5, 'show': True}, **({'ft': a.ft} if a.ft else {})),
          'layers': [{'src': src, 'at': [0, 0], 'px': res['pixels_per_grid']}], 'ground': 'none'}
-    for k in ('anchor', 'areas', 'links'):
+    for k in ('anchor', 'areas', 'links', 'spawns'):
         if e9.get(k): m[k] = e9[k]
     walls = [[P(p) for p in ln] for ln in u.get('line_of_sight', []) + u.get('objects_line_of_sight', []) if len(ln) >= 2]
     m.update({'walls': walls, 'doors': doors,

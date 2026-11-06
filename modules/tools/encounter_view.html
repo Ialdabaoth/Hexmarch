@@ -36,11 +36,12 @@
 // E9Map.open(pointers, title): one pointer opens its map at the pointed area; several show a picker first.
 // The page sets E9Map.base (the module folder, ending in /), E9Map.module (its id), E9Map.creatures (as for E9Card) and E9Map.scenes (encounters.scenes).
 // E9Map.load(id) gives a map file with its defaults filled in (the one place export and import code should read maps from).
+// E9Map.place(map, where, tokens, taken) -> one [x, y] per token (ENCOUNTER_FORMAT.md 14.1); where is a spawn id, an area id or [x, y, w, h].
 // E9Map.actions: header buttons for the map on screen, [{label, title, show(map) -> bool, run(map)}]; VTT export and links plug in here.
 window.E9Map = (() => {
   const dlg = document.getElementById('e9map'), cache = {};
   const e = t => String(t ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
-  const api = { base: '', module: '', creatures: [], scenes: {}, actions: [], open, show, load };
+  const api = { base: '', module: '', creatures: [], scenes: {}, actions: [], open, show, load, place };
   const pref = { get(k) { try { return localStorage.getItem('e9map-' + k); } catch (x) { return null; } }, set(k, v) { try { localStorage.setItem('e9map-' + k, v); } catch (x) {} } };
   let st = null, back = [];  // st: the map on screen; back: where Back returns to
   dlg.addEventListener('click', ev => { if (ev.target === dlg) dlg.close(); });
@@ -67,8 +68,58 @@ window.E9Map = (() => {
     m.layers = (m.layers || []).map(L => Object.assign({ at: [0, 0], px: 40, rotate: 0, opacity: 1, show: 'all' }, L));
     m.ground = m.ground || (m.anchor ? 'generate' : 'none');
     for (const k of ['walls', 'doors', 'lights']) m[k] = m[k] || [];
-    m.areas = m.areas || {}; m.links = m.links || []; m.environment = m.environment || {};
+    m.areas = m.areas || {}; m.links = m.links || []; m.spawns = m.spawns || {}; m.environment = m.environment || {};
     return m;
+  }
+  // ---- placement (section 14.1): nearest the centre first, skip walled and taken squares, spill ring by ring,
+  // and only into squares a token could walk to from the spawn rectangle without crossing a wall or closed door
+  function hits(ax, ay, bx, by, x0, y0, x1, y1) {  // does segment a-b touch box x0..x1, y0..y1? (Liang-Barsky)
+    const dx = bx - ax, dy = by - ay; let t0 = 0, t1 = 1;
+    for (const [p, q] of [[-dx, ax - x0], [dx, x1 - ax], [-dy, ay - y0], [dy, y1 - ay]]) {
+      if (p === 0) { if (q < 0) return false; continue; }
+      const r = q / p; if (p < 0) { if (r > t1) return false; if (r > t0) t0 = r; } else { if (r < t0) return false; if (r < t1) t1 = r; }
+    }
+    return t0 <= t1;
+  }
+  const crossing = (ax, ay, bx, by, cx, cy, dx, dy) => {  // do segments a-b and c-d cross?
+    const o = (px, py, qx, qy, rx, ry) => Math.sign((qx - px) * (ry - py) - (qy - py) * (rx - px));
+    return o(ax, ay, bx, by, cx, cy) * o(ax, ay, bx, by, dx, dy) <= 0 && o(cx, cy, dx, dy, ax, ay) * o(cx, cy, dx, dy, bx, by) <= 0;
+  };
+  const segs = walls => walls.flatMap(wl => wl.slice(1).map((b, k) => [wl[k][0], wl[k][1], b[0], b[1]]));
+  const blocked = (S, x0, y0, x1, y1) => S.some(([ax, ay, bx, by]) => hits(ax, ay, bx, by, x0, y0, x1, y1));
+  function place(m, where, tokens, taken) {
+    const sp = typeof where === 'string' ? m.spawns[where] : null;
+    const area = sp ? (sp.area && m.areas[sp.area]) : typeof where === 'string' ? m.areas[where] : null;
+    let r = sp && sp.squares ? (Array.isArray(sp.squares[0]) ? sp.squares[0] : sp.squares) : area ? rects(area)[0] : Array.isArray(where) ? where : [0, 0, m.size[0], m.size[1]];
+    r = r.map(Math.round);
+    const [W, H] = m.size, S = segs(m.walls.concat(m.doors.map(d => d.at))), K = (x, y) => x + ',' + y;
+    const inR = (x, y) => x >= r[0] && y >= r[1] && x < r[0] + r[2] && y < r[1] + r[3];
+    const cut = {}, open = (x, y) => { const k = K(x, y); if (!(k in cut)) cut[k] = !blocked(S, x + .3, y + .3, x + .7, y + .7); return cut[k]; };  // a wall may clip a corner, not the middle
+    // flood from the open square nearest the rectangle's centre (anywhere on the map if the rectangle has none), so a rectangle
+    // that overlaps solid rock still fills its floor; a step is barred where a wall crosses the line between the two squares' centres
+    const cx = r[0] + r[2] / 2, cy = r[1] + r[3] / 2, dist = ([x, y]) => Math.hypot(x + .5 - cx, y + .5 - cy);
+    let inside = []; for (let y = r[1]; y < r[1] + r[3]; y++) for (let x = r[0]; x < r[0] + r[2]; x++) if (x >= 0 && y >= 0 && x < W && y < H && open(x, y)) inside.push([x, y]);
+    if (!inside.length) for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (open(x, y)) inside.push([x, y]);
+    inside.sort((a, b) => dist(a) - dist(b) || a[1] - b[1] || a[0] - b[0]);
+    const seen = new Set(inside.length ? [K(...inside[0])] : []), q = inside.slice(0, 1);
+    for (let i = 0; i < q.length; i++) {
+      const [x, y] = q[i];
+      for (const [nx, ny] of [[x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]]) {
+        if (nx < 0 || ny < 0 || nx >= W || ny >= H || seen.has(K(nx, ny)) || !open(nx, ny) || S.some(([ax, ay, bx, by]) => crossing(ax, ay, bx, by, x + .5, y + .5, nx + .5, ny + .5))) continue;
+        seen.add(K(nx, ny)); q.push([nx, ny]);
+      }
+    }
+    const ring = ([x, y]) => Math.max(r[0] - x, x - (r[0] + r[2] - 1), r[1] - y, y - (r[1] + r[3] - 1), 0);
+    const cand = q.sort((a, b) => ring(a) - ring(b) || dist(a) - dist(b) || a[1] - b[1] || a[0] - b[0]);
+    const used = new Set((taken || []).map(p => K(...p))), out = [];
+    for (const t of tokens) {
+      const n = Math.max(1, Math.round(t.size || 1));
+      let got = cand.find(([x, y]) => { for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) if (used.has(K(x + i, y + j)) || !seen.has(K(x + i, y + j))) return false; return true; });
+      if (!got) got = cand.find(([x, y]) => !used.has(K(x, y))) || [r[0], r[1]];  // no room for the block: one square, else stack on the corner
+      for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) used.add(K(got[0] + i, got[1] + j));
+      out.push(got);
+    }
+    return out;
   }
   async function load(id) {
     if (!cache[id]) cache[id] = fetch(api.base + 'encounter-maps/' + encodeURIComponent(id) + '.json').then(r => { if (!r.ok) throw new Error(r.status); return r.json(); }).then(m => normalise(m, id));
@@ -83,8 +134,8 @@ window.E9Map = (() => {
     const zm = dlg.querySelector('.zm');
     zm.innerHTML = '<button data-z="0.8" title="Zoom out">−</button> <button data-z="1.25" title="Zoom in">+</button> <button data-z="fit">Fit</button>';
     // map actions: the walls overlay, then whatever the page plugged in (VTT export and links)
-    const ps = m.walls.length + m.doors.length + m.lights.length;
-    if (ps) { const b = document.createElement('button'); b.textContent = 'Walls'; b.title = 'Show the walls, doors and lights a VTT export carries'; b.className = pref.get('walls') === '1' ? 'on' : '';
+    const spawns = Object.entries(m.spawns), ps = m.walls.length + m.doors.length + m.lights.length + spawns.length;
+    if (ps) { const b = document.createElement('button'); b.textContent = 'Walls'; b.title = 'Show the walls, doors, lights, entrances and spawn points a VTT export carries'; b.className = pref.get('walls') === '1' ? 'on' : '';
       b.onclick = () => { const on = !b.classList.contains('on'); b.classList.toggle('on', on); pref.set('walls', on ? '1' : '0'); dlg.querySelector('svg.ps').style.display = on ? '' : 'none'; }; zm.append(' ', b); }
     for (const a of api.actions) if (!a.show || a.show(m)) { const b = document.createElement('button'); b.textContent = a.label; if (a.title) b.title = a.title; b.onclick = () => a.run(m); zm.append(' ', b); }
     const vp = dlg.querySelector('.vp'), pg = dlg.querySelector('.pg'), [w, h] = m.size;
@@ -98,10 +149,13 @@ window.E9Map = (() => {
       Object.assign(im.style, { left: q(L.at[0]), top: q(L.at[1]), opacity: L.opacity, transformOrigin: '0 0', transform: L.rotate ? `rotate(${L.rotate}deg)` : '' });
       im.onload = () => { im.style.width = q(im.naturalWidth / L.px); }; pg.append(im);
     }
-    if (ps) {  // play surface (section 3): walls red, doors blue (dashed if secret), lights as their reach
+    if (ps) {  // play surface (section 3): walls red, doors blue (dashed if secret), lights as their reach; entrances green, spawn points orange (section 14)
       const pts = a => a.map(p => p.join(',')).join(' ');
+      const spr = ([id, s]) => (s.squares ? (Array.isArray(s.squares[0]) ? s.squares : [s.squares]) : s.area && m.areas[s.area] ? rects(m.areas[s.area]) : []).map(([x, y, sw, sh]) => {
+        const c = s.kind === 'entrance' ? '#1f8a3a' : '#d06a10';
+        return `<rect x="${x}" y="${y}" width="${sw}" height="${sh}" fill="${c}26" stroke="${c}" stroke-width=".12" stroke-dasharray="${s.hidden ? '.3 .2' : ''}"><title>${e((s.kind === 'entrance' ? 'Entrance: ' : 'Spawn point: ') + (s.title || id))}</title></rect>`; }).join('');
       pg.insertAdjacentHTML('beforeend', `<svg class="ps" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" style="display:${pref.get('walls') === '1' ? '' : 'none'}">`
-        + m.lights.map(l => `<circle cx="${l.at[0]}" cy="${l.at[1]}" r="${l.range}" fill="#ffa04a22" stroke="#e07a1f" stroke-width=".08" stroke-dasharray=".3 .2"/>`).join('')
+        + spawns.map(spr).join('') + m.lights.map(l => `<circle cx="${l.at[0]}" cy="${l.at[1]}" r="${l.range}" fill="#ffa04a22" stroke="#e07a1f" stroke-width=".08" stroke-dasharray=".3 .2"/>`).join('')
         + m.walls.map(wl => `<polyline points="${pts(wl)}" fill="none" stroke="#d01c1c" stroke-width=".18" stroke-linejoin="round" stroke-linecap="round"/>`).join('')
         + m.doors.map(d => `<polyline points="${pts(d.at)}" stroke="#1c5bd0" stroke-width=".3" stroke-linecap="round"${d.secret ? ' stroke-dasharray=".2 .12"' : ''}/>`).join('') + '</svg>');
     }

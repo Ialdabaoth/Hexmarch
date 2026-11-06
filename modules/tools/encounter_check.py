@@ -3,8 +3,8 @@
 
     python3 -I modules/tools/encounter_check.py modules/<module>
 
-Checks every encounter-maps/<id>.json (format, size, layer files, areas, links, walls, doors, lights) and every
-pointer into a map (module.json site_encounters, scene "map" fields in any *.json with an "encounters" block).
+Checks every encounter-maps/<id>.json (format, size, layer files, areas, links, walls, doors, lights, spawns) and every
+pointer into a map (with its entrance or spawn point) (module.json site_encounters, scene "map" fields in any *.json with an "encounters" block).
 Prints one line per problem and exits 1 if there is any, so the site build stops instead of shipping a map
 that a VTT export or a PoI click would trip over. build.py runs it.
 """
@@ -48,11 +48,19 @@ def main(mdir):
             to = L.get('to') or {}; tid = to.get('map', mid)
             if tid not in maps: say(f'link {k}: goes to map {tid!r}, which this module does not have')
             elif to.get('area') and to['area'] not in (maps[tid].get('areas') or {}): say(f'link {k}: map {tid!r} has no area {to["area"]!r}')
+            elif to.get('entrance') and (maps[tid].get('spawns') or {}).get(to['entrance'], {}).get('kind') != 'entrance': say(f'link {k}: map {tid!r} has no entrance {to["entrance"]!r}')
         for k, wl in enumerate(m.get('walls') or []):
             if not (isinstance(wl, list) and len(wl) >= 2 and all(pt(p) and inside(p) for p in wl)): say(f'wall {k}: must be two or more [x, y] squares on the map')
         for k, d in enumerate(m.get('doors') or []):
             at = d.get('at')
             if not (isinstance(at, list) and len(at) == 2 and all(pt(p) and inside(p) for p in at)): say(f'door {k}: at must be two [x, y] ends on the map')
+        for sid, sp in (m.get('spawns') or {}).items():
+            if sp.get('kind') not in ('entrance', 'spawn'): say(f'spawn {sid}: kind must be entrance or spawn')
+            if sp.get('area') and sp['area'] not in (m.get('areas') or {}): say(f'spawn {sid}: no area {sp["area"]!r}')
+            sq = sp.get('squares')
+            for r in (sq if sq and isinstance(sq[0], list) else [sq] if sq else []):
+                if not (isinstance(r, list) and len(r) == 4 and all(num(x) for x in r)) or not (inside(r[:2]) and inside([r[0] + r[2], r[1] + r[3]])): say(f'spawn {sid}: squares {r} must be [x, y, w, h] on the map')
+            if sp.get('facing') and sp['facing'] not in ('n', 'ne', 'e', 'se', 's', 'sw', 'w', 'nw'): say(f'spawn {sid}: facing must be n, ne, e, se, s, sw, w or nw')
         for k, li in enumerate(m.get('lights') or []):
             if not (pt(li.get('at')) and inside(li['at']) and num(li.get('range')) and li['range'] > 0): say(f'light {k}: needs at [x, y] on the map and a positive range')
 
@@ -60,6 +68,9 @@ def main(mdir):
         p = {'map': p} if isinstance(p, str) else p
         if not isinstance(p, dict) or p.get('map') not in maps: errs.append(f'{where}: points at map {p.get("map") if isinstance(p, dict) else p!r}, which this module does not have'); return
         if p.get('area') and p['area'] not in (maps[p['map']].get('areas') or {}): errs.append(f'{where}: map {p["map"]!r} has no area {p["area"]!r}')
+        sp = maps[p['map']].get('spawns') or {}
+        if p.get('entrance') and sp.get(p['entrance'], {}).get('kind') != 'entrance': errs.append(f'{where}: map {p["map"]!r} has no entrance {p["entrance"]!r}')
+        if p.get('spawn') and p['spawn'] not in sp: errs.append(f'{where}: map {p["map"]!r} has no spawn point {p["spawn"]!r}')
 
     mod = json.load(open(os.path.join(mdir, 'module.json')))
     for site, ptrs in (mod.get('site_encounters') or {}).items():
@@ -71,6 +82,9 @@ def main(mdir):
         scenes = (j.get('encounters') or {}).get('scenes') if isinstance(j, dict) else None
         for sid, s in (scenes or {}).items():
             if s.get('map'): pointer(f'{f} scene {sid!r}', s['map'])
+            mp = s.get('map'); mp = mp.get('map') if isinstance(mp, dict) else mp
+            for w in s.get('who') or []:
+                if w.get('spawn') and w['spawn'] not in ((maps.get(mp) or {}).get('spawns') or {}): errs.append(f'{f} scene {sid!r}: {w.get("creature")} spawns at {w["spawn"]!r}, which map {mp!r} does not have')
 
     for e in errs: print('encounter maps:', e)
     print(f'encounter maps: {len(maps)} checked, {len(errs)} problem{"" if len(errs) == 1 else "s"}')
