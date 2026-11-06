@@ -62,7 +62,7 @@ def shape(s, rough=0.0, nz=None):
     elif 'blob' in s:
         cx, cy, rx, ry = s['blob']; g = affinity.scale(Point(cx, cy).buffer(1, 48), rx, ry)
     elif 'poly' in s:
-        g = Polygon(s['poly'])
+        g = Polygon(s['poly'], [s['hole']] if s.get('hole') else None)
     elif 'path' in s:
         g = LineString(s['path']).buffer(s.get('w', 2) / 2, cap_style=1, join_style=1)
     else:
@@ -236,6 +236,13 @@ def mark(d, m, P, rng, fonts):
         col = {'bed': (176, 150, 112), 'table': (150, 104, 60), 'chest': (120, 80, 40)}[t]
         d.rectangle([x0, y0, x0 + w * P, y0 + h * P], fill=col, outline=INK, width=3)
         if t == 'chest': d.line([x0, Y, x0 + w * P, Y], fill=INK, width=2)
+    elif t == 'fence':
+        pts = [(a * P, b * P) for a, b in m['path']]
+        d.line(pts, fill=(110, 76, 44), width=max(3, int(.16 * P)))
+        line = LineString(m['path'])
+        for k in range(int(line.length / m.get('every', 2)) + 1):
+            q = line.interpolate(k * m.get('every', 2)); r = .14 * P
+            d.rectangle([q.x * P - r, q.y * P - r, q.x * P + r, q.y * P + r], fill=(80, 54, 30), outline=INK)
     elif t == 'fountain':
         r = 1.6 * P; d.ellipse([X - r, Y - r, X + r, Y + r], fill=(168, 160, 146), outline=INK, width=3)
         r = 1.2 * P; d.ellipse([X - r, Y - r, X + r, Y + r], fill=WATER, outline=INK, width=2)
@@ -289,8 +296,6 @@ def render(plan, rng):
         im.paste((150, 130, 100), (0, 0), shade)
     else:
         im = texture(W, H, GROUND[plan.get('ground', 'grass')], rng, 16, 4)
-        road = union(plan.get('road', []), .25, nz)
-        im.paste(texture(W, H, ROAD, rng, 10, 2), (0, 0), mask_of(road, W, H, P).filter(ImageFilter.GaussianBlur(P * .15)))
     d = ImageDraw.Draw(im, 'RGBA')
     # outdoor: raised ground, water and cliffs
     if not cave:
@@ -305,6 +310,19 @@ def render(plan, rng):
             d = ImageDraw.Draw(im, 'RGBA')
             hatch(d, rock.difference(rock.buffer(-1.4)), P, rng, 11, .5, 2)
             draw_poly(d, rock, P, outline=INK, width=4)
+        # paths, dirt and paving go over the ground and any rock they climb
+        road = union(plan.get('road', []), .25, nz)
+        im.paste(texture(W, H, ROAD, rng, 10, 2), (0, 0), mask_of(road, W, H, P).filter(ImageFilter.GaussianBlur(P * .15)))
+        cob = union(plan.get('cobbles', []))
+        if not cob.is_empty:
+            im.paste(texture(W, H, (176, 168, 150), rng, 12, 1), (0, 0), mask_of(cob, W, H, P))
+            d = ImageDraw.Draw(im, 'RGBA')
+            for p_ in polys(cob):
+                x0, y0, x1, y1 = p_.bounds
+                for yy in range(int(y0 * 2), int(y1 * 2) + 1):
+                    for xx in range(int(x0 * 2), int(x1 * 2) + 1):
+                        if p_.contains(Point(xx / 2 + .25, yy / 2 + .25)): d.rectangle([xx * P / 2 + 1, yy * P / 2 + 1, (xx + 1) * P / 2 - 1, (yy + 1) * P / 2 - 1], outline=(120, 112, 98))
+        d = ImageDraw.Draw(im, 'RGBA')
         # outdoor floor: dug or built spaces (a barrow passage, a tunnel, a cellar) drawn over the ground in ink
         if not floor.is_empty:
             im.paste(texture(W, H, PAPER, rng, 8, 2), (0, 0), mask_of(floor, W, H, P))
@@ -326,7 +344,7 @@ def render(plan, rng):
         draw_poly(d, g, P, outline=INK, width=3)
     for b in plan.get('buildings', []):
         g = shape(b); x0, y0, x1, y1 = g.bounds
-        roof = {'slate': (104, 112, 122), 'thatch': (184, 154, 92), 'tile': (156, 84, 60), 'stone': STONE, 'lead': (130, 132, 128)}[b.get('roof', 'slate')]
+        roof = {'slate': (104, 112, 122), 'thatch': (184, 154, 92), 'tile': (156, 84, 60), 'stone': STONE, 'lead': (130, 132, 128), 'wood': (150, 108, 64)}[b.get('roof', 'slate')]
         draw_poly(d, affinity.translate(g, .3, .3), P, fill=(40, 34, 28, 110))
         draw_poly(d, g, P, fill=roof, outline=INK, width=3)
         if b.get('roof', 'slate') != 'stone':
