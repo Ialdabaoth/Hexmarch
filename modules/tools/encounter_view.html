@@ -38,7 +38,7 @@
 // E9Map.load(id) gives a map file with its defaults filled in (the one place export and import code should read maps from).
 // E9Map.place(map, where, tokens, taken) -> one [x, y] per token (ENCOUNTER_FORMAT.md 14.1); where is a spawn id, an area id or [x, y, w, h].
 // E9Map.places: the world's places with maps, [{name, pointers, go()}]; a map lists the ones it leads back out to (section 14.3).
-// E9Map.actions: header buttons for the map on screen, [{label, title, show(map) -> bool, run(map)}]; VTT export and links plug in here.
+// E9Map.actions: header buttons for the map on screen, [{label, title, show(map) -> bool, run(map, pointer)}]; VTT export and links plug in here.
 window.E9Map = (() => {
   const dlg = document.getElementById('e9map'), cache = {};
   const e = t => String(t ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
@@ -138,9 +138,9 @@ window.E9Map = (() => {
     const spawns = Object.entries(m.spawns), ps = m.walls.length + m.doors.length + m.lights.length + spawns.length;
     if (ps) { const b = document.createElement('button'); b.textContent = 'Walls'; b.title = 'Show the walls, doors, lights, entrances and spawn points a VTT export carries'; b.className = pref.get('walls') === '1' ? 'on' : '';
       b.onclick = () => { const on = !b.classList.contains('on'); b.classList.toggle('on', on); pref.set('walls', on ? '1' : '0'); dlg.querySelector('svg.ps').style.display = on ? '' : 'none'; }; zm.append(' ', b); }
-    for (const a of api.actions) if (!a.show || a.show(m)) { const b = document.createElement('button'); b.textContent = a.label; if (a.title) b.title = a.title; b.onclick = () => a.run(m); zm.append(' ', b); }
+    for (const a of api.actions) if (!a.show || a.show(m)) { const b = document.createElement('button'); b.textContent = a.label; if (a.title) b.title = a.title; b.onclick = () => a.run(m, st.p); zm.append(' ', b); }
     const vp = dlg.querySelector('.vp'), pg = dlg.querySelector('.pg'), [w, h] = m.size;
-    st = { m, vp, pg, sel: null, s: 1 };
+    st = { m, p, vp, pg, sel: null, s: 1 };  // p: the pointer the map was opened by
     // everything is placed in squares; --q is one square's size on screen
     const q = n => `calc(${n} * var(--q))`;
     pg.style.width = q(w); pg.style.height = q(h);

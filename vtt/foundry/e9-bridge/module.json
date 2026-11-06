@@ -1,0 +1,11 @@
+{
+  "id": "e9-bridge",
+  "title": "E9 Bridge",
+  "description": "Links Foundry VTT to the E9 Atlas: build an encounter map as a scene with its walls, doors and lights, place its creatures, and move the party to its entrance (e9-vtt/1 adapter).",
+  "version": "0.1.0",
+  "compatibility": { "minimum": "12", "verified": "13" },
+  "authors": [{ "name": "Heph (Bakagaijin Productions)" }],
+  "esmodules": ["scripts/e9-bridge.js"],
+  "url": "https://github.com/Ialdabaoth/MateriaMundiRPG",
+  "license": "CC0-1.0"
+}

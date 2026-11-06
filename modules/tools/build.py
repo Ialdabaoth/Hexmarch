@@ -187,7 +187,7 @@ M = {'format': 'mm-module/1', 'id': MOD['id'], 'title': MOD['title'], 'short': M
 json.dump(M, open(out + '/module.json', 'w'), ensure_ascii=False, indent=1)
 tpl = open(TOOLS + '/viewer.html').read()
 lite = {k: v for k, v in M.items() if k != 'world'}; lite['world'] = {k: v for k, v in M['world'].items() if k != 'hexes'}; lite['creatures'] = CREATURES; lite['scenes'] = ENC.get('scenes', {})
-CARD = open(TOOLS + '/creature_card.html').read() + open(TOOLS + '/encounter_view.html').read() + open(TOOLS + '/vtt_export.html').read()  # index card and encounter map viewer
+CARD = open(TOOLS + '/creature_card.html').read() + open(TOOLS + '/encounter_view.html').read() + open(TOOLS + '/vtt_export.html').read() + open(TOOLS + '/vtt_bridge.html').read()  # index card and encounter map viewer
 html = tpl.replace('<!--CARD-->', CARD).replace('/*DATA*/', json.dumps(lite, ensure_ascii=False).replace('</', '<\\/')).replace('<!--SYMBOLS-->', ''.join(syms.values())).replace('{{TITLE}}', MOD['title'])
 open(out + '/index.html', 'w').write(html)
 # a module that changed its id leaves a page at each old address that forwards to the new one, keeping ?mode and #links
