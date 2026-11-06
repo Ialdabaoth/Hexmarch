@@ -14,16 +14,18 @@ Plan keys (all coordinates in squares, [x, y] from the top-left, y down):
   ground  outdoor ground colour: grass | bog | forest | heath | ravine
   floor   carved or open shapes: {"rect": [x,y,w,h]} | {"blob": [cx,cy,rx,ry]} | {"path": [[x,y],...], "w": 2}
           add "built": true for straight masonry walls inside a cave plan
-  rock    outdoor only: shapes drawn as cliff/rock (hatched), e.g. ravine walls
+  rock    outdoor only: shapes drawn as cliff/rock (hatched), e.g. ravine walls; a path with "soft": "left"|"right"
+          is a terrace cliff: hard inked face on the other side, that side blurred into the ledge ("fade" in squares)
   water   shapes drawn as water (pools, streams)
   road    shapes drawn as a beaten path
   mounds  shapes drawn as raised ground (barrows, hummocks)
   trees   [{"in": shape, "n": count, "kind": "oak"|"pine"|"scrub"|"reed", "r": radius}] scattered, seeded
-  marks   [{"t": kind, "at": [x,y], ...}] kinds: num, letter, label, pit, secret, door, locked, stairs,
+  marks   [{"t": kind, "at": [x,y], ...}] kinds: num, letter, cave (mouth, optional "size"), label (optional "rot" degrees, "size", \n for lines), pit, secret, door, locked, stairs,
           fire, tent, web, bones, bed, table, chest, well, oak, sac, stake, garden, dotted, window
   areas, links, notes   copied into the map file
 """
 import json, math, os, random, sys
+import numpy as np
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 from shapely.geometry import Point, Polygon, LineString, box
 from shapely.ops import unary_union
@@ -62,7 +64,7 @@ def shape(s, rough=0.0, nz=None):
     elif 'blob' in s:
         cx, cy, rx, ry = s['blob']; g = affinity.scale(Point(cx, cy).buffer(1, 48), rx, ry)
     elif 'poly' in s:
-        g = Polygon(s['poly'])
+        g = Polygon(s['poly'], [s['hole']] if s.get('hole') else None)
     elif 'path' in s:
         g = LineString(s['path']).buffer(s.get('w', 2) / 2, cap_style=1, join_style=1)
     else:
@@ -180,7 +182,24 @@ def mark(d, m, P, rng, fonts):
         text_c(d, (X, Y + 1), str(m['text']), fonts['num'] if t == 'num' else fonts['letter'], fill=INK if t == 'num' else (250, 244, 226))
     elif t == 'label':
         f = fonts['big'] if m.get('big') else fonts['label']
-        text_c(d, (X, Y), m['text'], f, fill=INK, stroke=(244, 236, 214))
+        if m.get('size'): f = font(FONT_I, int(P * m['size']))
+        lines = str(m['text']).split('\n')
+        if not m.get('rot') and len(lines) == 1:
+            text_c(d, (X, Y), m['text'], f, fill=INK, stroke=(244, 236, 214))
+        else:
+            # rotated or stacked names follow a cliff or a building, as on a hand-lettered map
+            lh = f.getbbox('Hg')[3] + 4
+            tw = max(int(f.getlength(l)) for l in lines) + 12
+            tile = Image.new('RGBA', (tw, lh * len(lines) + 8), (0, 0, 0, 0)); td = ImageDraw.Draw(tile)
+            for i, l in enumerate(lines):
+                td.text((tw / 2, 4 + lh * (i + .5)), l, font=f, fill=INK, anchor='mm', stroke_width=3, stroke_fill=(244, 236, 214))
+            tile = tile.rotate(m.get('rot', 0), expand=True, resample=Image.BICUBIC)
+            d._image.paste(tile, (int(X - tile.width / 2), int(Y - tile.height / 2)), tile)
+    elif t == 'cave':
+        # a cave mouth in a cliff foot: a dark opening with a lip of ink
+        rx, ry = m.get('size', [1.1, .8]); rx *= P / 2; ry *= P / 2
+        d.ellipse([X - rx - 3, Y - ry - 3, X + rx + 3, Y + ry + 3], fill=(60, 52, 42))
+        d.ellipse([X - rx, Y - ry, X + rx, Y + ry], fill=(22, 18, 14), outline=INK, width=3)
     elif t == 'pit':
         s = .45 * P; d.rectangle([X - s, Y - s, X + s, Y + s], outline=INK, width=3)
         d.line([X - s, Y - s, X + s, Y + s], fill=INK, width=3); d.line([X - s, Y + s, X + s, Y - s], fill=INK, width=3)
@@ -236,6 +255,13 @@ def mark(d, m, P, rng, fonts):
         col = {'bed': (176, 150, 112), 'table': (150, 104, 60), 'chest': (120, 80, 40)}[t]
         d.rectangle([x0, y0, x0 + w * P, y0 + h * P], fill=col, outline=INK, width=3)
         if t == 'chest': d.line([x0, Y, x0 + w * P, Y], fill=INK, width=2)
+    elif t == 'fence':
+        pts = [(a * P, b * P) for a, b in m['path']]
+        d.line(pts, fill=(110, 76, 44), width=max(3, int(.16 * P)))
+        line = LineString(m['path'])
+        for k in range(int(line.length / m.get('every', 2)) + 1):
+            q = line.interpolate(k * m.get('every', 2)); r = .14 * P
+            d.rectangle([q.x * P - r, q.y * P - r, q.x * P + r, q.y * P + r], fill=(80, 54, 30), outline=INK)
     elif t == 'fountain':
         r = 1.6 * P; d.ellipse([X - r, Y - r, X + r, Y + r], fill=(168, 160, 146), outline=INK, width=3)
         r = 1.2 * P; d.ellipse([X - r, Y - r, X + r, Y + r], fill=WATER, outline=INK, width=2)
@@ -289,8 +315,6 @@ def render(plan, rng):
         im.paste((150, 130, 100), (0, 0), shade)
     else:
         im = texture(W, H, GROUND[plan.get('ground', 'grass')], rng, 16, 4)
-        road = union(plan.get('road', []), .25, nz)
-        im.paste(texture(W, H, ROAD, rng, 10, 2), (0, 0), mask_of(road, W, H, P).filter(ImageFilter.GaussianBlur(P * .15)))
     d = ImageDraw.Draw(im, 'RGBA')
     # outdoor: raised ground, water and cliffs
     if not cave:
@@ -299,12 +323,42 @@ def render(plan, rng):
             draw_poly(d, g.buffer(.4), P, fill=(70, 60, 40, 70))
             draw_poly(d, g, P, fill=(150, 156, 100), outline=INK, width=3)
             hatch(d, g.difference(g.buffer(-.9)), P, rng, 1.6, .35, 2, (60, 66, 40))
-        rock = union(plan.get('rock', []), .6, nz)
+        rock = union([r for r in plan.get('rock', []) if not r.get('soft')], .6, nz)
         if not rock.is_empty:
             im.paste(texture(W, H, ROCK, rng, 14, 3), (0, 0), mask_of(rock, W, H, P))
             d = ImageDraw.Draw(im, 'RGBA')
             hatch(d, rock.difference(rock.buffer(-1.4)), P, rng, 11, .5, 2)
             draw_poly(d, rock, P, outline=INK, width=4)
+        # terraced cliffs: a path of rock with one hard, inked face ("soft" names the other side, left or right of
+        # the path's direction) that fades into the ledge above it
+        for r in [r for r in plan.get('rock', []) if r.get('soft')]:
+            g = shape(r, .6, nz); line = LineString(r['path']); w2 = r.get('w', 2) / 2 + 1.5
+            # shapely's left is the screen's right, because y runs down the map
+            hard = line.buffer(-w2 if r['soft'] == 'right' else w2, single_sided=True)
+            face = g.intersection(hard)
+            m = mask_of(g, W, H, P).filter(ImageFilter.GaussianBlur(P * r.get('fade', .6)))
+            m = Image.fromarray(np.maximum(np.asarray(m), np.asarray(mask_of(face, W, H, P))))
+            im.paste(texture(W, H, ROCK, rng, 14, 3), (0, 0), m)
+            d = ImageDraw.Draw(im, 'RGBA')
+            hatch(d, g.difference(g.buffer(-1.1)).intersection(hard), P, rng, 11, .5, 2)
+            hatch(d, g.buffer(-.4), P, rng, 3, .4, 1, (60, 52, 44))
+            edge = g.boundary.intersection(hard.buffer(-.05))
+            for ln in getattr(edge, 'geoms', [edge]):
+                if ln.geom_type == 'LineString' and ln.length > .3:
+                    d.line([(x * P, y * P) for x, y in ln.coords], fill=INK, width=4, joint='curve')
+        # paths, dirt and paving go over the ground and any rock they climb
+        road = union(plan.get('road', []), .25, nz)
+        im.paste(texture(W, H, ROAD, rng, 10, 2), (0, 0), mask_of(road, W, H, P).filter(ImageFilter.GaussianBlur(P * .15)))
+        cob = union(plan.get('cobbles', []))
+        if not cob.is_empty:
+            im.paste(texture(W, H, (176, 168, 150), rng, 12, 1), (0, 0), mask_of(cob, W, H, P))
+            d = ImageDraw.Draw(im, 'RGBA')
+            for p_ in polys(union([c for c in plan['cobbles'] if not c.get('plain')])):
+                x0, y0, x1, y1 = p_.bounds
+                for yy in range(int(y0 * 2), int(y1 * 2) + 1):
+                    for xx in range(int(x0 * 2), int(x1 * 2) + 1):
+                        if p_.contains(Point(xx / 2 + .25, yy / 2 + .25)): d.rectangle([xx * P / 2 + 1, yy * P / 2 + 1, (xx + 1) * P / 2 - 1, (yy + 1) * P / 2 - 1], outline=(120, 112, 98))
+        d = ImageDraw.Draw(im, 'RGBA')
         # outdoor floor: dug or built spaces (a barrow passage, a tunnel, a cellar) drawn over the ground in ink
         if not floor.is_empty:
             im.paste(texture(W, H, PAPER, rng, 8, 2), (0, 0), mask_of(floor, W, H, P))
@@ -318,15 +372,9 @@ def render(plan, rng):
             x, y = p.exterior.coords[k]; d.line([(x - .3) * P, y * P, (x + .3) * P, y * P], fill=(170, 196, 198), width=2)
     # masonry: curtain walls, towers and roofed buildings (built maps such as the keep)
     STONE = (168, 160, 146)
-    for s in plan.get('walls', []):
-        g = shape(s)  # a closed wall is a ring with a hole, so fill it through a mask
-        im.paste((50, 44, 36), (0, 0), mask_of(g.buffer(.25), W, H, P).point(lambda v: v * 90 // 255))
-        im.paste(STONE, (0, 0), mask_of(g, W, H, P))
-        d = ImageDraw.Draw(im, 'RGBA')
-        draw_poly(d, g, P, outline=INK, width=3)
-    for b in plan.get('buildings', []):
+    def building(b):
         g = shape(b); x0, y0, x1, y1 = g.bounds
-        roof = {'slate': (104, 112, 122), 'thatch': (184, 154, 92), 'tile': (156, 84, 60), 'stone': STONE, 'lead': (130, 132, 128)}[b.get('roof', 'slate')]
+        roof = {'slate': (104, 112, 122), 'thatch': (184, 154, 92), 'tile': (156, 84, 60), 'stone': STONE, 'lead': (130, 132, 128), 'wood': (150, 108, 64)}[b.get('roof', 'slate')]
         draw_poly(d, affinity.translate(g, .3, .3), P, fill=(40, 34, 28, 110))
         draw_poly(d, g, P, fill=roof, outline=INK, width=3)
         if b.get('roof', 'slate') != 'stone':
@@ -337,6 +385,17 @@ def render(plan, rng):
             else:
                 xm = (x0 + x1) / 2; d.line([xm * P, y0 * P, xm * P, y1 * P], fill=INK, width=2)
                 for k in range(int((y1 - y0) * 2)): yy = (y0 + k / 2) * P; d.line([x0 * P + 2, yy, xm * P - 2, yy], fill=dark, width=1); d.line([xm * P + 2, yy, x1 * P - 2, yy], fill=dark, width=1)
+    # shops and houses first, then the curtain walls and the stone blocks built into them on top, so the masonry reads clean
+    for b in plan.get('buildings', []):
+        if b.get('roof', 'slate') != 'stone': building(b)
+    for s in plan.get('walls', []):
+        g = shape(s)  # a closed wall is a ring with a hole, so fill it through a mask
+        im.paste((50, 44, 36), (0, 0), mask_of(g.buffer(.25), W, H, P).point(lambda v: v * 90 // 255))
+        im.paste(STONE, (0, 0), mask_of(g, W, H, P))
+        d = ImageDraw.Draw(im, 'RGBA')
+        draw_poly(d, g, P, outline=INK, width=3)
+    for b in plan.get('buildings', []):
+        if b.get('roof', 'slate') == 'stone': building(b)
     for t in plan.get('towers', []):
         g = shape(t)
         draw_poly(d, g.buffer(.3), P, fill=(40, 34, 28, 110))
@@ -365,7 +424,7 @@ def render(plan, rng):
     im.paste(grid, (0, 0), Image.composite(grid, Image.new('RGBA', (W, H)), gmask))
     d = ImageDraw.Draw(im, 'RGBA')
     # trees and scrub, seeded, never on the floor, water or rock
-    block = unary_union([floor, water, union(plan.get('road', [])), union(plan.get('walls', [])), union(plan.get('buildings', [])), union(plan.get('towers', []))] + ([union(plan.get('rock', []))] if not cave else []))
+    block = unary_union([floor, water, union(plan.get('road', [])), union(plan.get('walls', [])), union(plan.get('buildings', [])), union(plan.get('towers', [])), union(plan.get('cobbles', []))] + ([union(plan.get('rock', []))] if not cave else []))
     for t in plan.get('trees', []):
         g = shape(t['in']).difference(block.buffer(t.get('r', 1) * .6))
         for x, y in sorted(scatter(g, t['n'], rng, t.get('r', 1) * 1.2), key=lambda p: p[1]):
