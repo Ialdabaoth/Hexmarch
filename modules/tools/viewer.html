@@ -96,6 +96,7 @@ html[data-mode="atlas"] main { grid-template-columns: minmax(0, 1fr); grid-templ
 <script type="application/json" id="module-data">/*DATA*/</script>
 <script>
 const D = JSON.parse(document.getElementById('module-data').textContent);
+if (window.E9Map) Object.assign(E9Map, { base: '', creatures: D.creatures || [], scenes: D.scenes || {} });
 const stage = document.getElementById('stage'), lists = document.getElementById('lists'), NS = 'http://www.w3.org/2000/svg';
 const EX = Object.fromEntries(D.leagues.map(p => [p.key, p])), AL = D.aliases || {};
 const cache = {}; let cur = null, natW = 1, natH = 1, z = 1, svg = null;
@@ -206,6 +207,12 @@ async function hexInfo(r) {
   // creatures who live here (CREATURES_FORMAT.md lair): a site in this hex, or a hex address on this map; each opens its index card
   const slugs = new Set(sites.map(s => s.slug)), here = (D.creatures || []).filter(c => slugs.has(c.site) || c.hex === map + ':' + r.hex);
   if (here.length && window.E9Card) { const p = document.createElement('p'); p.append('Creatures:'); box.append(p, E9Card.list(here)); }
+  // encounter maps of the sites here (ENCOUNTER_FORMAT.md section 4); each opens the map viewer, several show a picker
+  const maps = window.E9Map ? D.sites.filter(s => slugs.has(s.slug) && s.encounter) : [];
+  if (maps.length) { const p = document.createElement('p'); p.append('Encounter maps:'); const ul = document.createElement('ul'); ul.className = 'e9cr';
+    for (const s of maps) for (const q of s.encounter) { const b = document.createElement('button'); b.type = 'button'; b.textContent = q.label || q.map; b.onclick = () => E9Map.show(q);
+      const li = document.createElement('li'); li.append(b); ul.append(li); }
+    box.append(p, ul); }
   box.hidden = false;
   tell({ event: 'hex', map, hex: r.hex, hash: location.hash, terrain: t || null, terrainName: t ? TERRAIN[t] || t : null, scale, sites });
 }

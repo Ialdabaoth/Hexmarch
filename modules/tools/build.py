@@ -35,7 +35,7 @@ try: sha = subprocess.run(['git', 'rev-parse', '--short', 'HEAD'], capture_outpu
 except Exception: sha = ''
 # links shared with the E9 Companion (repo-root links.json); an empty link is hidden
 PATREON = json.load(open(os.path.join(os.path.dirname(ROOT), 'links.json'))).get('patreon', '')
-ATLAS = '0.2.11'  # version of the atlas tools and viewer themselves (Heph 2026-11-05); patch per PR, separate from each module's version
+ATLAS = '0.2.12'  # version of the atlas tools and viewer themselves (Heph 2026-11-05); patch per PR, separate from each module's version
 VER = f"v{MOD['version']}" + (f"+{os.environ.get('GITHUB_SHA', sha)[:7]}" if (os.environ.get('GITHUB_SHA') or sha) else '') + ' · ' + datetime.date.today().isoformat()
 ENV = dict(os.environ, HEXDEM=','.join(map(str, MOD['dem'])), HEXADMIN=os.path.normpath(os.path.join(mdir, MOD['admin'])),
            HEXTILES=os.path.join(ROOT, 'assets', 'tiles', 'icons'), HEXGEO=geo, MODVER=VER, MODATLAS=ATLAS, MODTITLE=MOD.get('short', MOD['title']),
@@ -80,7 +80,7 @@ if 'centroid' in MOD['atlas']:
             for p_ in range(4):
                 x.paste(x.crop((4, 0, 5, x.height)), (p_, 0)); x.paste(x.crop((r.width + 3, 0, r.width + 4, x.height)), (r.width + 4 + p_, 0))
             x.save(f'{out}/atlas/tiles/mask-{kind}{k}-x.png', optimize=True)
-    open(out + '/atlas/index.html', 'w').write(open(TOOLS + '/atlas.html').read().replace('{{TITLE}}', MOD['title']).replace('{{ATLAS}}', ATLAS).replace('<!--CARD-->', open(TOOLS + '/creature_card.html').read()).replace('{{PATREON}}', json.dumps(PATREON)))
+    open(out + '/atlas/index.html', 'w').write(open(TOOLS + '/atlas.html').read().replace('{{TITLE}}', MOD['title']).replace('{{ATLAS}}', ATLAS).replace('<!--CARD-->', open(TOOLS + '/creature_card.html').read() + open(TOOLS + '/encounter_view.html').read()).replace('{{PATREON}}', json.dumps(PATREON)))
 # 4. PDFs
 if PDF:
     os.makedirs(out + '/print', exist_ok=True)
@@ -150,14 +150,14 @@ for cid, c in ENC.get('creatures', {}).items():
     w = c.get('lair') or {}
     s_ = site_of.get(w.get('site'))
     CREATURES.append(dict(id=cid, name=c.get('name', cid), kind=c.get('kind', 'monster'), **{k: c[k] for k in ('is', 'troupe', 'faction', 'description', 'wants', 'knows') if k in c},
-                          site=w.get('site'), hex=w.get('hex'), site_name=s_['name'] if s_ else None, world_hex=s_['world_hex'] if s_ else None,
+                          site=w.get('site'), **({'room': w['room']} if w.get('room') else {}), hex=w.get('hex'), site_name=s_['name'] if s_ else None, world_hex=s_['world_hex'] if s_ else None,
                           league=s_['league'] if s_ else None, league_hex=s_['league_hex'] if s_ else None,
                           stats={r: resolve(r, cid) for r in BEST if cid in BEST[r].get('creatures', {})}))
 if ENC:
     json.dump({'encounters': ENC}, open(out + '/encounters.json', 'w'), ensure_ascii=False, indent=1)
     os.makedirs(out + '/bestiary', exist_ok=True)
     for r, b in BEST.items(): json.dump(b, open(f'{out}/bestiary/{r}.json', 'w'), ensure_ascii=False, indent=1)
-    if os.path.isdir(out + '/atlas'): json.dump({'creatures': CREATURES}, open(out + '/atlas/creatures.json', 'w'), ensure_ascii=False)
+    if os.path.isdir(out + '/atlas'): json.dump({'creatures': CREATURES, 'scenes': ENC.get('scenes', {})}, open(out + '/atlas/creatures.json', 'w'), ensure_ascii=False)
 # Encounter maps (ENCOUNTER_FORMAT.md): published as they are, one JSON per map plus its pictures
 EMAPS = {}
 edir = os.path.join(mdir, 'encounter-maps')
@@ -184,8 +184,8 @@ M = {'format': 'mm-module/1', 'id': MOD['id'], 'title': MOD['title'], 'short': M
      'print': {'atlas': 'print/atlas.pdf', 'leagues': 'print/leagues.pdf'} if PDF else {}}
 json.dump(M, open(out + '/module.json', 'w'), ensure_ascii=False, indent=1)
 tpl = open(TOOLS + '/viewer.html').read()
-lite = {k: v for k, v in M.items() if k != 'world'}; lite['world'] = {k: v for k, v in M['world'].items() if k != 'hexes'}; lite['creatures'] = CREATURES
-CARD = open(TOOLS + '/creature_card.html').read()
+lite = {k: v for k, v in M.items() if k != 'world'}; lite['world'] = {k: v for k, v in M['world'].items() if k != 'hexes'}; lite['creatures'] = CREATURES; lite['scenes'] = ENC.get('scenes', {})
+CARD = open(TOOLS + '/creature_card.html').read() + open(TOOLS + '/encounter_view.html').read()  # index card and encounter map viewer
 html = tpl.replace('<!--CARD-->', CARD).replace('/*DATA*/', json.dumps(lite, ensure_ascii=False).replace('</', '<\\/')).replace('<!--SYMBOLS-->', ''.join(syms.values())).replace('{{TITLE}}', MOD['title'])
 open(out + '/index.html', 'w').write(html)
 # a module that changed its id leaves a page at each old address that forwards to the new one, keeping ?mode and #links
