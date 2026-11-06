@@ -1,0 +1,94 @@
+<!-- VTT bridge (ENCOUNTER_FORMAT.md sections 14.2 and 14.4, Atlas 0.4.6): the E9 app's side of the e9-vtt/1 adapter protocol.
+     Active only when a VTT adapter opened this page with ?vtt=<app>&pair=<code>; build.py and atlas_app.py inline it after vtt_export.html -->
+<style>
+#e9bridge{position:fixed;left:50%;bottom:10px;transform:translateX(-50%);z-index:50;background:#2b2418;color:#f4efe1;font:13px Georgia,serif;padding:5px 12px;border-radius:14px;box-shadow:0 2px 10px #0006;white-space:nowrap}
+#e9bridge b{letter-spacing:.12em}
+#e9send{border:1px solid #8a7f66;border-radius:6px;padding:14px 16px;max-width:min(460px,calc(100vw - 32px));background:#f4efe1;color:#2b2418;font:14px/1.4 Georgia,serif;box-shadow:0 6px 24px #0005}
+#e9send::backdrop{background:#0004}
+#e9send h3{margin:0 0 6px;font-size:17px}#e9send p{margin:0 0 8px}#e9send small{color:#6b604c}
+#e9send label{display:block;margin:3px 0}#e9send fieldset{border:1px solid #d8cfb8;border-radius:6px;margin:0 0 10px;padding:6px 10px}
+#e9send button{font:inherit;background:#7a2e2e;color:#fffaf0;border:0;border-radius:6px;padding:6px 14px;cursor:pointer}#e9send button:disabled{opacity:.6;cursor:wait}
+#e9send button.x{float:right;background:none;color:#6b604c;font-size:20px;line-height:1;padding:0}
+#e9send .st{min-height:1.4em;color:#7a2e2e}
+</style>
+<dialog id="e9send" aria-labelledby="e9send-h"></dialog>
+<script>
+"use strict";
+window.E9Bridge = (() => {
+  const q = new URLSearchParams(location.search), app = q.get('vtt'), pair = q.get('pair'), peer = window.opener;
+  if (!app || !pair || !peer || !/^[a-z0-9-]{1,20}$/.test(app) || !/^[A-Z0-9]{4,8}$/.test(pair)) return null;
+  const NAMES = { foundry: 'Foundry', owlbear: 'Owlbear Rodeo', roll20: 'Roll20', fgu: 'Fantasy Grounds' }, NAME = NAMES[app] || app;
+  const e = t => String(t ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+  let origin = null, seq = 0, info = null; const wait = {};
+  // replies only from the window that opened us; its origin is learned from the first reply and checked from then on
+  addEventListener('message', ev => {
+    if (ev.source !== peer || !ev.data || ev.data.protocol !== 'e9-vtt/1' || ev.data.pair !== pair) return;
+    if (origin && ev.origin !== origin) return; origin = origin || ev.origin;
+    const w = wait[ev.data.id]; if (!w) return; delete wait[ev.data.id];
+    ev.data.ok ? w.ok(ev.data.result) : w.no(new Error(ev.data.error || 'the VTT refused'));
+  });
+  function send(cmd, args) {
+    const id = ++seq;
+    return new Promise((ok, no) => { wait[id] = { ok, no }; peer.postMessage({ protocol: 'e9-vtt/1', pair, id, cmd, args }, origin || '*');
+      setTimeout(() => { if (wait[id]) { delete wait[id]; no(new Error(NAME + ' did not answer')); } }, cmd === 'scene.open' ? 120e3 : 20e3); });
+  }
+  const bar = document.createElement('div'); bar.id = 'e9bridge'; bar.textContent = `Connecting to ${NAME}…`; document.body.append(bar);
+  send('hello', { protocol: 'e9-vtt/1', app: 'atlas', module: window.E9Map && E9Map.module }).then(r => { info = r;
+    bar.innerHTML = `Linked to ${e(NAME)} · code <b>${e(pair)}</b> <small>(check it matches ${e(NAME)})</small>`; })
+    .catch(err => { bar.textContent = `Not linked to ${NAME}: ${err.message}`; });
+  // dice in a scene's "who" count: 3, d6, 2d6, d6+1, d6÷2 (CREATURES_FORMAT.md); a troupe word counts as 1 until the bestiary is wired in
+  function roll(c) {
+    if (typeof c === 'number') return c;
+    const m = /^(\d*)d(\d+)([+-]\d+)?(?:÷(\d+))?$/.exec(String(c).replace(/\s/g, '')); if (!m) return +c || 1;
+    let t = 0; for (let k = 0; k < (+m[1] || 1); k++) t += 1 + Math.floor(Math.random() * +m[2]);
+    t += +(m[3] || 0); if (m[4]) t = Math.ceil(t / +m[4]); return Math.max(1, t);
+  }
+  function chance(c) { const m = /^(\d+)(?:-(\d+))?\s*on\s*d(\d+)$/.exec(String(c).trim()); if (!m) return true; const r = 1 + Math.floor(Math.random() * +m[3]); return r >= +m[1] && r <= +(m[2] || m[1]); }
+  const ptrMap = s => s.map && (typeof s.map === 'string' ? { map: s.map } : s.map);
+  function dialog(m, p) {
+    const dlg = document.getElementById('e9send'), scenes = Object.entries(E9Map.scenes || {}).filter(([, s]) => (ptrMap(s) || {}).map === m.id);
+    const ents = Object.entries(m.spawns).filter(([, s]) => s.kind === 'entrance');
+    const first = p && p.entrance && m.spawns[p.entrance] ? p.entrance : ents.length ? ents[0][0] : '';
+    dlg.innerHTML = `<button class="x" aria-label="Close">×</button><h3 id="e9send-h">Send to ${e(NAME)}</h3>
+      <p><small>${e(m.title || m.id)}: the scene with its walls, doors and lights, then the creatures and the party.</small></p>
+      ${scenes.length ? `<fieldset><legend>Creatures</legend>${scenes.map(([id, s]) => `<label><input type="checkbox" name="sc" value="${e(id)}" checked> ${e(s.title || id)}</label>`).join('')}</fieldset>` : ''}
+      <fieldset><legend>Party</legend><label>Arrive at <select name="ent"><option value="">${ents.length ? 'nowhere (move them yourself)' : 'the middle of the map'}</option>${ents.map(([id, s]) => `<option value="${e(id)}"${id === first ? ' selected' : ''}>${e(s.title || id)}</option>`).join('')}</select></label>
+      <label><input type="checkbox" name="act" checked> Show the scene to the players</label></fieldset>
+      <button class="go">Send</button> <span class="st" aria-live="polite"></span>`;
+    const st = dlg.querySelector('.st'), go = dlg.querySelector('.go');
+    dlg.querySelector('.x').onclick = () => dlg.close();
+    go.onclick = async () => {
+      go.disabled = true;
+      try {
+        st.textContent = 'Drawing the scene…';
+        const uvtt = await E9VTT.uvtt(m), key = `${E9Map.module}:${m.id}`;
+        st.textContent = `Building it in ${NAME}…`;
+        const { scene, link } = await send('scene.open', { map: key, title: m.title || m.id, uvtt });
+        const taken = [], tokens = [];
+        for (const box of dlg.querySelectorAll('input[name=sc]:checked')) {
+          const sid = box.value, s = E9Map.scenes[sid], sp = ptrMap(s) || {};
+          for (const w of s.who || []) {
+            if (w.chance && !chance(w.chance)) continue;  // "sometimes there" members: "1-3 on d6", "1-5 on d20"
+            const c = (E9Map.creatures || []).find(x => x.id === w.creature), n = roll(w.count), where = w.spawn || sp.spawn || sp.area || (ents[0] || [])[0];
+            const list = Array.from({ length: n }, () => ({ size: (c && c.size) || 1 }));
+            const sq = E9Map.place(m, where || [0, 0, m.size[0], m.size[1]], list, taken); taken.push(...sq);
+            const hid = !!(m.spawns[w.spawn || sp.spawn] || {}).hidden;
+            sq.forEach((xy, k) => tokens.push({ id: `${sid}/${w.creature}#${k + 1}`, name: c ? c.name : w.creature, creature: w.creature, square: xy, size: list[k].size, hidden: hid, disposition: s.disposition || 'hostile' }));
+          }
+        }
+        if (tokens.length) { st.textContent = `Placing ${tokens.length} creatures…`; await send('tokens.spawn', { scene, tokens }); }
+        const ent = dlg.querySelector('select[name=ent]').value;
+        if (ent || !ents.length) await send('party.place', { scene, entrance: ent || null, squares: E9Map.place(m, ent || [Math.floor(m.size[0] / 2) - 2, Math.floor(m.size[1] / 2) - 2, 4, 4], Array(12).fill({}), taken), actors: 'players' });
+        if (dlg.querySelector('input[name=act]').checked) await send('scene.activate', { scene });
+        st.textContent = `Done: ${NAME} has the scene${tokens.length ? `, ${tokens.length} creatures` : ''}.`;
+        if (link && window.E9Links) E9Links.save(key, { account: app, url: link });
+      } catch (err) { st.textContent = 'Stopped: ' + err.message; }
+      go.disabled = false;
+    };
+    dlg.addEventListener('click', ev => { if (ev.target === dlg) dlg.close(); });
+    dlg.showModal();
+  }
+  if (window.E9Map) E9Map.actions.push({ label: 'Send to ' + NAME, title: `Build this map in ${NAME}, place its creatures and the party`, run: dialog });
+  return { app, send, get info() { return info; } };
+})();
+</script>
