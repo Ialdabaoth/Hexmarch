@@ -19,7 +19,7 @@ Plan keys (all coordinates in squares, [x, y] from the top-left, y down):
   road    shapes drawn as a beaten path
   mounds  shapes drawn as raised ground (barrows, hummocks)
   trees   [{"in": shape, "n": count, "kind": "oak"|"pine"|"scrub"|"reed", "r": radius}] scattered, seeded
-  marks   [{"t": kind, "at": [x,y], ...}] kinds: num, letter, label (optional "rot" degrees, "size", \n for lines), pit, secret, door, locked, stairs,
+  marks   [{"t": kind, "at": [x,y], ...}] kinds: num, letter, cave (mouth, optional "size"), label (optional "rot" degrees, "size", \n for lines), pit, secret, door, locked, stairs,
           fire, tent, web, bones, bed, table, chest, well, oak, sac, stake, garden, dotted, window
   areas, links, notes   copied into the map file
 """
@@ -193,6 +193,11 @@ def mark(d, m, P, rng, fonts):
                 td.text((tw / 2, 4 + lh * (i + .5)), l, font=f, fill=INK, anchor='mm', stroke_width=3, stroke_fill=(244, 236, 214))
             tile = tile.rotate(m.get('rot', 0), expand=True, resample=Image.BICUBIC)
             d._image.paste(tile, (int(X - tile.width / 2), int(Y - tile.height / 2)), tile)
+    elif t == 'cave':
+        # a cave mouth in a cliff foot: a dark opening with a lip of ink
+        rx, ry = m.get('size', [1.1, .8]); rx *= P / 2; ry *= P / 2
+        d.ellipse([X - rx - 3, Y - ry - 3, X + rx + 3, Y + ry + 3], fill=(60, 52, 42))
+        d.ellipse([X - rx, Y - ry, X + rx, Y + ry], fill=(22, 18, 14), outline=INK, width=3)
     elif t == 'pit':
         s = .45 * P; d.rectangle([X - s, Y - s, X + s, Y + s], outline=INK, width=3)
         d.line([X - s, Y - s, X + s, Y + s], fill=INK, width=3); d.line([X - s, Y + s, X + s, Y - s], fill=INK, width=3)
