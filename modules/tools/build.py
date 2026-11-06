@@ -50,6 +50,11 @@ for b in MOD['books']:
 world = dict(MOD['world'], hex_mi=HX, px=round(96 / (HX * MI_KM), 4), master=True, title=MOD['title'], subtitle='', sites=sites)
 json.dump({'world': world}, open(work + '/world.json', 'w'), ensure_ascii=False)
 run(*PY, TOOLS + '/hexmap.py', geo, work, work + '/world.json')
+# atlas.land = "island": the E9 Atlas covers every county on the island (Heph 2026-11-06, all of Ireland), while the print maps
+# stay on the books' counties; this second, unprinted run only gives atlas_convert.py its Marches and the island's rivers
+if MOD['atlas'].get('land') == 'island':
+    json.dump({'island': dict(world, counties='*', sites=[])}, open(work + '/island.json', 'w'), ensure_ascii=False)
+    run(*PY, TOOLS + '/hexmap.py', geo, work, work + '/island.json')
 # 2. March pages (the print atlas: one 24-mile hex per page), 3. League pages (one 3-mile hex per page)
 run(*PY, TOOLS + '/atlas_pages.py', work + '/world.svg', work + '/world-grid.json', work + '/atlas.html')
 run(*PY, TOOLS + '/league_pages.py', os.path.join(mdir, 'module.json'), work + '/atlas-index.json', work + '/world-grid.json', work + '/league')
