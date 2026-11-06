@@ -126,7 +126,8 @@ def main(adir):
     save(ov, os.path.join(cdir, 'overview.png'))
     if w * h > OVERVIEW_MAX: print(f'atlas cache: warning: the overview is {w} x {h} = {w * h} Leagues, more than {OVERVIEW_MAX}')
 
-    J['cache'] = {'format': 'e9-atlas-cache/1', 'overview': {'png': 'cache/overview.png', 'i0': i0, 'j0': j0, 'w': w, 'h': h},
+    J['cache'] = {'format': 'e9-atlas-cache/1', 'stamp': hashlib.sha256(''.join(sorted(srcs.values())).encode()).hexdigest()[:10],  # tiles are fetched with ?v=<stamp>, so a browser never mixes old and new pieces
+                  'overview': {'png': 'cache/overview.png', 'i0': i0, 'j0': j0, 'w': w, 'h': h},
                   'fields': {'dir': 'cache/f/', 'w': 65, 'h': 49, 'du': 32, 'dv': 24},
                   'furlongs': {'dir': 'cache/u/', 'w': 2 * U_TILE[0] + 1, 'h': U_TILE[1] + U_TILE[2] + 1, 'du': U_TILE[0], 'dv': U_TILE[1], 'leagues': sorted([list(k) for k in UT])},
                   'hexes': {'dir': 'cache/h/', 'w': 2 * H_TILE[0] + 1, 'h': H_TILE[1] + H_TILE[2] + 1, 'du': H_TILE[0], 'dv': H_TILE[1], 'leagues': sorted([list(k) for k in HT])}}

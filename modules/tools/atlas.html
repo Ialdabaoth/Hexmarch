@@ -91,7 +91,7 @@ const TL = new Map(), HAS = { f: new Set(), u: new Set(), h: new Set() }, MI = n
 const RING = { f: 5, u: 4, h: 3 }, AROUND = { league: 'f', field: 'u', furlong: 'h' };  // what each level draws from, and how far round the centre it keeps
 const hexDist = (a, b, c, d) => { const z1 = b - (a - (a & 1)) / 2, z2 = d - (c - (c & 1)) / 2, dx = a - c, dz = z1 - z2; return Math.max(Math.abs(dx), Math.abs(dz), Math.abs(dx + dz)); };
 async function decode(url, w, h) {  // a palette PNG -> one terrain index per pixel (0 = nothing)
-  const bm = await createImageBitmap(await (await fetch(url)).blob(), { colorSpaceConversion: 'none', premultiplyAlpha: 'none' });
+  const bm = await createImageBitmap(await (await fetch(url + '?v=' + (CA.stamp || ''))).blob(), { colorSpaceConversion: 'none', premultiplyAlpha: 'none' });
   const c = new OffscreenCanvas(w, h), g = c.getContext('2d'); g.drawImage(bm, 0, 0);
   const px = g.getImageData(0, 0, w, h).data, a = new Uint8Array(w * h);
   for (let p = 0, q = 0; q < a.length; p += 4, q++) { const v = (px[p] << 16) | (px[p + 1] << 8) | px[p + 2]; if (v) a[q] = KEY[v] || 0; }
@@ -399,7 +399,8 @@ async function loadModules() {
   if (!MOD) { document.getElementById('crumbs').textContent = 'No module with an atlas map was found.'; if (MODS.length) { modList(); document.getElementById('modules').showModal(); } return; }
   A = MOD.base + 'atlas/'; store.set('e9-atlas-module', MOD.id);
   document.title = MOD.title + ' · E9 Atlas'; document.getElementById('modver').textContent = ' · ' + MOD.title + (MOD.version ? ' v' + plainVer(MOD.version).split(' ')[0] : '');
-  D = await (await fetch(A + 'map.json')).json(); TYPES = D.terrain.types; LBL = D.labels;
+  D = await (await fetch(A + 'map.json', { cache: 'no-cache' })).json(); TYPES = D.terrain.types; LBL = D.labels;  // always the current map.json: an old one has no tile cache
+  if (!D.cache) { document.getElementById('crumbs').textContent = 'This module\'s map was built for an older Atlas. Rebuild the site, then reload this page.'; return; }
   TYPES.forEach((t, k) => { T_BG[k + 1] = t.tile; if (t.icon) T_ICON[k + 1] = t.icon; });
   await loadCache();
   let SC = {};
