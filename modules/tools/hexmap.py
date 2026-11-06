@@ -2,7 +2,7 @@
 
 Usage: python3 -I hexmap.py <datadir> <outdir> <regions.json> [region keys...]
 
-A region has either "county" (Natural Earth name, e.g. "Meath") or "bbox" [minlon, minlat, maxlon, maxlat].
+A region has either "county" (Natural Earth name, e.g. "Meath"), "counties" (a list, or "*" for the whole island) or "bbox" [minlon, minlat, maxlon, maxlat].
 Optional per region: hex_mi (default 3), agg (DEM arc-seconds per cell, default 15), px (pixels per km),
 river_km2 (catchment needed to draw a river), forest, bog_east_of, hill_rel (local maps: metres above the
 map's median that count as hills), rivers [[label, lat, lon]], patches [[lat, lon, radius_mi, terrain]], overrides [[hex, terrain]], sites [[name, lat, lon, kind, note?]].
@@ -68,13 +68,16 @@ def drainage(dem, r0, r1, c0, c1, cell):
         if p >= 0 and flat[i] > 0: acc[p] += acc[i]
     return sub, flat, parent, acc, NC
 
-_counties = None
+_counties = None; _all = []
 def county(name):
     global _counties
     if _counties is None:
         adm = json.load(open(os.environ.get("HEXADMIN", f"{D}/ne_10m_admin_1_states_provinces.geojson")))
         _counties = {f["properties"]["name"].replace(" County", ""): shape(f["geometry"]) for f in adm["features"] if f["properties"].get("admin") == "Ireland"}
+        _all.extend(shape(f["geometry"]) for f in adm["features"])  # every feature: the file holds only this island, and some names repeat (Cork city and county)
     return _counties[name]
+def all_counties():
+    county("Meath"); return _all
 
 TERRAIN = {"grass": ("#dfe8b5", "Grassland / pasture"), "forest": ("#9cc28a", "Forest"), "woods": ("#bcd69e", "Light woods / scrub"), "bog": ("#c9b98f", "Bog"),
            "hills": ("#d9c08c", "Hills"), "mount": ("#b49a78", "Mountains")}
@@ -128,7 +131,7 @@ def make(key, R):
     HEX_MI = R.get("hex_mi", 3.0); agg = R.get("agg", 15); cell = agg / 3600.0
     dem = dem_for(agg)
     if "counties" in R:
-        cps = [county(c) for c in R["counties"]]; poly = unary_union(cps); has_border = True
+        cps = all_counties() if R["counties"] == "*" else [county(c) for c in R["counties"]]; poly = unary_union(cps); has_border = True  # "*": every county on the island
     elif "county" in R:
         cps = None; poly = county(R["county"]); has_border = True
     else:

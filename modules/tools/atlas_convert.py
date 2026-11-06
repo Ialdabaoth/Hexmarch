@@ -74,7 +74,7 @@ TYPES = [  # colour, id, name, tile, icon, travel (cost per mile, grass = 1; a d
 TID = {t[1]: k + 1 for k, t in enumerate(TYPES)}  # palette index; 0 = none
 PAL = [0, 0, 0] + [int(t[0][k:k + 2], 16) for t in TYPES for k in (1, 3, 5)]
 
-world = Grid(json.load(open(f'{WORK}/world-atlas.json')))
+world = Grid(json.load(open(f'{WORK}/island-atlas.json' if os.path.exists(f'{WORK}/island-atlas.json') else f'{WORK}/world-atlas.json')))  # atlas.land "island": the whole island
 pages = [Grid(json.load(open(p))) for p in sorted(glob.glob(f'{WORK}/league/l-*-atlas.json'))]
 for g in pages: g.cx, g.cy = (float(v) for v in face.forward(*g.d['anchor']))
 PAGE_R = 1.75 * 5000  # a League page's own 3-mile hex reaches 1.73 miles from its centre
