@@ -212,7 +212,7 @@ for b in MOD['books']:
     x, y = to_ft(np.array([c[1] for c in ring]), np.array([c[0] for c in ring])); lp = g.representative_point()
     regions.append(dict(name=reg['title'], kind='county', label=[int(v) for v in to_ft(lp.y, lp.x)], outline=np.stack([x, y], 1).tolist()))
 
-# points of interest: every site in the module, at its lattice hex plus an offset in feet
+# points of interest: every site in the module, each one whole 100-ft lattice hex (Heph 2026-11-06: a PoI is always a 100-ft hex, no offsets)
 S_ICON = {'castle': 'keep', 'town': 'village', 'abbey': 'church', 'tomb': 'stones', 'hill': 'hills', 'cave': 'cave', 'ruin': 'ruins', 'grove': 'great-tree', 'camp': 'community', 'lair': 'hole', 'mist': 'fog', 'dead': 'graveyard'}  # keep in step with hexmap.py
 book_of = {}
 for b in MOD['books']:
@@ -225,10 +225,8 @@ for k, reg in MOD['regions'].items():
         if st[0] in seen: continue
         x, y = face.forward(st[1], st[2]); C, R = hex_round(x, y, 100 / math.sqrt(3))
         if tuple(int(v) for v in nearest(C, R, 1200)) not in keep: continue
-        seen.add(st[0]); cx, cy = ft(int(C), int(R))
+        seen.add(st[0])
         p = dict(id=slug(st[0]), name=st[0], kind=st[3], icon=MOD.get('site_icons', {}).get(st[0]) or S_ICON.get(st[3]), hex=[int(C), int(R)])
-        o = [round(float(x) - cx), round(float(y) - cy)]
-        if o != [0, 0]: p['ft'] = o
         if k in book_of: p['book'] = book_of[k]
         if len(st) > 4 and st[4]: p['note'] = st[4]
         if MOD.get('site_encounters', {}).get(st[0]): p['encounter'] = MOD['site_encounters'][st[0]]  # Encounter-map pointers (ENCOUNTER_FORMAT.md section 4)

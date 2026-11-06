@@ -209,10 +209,11 @@ function draw() {
   ctx.font = `bold ${fs}px Georgia`;
   const KP = [];
   for (const p of D.pois) {
-    const [x, y] = ft(...p.hex), o = p.ft || [0, 0], [sx, sy] = S(x + o[0], y + o[1]);
+    const [sx, sy] = S(...ft(...p.hex));  // a place is always one 100-ft hex (Heph 2026-11-06): drawn at its centre
     if (sx < -100 || sy < -100 || sx > W + 100 || sy > H + 100) continue;
     if (sx >= 0 && sy >= 0 && sx <= W && sy <= H) KP.push(p);
     const im = p.icon && tile(p.icon);
+    if (V.lvl === 'field') { fieldPoi(p, im, sx, sy); continue; }
     if (im) { const a = Math.max(.87, im.naturalHeight / im.naturalWidth); ctx.drawImage(im, sx - isz / 2, sy - isz * a / 2, isz, isz * a); }
     else { ctx.beginPath(); ctx.arc(sx, sy, 4, 0, 7); ctx.fillStyle = '#2b2418'; ctx.fill(); }
     if (V.lvl !== 'region') { const ty = sy + isz * .55 + fs; ctx.strokeStyle = '#f4efe1'; ctx.lineWidth = 3.5; ctx.strokeText(name(p.name), sx, ty); ctx.fillStyle = '#2b2418'; ctx.fillText(name(p.name), sx, ty); }
@@ -251,7 +252,7 @@ document.getElementById('key').addEventListener('click', e => {
   const em = e.target.closest('.emb'); if (em) { openMaps(D.pois.find(q => q.id === em.dataset.id)); return; }
   const cr = e.target.closest('.cr'); if (cr) { const c = CR.find(x => x.id === cr.dataset.cr); if (c && window.E9Card) E9Card.show(c); return; }
   const r = e.target.closest('.pl'); if (!r) return; const p = D.pois.find(q => q.id === r.dataset.id); if (!p) return;
-  const [x, y] = ft(...p.hex), o = p.ft || [0, 0]; goDown(x + o[0], y + o[1]);
+  goDown(...ft(...p.hex));
 });
 document.getElementById('keybtn').onclick = () => { document.body.classList.toggle('nokey'); redraw(); };
 if (matchMedia('(max-width:700px)').matches) document.body.classList.add('nokey');
@@ -265,11 +266,23 @@ function creaturesHere() {
   }).sort((a, b) => a.name.localeCompare(b.name));
 }
 function openMaps(p) { if (p && p.encounter && window.E9Map) E9Map.open(p.encounter, name(p.name)); }
+// at Field level a place fills its own 100-ft hex and never spills out of it (Heph 2026-11-06): the icon in the upper part,
+// the name below it, shrunk to the hex's width there, or left to the key when the hex is too small to read it
+function fieldPoi(p, im, sx, sy) {
+  const F = 100 * cam.s, R = F / SQ3, half = y => R - Math.abs(y) / SQ3;  // flat-top hex: half its width at height y from the centre
+  const a = im ? Math.max(.87, im.naturalHeight / im.naturalWidth) : 1, s = Math.min(.5 * F / a, .5 * F), cy = sy - .1 * F;
+  if (im) ctx.drawImage(im, sx - s / 2, cy - s * a / 2, s, s * a); else { ctx.beginPath(); ctx.arc(sx, cy, Math.min(4, F / 10), 0, 7); ctx.fillStyle = '#2b2418'; ctx.fill(); }
+  const ty = .3 * F, label = name(p.name);
+  let fs = Math.min(14, F * .13); ctx.font = `bold ${fs}px Georgia`;
+  const room = 2 * half(ty + fs / 2) - 6, w = ctx.measureText(label).width;
+  if (w > room) { fs *= room / w; ctx.font = `bold ${fs}px Georgia`; }
+  if (fs < 8) return;
+  ctx.textAlign = 'center'; ctx.strokeStyle = '#f4efe1'; ctx.lineWidth = 3; ctx.strokeText(label, sx, sy + ty + fs * .35); ctx.fillStyle = '#2b2418'; ctx.fillText(label, sx, sy + ty + fs * .35);
+}
 // the place with an encounter map under a point, at Field level (ENCOUNTER_FORMAT.md section 4): its icon, or its 100-ft hex
 function mapPoiAt(x, y) {
   if (V.lvl !== 'field') return null; const [C, R] = hexAt(x, y, 1);
-  return D.pois.find(p => { if (!p.encounter) return false; const [px, py] = ft(...p.hex), o = p.ft || [0, 0];
-    return (p.hex[0] === C && p.hex[1] === R) || Math.hypot(px + o[0] - x, py + o[1] - y) * cam.s < 34; }) || null;
+  return D.pois.find(p => p.encounter && p.hex[0] === C && p.hex[1] === R) || null;  // a place is its whole 100-ft hex
 }
 function goDown(x, y) {  // Heph's rule: anything clicked zooms in one level, centred on it; at Field level a place opens its Encounter map
   const N = LV[V.lvl].draw, [i, j] = hexAt(x, y, N);
