@@ -16,6 +16,7 @@ button,select{font:inherit;font-size:14px;background:#fffaf0;border:1px solid #b
 #key .row{display:flex;align-items:center;gap:8px;padding:2px 0}#key .pl{cursor:pointer;border-radius:4px}#key .pl:hover{background:#ebe3cf}
 #key .sw{width:30px;height:26px;flex:none;background-size:cover;background-position:center;display:flex;align-items:center;justify-content:center}
 #key .sw img{max-width:26px;max-height:22px}#key small{color:var(--dim)}
+#key .emb{font:inherit;font-size:12px;padding:0 6px;margin-top:2px;border-radius:10px;cursor:pointer}#key .emb:hover{background:#ebe3cf}
 #key .support{margin:14px 0 4px;padding-top:8px;border-top:1px solid #d8cfb8;color:var(--dim)}#key .support a{color:var(--red)}
 body.nokey #key{display:none}@media(max-width:700px){#key{position:absolute;right:0;top:0;bottom:0;box-shadow:-2px 0 8px #0003}}
 canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor:pointer}
@@ -228,7 +229,7 @@ function key(ts, ps) {
   if (ps.length) {
     h += '<h2>Places</h2>';
     for (const p of ps.slice().sort((a, b) => name(a.name).localeCompare(name(b.name))))
-      h += `<div class="row pl" data-id="${esc(p.id)}"><span class="sw">${p.icon ? `<img src="tiles/${p.icon}.png" alt="">` : ''}</span><span>${esc(name(p.name))}<br><small>${esc(p.kind)}${p.book ? ' · ' + esc(p.book) : ''}</small></span></div>`;
+      h += `<div class="row pl" data-id="${esc(p.id)}"><span class="sw">${p.icon ? `<img src="tiles/${p.icon}.png" alt="">` : ''}</span><span>${esc(name(p.name))}<br><small>${esc(p.kind)}${p.book ? ' · ' + esc(p.book) : ''}</small>${p.encounter && window.E9Map ? `<br><button class="emb" data-id="${esc(p.id)}">${p.encounter.length > 1 ? p.encounter.length + ' encounter maps' : 'Encounter map'}</button>` : ''}</span></div>`;
   }
   // creatures in the hex being looked at (the dashed one): their lair is a place in it, or a 100-ft hex address in it
   const here = creaturesHere();
@@ -241,6 +242,7 @@ function key(ts, ps) {
   if (h !== KEYHTML) document.getElementById('key').innerHTML = KEYHTML = h;
 }
 document.getElementById('key').addEventListener('click', e => {
+  const em = e.target.closest('.emb'); if (em) { openMaps(D.pois.find(q => q.id === em.dataset.id)); return; }
   const cr = e.target.closest('.cr'); if (cr) { const c = CR.find(x => x.id === cr.dataset.cr); if (c && window.E9Card) E9Card.show(c); return; }
   const r = e.target.closest('.pl'); if (!r) return; const p = D.pois.find(q => q.id === r.dataset.id); if (!p) return;
   const [x, y] = ft(...p.hex), o = p.ft || [0, 0]; goDown(x + o[0], y + o[1]);
@@ -256,9 +258,17 @@ function creaturesHere() {
     return false;
   }).sort((a, b) => a.name.localeCompare(b.name));
 }
-function goDown(x, y) {  // Heph's rule: anything clicked zooms in one level, centred on it; Field level waits for Encounter maps
+function openMaps(p) { if (p && p.encounter && window.E9Map) E9Map.open(p.encounter, name(p.name)); }
+// the place with an encounter map under a point, at Field level (ENCOUNTER_FORMAT.md section 4): its icon, or its 100-ft hex
+function mapPoiAt(x, y) {
+  if (V.lvl !== 'field') return null; const [C, R] = hexAt(x, y, 1);
+  return D.pois.find(p => { if (!p.encounter) return false; const [px, py] = ft(...p.hex), o = p.ft || [0, 0];
+    return (p.hex[0] === C && p.hex[1] === R) || Math.hypot(px + o[0] - x, py + o[1] - y) * cam.s < 34; }) || null;
+}
+function goDown(x, y) {  // Heph's rule: anything clicked zooms in one level, centred on it; at Field level a place opens its Encounter map
   const N = LV[V.lvl].draw, [i, j] = hexAt(x, y, N);
-  if (!T(i, j, N) || V.lvl === 'field') return;
+  if (V.lvl === 'field') { openMaps(mapPoiAt(x, y)); return; }
+  if (!T(i, j, N)) return;
   const [C, R] = N === 1 ? [i, j] : centre(i, j, N);
   AIM = hexFt(i, j, N);
   if (V.lvl === 'region') { const [mi, mj] = nearest(C, R, 1200); location.hash = marchAddr(mi, mj); }
@@ -288,7 +298,8 @@ cv.addEventListener('pointermove', e => {
   if (drag) { const dx = e.clientX - drag.x, dy = e.clientY - drag.y; if (Math.hypot(dx, dy) > 5) drag.moved = true;
     if (drag.moved) { cam.x = drag.cx - dx / cam.s; cam.y = drag.cy - dy / cam.s; redraw(); } return; }
   const N = LV[V.lvl].draw, [i, j] = hexAt(x, y, N), t = T(i, j, N), [C, R] = N === 1 ? [i, j] : centre(i, j, N);
-  document.getElementById('hover').textContent = t ? `${N === 1 ? addr(C, R) : N === 25 ? 'Field ' + addr(C, R).slice(12) : leagueAddr(i, j)} · ${TYPES[t - 1].name}` : '';
+  const mp = mapPoiAt(x, y); cv.style.cursor = V.lvl === 'field' && !mp ? 'grab' : 'pointer';
+  document.getElementById('hover').textContent = mp ? `${name(mp.name)} · click to open the encounter map` : t ? `${N === 1 ? addr(C, R) : N === 25 ? 'Field ' + addr(C, R).slice(12) : leagueAddr(i, j)} · ${TYPES[t - 1].name}` : '';
 });
 cv.addEventListener('pointerup', e => {
   if (!drag) return; const moved = drag.moved; drag = null; if (moved) return;
@@ -309,7 +320,9 @@ addEventListener('hashchange', go); addEventListener('resize', redraw);
   D = await (await fetch('map.json')).json(); TYPES = D.terrain.types; LBL = D.labels;
   TYPES.forEach((t, k) => { T_BG[k + 1] = t.tile; if (t.icon) T_ICON[k + 1] = t.icon; });
   await Promise.all(D.terrain.marches.map(loadMarch));
-  try { CR = (await (await fetch('creatures.json')).json()).creatures || []; } catch (e) { CR = []; }  // a module without creatures has no file
+  let SC = {};
+  try { const j = await (await fetch('creatures.json')).json(); CR = j.creatures || []; SC = j.scenes || {}; } catch (e) { CR = []; }  // a module without creatures has no file
+  if (window.E9Map) Object.assign(E9Map, { base: '../', creatures: CR, scenes: SC });  // encounter maps sit beside the atlas folder
   smoothRivers(); go();
 })();
 </script></body></html>

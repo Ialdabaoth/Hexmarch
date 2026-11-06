@@ -1,0 +1,172 @@
+<!-- Encounter map viewer (ENCOUNTER_FORMAT.md), shared by the module viewer and the E9 Atlas; build.py inlines it into both pages after the creature card -->
+<style>
+#e9map{border:1px solid #8a7f66;border-radius:6px;padding:0;width:min(1200px,calc(100vw - 16px));height:calc(100vh - 32px);max-width:none;max-height:none;background:#f4efe1;color:#2b2418;font-family:Georgia,serif;box-shadow:0 6px 24px #0005;overflow:hidden}
+#e9map[open]{display:flex;flex-direction:column}
+#e9map::backdrop{background:#0006}
+#e9map .hd{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:2px solid #7a2e2e;flex:none}
+#e9map .hd h3{margin:0;font-size:17px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#e9map .hd button{font:inherit;font-size:14px;background:#fffaf0;border:1px solid #b8ab8c;border-radius:4px;padding:1px 8px;color:#2b2418;cursor:pointer}
+#e9map .hd .x{border:0;background:none;font-size:20px;line-height:1;color:#6b604c}
+#e9map .body{flex:1;display:grid;grid-template-columns:1fr 300px;min-height:0}
+#e9map .vp{overflow:auto;position:relative;display:grid;background:#3a342b;cursor:grab;touch-action:none}#e9map .vp.drag{cursor:grabbing}
+#e9map .pg{position:relative;--q:40px;margin:auto}
+#e9map .pg img{position:absolute;display:block;user-select:none;-webkit-user-drag:none;pointer-events:none}
+#e9map .ar{position:absolute;border:2px solid transparent;border-radius:3px;cursor:pointer}
+#e9map .ar:hover{border-color:#7a2e2ecc;background:#7a2e2e14}
+#e9map .ar.on{border-color:#b3261e;background:#b3261e1f;box-shadow:0 0 0 2px #fffaf099}
+#e9map .ln{position:absolute;transform:translate(-50%,-50%);font:12px Georgia,serif;background:#7a2e2e;color:#fffaf0;border:1px solid #fffaf0;border-radius:10px;padding:1px 7px;cursor:pointer;white-space:nowrap}
+#e9map .side{overflow:auto;border-left:1px solid #d8cfb8;padding:10px 14px;font-size:13px}
+#e9map .side h4{margin:0 0 6px;font-size:15px}#e9map .side p{margin:0 0 6px}
+#e9map .lb{color:#6b604c;font-size:11px;text-transform:uppercase;letter-spacing:.05em}
+#e9map .sc{border-top:1px solid #d8cfb8;padding-top:8px;margin-top:8px}
+#e9map .pl{font-style:italic}
+#e9map ul.al{list-style:none;margin:0;padding:0}#e9map ul.al button{font:inherit;font-size:13px;background:none;border:0;padding:3px 4px;text-align:left;width:100%;cursor:pointer;border-radius:4px;color:#2b2418}
+#e9map ul.al button:hover{background:#ebe3cf}#e9map ul.al small,#e9map .side small{color:#6b604c}
+#e9map .pick{padding:16px;display:grid;gap:8px;align-content:start;justify-items:start}
+#e9map .pick button{font:inherit;font-size:15px;background:#fffaf0;border:1px solid #b8ab8c;border-radius:6px;padding:6px 14px;cursor:pointer;color:#2b2418}
+#e9map .pick button:hover{background:#ebe3cf}
+#e9map .ft{font-size:11px;color:#6b604c;padding:3px 12px;border-top:1px solid #d8cfb8;flex:none}
+@media(max-width:760px){#e9map .body{grid-template-columns:1fr;grid-template-rows:1fr minmax(120px,40%)}#e9map .side{border-left:0;border-top:1px solid #d8cfb8}}
+</style>
+<dialog id="e9map" aria-labelledby="e9map-h"></dialog>
+<script>
+"use strict";
+// E9Map.open(pointers, title): one pointer opens its map at the pointed area; several show a picker first.
+// The page sets E9Map.base (the module folder, ending in /), E9Map.creatures (as for E9Card) and E9Map.scenes (encounters.scenes).
+window.E9Map = (() => {
+  const dlg = document.getElementById('e9map'), cache = {};
+  const e = t => String(t ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+  const api = { base: '', creatures: [], scenes: {}, open, show };
+  let st = null, back = [];  // st: the map on screen; back: where Back returns to
+  dlg.addEventListener('click', ev => { if (ev.target === dlg) dlg.close(); });
+  dlg.addEventListener('close', () => { st = null; back = []; });
+  const shell = (title, inner) => {
+    dlg.innerHTML = `<div class="hd">${back.length ? '<button class="bk" title="Back">‹ Back</button>' : ''}<h3 id="e9map-h">${e(title)}</h3><span class="zm"></span><button class="x" aria-label="Close">×</button></div>${inner}`;
+    dlg.querySelector('.x').onclick = () => dlg.close();
+    const b = dlg.querySelector('.bk'); if (b) b.onclick = () => { const f = back.pop(); f(); };
+    if (!dlg.open) dlg.showModal();
+  };
+  function open(ptrs, title) {
+    ptrs = (Array.isArray(ptrs) ? ptrs : [ptrs]).map(p => typeof p === 'string' ? { map: p } : p);
+    if (ptrs.length === 1) return show(ptrs[0]);
+    const pick = () => {
+      shell(title || 'Encounter maps', '<div class="pick"><p>Which map?</p></div>');
+      const box = dlg.querySelector('.pick');
+      for (const p of ptrs) { const b = document.createElement('button'); b.textContent = p.label || p.map; b.onclick = () => { back.push(pick); show(p); }; box.append(b); }
+    };
+    pick();
+  }
+  async function load(id) {
+    if (!cache[id]) cache[id] = fetch(api.base + 'encounter-maps/' + encodeURIComponent(id) + '.json').then(r => { if (!r.ok) throw new Error(r.status); return r.json(); });
+    try { return await cache[id]; } catch (err) { delete cache[id]; throw err; }
+  }
+  const scenesFor = id => Object.entries(api.scenes || {}).filter(([, s]) => s.map && (s.map === id || s.map.map === id));
+  async function show(p) {
+    let m;
+    try { m = await load(p.map); } catch (err) { shell(p.label || p.map, `<div class="pick"><p>Could not load the map “${e(p.map)}”.</p></div>`); return; }
+    shell(m.title || m.id, `<div class="body"><div class="vp"><div class="pg"></div></div><div class="side"></div></div><div class="ft">${e([m.grid && m.grid.ft ? `1 square = ${m.grid.ft} ft` : '', m.credit, m.licence].filter(Boolean).join(' · '))}</div>`);
+    const zm = dlg.querySelector('.zm');
+    zm.innerHTML = '<button data-z="0.8" title="Zoom out">−</button> <button data-z="1.25" title="Zoom in">+</button> <button data-z="fit">Fit</button>';
+    const vp = dlg.querySelector('.vp'), pg = dlg.querySelector('.pg'), [w, h] = m.size;
+    st = { m, vp, pg, sel: null, s: 1 };
+    // everything is placed in squares; --q is one square's size on screen
+    const q = n => `calc(${n} * var(--q))`;
+    pg.style.width = q(w); pg.style.height = q(h);
+    for (const L of m.layers || []) {
+      const im = new Image(); im.alt = ''; im.src = api.base + 'encounter-maps/' + L.src;
+      im.style.left = q(L.at ? L.at[0] : 0); im.style.top = q(L.at ? L.at[1] : 0);
+      im.onload = () => { im.style.width = q(im.naturalWidth / (L.px || 40)); }; pg.append(im);
+    }
+    for (const [id, a] of Object.entries(m.areas || {})) {
+      const [x, y, aw, ah] = a.squares, d = document.createElement('div'); d.className = 'ar'; d.dataset.a = id; d.title = a.title || id;
+      Object.assign(d.style, { left: q(x), top: q(y), width: q(aw), height: q(ah) });
+      pg.append(d);
+    }
+    for (const L of m.links || []) {
+      const b = document.createElement('button'); b.className = 'ln'; b.textContent = L.label || 'Link';
+      Object.assign(b.style, { left: q(L.from[0] + .5), top: q(L.from[1] + .5) });
+      b.onclick = ev => { ev.stopPropagation(); const cur = { ...p }; back.push(() => show(cur)); show({ ...L.to, map: L.to.map || m.id }); };
+      pg.append(b);
+    }
+    pg.addEventListener('click', ev => { const a = ev.target.closest('.ar'); if (a && !st.dragged) pickArea(a.dataset.a); });
+    zm.onclick = ev => { const z = ev.target.dataset.z; if (!z) return; z === 'fit' ? fit() : zoom(+z); };
+    // drag to pan
+    let dr = null;
+    vp.addEventListener('pointerdown', ev => { if (ev.target.closest('.ln')) return; dr = { x: ev.clientX, y: ev.clientY, l: vp.scrollLeft, t: vp.scrollTop }; st.dragged = false; });
+    vp.addEventListener('pointermove', ev => { if (!dr) return; const dx = ev.clientX - dr.x, dy = ev.clientY - dr.y;
+      if (!st.dragged && Math.hypot(dx, dy) > 5) { st.dragged = true; vp.classList.add('drag'); vp.setPointerCapture(ev.pointerId); }
+      if (st.dragged) { vp.scrollLeft = dr.l - dx; vp.scrollTop = dr.t - dy; } });
+    const end = () => { dr = null; vp.classList.remove('drag'); setTimeout(() => { if (st) st.dragged = false; }, 0); };
+    vp.addEventListener('pointerup', end); vp.addEventListener('pointercancel', end);
+    vp.addEventListener('wheel', ev => { if (!ev.ctrlKey && !ev.metaKey) return; ev.preventDefault(); zoom(ev.deltaY < 0 ? 1.25 : .8, ev); }, { passive: false });
+    fit();
+    const sq = p.area && m.areas && m.areas[p.area] ? m.areas[p.area].squares : p.squares || (p.square ? [p.square[0], p.square[1], 1, 1] : null);
+    if (sq) { if (p.area) pickArea(p.area); else side(); if (sq[2] * sq[3] < w * h / 4) { st.s = Math.min(1.25, Math.max(st.s, fitScale() * 2)); apply(); } centreOn(sq); }
+    else side();
+  }
+  const fitScale = () => Math.min(st.vp.clientWidth / (st.m.size[0] * 40), st.vp.clientHeight / (st.m.size[1] * 40));
+  function apply() { st.pg.style.setProperty('--q', 40 * st.s + 'px'); }
+  function fit() { st.s = fitScale(); apply(); }
+  function zoom(f, ev) {
+    const { vp } = st, b = vp.getBoundingClientRect(), px = ev ? ev.clientX - b.left : vp.clientWidth / 2, py = ev ? ev.clientY - b.top : vp.clientHeight / 2;
+    const x = (vp.scrollLeft + px) / st.s, y = (vp.scrollTop + py) / st.s;
+    st.s = Math.max(fitScale() * .5, Math.min(3, st.s * f)); apply(); vp.scrollLeft = x * st.s - px; vp.scrollTop = y * st.s - py;
+  }
+  function centreOn([x, y, w, h]) { const { vp, s } = st; vp.scrollLeft = (x + w / 2) * 40 * s - vp.clientWidth / 2; vp.scrollTop = (y + h / 2) * 40 * s - vp.clientHeight / 2; }
+  function pickArea(id) {
+    st.sel = st.sel === id ? null : id;
+    st.pg.querySelectorAll('.ar').forEach(d => d.classList.toggle('on', d.dataset.a === st.sel));
+    side();
+  }
+  function who(list) {
+    const ul = document.createElement('ul'); ul.className = 'e9cr';
+    for (const w of list || []) {
+      const c = api.creatures.find(x => x.id === w.creature), li = document.createElement('li'), b = document.createElement('button'); b.type = 'button';
+      b.textContent = c ? c.name : w.creature;
+      const n = [w.count !== undefined && w.count !== 1 ? '×' + w.count : '', w.chance ? '(' + w.chance + ')' : ''].filter(Boolean).join(' ');
+      if (n) b.append(' ', Object.assign(document.createElement('small'), { textContent: n }));
+      if (c && window.E9Card) b.onclick = () => E9Card.show(c); else b.disabled = true;
+      li.append(b); ul.append(li);
+    }
+    return ul;
+  }
+  function side() {
+    const { m, sel } = st, box = dlg.querySelector('.side'); box.replaceChildren();
+    const add = h => { const d = document.createElement('div'); d.innerHTML = h; box.append(...d.childNodes); };
+    const all = scenesFor(m.id);
+    if (!sel) {
+      add(`<h4>${e(m.title || m.id)}</h4>${m.notes ? `<p><small>${e(m.notes)}</small></p>` : ''}<p class="lb">Areas</p>`);
+      const ul = document.createElement('ul'); ul.className = 'al';
+      const nat = (a, b) => (a[1].title || a[0]).localeCompare(b[1].title || b[0], undefined, { numeric: true });
+      for (const [id, a] of Object.entries(m.areas || {}).sort(nat)) {
+        const n = all.filter(([, s]) => s.map.area === id).length, b = document.createElement('button');
+        b.innerHTML = `${e(a.title || id)}${n ? ` <small>· ${n === 1 ? 'encounter' : n + ' encounters'}</small>` : ''}`;
+        b.onclick = () => { pickArea(id); centreOn(a.squares); }; const li = document.createElement('li'); li.append(b); ul.append(li);
+      }
+      box.append(ul);
+      const loose = all.filter(([, s]) => !s.map.area);
+      for (const [, s] of loose) scene(box, s);
+      return;
+    }
+    const a = m.areas[sel], here = all.filter(([, s]) => s.map.area === sel);
+    add(`<p><button type="button" class="lb" style="background:none;border:0;padding:0;cursor:pointer">‹ All areas</button></p><h4>${e(a.title || sel)}</h4>`);
+    box.querySelector('button.lb').onclick = () => pickArea(sel);
+    if (!here.length) add('<p><small>Nothing keyed here.</small></p>');
+    for (const [, s] of here) scene(box, s, here.length === 1 && s.title === a.title);
+  }
+  function scene(box, s, untitled) {
+    const d = document.createElement('div'); d.className = 'sc';
+    let h = untitled ? '' : `<p><b>${e(s.title)}</b></p>`;
+    if (s.players) h += `<p class="pl">${e(s.players)}</p>`;
+    if (s.description) h += `<p>${e(s.description)}</p>`;
+    const tag = [s.disposition, s.threat].filter(Boolean).join(' · '); if (tag) h += `<p><span class="lb">${e(tag)}</span></p>`;
+    d.innerHTML = h;
+    if (s.who && s.who.length) d.append(who(s.who));
+    let t = '';
+    for (const [k, l] of [['wants', 'Wants'], ['tactics', 'Tactics'], ['treasure', 'Treasure']]) if (s[k]) t += `<p><span class="lb">${l}</span> ${e(s[k])}</p>`;
+    if (t) { const x = document.createElement('div'); x.style.marginTop = '6px'; x.innerHTML = t; d.append(x); }
+    box.append(d);
+  }
+  return api;
+})();
+</script>
