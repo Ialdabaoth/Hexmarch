@@ -26,12 +26,15 @@ body.nokey #key{display:none}@media(max-width:700px){#key{position:absolute;righ
 canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor:pointer}
 footer{display:flex;justify-content:space-between;gap:12px;padding:4px 16px;font-size:12px;color:var(--dim);border-top:1px solid #d8cfb8}
 #hover{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#route{position:absolute;left:10px;top:10px;z-index:2;max-width:calc(100% - 20px);background:#fffaf0ee;border:1px solid #b8ab8c;border-radius:6px;padding:6px 10px;font-size:13px;box-shadow:0 2px 8px #0002}
+#route[hidden]{display:none}#route b{color:var(--red)}#route small{color:var(--dim)}#route button{font-size:12px;padding:0 8px;margin:4px 6px 0 0}
+#routebtn.on{border-color:var(--red);color:var(--red)}
 </style></head><body>
 <header><h1 id="crumbs"></h1>
 <div class="ctl"><select id="lang"><option value="ga">Gaeilge</option><option value="en">English</option></select>
 <label><input type="checkbox" id="edges" checked> Hex Edges</label>
-<button id="out" title="Zoom out">−</button><button id="in" title="Zoom in">+</button><button id="fit">Fit</button><button id="keybtn">Key</button><button id="modbtn" title="Load a different module">Modules</button></div></header>
-<div id="main"><div id="map"><canvas id="cv"></canvas></div><aside id="key"></aside></div>
+<button id="out" title="Zoom out">−</button><button id="in" title="Zoom in">+</button><button id="fit">Fit</button><button id="routebtn" title="Plot a route and estimate the travel time">Route</button><button id="keybtn">Key</button><button id="modbtn" title="Load a different module">Modules</button></div></header>
+<div id="main"><div id="map"><canvas id="cv"></canvas><div id="route" hidden aria-live="polite"></div></div><aside id="key"></aside></div>
 <footer><span id="hover">Click a hex to zoom in.</span><span>E9 Atlas {{ATLAS}}<span id="modver"></span></span></footer>
 <dialog id="modules"><h2>Load a module</h2><ul id="modlist"></ul><button id="modclose">Close</button></dialog>
 <!--CARD-->
@@ -256,7 +259,53 @@ function draw() {
   const own = LV[V.lvl].own;
   if (own) { const [sx, sy] = S(...hexFt(V.i, V.j, own)); hexPath(sx, sy, own * 100 * cam.s / SQ3); ctx.setLineDash([9, 5]); ctx.strokeStyle = '#b3261e'; ctx.lineWidth = 2.5; ctx.stroke(); ctx.setLineDash([]); }
   if (V.sel) { const [sx, sy] = S(...ft(...V.sel)); hexPath(sx, sy, 100 * cam.s / SQ3); ctx.strokeStyle = '#b3261e'; ctx.lineWidth = 3; ctx.stroke(); }
+  drawRoute();
   keepNear();
+}
+
+// ---- the path tool (Heph 2026-11-06, Atlas 0.4.12): Route mode turns clicks into stops; the route is measured on the terrain the
+// current level draws (Leagues, Fields, Furlongs or 100-ft hexes), sampled along each straight leg, and timed with E9Atlas.travel
+let ROUTE = false, STOPS = [];
+function addStop(x, y) {
+  const N = LV[V.lvl].draw, [i, j] = hexAt(x, y, N); STOPS.push(hexFt(i, j, N)); routeBox(); redraw();
+}
+function routeLegs() {  // [{mi, terrain}] along the route, one sample per quarter hex, merged where the terrain stays the same
+  const N = LV[V.lvl].draw, step = N * 25, legs = []; let unknown = 0;
+  for (let k = 1; k < STOPS.length; k++) {
+    const [ax, ay] = STOPS[k - 1], [bx, by] = STOPS[k], d = Math.hypot(bx - ax, by - ay), n = Math.max(1, Math.ceil(d / step));
+    for (let s = 0; s < n; s++) {
+      const f = (s + .5) / n, t = T(...hexAt(ax + (bx - ax) * f, ay + (by - ay) * f, N), N), id = t ? TYPES[t - 1].id : null, mi = d / n / 5000;
+      if (!t) unknown += mi;
+      const last = legs[legs.length - 1]; if (last && last.terrain === id) last.mi += mi; else legs.push({ mi, terrain: id });
+    }
+  }
+  return { legs, unknown };
+}
+const hm = h => { const m = Math.round(h * 60); return m < 60 ? m + ' min' : Math.floor(m / 60) + ' h' + (m % 60 ? ' ' + m % 60 + ' min' : ''); };
+function routeBox() {
+  const box = document.getElementById('route'); box.hidden = !ROUTE; if (!ROUTE) return;
+  if (!STOPS.length) { box.innerHTML = '<b>Route</b> · click hexes to add stops. <small>Drag still moves the map.</small><br><button data-r="done">Done</button>'; return; }
+  const { legs, unknown } = routeLegs(), r = E9Atlas.travel(legs.map(g => ({ mi: g.mi, terrain: g.terrain || 'unknown' }))), P = (D.travel || {}).pace || {};
+  const unit = { region: 'Leagues', march: 'Leagues', league: 'Fields', field: 'Furlongs', furlong: '100-ft hexes' }[V.lvl];
+  let h = `<b>Route</b> · ${STOPS.length} stop${STOPS.length === 1 ? '' : 's'} · ${r.mi.toFixed(r.mi < 10 ? 1 : 0)} mi`;
+  if (STOPS.length > 1) h += r.blocked ? ` · <b>crosses ${esc(TYPES.find(t => t.id === r.blocked).name.toLowerCase())}</b>: no way on foot`
+    : ` · ${hm(r.hours)}${r.days >= .5 ? ` · ${r.days.toFixed(1)} days of ${P.hours_per_day || 8} h` : ''}`;
+  h += `<br><small>Terrain read from ${unit}${unknown > .05 ? `; ${unknown.toFixed(1)} mi unmapped, at normal pace` : ''}. No roads yet.</small><br><button data-r="undo">Undo</button><button data-r="clear">Clear</button><button data-r="done">Done</button>`;
+  box.innerHTML = h;
+}
+document.getElementById('route').addEventListener('click', e => { const b = e.target.closest('button[data-r]'); if (!b) return;
+  if (b.dataset.r === 'undo') STOPS.pop(); else if (b.dataset.r === 'clear') STOPS = []; else setRoute(false); routeBox(); redraw(); });
+function setRoute(on) { ROUTE = on; document.getElementById('routebtn').classList.toggle('on', on); document.getElementById('hover').textContent = on ? 'Route: click a hex to add a stop.' : 'Click a hex to zoom in.'; routeBox(); redraw(); }
+document.getElementById('routebtn').onclick = () => setRoute(!ROUTE);
+addEventListener('keydown', e => { if (e.key === 'Escape' && ROUTE) setRoute(false); });
+function drawRoute() {
+  if (!STOPS.length) return;
+  ctx.lineJoin = ctx.lineCap = 'round';
+  for (const [w, c, dash] of [[6, '#f4efe1', []], [3, '#7a2e2e', [10, 6]]]) {
+    ctx.beginPath(); for (const p of STOPS) ctx.lineTo(...S(...p)); ctx.setLineDash(dash); ctx.lineWidth = w; ctx.strokeStyle = c; ctx.stroke(); }
+  ctx.setLineDash([]);
+  STOPS.forEach((p, k) => { const [sx, sy] = S(...p); ctx.beginPath(); ctx.arc(sx, sy, k ? 5 : 6, 0, 7); ctx.fillStyle = k ? '#7a2e2e' : '#f4efe1'; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = '#7a2e2e'; ctx.stroke(); });
+  if (ROUTE && !drawRoute.q) drawRoute.q = setTimeout(() => { drawRoute.q = 0; routeBox(); }, 150);  // tiles landing change the sums
 }
 
 // travel (Heph 2026-11-06, ATLAS_FORMAT.md "Travel"): each terrain type's time multiplier against the module's pace, and the roads'.
@@ -372,7 +421,7 @@ cv.addEventListener('pointermove', e => {
 });
 cv.addEventListener('pointerup', e => {
   if (!drag) return; const moved = drag.moved; drag = null; if (moved) return;
-  const b = cv.getBoundingClientRect(); goDown(...F(e.clientX - b.left, e.clientY - b.top));
+  const b = cv.getBoundingClientRect(), at = F(e.clientX - b.left, e.clientY - b.top); if (ROUTE) addStop(...at); else goDown(...at);
 });
 cv.addEventListener('wheel', e => { e.preventDefault(); zoom(e.deltaY < 0 ? 1.25 : .8, e); }, { passive: false });
 function zoom(f, e) {
