@@ -19,7 +19,7 @@ Plan keys (all coordinates in squares, [x, y] from the top-left, y down):
   road    shapes drawn as a beaten path
   mounds  shapes drawn as raised ground (barrows, hummocks)
   trees   [{"in": shape, "n": count, "kind": "oak"|"pine"|"scrub"|"reed", "r": radius}] scattered, seeded
-  marks   [{"t": kind, "at": [x,y], ...}] kinds: num, letter, label, pit, secret, door, locked, stairs,
+  marks   [{"t": kind, "at": [x,y], ...}] kinds: num, letter, label (optional "rot" degrees, "size", \n for lines), pit, secret, door, locked, stairs,
           fire, tent, web, bones, bed, table, chest, well, oak, sac, stake, garden, dotted, window
   areas, links, notes   copied into the map file
 """
@@ -180,7 +180,19 @@ def mark(d, m, P, rng, fonts):
         text_c(d, (X, Y + 1), str(m['text']), fonts['num'] if t == 'num' else fonts['letter'], fill=INK if t == 'num' else (250, 244, 226))
     elif t == 'label':
         f = fonts['big'] if m.get('big') else fonts['label']
-        text_c(d, (X, Y), m['text'], f, fill=INK, stroke=(244, 236, 214))
+        if m.get('size'): f = font(FONT_I, int(P * m['size']))
+        lines = str(m['text']).split('\n')
+        if not m.get('rot') and len(lines) == 1:
+            text_c(d, (X, Y), m['text'], f, fill=INK, stroke=(244, 236, 214))
+        else:
+            # rotated or stacked names follow a cliff or a building, as on a hand-lettered map
+            lh = f.getbbox('Hg')[3] + 4
+            tw = max(int(f.getlength(l)) for l in lines) + 12
+            tile = Image.new('RGBA', (tw, lh * len(lines) + 8), (0, 0, 0, 0)); td = ImageDraw.Draw(tile)
+            for i, l in enumerate(lines):
+                td.text((tw / 2, 4 + lh * (i + .5)), l, font=f, fill=INK, anchor='mm', stroke_width=3, stroke_fill=(244, 236, 214))
+            tile = tile.rotate(m.get('rot', 0), expand=True, resample=Image.BICUBIC)
+            d._image.paste(tile, (int(X - tile.width / 2), int(Y - tile.height / 2)), tile)
     elif t == 'pit':
         s = .45 * P; d.rectangle([X - s, Y - s, X + s, Y + s], outline=INK, width=3)
         d.line([X - s, Y - s, X + s, Y + s], fill=INK, width=3); d.line([X - s, Y + s, X + s, Y - s], fill=INK, width=3)
