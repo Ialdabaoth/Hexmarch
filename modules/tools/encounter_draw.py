@@ -14,7 +14,8 @@ Plan keys (all coordinates in squares, [x, y] from the top-left, y down):
   ground  outdoor ground colour: grass | bog | forest | heath | ravine
   floor   carved or open shapes: {"rect": [x,y,w,h]} | {"blob": [cx,cy,rx,ry]} | {"path": [[x,y],...], "w": 2}
           add "built": true for straight masonry walls inside a cave plan
-  rock    outdoor only: shapes drawn as cliff/rock (hatched), e.g. ravine walls
+  rock    outdoor only: shapes drawn as cliff/rock (hatched), e.g. ravine walls; a path with "soft": "left"|"right"
+          is a terrace cliff: hard inked face on the other side, that side blurred into the ledge ("fade" in squares)
   water   shapes drawn as water (pools, streams)
   road    shapes drawn as a beaten path
   mounds  shapes drawn as raised ground (barrows, hummocks)
@@ -24,6 +25,7 @@ Plan keys (all coordinates in squares, [x, y] from the top-left, y down):
   areas, links, notes   copied into the map file
 """
 import json, math, os, random, sys
+import numpy as np
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 from shapely.geometry import Point, Polygon, LineString, box
 from shapely.ops import unary_union
@@ -321,12 +323,29 @@ def render(plan, rng):
             draw_poly(d, g.buffer(.4), P, fill=(70, 60, 40, 70))
             draw_poly(d, g, P, fill=(150, 156, 100), outline=INK, width=3)
             hatch(d, g.difference(g.buffer(-.9)), P, rng, 1.6, .35, 2, (60, 66, 40))
-        rock = union(plan.get('rock', []), .6, nz)
+        rock = union([r for r in plan.get('rock', []) if not r.get('soft')], .6, nz)
         if not rock.is_empty:
             im.paste(texture(W, H, ROCK, rng, 14, 3), (0, 0), mask_of(rock, W, H, P))
             d = ImageDraw.Draw(im, 'RGBA')
             hatch(d, rock.difference(rock.buffer(-1.4)), P, rng, 11, .5, 2)
             draw_poly(d, rock, P, outline=INK, width=4)
+        # terraced cliffs: a path of rock with one hard, inked face ("soft" names the other side, left or right of
+        # the path's direction) that fades into the ledge above it
+        for r in [r for r in plan.get('rock', []) if r.get('soft')]:
+            g = shape(r, .6, nz); line = LineString(r['path']); w2 = r.get('w', 2) / 2 + 1.5
+            # shapely's left is the screen's right, because y runs down the map
+            hard = line.buffer(-w2 if r['soft'] == 'right' else w2, single_sided=True)
+            face = g.intersection(hard)
+            m = mask_of(g, W, H, P).filter(ImageFilter.GaussianBlur(P * r.get('fade', .6)))
+            m = Image.fromarray(np.maximum(np.asarray(m), np.asarray(mask_of(face, W, H, P))))
+            im.paste(texture(W, H, ROCK, rng, 14, 3), (0, 0), m)
+            d = ImageDraw.Draw(im, 'RGBA')
+            hatch(d, g.difference(g.buffer(-1.1)).intersection(hard), P, rng, 11, .5, 2)
+            hatch(d, g.buffer(-.4), P, rng, 3, .4, 1, (60, 52, 44))
+            edge = g.boundary.intersection(hard.buffer(-.05))
+            for ln in getattr(edge, 'geoms', [edge]):
+                if ln.geom_type == 'LineString' and ln.length > .3:
+                    d.line([(x * P, y * P) for x, y in ln.coords], fill=INK, width=4, joint='curve')
         # paths, dirt and paving go over the ground and any rock they climb
         road = union(plan.get('road', []), .25, nz)
         im.paste(texture(W, H, ROAD, rng, 10, 2), (0, 0), mask_of(road, W, H, P).filter(ImageFilter.GaussianBlur(P * .15)))
