@@ -66,11 +66,18 @@ class Grid:
         c, r = hex_round(px, py, self.s); ok = (c >= 0) & (r >= 0) & (c < d['ncol']) & (r < d['nrow'])
         return np.where(ok, self.T[np.clip(c, 0, d['ncol']), np.clip(r, 0, d['nrow'])], -1)
 
-TYPES = [  # colour, id, name, tile, icon, travel (cost per mile, grass = 1; a draft)
+TYPES = [  # colour, id, name, tile, icon, travel (time multiplier, grass = 1; null = no travel on foot; module.json atlas.travel.terrain overrides)
     ('#dfe8b5', 'grass', 'Grassland', 'bg-green', None, 1), ('#bcd69e', 'woods', 'Light woods', 'bg-green', 'trees', 1),
     ('#9cc28a', 'forest', 'Forest', 'bg-green', 'forest', 1.5), ('#d9c08c', 'hills', 'Hills', 'bg-green', 'hills', 1.5),
     ('#b49a78', 'mount', 'Mountains', 'bg-brown', 'mountains', 2), ('#c9b98f', 'bog', 'Bog', 'bg-grey', 'swamp', 2),
     ('#b9d3e0', 'sea', 'Sea', 'bg-blue', None, None), ('#a3c8dc', 'lake', 'Lake or river', 'bg-blue', None, None)]
+# travel (Heph 2026-11-06, ATLAS_FORMAT.md "Travel"): module.json atlas.travel may set the pace, each terrain's time multiplier and the roads'
+_tv = MOD['atlas'].get('travel') or {}
+TRAVEL = {'pace': {'mi_per_hour': 3, 'hours_per_day': 8, **_tv.get('pace', {})}, 'roads': {'roman': 0.5, 'local': 0.75, 'trail': 1, **_tv.get('roads', {})}}
+for k, tv in _tv.get('terrain', {}).items():
+    if k not in [t[1] for t in TYPES]: sys.exit(f'module.json atlas.travel.terrain: no terrain type {k!r} (types: {", ".join(t[1] for t in TYPES)})')
+    if tv is not None and not (isinstance(tv, (int, float)) and tv > 0): sys.exit(f'module.json atlas.travel.terrain.{k}: a positive number, or null for no travel on foot')
+    TYPES = [t[:5] + (tv,) if t[1] == k else t for t in TYPES]
 TID = {t[1]: k + 1 for k, t in enumerate(TYPES)}  # palette index; 0 = none
 PAL = [0, 0, 0] + [int(t[0][k:k + 2], 16) for t in TYPES for k in (1, 3, 5)]
 
@@ -237,6 +244,6 @@ J = {'format': 'e9-atlas/1', 'id': MOD['id'], 'title': MOD['title'], 'names': MO
      'origin': {'projection': 'dymaxion', 'centroid': {'name': A['centroid'][0], 'lat': la, 'lon': lo}, 'x_ft': 0, 'y_ft': 0},
      'labels': {'march': list(M0), 'league': list(L0)},
      'terrain': {'types': [dict(color=c, id=t, name=n, tile=tl, **({'icon': ic} if ic else {}), travel=tv) for c, t, n, tl, ic, tv in TYPES], 'marches': MJ, 'overrides': {}},
-     'rivers': rivers, 'roads': [], 'crossings': [], 'regions': regions, 'pois': pois}
+     'travel': TRAVEL, 'rivers': rivers, 'roads': [], 'crossings': [], 'regions': regions, 'pois': pois}
 json.dump(J, open(f'{OUT}/map.json', 'w'), ensure_ascii=False, separators=(',', ':'))
 print(f"E9 Atlas map: {len(MJ)} Marches, {len(rivers)} rivers, {len(regions)} regions, {len(pois)} POIs, map.json {os.path.getsize(OUT + '/map.json') // 1024} KB -> {OUT}")

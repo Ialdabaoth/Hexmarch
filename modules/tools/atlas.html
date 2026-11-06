@@ -259,6 +259,19 @@ function draw() {
   keepNear();
 }
 
+// travel (Heph 2026-11-06, ATLAS_FORMAT.md "Travel"): each terrain type's time multiplier against the module's pace, and the roads'.
+// E9Atlas.travel(legs) adds up a route for the path tool to come: legs = [{mi, terrain: id, road?: class}] -> {hours, days, mi}
+const travelNote = t => t.travel === null ? 'no travel on foot' : t.travel === undefined ? '' : (() => { const p = (D.travel || {}).pace || {}, mph = (p.mi_per_hour || 3) / t.travel;
+  return `${t.travel === 1 ? 'normal pace' : '×' + t.travel + ' travel time'} · ${+mph.toFixed(1)} mi/h`; })();
+window.E9Atlas = { travel(legs) {
+  const P = (D.travel || {}).pace || {}, mph = P.mi_per_hour || 3, day = P.hours_per_day || 8, RD = (D.travel || {}).roads || {};
+  let hours = 0, mi = 0;
+  for (const g of legs) { const t = TYPES.find(x => x.id === g.terrain), k = g.road && RD[g.road] !== undefined ? RD[g.road] : t ? t.travel : 1;
+    if (k === null) return { hours: Infinity, days: Infinity, mi: mi + g.mi, blocked: g.terrain };  // no travel on foot (sea, lake): boats come later
+    hours += g.mi * (k ?? 1) / mph; mi += g.mi; }
+  return { hours, days: hours / day, mi };
+} };
+
 // the map key (Heph 2026-11-05: "get the map keys back"): terrain in view, then the places in view; a place zooms in like a click
 let KEYHTML = '';
 const PATREON = {{PATREON}};  // from links.json at build time; empty hides the link
@@ -266,7 +279,7 @@ const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;',
 function key(ts, ps) {
   let h = '<h2>Terrain</h2>';
   TYPES.forEach((t, k) => { if (!ts.has(k + 1)) return;
-    h += `<div class="row"><span class="sw" style="background-color:${t.color};background-image:url(${A}tiles/${t.tile}.png)">${t.icon ? `<img src="${A}tiles/${t.icon}.png" alt="">` : ''}</span>${esc(t.name)}</div>`; });
+    h += `<div class="row"><span class="sw" style="background-color:${t.color};background-image:url(${A}tiles/${t.tile}.png)">${t.icon ? `<img src="${A}tiles/${t.icon}.png" alt="">` : ''}</span><span>${esc(t.name)}<br><small>${travelNote(t)}</small></span></div>`; });
   if (ps.length) {
     h += '<h2>Places</h2>';
     for (const p of ps.slice().sort((a, b) => name(a.name).localeCompare(name(b.name))))
