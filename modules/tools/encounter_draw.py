@@ -434,9 +434,10 @@ def render(plan, rng):
         mark(d, m, P, rng, fonts)
     # frame, north arrow and scale
     d.rectangle([0, 0, W - 1, H - 1], outline=INK, width=6)
-    sx, sy = P * .8, H - P * .9; n = 4 if plan.get('ft', 5) == 5 else 5
-    for k in range(n): d.rectangle([sx + k * P, sy, sx + (k + 1) * P, sy + .25 * P], fill=INK if k % 2 == 0 else (244, 236, 214), outline=INK, width=2)
-    text_c(d, (sx + n * P / 2, sy - .45 * P), f"{n * plan.get('ft', 5)} ft", fonts['label'], stroke=(244, 236, 214))
+    # the scale bar sits on the grid: it starts on a grid line and each block is exactly one square
+    sx, sy = P, H - P; n = 4 if plan.get('ft', 5) == 5 else 5
+    for k in range(n): d.rectangle([sx + k * P, sy - .25 * P, sx + (k + 1) * P, sy], fill=INK if k % 2 == 0 else (244, 236, 214), outline=INK, width=2)
+    text_c(d, (sx + n * P / 2, sy - .7 * P), f"{n * plan.get('ft', 5)} ft", fonts['label'], stroke=(244, 236, 214))
     ax, ay = W - P * 1.2, P * 1.6
     d.polygon([(ax, ay - P), (ax + .35 * P, ay + .3 * P), (ax, ay), (ax - .35 * P, ay + .3 * P)], fill=INK)
     text_c(d, (ax, ay + .8 * P), 'N', fonts['num'], stroke=(244, 236, 214))
