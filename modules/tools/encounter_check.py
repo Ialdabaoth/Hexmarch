@@ -73,8 +73,26 @@ def main(mdir):
         if p.get('spawn') and p['spawn'] not in sp: errs.append(f'{where}: map {p["map"]!r} has no spawn point {p["spawn"]!r}')
 
     mod = json.load(open(os.path.join(mdir, 'module.json')))
+    used = {}  # (map, entrance) -> the places and links that come in by it (section 14.4)
     for site, ptrs in (mod.get('site_encounters') or {}).items():
-        for p in ptrs: pointer(f'module.json site_encounters[{site!r}]', p)
+        for p in ptrs:
+            pointer(f'module.json site_encounters[{site!r}]', p)
+            if isinstance(p, dict) and p.get('entrance'): used.setdefault((p['map'], p['entrance']), []).append(site)
+    for mid, m in maps.items():
+        for L in m.get('links') or []:
+            to = L.get('to') or {}
+            if to.get('entrance'): used.setdefault((to.get('map', mid), to['entrance']), []).append(f'link from {mid}')
+    warns = []
+    for (mid, ent), who in used.items():
+        places = [w for w in who if not w.startswith('link from ')]
+        if len(places) > 1: warns.append(f'encounter-maps/{mid}.json: entrance {ent!r} is claimed by several places ({", ".join(places)}); give each its own')
+    for mid, m in maps.items():
+        for sid, sp in (m.get('spawns') or {}).items():
+            if sp.get('kind') != 'entrance': continue
+            if (mid, sid) not in used: warns.append(f'encounter-maps/{mid}.json: entrance {sid!r} is not used by any place or link yet')
+            sq = sp.get('squares')
+            for r in (sq if sq and isinstance(sq[0], list) else [sq] if sq else []):
+                if isinstance(r, list) and len(r) == 4 and (max(r[2], r[3]) > 25 or min(r[2], r[3]) > 20): warns.append(f'encounter-maps/{mid}.json: entrance {sid!r} is {r[2]} x {r[3]} squares, more than a 100-ft hex (25 x 20)')
     for f in sorted(os.listdir(mdir)):
         if not f.endswith('.json') or f == 'module.json': continue
         try: j = json.load(open(os.path.join(mdir, f)))
@@ -87,7 +105,8 @@ def main(mdir):
                 if w.get('spawn') and w['spawn'] not in ((maps.get(mp) or {}).get('spawns') or {}): errs.append(f'{f} scene {sid!r}: {w.get("creature")} spawns at {w["spawn"]!r}, which map {mp!r} does not have')
 
     for e in errs: print('encounter maps:', e)
-    print(f'encounter maps: {len(maps)} checked, {len(errs)} problem{"" if len(errs) == 1 else "s"}')
+    for w in warns: print('encounter maps: warning:', w)
+    print(f'encounter maps: {len(maps)} checked, {len(errs)} problem{"" if len(errs) == 1 else "s"}' + (f', {len(warns)} warning{"" if len(warns) == 1 else "s"}' if warns else ''))
     return 1 if errs else 0
 
 

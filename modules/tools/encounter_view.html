@@ -37,11 +37,12 @@
 // The page sets E9Map.base (the module folder, ending in /), E9Map.module (its id), E9Map.creatures (as for E9Card) and E9Map.scenes (encounters.scenes).
 // E9Map.load(id) gives a map file with its defaults filled in (the one place export and import code should read maps from).
 // E9Map.place(map, where, tokens, taken) -> one [x, y] per token (ENCOUNTER_FORMAT.md 14.1); where is a spawn id, an area id or [x, y, w, h].
+// E9Map.places: the world's places with maps, [{name, pointers, go()}]; a map lists the ones it leads back out to (section 14.4).
 // E9Map.actions: header buttons for the map on screen, [{label, title, show(map) -> bool, run(map)}]; VTT export and links plug in here.
 window.E9Map = (() => {
   const dlg = document.getElementById('e9map'), cache = {};
   const e = t => String(t ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
-  const api = { base: '', module: '', creatures: [], scenes: {}, actions: [], open, show, load, place };
+  const api = { base: '', module: '', creatures: [], scenes: {}, actions: [], places: [], open, show, load, place };
   const pref = { get(k) { try { return localStorage.getItem('e9map-' + k); } catch (x) { return null; } }, set(k, v) { try { localStorage.setItem('e9map-' + k, v); } catch (x) {} } };
   let st = null, back = [];  // st: the map on screen; back: where Back returns to
   dlg.addEventListener('click', ev => { if (ev.target === dlg) dlg.close(); });
@@ -182,7 +183,8 @@ window.E9Map = (() => {
     vp.addEventListener('pointerup', end); vp.addEventListener('pointercancel', end);
     vp.addEventListener('wheel', ev => { if (!ev.ctrlKey && !ev.metaKey) return; ev.preventDefault(); zoom(ev.deltaY < 0 ? 1.25 : .8, ev); }, { passive: false });
     fit();
-    const sq = p.area && m.areas[p.area] ? rects(m.areas[p.area])[0] : p.squares || (p.square ? [p.square[0], p.square[1], 1, 1] : null);
+    const ent = p.entrance && m.spawns[p.entrance], esq = ent && (ent.squares ? (Array.isArray(ent.squares[0]) ? ent.squares[0] : ent.squares) : ent.area && m.areas[ent.area] ? rects(m.areas[ent.area])[0] : null);
+    const sq = esq ? esq : p.area && m.areas[p.area] ? rects(m.areas[p.area])[0] : p.squares || (p.square ? [p.square[0], p.square[1], 1, 1] : null);
     if (sq) { if (p.area) pickArea(p.area); else side(); if (sq[2] * sq[3] < w * h / 4) { st.s = Math.min(1.25, Math.max(st.s, fitScale() * 2)); apply(); } centreOn(sq); }
     else side();
   }
@@ -226,6 +228,17 @@ window.E9Map = (() => {
         b.onclick = () => { pickArea(id); centreOn(rects(a)[0]); }; const li = document.createElement('li'); li.append(b); ul.append(li);
       }
       box.append(ul);
+      // ways out (section 14.4): every place in the world whose pointer enters this map, by its entrance (or pointed area)
+      const outs = api.places.flatMap(pl => (pl.pointers || []).filter(q => (typeof q === 'string' ? q : q.map) === m.id).map(q => ({ pl, q })));
+      if (outs.length) {
+        add('<p class="lb">Ways out</p>'); const ol = document.createElement('ul'); ol.className = 'al';
+        for (const { pl, q } of outs) {
+          const where = q.entrance && m.spawns[q.entrance] ? m.spawns[q.entrance].title || q.entrance : q.area && m.areas[q.area] ? m.areas[q.area].title || q.area : '';
+          const b = document.createElement('button'); b.innerHTML = `Out to ${e(pl.name)}${where ? ` <small>· ${e(where)}</small>` : ''}`;
+          b.onclick = () => { dlg.close(); pl.go(); }; const li = document.createElement('li'); li.append(b); ol.append(li);
+        }
+        box.append(ol);
+      }
       const loose = all.filter(([, s]) => !s.map.area);
       for (const [, s] of loose) scene(box, s);
       return;
