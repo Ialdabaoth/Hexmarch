@@ -348,13 +348,7 @@ def render(plan, rng):
             x, y = p.exterior.coords[k]; d.line([(x - .3) * P, y * P, (x + .3) * P, y * P], fill=(170, 196, 198), width=2)
     # masonry: curtain walls, towers and roofed buildings (built maps such as the keep)
     STONE = (168, 160, 146)
-    for s in plan.get('walls', []):
-        g = shape(s)  # a closed wall is a ring with a hole, so fill it through a mask
-        im.paste((50, 44, 36), (0, 0), mask_of(g.buffer(.25), W, H, P).point(lambda v: v * 90 // 255))
-        im.paste(STONE, (0, 0), mask_of(g, W, H, P))
-        d = ImageDraw.Draw(im, 'RGBA')
-        draw_poly(d, g, P, outline=INK, width=3)
-    for b in plan.get('buildings', []):
+    def building(b):
         g = shape(b); x0, y0, x1, y1 = g.bounds
         roof = {'slate': (104, 112, 122), 'thatch': (184, 154, 92), 'tile': (156, 84, 60), 'stone': STONE, 'lead': (130, 132, 128), 'wood': (150, 108, 64)}[b.get('roof', 'slate')]
         draw_poly(d, affinity.translate(g, .3, .3), P, fill=(40, 34, 28, 110))
@@ -367,6 +361,17 @@ def render(plan, rng):
             else:
                 xm = (x0 + x1) / 2; d.line([xm * P, y0 * P, xm * P, y1 * P], fill=INK, width=2)
                 for k in range(int((y1 - y0) * 2)): yy = (y0 + k / 2) * P; d.line([x0 * P + 2, yy, xm * P - 2, yy], fill=dark, width=1); d.line([xm * P + 2, yy, x1 * P - 2, yy], fill=dark, width=1)
+    # shops and houses first, then the curtain walls and the stone blocks built into them on top, so the masonry reads clean
+    for b in plan.get('buildings', []):
+        if b.get('roof', 'slate') != 'stone': building(b)
+    for s in plan.get('walls', []):
+        g = shape(s)  # a closed wall is a ring with a hole, so fill it through a mask
+        im.paste((50, 44, 36), (0, 0), mask_of(g.buffer(.25), W, H, P).point(lambda v: v * 90 // 255))
+        im.paste(STONE, (0, 0), mask_of(g, W, H, P))
+        d = ImageDraw.Draw(im, 'RGBA')
+        draw_poly(d, g, P, outline=INK, width=3)
+    for b in plan.get('buildings', []):
+        if b.get('roof', 'slate') == 'stone': building(b)
     for t in plan.get('towers', []):
         g = shape(t)
         draw_poly(d, g.buffer(.3), P, fill=(40, 34, 28, 110))
