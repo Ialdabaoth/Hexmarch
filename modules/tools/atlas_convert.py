@@ -231,6 +231,7 @@ for k, reg in MOD['regions'].items():
         if o != [0, 0]: p['ft'] = o
         if k in book_of: p['book'] = book_of[k]
         if len(st) > 4 and st[4]: p['note'] = st[4]
+        if MOD.get('site_encounters', {}).get(st[0]): p['encounter'] = MOD['site_encounters'][st[0]]  # Encounter-map pointers (ENCOUNTER_FORMAT.md section 4)
         pois.append(p)
 
 la, lo = A['centroid'][1:3]

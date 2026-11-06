@@ -35,7 +35,7 @@ try: sha = subprocess.run(['git', 'rev-parse', '--short', 'HEAD'], capture_outpu
 except Exception: sha = ''
 # links shared with the E9 Companion (repo-root links.json); an empty link is hidden
 PATREON = json.load(open(os.path.join(os.path.dirname(ROOT), 'links.json'))).get('patreon', '')
-ATLAS = '0.2.10'  # version of the atlas tools and viewer themselves (Heph 2026-11-05); patch per PR, separate from each module's version
+ATLAS = '0.2.11'  # version of the atlas tools and viewer themselves (Heph 2026-11-05); patch per PR, separate from each module's version
 VER = f"v{MOD['version']}" + (f"+{os.environ.get('GITHUB_SHA', sha)[:7]}" if (os.environ.get('GITHUB_SHA') or sha) else '') + ' · ' + datetime.date.today().isoformat()
 ENV = dict(os.environ, HEXDEM=','.join(map(str, MOD['dem'])), HEXADMIN=os.path.normpath(os.path.join(mdir, MOD['admin'])),
            HEXTILES=os.path.join(ROOT, 'assets', 'tiles', 'icons'), HEXGEO=geo, MODVER=VER, MODATLAS=ATLAS, MODTITLE=MOD.get('short', MOD['title']),
@@ -158,6 +158,14 @@ if ENC:
     os.makedirs(out + '/bestiary', exist_ok=True)
     for r, b in BEST.items(): json.dump(b, open(f'{out}/bestiary/{r}.json', 'w'), ensure_ascii=False, indent=1)
     if os.path.isdir(out + '/atlas'): json.dump({'creatures': CREATURES}, open(out + '/atlas/creatures.json', 'w'), ensure_ascii=False)
+# Encounter maps (ENCOUNTER_FORMAT.md): published as they are, one JSON per map plus its pictures
+EMAPS = {}
+edir = os.path.join(mdir, 'encounter-maps')
+if os.path.isdir(edir):
+    shutil.copytree(edir, out + '/encounter-maps', dirs_exist_ok=True, ignore=shutil.ignore_patterns('plan.json'))
+    EMAPS = {f[:-5]: f'encounter-maps/{f}' for f in sorted(os.listdir(edir)) if f.endswith('.json')}
+for s_ in SITES:
+    if MOD.get('site_encounters', {}).get(s_['name']): s_['encounter'] = MOD['site_encounters'][s_['name']]
 H0 = next(h for h in G['hexes'] if h['col'] == 0 and h['row'] == 0)
 M = {'format': 'mm-module/1', 'id': MOD['id'], 'title': MOD['title'], 'short': MOD.get('short', MOD['title']), 'version': VER, 'atlas': ATLAS, 'license': MOD.get('license', 'CC0-1.0'),
      'scales': {'mile_ft': 5000, 'region_hex_mi': MOD['atlas']['page_hex_mi'], 'march_hex_mi': HX, 'league_hex_mi': MOD['league']['hex_mi'], 'field_hex_ft': 100, 'encounter_square_ft': 5},
@@ -170,6 +178,7 @@ M = {'format': 'mm-module/1', 'id': MOD['id'], 'title': MOD['title'], 'short': M
                       center_px=p['center_px'], sites=[dict(s_, slug=slug(s_['name'])) for s_ in p['sites']]) for p in PI],
      'sites': SITES, 'aliases': ALIASES,
      **({'encounters': 'encounters.json', 'bestiary': {r: f'bestiary/{r}.json' for r in BEST}} if ENC else {}),
+     **({'encounter_maps': EMAPS} if EMAPS else {}),
      'names': MOD.get('names', {}),  # label translations {name as on the map: {'en': ..., 'ga': ...}}; the viewer's Language box uses them
      'links': {'world': '#world', 'march': '#march-<page>', 'league': '#l-<march hex>', 'site': '#l-<march hex>--<slug>', 'hex': '#<map>:<hex>'},
      'print': {'atlas': 'print/atlas.pdf', 'leagues': 'print/leagues.pdf'} if PDF else {}}
