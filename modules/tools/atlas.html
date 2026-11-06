@@ -355,7 +355,7 @@ async function loadModules() {
   await Promise.all(D.terrain.marches.map(loadMarch));
   let SC = {};
   try { const j = await (await fetch(A + 'creatures.json')).json(); CR = j.creatures || []; SC = j.scenes || {}; } catch (e) { CR = []; }  // a module without creatures has no file
-  if (window.E9Map) Object.assign(E9Map, { base: MOD.base, creatures: CR, scenes: SC });  // encounter maps sit in the module folder
+  if (window.E9Map) Object.assign(E9Map, { base: MOD.base, module: MOD.id, creatures: CR, scenes: SC });  // encounter maps sit in the module folder
   smoothRivers(); go();
 })();
 </script></body></html>

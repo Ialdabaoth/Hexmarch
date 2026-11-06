@@ -9,7 +9,9 @@
 #e9map .hd .x{border:0;background:none;font-size:20px;line-height:1;color:#6b604c}
 #e9map .body{flex:1;display:grid;grid-template-columns:1fr 300px;min-height:0}
 #e9map .vp{overflow:auto;position:relative;display:grid;background:#3a342b;cursor:grab;touch-action:none}#e9map .vp.drag{cursor:grabbing}
-#e9map .pg{position:relative;--q:40px;margin:auto}
+#e9map .pg{position:relative;--q:40px;margin:auto;overflow:hidden}
+#e9map .pg svg.ps{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+#e9map .hd button.on{background:#7a2e2e;color:#fffaf0;border-color:#7a2e2e}
 #e9map .pg img{position:absolute;display:block;user-select:none;-webkit-user-drag:none;pointer-events:none}
 #e9map .ar{position:absolute;border:2px solid transparent;border-radius:3px;cursor:pointer}
 #e9map .ar:hover{border-color:#7a2e2ecc;background:#7a2e2e14}
@@ -32,11 +34,14 @@
 <script>
 "use strict";
 // E9Map.open(pointers, title): one pointer opens its map at the pointed area; several show a picker first.
-// The page sets E9Map.base (the module folder, ending in /), E9Map.creatures (as for E9Card) and E9Map.scenes (encounters.scenes).
+// The page sets E9Map.base (the module folder, ending in /), E9Map.module (its id), E9Map.creatures (as for E9Card) and E9Map.scenes (encounters.scenes).
+// E9Map.load(id) gives a map file with its defaults filled in (the one place export and import code should read maps from).
+// E9Map.actions: header buttons for the map on screen, [{label, title, show(map) -> bool, run(map)}]; VTT export and links plug in here.
 window.E9Map = (() => {
   const dlg = document.getElementById('e9map'), cache = {};
   const e = t => String(t ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
-  const api = { base: '', creatures: [], scenes: {}, open, show };
+  const api = { base: '', module: '', creatures: [], scenes: {}, actions: [], open, show, load };
+  const pref = { get(k) { try { return localStorage.getItem('e9map-' + k); } catch (x) { return null; } }, set(k, v) { try { localStorage.setItem('e9map-' + k, v); } catch (x) {} } };
   let st = null, back = [];  // st: the map on screen; back: where Back returns to
   dlg.addEventListener('click', ev => { if (ev.target === dlg) dlg.close(); });
   dlg.addEventListener('close', () => { st = null; back = []; });
@@ -56,10 +61,20 @@ window.E9Map = (() => {
     };
     pick();
   }
+  // defaults from ENCOUNTER_FORMAT.md section 3, so nothing downstream has to know them
+  function normalise(m, id) {
+    m.id = m.id || id; m.grid = Object.assign({ ft: 5, show: true }, m.grid);
+    m.layers = (m.layers || []).map(L => Object.assign({ at: [0, 0], px: 40, rotate: 0, opacity: 1, show: 'all' }, L));
+    m.ground = m.ground || (m.anchor ? 'generate' : 'none');
+    for (const k of ['walls', 'doors', 'lights']) m[k] = m[k] || [];
+    m.areas = m.areas || {}; m.links = m.links || []; m.environment = m.environment || {};
+    return m;
+  }
   async function load(id) {
-    if (!cache[id]) cache[id] = fetch(api.base + 'encounter-maps/' + encodeURIComponent(id) + '.json').then(r => { if (!r.ok) throw new Error(r.status); return r.json(); });
+    if (!cache[id]) cache[id] = fetch(api.base + 'encounter-maps/' + encodeURIComponent(id) + '.json').then(r => { if (!r.ok) throw new Error(r.status); return r.json(); }).then(m => normalise(m, id));
     try { return await cache[id]; } catch (err) { delete cache[id]; throw err; }
   }
+  const rects = a => Array.isArray(a.squares[0]) ? a.squares : [a.squares];
   const scenesFor = id => Object.entries(api.scenes || {}).filter(([, s]) => s.map && (s.map === id || s.map.map === id));
   async function show(p) {
     let m;
@@ -67,22 +82,35 @@ window.E9Map = (() => {
     shell(m.title || m.id, `<div class="body"><div class="vp"><div class="pg"></div></div><div class="side"></div></div><div class="ft">${e([m.grid && m.grid.ft ? `1 square = ${m.grid.ft} ft` : '', m.credit, m.licence].filter(Boolean).join(' · '))}</div>`);
     const zm = dlg.querySelector('.zm');
     zm.innerHTML = '<button data-z="0.8" title="Zoom out">−</button> <button data-z="1.25" title="Zoom in">+</button> <button data-z="fit">Fit</button>';
+    // map actions: the walls overlay, then whatever the page plugged in (VTT export and links)
+    const ps = m.walls.length + m.doors.length + m.lights.length;
+    if (ps) { const b = document.createElement('button'); b.textContent = 'Walls'; b.title = 'Show the walls, doors and lights a VTT export carries'; b.className = pref.get('walls') === '1' ? 'on' : '';
+      b.onclick = () => { const on = !b.classList.contains('on'); b.classList.toggle('on', on); pref.set('walls', on ? '1' : '0'); dlg.querySelector('svg.ps').style.display = on ? '' : 'none'; }; zm.append(' ', b); }
+    for (const a of api.actions) if (!a.show || a.show(m)) { const b = document.createElement('button'); b.textContent = a.label; if (a.title) b.title = a.title; b.onclick = () => a.run(m); zm.append(' ', b); }
     const vp = dlg.querySelector('.vp'), pg = dlg.querySelector('.pg'), [w, h] = m.size;
     st = { m, vp, pg, sel: null, s: 1 };
     // everything is placed in squares; --q is one square's size on screen
     const q = n => `calc(${n} * var(--q))`;
     pg.style.width = q(w); pg.style.height = q(h);
-    for (const L of m.layers || []) {
+    if (m.ground !== 'none' && m.ground !== 'generate') pg.style.background = m.ground;  // a colour (generated ground comes later)
+    for (const L of m.layers) {
       const im = new Image(); im.alt = ''; im.src = api.base + 'encounter-maps/' + L.src;
-      im.style.left = q(L.at ? L.at[0] : 0); im.style.top = q(L.at ? L.at[1] : 0);
-      im.onload = () => { im.style.width = q(im.naturalWidth / (L.px || 40)); }; pg.append(im);
+      Object.assign(im.style, { left: q(L.at[0]), top: q(L.at[1]), opacity: L.opacity, transformOrigin: '0 0', transform: L.rotate ? `rotate(${L.rotate}deg)` : '' });
+      im.onload = () => { im.style.width = q(im.naturalWidth / L.px); }; pg.append(im);
     }
-    for (const [id, a] of Object.entries(m.areas || {})) {
-      const [x, y, aw, ah] = a.squares, d = document.createElement('div'); d.className = 'ar'; d.dataset.a = id; d.title = a.title || id;
+    if (ps) {  // play surface (section 3): walls red, doors blue (dashed if secret), lights as their reach
+      const pts = a => a.map(p => p.join(',')).join(' ');
+      pg.insertAdjacentHTML('beforeend', `<svg class="ps" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" style="display:${pref.get('walls') === '1' ? '' : 'none'}">`
+        + m.lights.map(l => `<circle cx="${l.at[0]}" cy="${l.at[1]}" r="${l.range}" fill="#ffa04a22" stroke="#e07a1f" stroke-width=".08" stroke-dasharray=".3 .2"/>`).join('')
+        + m.walls.map(wl => `<polyline points="${pts(wl)}" fill="none" stroke="#d01c1c" stroke-width=".18" stroke-linejoin="round" stroke-linecap="round"/>`).join('')
+        + m.doors.map(d => `<polyline points="${pts(d.at)}" stroke="#1c5bd0" stroke-width=".3" stroke-linecap="round"${d.secret ? ' stroke-dasharray=".2 .12"' : ''}/>`).join('') + '</svg>');
+    }
+    for (const [id, a] of Object.entries(m.areas)) for (const [x, y, aw, ah] of rects(a)) {  // an area may be several rectangles
+      const d = document.createElement('div'); d.className = 'ar'; d.dataset.a = id; d.title = a.title || id;
       Object.assign(d.style, { left: q(x), top: q(y), width: q(aw), height: q(ah) });
       pg.append(d);
     }
-    for (const L of m.links || []) {
+    for (const L of m.links) {
       const b = document.createElement('button'); b.className = 'ln'; b.textContent = L.label || 'Link';
       Object.assign(b.style, { left: q(L.from[0] + .5), top: q(L.from[1] + .5) });
       b.onclick = ev => { ev.stopPropagation(); const cur = { ...p }; back.push(() => show(cur)); show({ ...L.to, map: L.to.map || m.id }); };
@@ -100,7 +128,7 @@ window.E9Map = (() => {
     vp.addEventListener('pointerup', end); vp.addEventListener('pointercancel', end);
     vp.addEventListener('wheel', ev => { if (!ev.ctrlKey && !ev.metaKey) return; ev.preventDefault(); zoom(ev.deltaY < 0 ? 1.25 : .8, ev); }, { passive: false });
     fit();
-    const sq = p.area && m.areas && m.areas[p.area] ? m.areas[p.area].squares : p.squares || (p.square ? [p.square[0], p.square[1], 1, 1] : null);
+    const sq = p.area && m.areas[p.area] ? rects(m.areas[p.area])[0] : p.squares || (p.square ? [p.square[0], p.square[1], 1, 1] : null);
     if (sq) { if (p.area) pickArea(p.area); else side(); if (sq[2] * sq[3] < w * h / 4) { st.s = Math.min(1.25, Math.max(st.s, fitScale() * 2)); apply(); } centreOn(sq); }
     else side();
   }
@@ -141,7 +169,7 @@ window.E9Map = (() => {
       for (const [id, a] of Object.entries(m.areas || {}).sort(nat)) {
         const n = all.filter(([, s]) => s.map.area === id).length, b = document.createElement('button');
         b.innerHTML = `${e(a.title || id)}${n ? ` <small>· ${n === 1 ? 'encounter' : n + ' encounters'}</small>` : ''}`;
-        b.onclick = () => { pickArea(id); centreOn(a.squares); }; const li = document.createElement('li'); li.append(b); ul.append(li);
+        b.onclick = () => { pickArea(id); centreOn(rects(a)[0]); }; const li = document.createElement('li'); li.append(b); ul.append(li);
       }
       box.append(ul);
       const loose = all.filter(([, s]) => !s.map.area);
