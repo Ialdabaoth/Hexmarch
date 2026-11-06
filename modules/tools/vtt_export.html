@@ -1,0 +1,92 @@
+<!-- Export for VTT (ENCOUNTER_FORMAT.md section 7, Atlas 0.4.1): plugs into the encounter map viewer through E9Map.actions; build.py and atlas_app.py inline it after encounter_view.html -->
+<style>
+#e9vtt{border:1px solid #8a7f66;border-radius:6px;padding:14px 16px;max-width:min(460px,calc(100vw - 32px));background:#f4efe1;color:#2b2418;font:14px/1.4 Georgia,serif;box-shadow:0 6px 24px #0005}
+#e9vtt::backdrop{background:#0004}
+#e9vtt h3{margin:0 0 4px;font-size:17px}#e9vtt p{margin:0 0 8px}#e9vtt small{color:#6b604c}
+#e9vtt .opt{display:grid;gap:8px;margin:10px 0}
+#e9vtt .opt button{font:inherit;text-align:left;background:#fffaf0;border:1px solid #b8ab8c;border-radius:6px;padding:7px 12px;cursor:pointer;color:#2b2418}
+#e9vtt .opt button:hover{background:#ebe3cf}#e9vtt .opt button:disabled{opacity:.6;cursor:wait}
+#e9vtt .opt b{display:block}
+#e9vtt .st{min-height:1.4em;color:#7a2e2e}
+#e9vtt .x{float:right;border:0;background:none;font-size:20px;line-height:1;color:#6b604c;cursor:pointer}
+</style>
+<dialog id="e9vtt" aria-labelledby="e9vtt-h"></dialog>
+<script>
+"use strict";
+// E9VTT.uvtt(map) -> Universal VTT object, E9VTT.picture(map) -> {canvas, px}: also usable from the console or other tools.
+window.E9VTT = (() => {
+  const dlg = document.getElementById('e9vtt');
+  const e = t => String(t ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+  const MAXPX = 16e6, MAXSIDE = 16000;  // stay under the smallest browser canvas limit (iOS Safari, about 16.7 megapixels)
+  const xy = ([x, y]) => ({ x, y });
+  const argb = c => { const m = /^#?([0-9a-f]{6})$/i.exec(c || ''); return 'ff' + (m ? m[1].toLowerCase() : 'ffffff'); };
+  const img = src => new Promise((ok, no) => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => no(new Error('could not load ' + src)); i.src = src; });
+  // the map flattened to one picture: players' layers only, at the largest layer's pixels per square (smaller if the canvas would be too big)
+  async function picture(m) {
+    const [w, h] = m.size, lay = m.layers.filter(L => L.show !== 'referee');
+    let px = Math.round(lay.length ? Math.max(...lay.map(L => L.px)) : 40);
+    px = Math.max(8, Math.floor(Math.min(px, Math.sqrt(MAXPX / (w * h)), MAXSIDE / Math.max(w, h))));
+    const cv = document.createElement('canvas'); cv.width = w * px; cv.height = h * px;
+    const g = cv.getContext('2d');
+    g.fillStyle = m.ground && m.ground !== 'none' && m.ground !== 'generate' ? m.ground : '#f4efe1'; g.fillRect(0, 0, cv.width, cv.height);
+    for (const L of lay) {
+      const im = await img(E9Map.base + 'encounter-maps/' + L.src), s = px / L.px;
+      g.save(); g.globalAlpha = L.opacity; g.translate(L.at[0] * px, L.at[1] * px); if (L.rotate) g.rotate(L.rotate * Math.PI / 180);
+      g.drawImage(im, 0, 0, im.naturalWidth * s, im.naturalHeight * s); g.restore();
+    }
+    return { canvas: cv, px };
+  }
+  const blobOf = (cv, type) => new Promise(ok => cv.toBlob(ok, type));
+  const b64 = blob => new Promise(ok => { const r = new FileReader(); r.onload = () => ok(String(r.result).split(',')[1]); r.readAsDataURL(blob); });
+  // ENCOUNTER_FORMAT.md section 7: squares stay squares, points become {x, y}, colours ARGB without '#'
+  function uvtt(m, px, image) {
+    const env = m.environment || {};
+    return {
+      format: 0.3,
+      resolution: { map_origin: { x: 0, y: 0 }, map_size: xy(m.size), pixels_per_grid: px },
+      line_of_sight: m.walls.map(wl => wl.map(xy)),
+      objects_line_of_sight: [],
+      portals: m.doors.map(d => { const [a, b] = d.at; return { position: xy([(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]), bounds: [xy(a), xy(b)],
+        rotation: Math.atan2(b[1] - a[1], b[0] - a[0]), closed: d.closed !== false, freestanding: false }; }),
+      environment: { baked_lighting: !!env.baked, ambient_light: argb(env.ambient) },
+      lights: m.lights.map(l => ({ position: xy(l.at), range: l.range, intensity: l.intensity ?? 1, color: argb(l.colour), shadows: true })),
+      // what Universal VTT has no field for; other tools ignore it, E9 import reads it back
+      e9: { format: m.format, module: E9Map.module, id: m.id, title: m.title, grid: m.grid, areas: m.areas, links: m.links, anchor: m.anchor,
+            doors: m.doors, licence: m.licence, credit: m.credit },
+      image
+    };
+  }
+  function save(blob, name) {
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 60e3);
+  }
+  const fname = (m, ext) => [E9Map.module, m.id].filter(Boolean).join('-') + ext;
+  function open(m) {
+    const [w, h] = m.size, ft = m.grid.ft || 5;
+    dlg.innerHTML = `<button class="x" aria-label="Close">×</button><h3 id="e9vtt-h">Export for VTT</h3>
+      <p><small>${e(m.title || m.id)} · ${w} × ${h} squares of ${ft} ft · ${m.walls.length} walls, ${m.doors.length} doors, ${m.lights.length} lights</small></p>
+      <div class="opt">
+        <button data-k="uvtt"><b>Universal VTT (.uvtt)</b><small>Picture, grid, walls, doors and lights in one file. Foundry VTT (Universal Battlemap Importer), Fantasy Grounds Unity, Arkenforge and others. Same content as Dungeondraft's .dd2vtt: rename it if a tool asks for that.</small></button>
+        <button data-k="png"><b>Picture only (.png)</b><small>The map on its own, for Roll20, Owlbear Rodeo and others that take an image: set the grid to the pixels per square shown when it is saved.</small></button>
+      </div>
+      <p class="st" aria-live="polite"></p>
+      <p><small>${e([m.credit, m.licence].filter(Boolean).join(' · '))}</small></p>`;
+    const st = dlg.querySelector('.st'), btns = [...dlg.querySelectorAll('.opt button')];
+    dlg.querySelector('.x').onclick = () => dlg.close();
+    dlg.querySelector('.opt').onclick = async ev => {
+      const b = ev.target.closest('button'); if (!b) return;
+      btns.forEach(x => x.disabled = true); st.textContent = 'Drawing the picture…';
+      try {
+        const { canvas, px } = await picture(m), png = await blobOf(canvas, 'image/png');
+        if (b.dataset.k === 'png') { save(png, fname(m, `-${px}px.png`)); st.textContent = `Saved. Grid: ${px} pixels per square, ${w} × ${h} squares.`; }
+        else { const j = JSON.stringify(uvtt(m, px, await b64(png))); save(new Blob([j], { type: 'application/json' }), fname(m, '.uvtt')); st.textContent = `Saved (${(j.length / 1048576).toFixed(1)} MB, ${px} pixels per square).`; }
+      } catch (err) { st.textContent = 'Export failed: ' + err.message; }
+      btns.forEach(x => x.disabled = false);
+    };
+    dlg.addEventListener('click', ev => { if (ev.target === dlg) dlg.close(); });
+    dlg.showModal();
+  }
+  if (window.E9Map) E9Map.actions.push({ label: 'Export for VTT', title: 'Save this map for Foundry, Fantasy Grounds, Roll20, Owlbear Rodeo…', run: open });
+  return { picture, uvtt: async m => { const { canvas, px } = await picture(m); return uvtt(m, px, await b64(await blobOf(canvas, 'image/png'))); }, open };
+})();
+</script>

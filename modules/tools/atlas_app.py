@@ -14,7 +14,7 @@ TOOLS = os.path.dirname(os.path.abspath(__file__)); REPO = os.path.dirname(os.pa
 site = os.path.abspath(sys.argv[1])
 ATLAS = open(TOOLS + '/ATLAS_VERSION').read().strip()
 PATREON = json.load(open(os.path.join(REPO, 'links.json'))).get('patreon', '')  # shared with the E9 Companion; empty hides the link
-CARD = open(TOOLS + '/creature_card.html').read() + open(TOOLS + '/encounter_view.html').read()  # index card and encounter map viewer
+CARD = open(TOOLS + '/creature_card.html').read() + open(TOOLS + '/encounter_view.html').read() + open(TOOLS + '/vtt_export.html').read()  # index card and encounter map viewer
 html = open(TOOLS + '/atlas.html').read().replace('{{ATLAS}}', ATLAS).replace('<!--CARD-->', CARD).replace('{{PATREON}}', json.dumps(PATREON))
 os.makedirs(site + '/atlas', exist_ok=True)
 open(site + '/atlas/index.html', 'w').write(html)
