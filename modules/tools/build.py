@@ -162,6 +162,7 @@ if ENC:
 EMAPS = {}
 edir = os.path.join(mdir, 'encounter-maps')
 if os.path.isdir(edir):
+    subprocess.run(PY + [TOOLS + '/encounter_check.py', mdir], check=True)  # stops the build on a broken map or pointer
     shutil.copytree(edir, out + '/encounter-maps', dirs_exist_ok=True, ignore=shutil.ignore_patterns('plan.json'))
     EMAPS = {f[:-5]: f'encounter-maps/{f}' for f in sorted(os.listdir(edir)) if f.endswith('.json')}
 for s_ in SITES:

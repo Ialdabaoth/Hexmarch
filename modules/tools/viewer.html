@@ -110,7 +110,7 @@ if (new URLSearchParams(location.search).get('tools') === 'host') document.docum
 <script type="application/json" id="module-data">/*DATA*/</script>
 <script>
 const D = JSON.parse(document.getElementById('module-data').textContent);
-if (window.E9Map) Object.assign(E9Map, { base: '', creatures: D.creatures || [], scenes: D.scenes || {} });
+if (window.E9Map) Object.assign(E9Map, { base: '', module: D.id, creatures: D.creatures || [], scenes: D.scenes || {} });
 const stage = document.getElementById('stage'), lists = document.getElementById('lists'), NS = 'http://www.w3.org/2000/svg';
 const EX = Object.fromEntries(D.leagues.map(p => [p.key, p])), AL = D.aliases || {};
 const cache = {}; let cur = null, natW = 1, natH = 1, z = 1, svg = null;

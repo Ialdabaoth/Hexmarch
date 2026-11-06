@@ -22,13 +22,21 @@ Plan keys (all coordinates in squares, [x, y] from the top-left, y down):
   trees   [{"in": shape, "n": count, "kind": "oak"|"pine"|"scrub"|"reed", "r": radius}] scattered, seeded
   marks   [{"t": kind, "at": [x,y], ...}] kinds: num, letter, cave (mouth, optional "size"), label (optional "rot" degrees, "size", \n for lines), pit, secret, door, locked, stairs,
           fire, tent, web, bones, bed, table, chest, well, oak, sac, stake, garden, dotted, window
-  areas, links, notes   copied into the map file
+  areas, links, notes, credit   copied into the map file
+
+Play surface (Atlas 0.4.0, for Universal VTT export, ENCOUNTER_FORMAT.md sections 3 and 7): the map file also gets
+  walls   sight-blocking polylines in squares: the floor's edge (caves, dug floors outdoors) and the outline of curtain
+          walls, towers and buildings, cut open where a door stands. Cliffs ("rock") and water stay open ground.
+  doors   one per door, locked or secret mark: a one-square segment across the mark ("dir" h or v), closed
+  lights  one per fire mark, 6 squares (30 ft), warm colour
+  plan key "openings": shapes that cut the walls without drawing anything (a gate passage, an open archway)
+`--json` rewrites only the map files and leaves the pictures alone (JPEG bytes differ between Pillow builds).
 """
-import json, math, os, random, sys
+import json, math, os, random, re, sys
 import numpy as np
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 from shapely.geometry import Point, Polygon, LineString, box
-from shapely.ops import unary_union
+from shapely.ops import unary_union, linemerge
 from shapely import affinity
 
 FONT_B = '/usr/share/fonts/truetype/dejavu/DejaVuSerif-Bold.ttf'
@@ -441,14 +449,43 @@ def render(plan, rng):
     ax, ay = W - P * 1.2, P * 1.6
     d.polygon([(ax, ay - P), (ax + .35 * P, ay + .3 * P), (ax, ay), (ax - .35 * P, ay + .3 * P)], fill=INK)
     text_c(d, (ax, ay + .8 * P), 'N', fonts['num'], stroke=(244, 236, 214))
-    return im
+    return im, floor
 
 
-def build(root, mid):
+DOORS = ('door', 'locked', 'secret')
+
+
+def play_surface(plan, floor):
+    """Walls, doors and lights (ENCOUNTER_FORMAT.md section 3) from the same shapes the picture is drawn from."""
+    w, h = plan['size']; frame = box(0, 0, w, h); r2 = lambda v: round(v, 2)
+    doors, lights, cuts = [], [], []
+    for m in plan.get('marks', []):
+        x, y = m['at']
+        if m['t'] in DOORS:
+            a, b = ([x - .5, y], [x + .5, y]) if m.get('dir', 'h') == 'h' else ([x, y - .5], [x, y + .5])
+            doors.append({'at': [[r2(v) for v in a], [r2(v) for v in b]], 'closed': True, 'secret': m['t'] == 'secret', **({'locked': True} if m['t'] == 'locked' else {})})
+            cuts.append(box(x - .55, y - .55, x + .55, y + .55))
+        elif m['t'] == 'fire':
+            lights.append({'at': [r2(x), r2(y)], 'range': 6, 'colour': '#ffa04a', 'intensity': 1})
+    masonry = unary_union([shape(s) for k in ('walls', 'towers', 'buildings') for s in plan.get(k, [])] or [Polygon()])
+    solid = unary_union([floor.intersection(frame).boundary, masonry.intersection(frame).boundary])
+    solid = solid.difference(frame.exterior.buffer(.02))  # the map's own edge is not a wall
+    cuts += [shape(o) for o in plan.get('openings', [])]
+    if cuts: solid = solid.difference(unary_union(cuts))
+    if solid.is_empty: lines = []
+    else:
+        g = linemerge(solid) if solid.geom_type == 'MultiLineString' else solid
+        lines = [ln.simplify(.08) for ln in getattr(g, 'geoms', [g]) if ln.geom_type == 'LineString' and ln.length > .2]
+    walls = [[[r2(x), r2(y)] for x, y in ln.coords] for ln in lines]
+    return walls, doors, lights
+
+
+def build(root, mid, draw=True):
     pdir = os.path.join(root, mid); plan = json.load(open(os.path.join(pdir, 'plan.json')))
     rng = random.Random(plan.get('seed', mid))
-    im = render(plan, rng)
-    im.save(os.path.join(pdir, 'map.jpg'), quality=82, optimize=True, progressive=True)
+    im, floor = render(plan, rng)
+    if draw: im.save(os.path.join(pdir, 'map.jpg'), quality=82, optimize=True, progressive=True)
+    walls, doors, lights = play_surface(plan, floor)
     P = plan.get('px', 40)
     m = {'format': 'e9-encounter-map/1', 'id': mid, 'title': plan['title'], 'size': plan['size'],
          'grid': {'ft': plan.get('ft', 5), 'show': True},
@@ -457,13 +494,16 @@ def build(root, mid):
     if plan.get('terrain'): m['terrain'] = plan['terrain']
     for k in ('anchor', 'areas', 'links', 'notes'):
         if plan.get(k): m[k] = plan[k]
-    m.update({'walls': [], 'doors': [], 'lights': [], 'environment': {},
-              'licence': 'CC0', 'credit': 'Drawn for Beyond the Pale with the E9 Atlas encounter tool (original layout, no traced art)'})
-    json.dump(m, open(os.path.join(root, mid + '.json'), 'w'), ensure_ascii=False, indent=1)
-    print(f"{mid}: {plan['size'][0]}x{plan['size'][1]} squares, {len(plan.get('areas', {}))} areas, {os.path.getsize(os.path.join(pdir, 'map.jpg')) // 1024} KB")
+    m.update({'walls': walls, 'doors': doors, 'lights': lights, 'environment': {},
+              'licence': plan.get('licence', 'CC0'), 'credit': plan.get('credit', 'Drawn for Beyond the Pale with the E9 Atlas encounter tool')})
+    txt = json.dumps(m, ensure_ascii=False, indent=1)
+    txt = re.sub(r'\[\s+(-?[\d.]+),\s+(-?[\d.]+)\s+\]', r'[\1, \2]', txt)  # one [x, y] point per line, not three
+    open(os.path.join(root, mid + '.json'), 'w').write(txt)
+    print(f"{mid}: {plan['size'][0]}x{plan['size'][1]} squares, {len(plan.get('areas', {}))} areas, {len(walls)} walls, {len(doors)} doors, {len(lights)} lights, {os.path.getsize(os.path.join(pdir, 'map.jpg')) // 1024} KB")
 
 
 if __name__ == '__main__':
-    root = sys.argv[1]
-    ids = sys.argv[2:] or sorted(d for d in os.listdir(root) if os.path.isfile(os.path.join(root, d, 'plan.json')))
-    for mid in ids: build(root, mid)
+    args = [a for a in sys.argv[1:] if a != '--json']; draw = '--json' not in sys.argv
+    root = args[0]
+    ids = args[1:] or sorted(d for d in os.listdir(root) if os.path.isfile(os.path.join(root, d, 'plan.json')))
+    for mid in ids: build(root, mid, draw)
