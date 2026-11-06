@@ -317,7 +317,7 @@ def render(plan, rng):
         if not cob.is_empty:
             im.paste(texture(W, H, (176, 168, 150), rng, 12, 1), (0, 0), mask_of(cob, W, H, P))
             d = ImageDraw.Draw(im, 'RGBA')
-            for p_ in polys(cob):
+            for p_ in polys(union([c for c in plan['cobbles'] if not c.get('plain')])):
                 x0, y0, x1, y1 = p_.bounds
                 for yy in range(int(y0 * 2), int(y1 * 2) + 1):
                     for xx in range(int(x0 * 2), int(x1 * 2) + 1):
@@ -383,7 +383,7 @@ def render(plan, rng):
     im.paste(grid, (0, 0), Image.composite(grid, Image.new('RGBA', (W, H)), gmask))
     d = ImageDraw.Draw(im, 'RGBA')
     # trees and scrub, seeded, never on the floor, water or rock
-    block = unary_union([floor, water, union(plan.get('road', [])), union(plan.get('walls', [])), union(plan.get('buildings', [])), union(plan.get('towers', []))] + ([union(plan.get('rock', []))] if not cave else []))
+    block = unary_union([floor, water, union(plan.get('road', [])), union(plan.get('walls', [])), union(plan.get('buildings', [])), union(plan.get('towers', [])), union(plan.get('cobbles', []))] + ([union(plan.get('rock', []))] if not cave else []))
     for t in plan.get('trees', []):
         g = shape(t['in']).difference(block.buffer(t.get('r', 1) * .6))
         for x, y in sorted(scatter(g, t['n'], rng, t.get('r', 1) * 1.2), key=lambda p: p[1]):
