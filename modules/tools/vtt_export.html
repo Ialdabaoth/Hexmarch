@@ -51,7 +51,7 @@ window.E9VTT = (() => {
       environment: { baked_lighting: !!env.baked, ambient_light: argb(env.ambient) },
       lights: m.lights.map(l => ({ position: xy(l.at), range: l.range, intensity: l.intensity ?? 1, color: argb(l.colour), shadows: true })),
       // what Universal VTT has no field for; other tools ignore it, E9 import reads it back
-      e9: { format: m.format, module: E9Map.module, id: m.id, title: m.title, grid: m.grid, areas: m.areas, links: m.links, anchor: m.anchor,
+      e9: { format: m.format, module: E9Map.module, id: m.id, title: m.title, grid: m.grid, areas: m.areas, links: m.links, anchor: m.anchor, spawns: m.spawns,
             doors: m.doors, licence: m.licence, credit: m.credit },
       image
     };
