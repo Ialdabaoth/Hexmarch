@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>{{TITLE}} · E9 Atlas</title>
+<title>E9 Atlas</title>
 <style>
 :root{--bg:#f4efe1;--ink:#2b2418;--dim:#6b604c;--line:#8a7f66;--red:#7a2e2e}
 *{box-sizing:border-box}html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:Georgia,serif}
@@ -17,6 +17,10 @@ button,select{font:inherit;font-size:14px;background:#fffaf0;border:1px solid #b
 #key .sw{width:30px;height:26px;flex:none;background-size:cover;background-position:center;display:flex;align-items:center;justify-content:center}
 #key .sw img{max-width:26px;max-height:22px}#key small{color:var(--dim)}
 #key .emb{font:inherit;font-size:12px;padding:0 6px;margin-top:2px;border-radius:10px;cursor:pointer}#key .emb:hover{background:#ebe3cf}
+#mod{color:var(--red)}
+#modules{border:1px solid #b8ab8c;border-radius:8px;background:var(--bg);color:var(--ink);padding:12px 16px;max-width:min(440px,92vw)}#modules::backdrop{background:#0004}
+#modules h2{font-size:16px;margin:0 0 8px;font-weight:normal}#modules ul{list-style:none;margin:0 0 10px;padding:0}
+#modules li button{width:100%;text-align:left;margin:2px 0;padding:6px 10px}#modules li button[disabled]{opacity:.55;cursor:default}#modules li button.on{border-color:var(--red)}#modules small{color:var(--dim)}
 #key .support{margin:14px 0 4px;padding-top:8px;border-top:1px solid #d8cfb8;color:var(--dim)}#key .support a{color:var(--red)}
 body.nokey #key{display:none}@media(max-width:700px){#key{position:absolute;right:0;top:0;bottom:0;box-shadow:-2px 0 8px #0003}}
 canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor:pointer}
@@ -26,9 +30,10 @@ footer{display:flex;justify-content:space-between;gap:12px;padding:4px 16px;font
 <header><h1 id="crumbs"></h1>
 <div class="ctl"><select id="lang"><option value="ga">Gaeilge</option><option value="en">English</option></select>
 <label><input type="checkbox" id="edges" checked> Hex Edges</label>
-<button id="out" title="Zoom out">−</button><button id="in" title="Zoom in">+</button><button id="fit">Fit</button><button id="keybtn">Key</button></div></header>
+<button id="out" title="Zoom out">−</button><button id="in" title="Zoom in">+</button><button id="fit">Fit</button><button id="keybtn">Key</button><button id="modbtn" title="Load a different module">Modules</button></div></header>
 <div id="main"><div id="map"><canvas id="cv"></canvas></div><aside id="key"></aside></div>
-<footer><span id="hover">Click a hex to zoom in.</span><span>E9 Atlas {{ATLAS}} · dynamic preview</span></footer>
+<footer><span id="hover">Click a hex to zoom in.</span><span>E9 Atlas {{ATLAS}}<span id="modver"></span></span></footer>
+<dialog id="modules"><h2>Load a module</h2><ul id="modlist"></ul><button id="modclose">Close</button></dialog>
 <!--CARD-->
 <script>
 "use strict";
@@ -70,7 +75,7 @@ function tile(n) {
     g.drawImage(bg, 0, 0); g.globalCompositeOperation = 'destination-in'; g.drawImage(m, 0, 0);
     return IMG[n] = c;
   }
-  let im = IMG[n]; if (!im) { im = IMG[n] = new Image(); im.onload = redraw; im.src = 'tiles/' + n + '.png'; }
+  let im = IMG[n]; if (!im) { im = IMG[n] = new Image(); im.onload = redraw; im.src = A + 'tiles/' + n + '.png'; }
   if (!(im instanceof HTMLImageElement)) return im;
   if (!im.complete || !im.naturalWidth) return null;
   if (n.startsWith('bg-')) {  // background tiles become canvases too, so they are resampled exactly like the blend tiles drawn over them
@@ -80,7 +85,7 @@ function tile(n) {
   return im;
 }
 async function loadMarch(m) {
-  const blob = await (await fetch(m.png)).blob();
+  const blob = await (await fetch(A + m.png)).blob();
   const bm = await createImageBitmap(blob, { colorSpaceConversion: 'none', premultiplyAlpha: 'none' });
   const c = new OffscreenCanvas(1600, 1200), g = c.getContext('2d'); g.drawImage(bm, 0, 0);
   const px = g.getImageData(0, 0, 1600, 1200).data, a = new Uint8Array(1600 * 1200), key = {};
@@ -226,11 +231,11 @@ const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;',
 function key(ts, ps) {
   let h = '<h2>Terrain</h2>';
   TYPES.forEach((t, k) => { if (!ts.has(k + 1)) return;
-    h += `<div class="row"><span class="sw" style="background-color:${t.color};background-image:url(tiles/${t.tile}.png)">${t.icon ? `<img src="tiles/${t.icon}.png" alt="">` : ''}</span>${esc(t.name)}</div>`; });
+    h += `<div class="row"><span class="sw" style="background-color:${t.color};background-image:url(${A}tiles/${t.tile}.png)">${t.icon ? `<img src="${A}tiles/${t.icon}.png" alt="">` : ''}</span>${esc(t.name)}</div>`; });
   if (ps.length) {
     h += '<h2>Places</h2>';
     for (const p of ps.slice().sort((a, b) => name(a.name).localeCompare(name(b.name))))
-      h += `<div class="row pl" data-id="${esc(p.id)}"><span class="sw">${p.icon ? `<img src="tiles/${p.icon}.png" alt="">` : ''}</span><span>${esc(name(p.name))}<br><small>${esc(p.kind)}${p.book ? ' · ' + esc(p.book) : ''}</small>${p.encounter && window.E9Map ? `<br><button class="emb" data-id="${esc(p.id)}">${p.encounter.length > 1 ? p.encounter.length + ' encounter maps' : 'Encounter map'}</button>` : ''}</span></div>`;
+      h += `<div class="row pl" data-id="${esc(p.id)}"><span class="sw">${p.icon ? `<img src="${A}tiles/${p.icon}.png" alt="">` : ''}</span><span>${esc(name(p.name))}<br><small>${esc(p.kind)}${p.book ? ' · ' + esc(p.book) : ''}</small>${p.encounter && window.E9Map ? `<br><button class="emb" data-id="${esc(p.id)}">${p.encounter.length > 1 ? p.encounter.length + ' encounter maps' : 'Encounter map'}</button>` : ''}</span></div>`;
   }
   // creatures in the hex being looked at (the dashed one): their lair is a place in it, or a 100-ft hex address in it
   const here = creaturesHere();
@@ -279,10 +284,9 @@ function goDown(x, y) {  // Heph's rule: anything clicked zooms in one level, ce
   else location.hash = addr(C, R);
 }
 function crumbs() {
-  const out = [`<b>${D.title}</b>`, `<a href="#world">Region</a>`];
+  const out = [`<a id="mod" href="${esc(MOD.base)}" title="Loaded module: ${esc(MOD.path)} (opens its map viewer)"><b>${esc(D.title)}</b></a>`, `<a href="#world">Region</a>`];
   let C, R;
   if (V.lvl !== 'region') [C, R] = V.lvl === 'march' ? centre(V.i, V.j, 1200) : V.sel || centre(V.i, V.j, LV[V.lvl].own);
-  if (V.lvl === 'field' && !V.sel) [C, R] = centre(V.i, V.j, 25), C = C, R = R;
   if (C !== undefined) {
     const [mi, mj] = V.lvl === 'march' ? [V.i, V.j] : nearest(C, R, 1200); out.push(`<a href="${marchAddr(mi, mj)}">March ${marchAddr(mi, mj).slice(7)}</a>`);
     if (V.lvl !== 'march') { const [li, lj] = nearest(C, R, 150); out.push(`<a href="${leagueAddr(li, lj)}">League ${leagueAddr(li, lj).slice(7)}</a>`); }
@@ -319,13 +323,39 @@ document.getElementById('edges').onchange = e => { EDGES = e.target.checked; red
 document.getElementById('lang').onchange = e => { lang = e.target.value; crumbs(); redraw(); };
 addEventListener('hashchange', go); addEventListener('resize', redraw);
 
+// ---- modules (Heph 2026-11-06): the Atlas is one app at /atlas/ that loads any module listed in the site's mm.json ----
+// ?module=<id> picks one (else the last one opened, else the first with an atlas); A is that module's atlas folder
+let MODS = [], MOD = null, A = '';
+const SITE = new URL('../', location.href), store = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} } };
+const plainVer = v => String(v || '').replace(/^v/, '');
+function pick(id) { const u = new URL(location.href); u.searchParams.set('module', id); u.hash = ''; location.href = u.href; }
+function modList() {
+  document.getElementById('modlist').innerHTML = MODS.map(m => `<li><button data-id="${esc(m.id)}"${m.ok ? '' : ' disabled'}${m === MOD ? ' class="on"' : ''}>${esc(m.title)}<br><small>${esc(m.path)}${m.version ? ' · v' + esc(plainVer(m.version).split(' ')[0]) : ''}${m === MOD ? ' · loaded' : m.ok ? '' : ' · no atlas map'}</small></button></li>`).join('');
+}
+document.getElementById('modbtn').onclick = () => { modList(); document.getElementById('modules').showModal(); };
+document.getElementById('modclose').onclick = () => document.getElementById('modules').close();
+document.getElementById('modlist').addEventListener('click', e => { const b = e.target.closest('button[data-id]'); if (b && !b.disabled) { if (MOD && b.dataset.id === MOD.id) document.getElementById('modules').close(); else pick(b.dataset.id); } });
+async function loadModules() {
+  const repo = await (await fetch(new URL('mm.json', SITE))).json();
+  MODS = await Promise.all((repo.modules || []).map(async m => {
+    const base = new URL(m.path.replace(/\/?$/, '/'), SITE).href, r = { id: m.id, path: m.path, title: m.id, version: '', base, ok: false };
+    try { const j = await (await fetch(base + 'module.json')).json(); Object.assign(r, { title: j.title || m.id, version: j.version || '', ok: !!j.atlas_map }); } catch (e) {}
+    return r; }));
+  const want = new URLSearchParams(location.search).get('module') || store.get('e9-atlas-module');
+  MOD = MODS.find(m => m.id === want && m.ok) || MODS.find(m => m.ok);
+}
+
 (async () => {
-  D = await (await fetch('map.json')).json(); TYPES = D.terrain.types; LBL = D.labels;
+  try { await loadModules(); } catch (e) {}
+  if (!MOD) { document.getElementById('crumbs').textContent = 'No module with an atlas map was found.'; if (MODS.length) { modList(); document.getElementById('modules').showModal(); } return; }
+  A = MOD.base + 'atlas/'; store.set('e9-atlas-module', MOD.id);
+  document.title = MOD.title + ' · E9 Atlas'; document.getElementById('modver').textContent = ' · ' + MOD.title + (MOD.version ? ' v' + plainVer(MOD.version).split(' ')[0] : '');
+  D = await (await fetch(A + 'map.json')).json(); TYPES = D.terrain.types; LBL = D.labels;
   TYPES.forEach((t, k) => { T_BG[k + 1] = t.tile; if (t.icon) T_ICON[k + 1] = t.icon; });
   await Promise.all(D.terrain.marches.map(loadMarch));
   let SC = {};
-  try { const j = await (await fetch('creatures.json')).json(); CR = j.creatures || []; SC = j.scenes || {}; } catch (e) { CR = []; }  // a module without creatures has no file
-  if (window.E9Map) Object.assign(E9Map, { base: '../', creatures: CR, scenes: SC });  // encounter maps sit beside the atlas folder
+  try { const j = await (await fetch(A + 'creatures.json')).json(); CR = j.creatures || []; SC = j.scenes || {}; } catch (e) { CR = []; }  // a module without creatures has no file
+  if (window.E9Map) Object.assign(E9Map, { base: MOD.base, creatures: CR, scenes: SC });  // encounter maps sit in the module folder
   smoothRivers(); go();
 })();
 </script></body></html>

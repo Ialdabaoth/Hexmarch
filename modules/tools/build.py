@@ -33,9 +33,7 @@ for la in range(la0, la1 + 1):
             print('fetching', t); urllib.request.urlretrieve(f'https://s3.amazonaws.com/elevation-tiles-prod/skadi/{t[:3]}/{t}.hgt.gz', f)
 try: sha = subprocess.run(['git', 'rev-parse', '--short', 'HEAD'], capture_output=True, text=True, cwd=ROOT).stdout.strip()
 except Exception: sha = ''
-# links shared with the E9 Companion (repo-root links.json); an empty link is hidden
-PATREON = json.load(open(os.path.join(os.path.dirname(ROOT), 'links.json'))).get('patreon', '')
-ATLAS = '0.2.13'  # version of the atlas tools and viewer themselves (Heph 2026-11-05); patch per PR, separate from each module's version
+ATLAS = open(TOOLS + '/ATLAS_VERSION').read().strip()  # the E9 Atlas app and tools (Heph 2026-11-05); patch per PR, separate from each module's version
 VER = f"v{MOD['version']}" + (f"+{os.environ.get('GITHUB_SHA', sha)[:7]}" if (os.environ.get('GITHUB_SHA') or sha) else '') + ' · ' + datetime.date.today().isoformat()
 ENV = dict(os.environ, HEXDEM=','.join(map(str, MOD['dem'])), HEXADMIN=os.path.normpath(os.path.join(mdir, MOD['admin'])),
            HEXTILES=os.path.join(ROOT, 'assets', 'tiles', 'icons'), HEXGEO=geo, MODVER=VER, MODATLAS=ATLAS, MODTITLE=MOD.get('short', MOD['title']),
@@ -80,7 +78,9 @@ if 'centroid' in MOD['atlas']:
             for p_ in range(4):
                 x.paste(x.crop((4, 0, 5, x.height)), (p_, 0)); x.paste(x.crop((r.width + 3, 0, r.width + 4, x.height)), (r.width + 4 + p_, 0))
             x.save(f'{out}/atlas/tiles/mask-{kind}{k}-x.png', optimize=True)
-    open(out + '/atlas/index.html', 'w').write(open(TOOLS + '/atlas.html').read().replace('{{TITLE}}', MOD['title']).replace('{{ATLAS}}', ATLAS).replace('<!--CARD-->', open(TOOLS + '/creature_card.html').read() + open(TOOLS + '/encounter_view.html').read()).replace('{{PATREON}}', json.dumps(PATREON)))
+    # the app itself lives once at <site>/atlas/ (atlas_app.py, Atlas 0.3.0); this old address forwards there, keeping the #link
+    open(out + '/atlas/index.html', 'w').write(f'<!doctype html><meta charset="utf-8"><title>{MOD["title"]} · E9 Atlas</title><meta name="robots" content="noindex">'
+        f'<script>location.replace("../../../atlas/?module={MOD["id"]}" + location.hash)</script><p>The E9 Atlas moved to <a href="../../../atlas/?module={MOD["id"]}">its own page</a>.</p>')
 # 4. PDFs
 if PDF:
     os.makedirs(out + '/print', exist_ok=True)
@@ -179,6 +179,7 @@ M = {'format': 'mm-module/1', 'id': MOD['id'], 'title': MOD['title'], 'short': M
      'sites': SITES, 'aliases': ALIASES,
      **({'encounters': 'encounters.json', 'bestiary': {r: f'bestiary/{r}.json' for r in BEST}} if ENC else {}),
      **({'encounter_maps': EMAPS} if EMAPS else {}),
+     **({'atlas_map': 'atlas/map.json'} if os.path.isdir(out + '/atlas') else {}),  # the E9 Atlas app (<site>/atlas/) lists modules that have one
      'names': MOD.get('names', {}),  # label translations {name as on the map: {'en': ..., 'ga': ...}}; the viewer's Language box uses them
      'links': {'world': '#world', 'march': '#march-<page>', 'league': '#l-<march hex>', 'site': '#l-<march hex>--<slug>', 'hex': '#<map>:<hex>'},
      'print': {'atlas': 'print/atlas.pdf', 'leagues': 'print/leagues.pdf'} if PDF else {}}

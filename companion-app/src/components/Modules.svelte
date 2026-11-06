@@ -43,11 +43,12 @@
       {#each app.modules as m (m.base + m.id)}
         <li>
           <div>
-            <strong>{m.manifest.title}</strong> <span class="small muted">v{m.manifest.version} · {m.manifest.license}</span>
+            <strong>{m.manifest.title}</strong> <span class="small muted">v{String(m.manifest.version).replace(/^v/, '')} · {m.manifest.license}</span>
             <div class="small muted">{m.manifest.books?.length ?? 0} books</div>
           </div>
           <div class="row">
             <a class="button-like" href={viewerUrl(m.base, m.path ?? `${m.id}/`)} target="_blank" rel="noopener">Open</a>
+            {#if m.manifest.atlas_map}<a class="button-like" href={new URL(`atlas/?module=${encodeURIComponent(m.id)}`, m.base).href} target="_blank" rel="noopener">Atlas</a>{/if}
             <button class="ghost" onclick={() => remove(m)} aria-label="Remove {m.manifest.title}">Remove</button>
           </div>
         </li>
