@@ -15,6 +15,13 @@ describe('isViewerMessage', () => {
     expect(isViewerMessage({ type: 'mm-viewer', event: 'view', module: 'season-1', hash: '#atlas-3', map: 'world', title: 'Atlas page 3', small: 'hex 0105' })).toBe(true);
   });
 
+  it('accepts tools and key messages', () => {
+    expect(isViewerMessage({ type: 'mm-viewer', event: 'tools', module: 'isle-of-mists', lang: 'ga', langs: [{ value: 'ga', label: 'Gaeilge' }, { value: 'en', label: 'English' }], edges: true, zoom: 32 })).toBe(true);
+    expect(isViewerMessage({ type: 'mm-viewer', event: 'key', module: 'isle-of-mists', hash: '#world', terrain: [], places: [], creatures: [] })).toBe(true);
+    expect(isViewerMessage({ type: 'mm-viewer', event: 'tools', module: 'isle-of-mists', lang: 'ga', langs: 'ga', edges: true, zoom: 32 })).toBe(false);
+    expect(isViewerMessage({ type: 'mm-viewer', event: 'key', module: 'isle-of-mists', hash: '#world', terrain: {}, places: [], creatures: [] })).toBe(false);
+  });
+
   it('refuses anything else', () => {
     expect(isViewerMessage(null)).toBe(false);
     expect(isViewerMessage('mm-viewer')).toBe(false);

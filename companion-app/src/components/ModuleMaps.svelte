@@ -2,18 +2,23 @@
   import { untrack } from 'svelte';
   import { app } from '../lib/app.svelte';
   import { viewerUrl, type SavedModule } from '../lib/modules';
-  import { isViewerMessage, type ViewerHex } from '../lib/viewer';
+  import { isViewerMessage, type ViewerHex, type ViewerTools } from '../lib/viewer';
 
-  // A module's maps in two frames: the map alone (?mode=map) and its atlas of pages
-  // (?mode=atlas). A page picked in the atlas opens in the map; tapping a hex shows
-  // what's there, and the party can be placed on it.
+  // A module's maps in two frames: the map alone (?mode=map) and its key (?mode=key), drawn
+  // as the E9 Atlas app's side panel: terrain and places in view, creatures here. The map
+  // frame says what's in view and the key frame draws it; a place picked in the key opens
+  // in the map. Tapping a hex shows what's there, and the party can be placed on it.
   const HOME_MODULES = 'https://ialdabaoth.github.io/MateriaMundiRPG/';
 
   let mapFrame = $state<HTMLIFrameElement>();
-  let atlasFrame = $state<HTMLIFrameElement>();
+  let keyFrame = $state<HTMLIFrameElement>();
+  let lastKey: object | null = null;
   let chosen = $state('');
   let picked = $state<ViewerHex | null>(null);
   let showing = $state({ hash: '#world', title: '', small: '' });
+  // The map's language, hex-edge and zoom controls, drawn below the frame. Viewers older
+  // than the "tools" message keep their own controls inside the frame.
+  let tools = $state<ViewerTools | null>(null);
   let busy = $state(false);
   let problem = $state('');
 
@@ -39,13 +44,17 @@
     if (!isViewerMessage(e.data)) return;
     const d = e.data;
     if (mapFrame && e.source === mapFrame.contentWindow) {
-      if (d.event === 'view') {
+      if (d.event === 'tools') tools = d;
+      else if (d.event === 'key') {
+        lastKey = { terrain: d.terrain, places: d.places, creatures: d.creatures };
+        post(keyFrame, { key: lastKey });
+      }
+      else if (d.event === 'view') {
         sendMarks();
         showing = { hash: d.hash, title: d.title ?? '', small: d.small ?? '' };
-        post(atlasFrame, { current: d.hash });
         if (!d.hash.includes(':')) picked = null;
       } else if (d.event === 'hex') picked = d;
-    } else if (atlasFrame && e.source === atlasFrame.contentWindow && d.event === 'select') {
+    } else if (keyFrame && e.source === keyFrame.contentWindow && d.event === 'select') {
       post(mapFrame, { show: d.hash });
     }
   }
@@ -84,14 +93,30 @@
       {#if showing.hash !== '#world'}<button class="ghost small" onclick={() => post(mapFrame, { show: '#world' })}>Whole map</button>{/if}
     </div>
     <div class="frame">
-      <iframe bind:this={mapFrame} class="map" src="{base}?mode=map{start}" title="{current.manifest.title}: map" onload={sendMarks}></iframe>
+      <iframe bind:this={mapFrame} class="map" src="{base}?mode=map&tools=host{start}" title="{current.manifest.title}: map"
+        onload={() => { sendMarks(); post(mapFrame, { tools: true }); }}></iframe>
     </div>
-    <div class="row small bar">
-      <span class="grow muted">
+    <div class="strip small">
+      {#if tools}
+        <div class="row tools">
+          {#if tools.langs.length > 1}
+            <select aria-label="Map language" value={tools.lang} onchange={(e) => { const lang = (e.target as HTMLSelectElement).value; post(mapFrame, { lang }); post(keyFrame, { lang }); }}>
+              {#each tools.langs as l (l.value)}<option value={l.value}>{l.label}</option>{/each}
+            </select>
+          {/if}
+          <label class="check"><input type="checkbox" checked={tools.edges} onchange={(e) => post(mapFrame, { edges: (e.target as HTMLInputElement).checked })} /> Hex edges</label>
+          <span class="zoom">
+            <button aria-label="Zoom out" onclick={() => post(mapFrame, { zoom: 'out' })}>−</button>
+            <span class="pct">{tools.zoom}%</span>
+            <button aria-label="Zoom in" onclick={() => post(mapFrame, { zoom: 'in' })}>+</button>
+          </span>
+        </div>
+      {/if}
+      <div class="muted">
         {#if here && at}Party: hex {at.label} <button class="link" onclick={() => post(mapFrame, { show: `#${at.map}:${at.hex}` })}>Show</button>
         {:else}Tap a hex to see what's there.{/if}
-      </span>
-      <a href="{base}{showing.hash}" target="_blank" rel="noopener">Full screen</a>
+        · <a href="{base}{showing.hash}" target="_blank" rel="noopener">Full screen</a>
+      </div>
     </div>
     {#if picked}
       <section class="card picked">
@@ -105,9 +130,10 @@
       </section>
     {/if}
     <details class="atlas" open>
-      <summary class="small muted">Atlas and exploration pages</summary>
+      <summary class="small muted">Key</summary>
       <div class="frame">
-        <iframe bind:this={atlasFrame} class="list" src="{base}?mode=atlas{start}" title="{current.manifest.title}: atlas"></iframe>
+        <iframe bind:this={keyFrame} class="list" src="{base}?mode=key" title="{current.manifest.title}: key"
+          onload={() => { if (lastKey) post(keyFrame, { key: lastKey }); }}></iframe>
       </div>
     </details>
   {/key}
@@ -128,8 +154,14 @@
   iframe { display: block; width: 100%; border: 0; }
   iframe.map { height: 62vh; }
   iframe.list { height: 45vh; }
-  .bar { margin-top: 0.4rem; flex-wrap: nowrap; }
-  .bar a { color: var(--accent); white-space: nowrap; }
+  .strip { margin-top: 0.4rem; display: flex; flex-direction: column; gap: 0.3rem; align-items: flex-start; }
+  .strip a { color: var(--accent); white-space: nowrap; }
+  .tools { gap: 0.6rem; align-items: center; flex-wrap: wrap; justify-content: flex-start; }
+  .tools select { width: auto; min-height: 0; padding: 0.2rem 0.4rem; }
+  .tools .check { margin: 0; display: inline-flex; align-items: center; gap: 0.3rem; }
+  .zoom { display: inline-flex; align-items: center; gap: 0.3rem; }
+  .zoom button { min-height: 0; padding: 0.1rem 0.6rem; }
+  .pct { min-width: 3em; text-align: center; font-variant-numeric: tabular-nums; }
   .picked { margin-top: 0.5rem; }
   .atlas { margin-top: 0.75rem; }
   .atlas summary { cursor: pointer; margin-bottom: 0.35rem; }
