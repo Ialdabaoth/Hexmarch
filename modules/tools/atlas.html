@@ -61,7 +61,7 @@ function hexAt(x, y, N) {  // level-N hex (i, j) under a point in feet: the leve
 }
 const hexFt = (i, j, N) => { const [C, R] = centre(i, j, N); return N === 25 ? [C * CW, (R + 0.5 * (i & 1)) * 100] : ft(C, R); };
 const T_BG = {}, T_ICON = {}, HEX_FEATURES = new Set(['clearing', 'bushes', 'thorns', 'spider', 'great-tree', 'mushrooms', 'forest-cave', 'forest-hill', 'stone-circle']);
-let D, TYPES = [], LBL, lang = 'ga', EDGES = true, CR = [];  // CR: the module's creatures (creatures.json from build.py)
+let D, POIS = null, TYPES = [], LBL, lang = 'ga', EDGES = true, CR = [];  // CR: the module's creatures (creatures.json from build.py)
 const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
 
 // ---- data ----
@@ -262,9 +262,16 @@ function draw() {
   const isz = { region: 16, march: 30, league: 44, field: 50, furlong: 56 }[V.lvl], fs = { region: 10, march: 12, league: 13, field: 13, furlong: 14 }[V.lvl];
   ctx.font = `bold ${fs}px Georgia`;
   const KP = [];
-  for (const p of D.pois) {
+  // place ranks (Heph 2026-11-06): 1 shows from the Region view, 2 from March, 3 from League down; then, most important first,
+  // a place whose icon (and name) would overlap one already drawn waits for a closer zoom
+  const maxRank = { region: 1, march: 2 }[V.lvl] || 3, put = [], bh = isz + (V.lvl === 'region' ? 0 : fs * 1.6);
+  POIS = POIS || D.pois.slice().sort((a, b) => (a.rank || 3) - (b.rank || 3));
+  for (const p of POIS) {
+    if ((p.rank || 3) > maxRank) continue;
     const [sx, sy] = S(...ft(...p.hex));  // a place is always one 100-ft hex (Heph 2026-11-06): drawn at its centre
     if (sx < -100 || sy < -100 || sx > W + 100 || sy > H + 100) continue;
+    if (V.lvl !== 'furlong') { const w = Math.max(isz, ctx.measureText(name(p.name)).width * (V.lvl === 'region' ? 0 : 1));
+      if (put.some(q => Math.abs(q[0] - sx) < (q[2] + w) / 2 && Math.abs(q[1] - sy) < bh)) continue; put.push([sx, sy, w]); }
     if (sx >= 0 && sy >= 0 && sx <= W && sy <= H) KP.push(p);
     const im = p.icon && tile(p.icon);
     if (V.lvl === 'furlong') { fieldPoi(p, im, sx, sy); continue; }

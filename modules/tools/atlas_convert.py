@@ -225,6 +225,12 @@ book_of = {}
 for b in MOD['books']:
     for k in (b['region'], b.get('detail')):
         if k: book_of.setdefault(k, b['id'])
+# place ranks (Heph 2026-11-06, ATLAS_FORMAT.md "Place ranks"): 1 shows from the Region view, 2 from the March view, 3 from the League view
+KIND_RANK = {'town': 1, 'abbey': 2}
+_all = {st[0] for reg in MOD['regions'].values() for st in reg.get('sites', [])}
+for nm, rk in MOD.get('site_ranks', {}).items():
+    if nm not in _all: sys.exit(f'module.json site_ranks: no site named {nm!r}')
+    if rk not in (1, 2, 3): sys.exit(f'module.json site_ranks[{nm!r}]: 1 (major), 2 (notable) or 3 (minor)')
 pois, seen = [], set()
 keep = set(marches)
 for k, reg in MOD['regions'].items():
@@ -234,6 +240,7 @@ for k, reg in MOD['regions'].items():
         if tuple(int(v) for v in nearest(C, R, 1200)) not in keep: continue
         seen.add(st[0])
         p = dict(id=slug(st[0]), name=st[0], kind=st[3], icon=MOD.get('site_icons', {}).get(st[0]) or S_ICON.get(st[3]), hex=[int(C), int(R)])
+        p['rank'] = int(MOD.get('site_ranks', {}).get(st[0]) or KIND_RANK.get(st[3], 3))  # 1 major, 2 notable, 3 minor: the zoom it first shows at
         if k in book_of: p['book'] = book_of[k]
         if len(st) > 4 and st[4]: p['note'] = st[4]
         if MOD.get('site_encounters', {}).get(st[0]): p['encounter'] = MOD['site_encounters'][st[0]]  # Encounter-map pointers (ENCOUNTER_FORMAT.md section 4)
