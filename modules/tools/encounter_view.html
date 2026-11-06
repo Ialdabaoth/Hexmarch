@@ -228,7 +228,7 @@ window.E9Map = (() => {
         b.onclick = () => { pickArea(id); centreOn(rects(a)[0]); }; const li = document.createElement('li'); li.append(b); ul.append(li);
       }
       box.append(ul);
-      // ways out (section 14.4): every place in the world whose pointer enters this map, by its entrance (or pointed area)
+      // ways out (section 14.3): every place in the world whose pointer enters this map, by its entrance (or pointed area)
       const outs = api.places.flatMap(pl => (pl.pointers || []).filter(q => (typeof q === 'string' ? q : q.map) === m.id).map(q => ({ pl, q })));
       if (outs.length) {
         add('<p class="lb">Ways out</p>'); const ol = document.createElement('ul'); ol.className = 'al';

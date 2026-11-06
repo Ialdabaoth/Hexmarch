@@ -73,7 +73,7 @@ def main(mdir):
         if p.get('spawn') and p['spawn'] not in sp: errs.append(f'{where}: map {p["map"]!r} has no spawn point {p["spawn"]!r}')
 
     mod = json.load(open(os.path.join(mdir, 'module.json')))
-    used = {}  # (map, entrance) -> the places and links that come in by it (section 14.4)
+    used = {}  # (map, entrance) -> the places and links that come in by it (section 14.3)
     for site, ptrs in (mod.get('site_encounters') or {}).items():
         for p in ptrs:
             pointer(f'module.json site_encounters[{site!r}]', p)
