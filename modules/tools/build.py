@@ -35,7 +35,7 @@ try: sha = subprocess.run(['git', 'rev-parse', '--short', 'HEAD'], capture_outpu
 except Exception: sha = ''
 # links shared with the E9 Companion (repo-root links.json); an empty link is hidden
 PATREON = json.load(open(os.path.join(os.path.dirname(ROOT), 'links.json'))).get('patreon', '')
-ATLAS = '0.2.12'  # version of the atlas tools and viewer themselves (Heph 2026-11-05); patch per PR, separate from each module's version
+ATLAS = '0.2.13'  # version of the atlas tools and viewer themselves (Heph 2026-11-05); patch per PR, separate from each module's version
 VER = f"v{MOD['version']}" + (f"+{os.environ.get('GITHUB_SHA', sha)[:7]}" if (os.environ.get('GITHUB_SHA') or sha) else '') + ' · ' + datetime.date.today().isoformat()
 ENV = dict(os.environ, HEXDEM=','.join(map(str, MOD['dem'])), HEXADMIN=os.path.normpath(os.path.join(mdir, MOD['admin'])),
            HEXTILES=os.path.join(ROOT, 'assets', 'tiles', 'icons'), HEXGEO=geo, MODVER=VER, MODATLAS=ATLAS, MODTITLE=MOD.get('short', MOD['title']),
