@@ -56,6 +56,7 @@ run(*PY, TOOLS + '/league_pages.py', os.path.join(mdir, 'module.json'), work + '
 # E9 Atlas format (ATLAS_FORMAT.md): the same terrain as one map JSON + one PNG per March, for the dynamic renderer
 if 'centroid' in MOD['atlas']:
     run(*PY, TOOLS + '/atlas_convert.py', os.path.join(mdir, 'module.json'), work, out + '/atlas')
+    run(*PY, TOOLS + '/atlas_cache.py', out + '/atlas')  # the pieces the Atlas loads around the view (rebuilt when a March PNG changes)
     # the dynamic renderer (preview): atlas/index.html draws every level from map.json + the March PNGs, with the shared tiles
     AJ = json.load(open(out + '/atlas/map.json')); os.makedirs(out + '/atlas/tiles', exist_ok=True)
     TD = os.path.join(ROOT, 'assets', 'tiles', 'icons')
