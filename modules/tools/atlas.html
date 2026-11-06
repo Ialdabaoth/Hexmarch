@@ -169,6 +169,11 @@ function fit() {
   const [x0, y0, x1, y1] = regionBox();
   cam.x = (x0 + x1) / 2; cam.y = (y0 + y1) / 2; cam.s = Math.min(W / (x1 - x0), H / (y1 - y0)) * .96;
 }
+const FAR = {};  // a terrain's colour when its hex is too small for the icon: a type with an icon is drawn darker, so woods and hills stand out from grass
+function farColour(t) {
+  if (FAR[t]) return FAR[t]; const c = TYPES[t - 1].color, k = T_ICON[t] ? .72 : 1;
+  return FAR[t] = '#' + [1, 3, 5].map(o => Math.round(parseInt(c.slice(o, o + 2), 16) * k).toString(16).padStart(2, '0')).join('');
+}
 function regionBox() {  // the region's extent in feet: every March, whole
   let x0 = 1e12, y0 = 1e12, x1 = -1e12, y1 = -1e12;
   for (const m of MI.values()) { const [x, y] = ft(m.Cm, m.Rm); x0 = Math.min(x0, x - 800 * CW); x1 = Math.max(x1, x + 800 * CW); y0 = Math.min(y0, y - 60000); y1 = Math.max(y1, y + 60000); }
@@ -225,9 +230,9 @@ function draw() {
     // one rect for the tile and its blends, snapped to device pixels so they can never resample differently
     const sn = v => Math.round(v * dpr) / dpr, X = sn(sx - bw / 2 - pad * bw), Y = sn(sy - hh / 2 - pad * bw);
     const w_ = sn(sx + bw / 2 + pad * bw) - X, h_ = sn(sy + hh / 2 + pad * bw) - Y;
-    const im = bg && tile(bg + sfx);
-    if (im) ctx.drawImage(im, X, Y, w_, h_); else { hexPath(sx, sy, r); ctx.fillStyle = TYPES[t - 1].color; ctx.fill(); }
-    if (bg) {  // blends: each border bleeds both ways at 40% (hexmap.py BLEED_ALPHA)
+    const im = r > 5 && bg && tile(bg + sfx);  // too small for its icon: the hex takes the terrain's own colour, so forest still reads as forest (Heph 2026-11-06)
+    if (im) ctx.drawImage(im, X, Y, w_, h_); else { hexPath(sx, sy, r); ctx.fillStyle = farColour(t); ctx.fill(); }
+    if (bg && im) {  // blends: each border bleeds both ways at 40% (hexmap.py BLEED_ALPHA)
       const ring = DIRS(i & 1).map(([di, dj]) => { const nb = T_BG[T(i + di, j + dj, N)]; return nb && nb !== bg ? nb.slice(3) : null; });
       ctx.globalAlpha = .4;
       ring.forEach((c, k) => { if (!c) return;
