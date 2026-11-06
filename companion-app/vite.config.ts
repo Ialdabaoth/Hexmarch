@@ -24,7 +24,7 @@ export default defineConfig({
       // modules/ (map viewers, PDFs, module.json) is published beside the app, under the same base
       // (/MateriaMundiRPG/modules/…). The app's offline shell must not answer for those pages, or a
       // map viewer opens as another copy of the app.
-      workbox: { navigateFallbackDenylist: [/\/modules\//] },
+      workbox: { navigateFallbackDenylist: [/\/modules\//, /\/atlas\//] }, // static pages beside the app: the module viewers and the E9 Atlas
       manifest: {
         name: 'E9 Companion',
         short_name: 'E9',
