@@ -13,7 +13,10 @@ Plan keys (all coordinates in squares, [x, y] from the top-left, y down):
   style   "cave" (rock everywhere, floor carved out, rough walls) | "outdoor" (ground everywhere)
   ground  outdoor ground colour: grass | bog | forest | heath | ravine
   floor   carved or open shapes: {"rect": [x,y,w,h]} | {"blob": [cx,cy,rx,ry]} | {"path": [[x,y],...], "w": 2}
+          | {"poly": [[x,y],...], "holes": [[[x,y],...], ...]} (pillars and rock islands left standing)
           add "built": true for straight masonry walls inside a cave plan
+  open    cave only: open sky inside a cave plan (a ravine the caves ring), drawn as the plan's ground with a
+          hatched cliff edge; trees may stand on it
   rock    outdoor only: shapes drawn as cliff/rock (hatched), e.g. ravine walls; a path with "soft": "left"|"right"
           is a terrace cliff: hard inked face on the other side, that side blurred into the ledge ("fade" in squares)
   water   shapes drawn as water (pools, streams)
@@ -22,7 +25,7 @@ Plan keys (all coordinates in squares, [x, y] from the top-left, y down):
   trees   [{"in": shape, "n": count, "kind": "oak"|"pine"|"scrub"|"reed", "r": radius}] scattered, seeded
   marks   [{"t": kind, "at": [x,y], ...}] kinds: num, letter, cave (mouth, optional "size"), label (optional "rot" degrees, "size", \n for lines), pit, secret, door, locked, stairs,
           fire, tent, web, bones, bed, table, chest, well, oak, sac, stake, garden, dotted, window
-  areas, links, notes, credit   copied into the map file
+  areas, spawns, links, notes, credit   copied into the map file (spawns: entrances and spawn points, ENCOUNTER_FORMAT.md 14.1)
 
 Play surface (Atlas 0.4.0, for Universal VTT export, ENCOUNTER_FORMAT.md sections 3 and 7): the map file also gets
   walls   sight-blocking polylines in squares: the floor's edge (caves, dug floors outdoors) and the outline of curtain
@@ -72,7 +75,7 @@ def shape(s, rough=0.0, nz=None):
     elif 'blob' in s:
         cx, cy, rx, ry = s['blob']; g = affinity.scale(Point(cx, cy).buffer(1, 48), rx, ry)
     elif 'poly' in s:
-        g = Polygon(s['poly'], [s['hole']] if s.get('hole') else None)
+        g = Polygon(s['poly'], s.get('holes') or ([s['hole']] if s.get('hole') else None))
     elif 'path' in s:
         g = LineString(s['path']).buffer(s.get('w', 2) / 2, cap_style=1, join_style=1)
     else:
@@ -313,6 +316,11 @@ def render(plan, rng):
     frame = box(0, 0, w, h)
     if cave:
         im = texture(W, H, ROCK, rng, 14, 3)
+        if plan.get('open'):
+            og = union(plan['open'], .6, nz)
+            im.paste(texture(W, H, GROUND[plan.get('ground', 'ravine')], rng, 16, 4), (0, 0), mask_of(og, W, H, P))
+            hatch(ImageDraw.Draw(im, 'RGBA'), og.buffer(.9).difference(og).intersection(frame), P, rng, 12, .5, 2)
+            draw_poly(ImageDraw.Draw(im, 'RGBA'), og, P, outline=INK, width=4)
         fm = mask_of(floor, W, H, P)
         # a dark halo in the rock and a soft shade on the floor along each wall give the caves depth
         halo = fm.filter(ImageFilter.GaussianBlur(P * .5))
@@ -507,7 +515,7 @@ def build(root, mid, draw=True):
          'layers': [{'src': f'{mid}/map.jpg', 'at': [0, 0], 'px': P}],
          'ground': 'none'}
     if plan.get('terrain'): m['terrain'] = plan['terrain']
-    for k in ('anchor', 'areas', 'links', 'notes'):
+    for k in ('anchor', 'areas', 'spawns', 'links', 'notes'):
         if plan.get(k): m[k] = plan[k]
     if surface: m['surface'] = surface
     m.update({'walls': walls, 'doors': doors, 'lights': lights, 'environment': {},
