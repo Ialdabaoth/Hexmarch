@@ -9,7 +9,12 @@ header{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;padding:8px 1
 h1{font-size:16px;margin:0;font-weight:normal;flex:1 1 320px}
 h1 a{color:var(--red);text-decoration:none;white-space:nowrap}h1 a:hover{text-decoration:underline}h1 b{white-space:nowrap}
 .ctl{display:flex;gap:6px;align-items:center;font-size:14px}
-#gridc{width:26px;height:22px;padding:0 1px;border:1px solid #b8ab8c;border-radius:4px;background:none;cursor:pointer}#grida{width:60px}body:has(#edges:not(:checked)) #gridc,body:has(#edges:not(:checked)) #grida{display:none}
+/* hex grid controls (Heph 2026-11-07, Atlas 0.5.5): one ⬡ button that drops down Hex edges, outline colour and opacity */
+#gridbox{position:relative}#gridbtn{font-size:16px;line-height:1;padding:2px 7px}#gridbtn[aria-expanded=true]{border-color:var(--red);color:var(--red)}
+#gridpanel{position:absolute;right:0;top:calc(100% + 4px);z-index:5;display:flex;flex-direction:column;gap:8px;min-width:190px;padding:10px 12px;background:#fffaf0;border:1px solid #b8ab8c;border-radius:6px;box-shadow:0 2px 8px #0003;font-size:13px}
+#gridpanel[hidden]{display:none}#gridpanel label{display:flex;align-items:center;gap:8px;justify-content:space-between;white-space:nowrap}#gridpanel label:first-child{justify-content:flex-start}#gridpanel input{accent-color:var(--red)}
+#gridc{width:30px;height:22px;padding:0 1px;border:1px solid #b8ab8c;border-radius:4px;background:none;cursor:pointer}#grida{width:90px}
+#gridpanel:has(#edges:not(:checked)) .gr{opacity:.45;pointer-events:none}
 button,select{font:inherit;font-size:14px;background:#fffaf0;border:1px solid #b8ab8c;border-radius:4px;padding:2px 8px;color:var(--ink)}
 #main{flex:1;display:flex;min-height:0;position:relative}#map{flex:1;position:relative;min-height:0}
 #key{width:250px;overflow:auto;border-left:1px solid #d8cfb8;padding:8px 12px;font-size:13px;background:var(--bg)}
@@ -36,7 +41,10 @@ footer a{color:var(--red)}
 </style></head><body>
 <header><h1 id="crumbs"></h1>
 <div class="ctl"><select id="lang" aria-label="Language" hidden></select>
-<label><input type="checkbox" id="edges" checked> Hex Edges</label><input type="color" id="gridc" value="#ffffff" title="Colour of the larger hex outlines"><input type="range" id="grida" min="10" max="100" value="80" title="Opacity of the larger hex outlines">
+<div id="gridbox"><button id="gridbtn" title="Hex grid" aria-haspopup="true" aria-expanded="false" aria-controls="gridpanel">⬡</button>
+<div id="gridpanel" hidden><label><input type="checkbox" id="edges" checked> Hex edges</label>
+<label class="gr">Outline colour <input type="color" id="gridc" value="#ffffff"></label>
+<label class="gr">Opacity <input type="range" id="grida" min="10" max="100" value="80"></label></div></div>
 <button id="out" title="Zoom out">−</button><button id="in" title="Zoom in">+</button><button id="fit">Fit</button><button id="routebtn" title="Plot a route and estimate the travel time">Route</button><button id="partybtn" title="Show, place or move the party">Party</button><button id="keybtn">Key</button><button id="modbtn" title="Load a different module">Modules</button></div></header>
 <div id="main"><div id="map"><canvas id="cv"></canvas><div id="route" hidden aria-live="polite"></div><div id="party" hidden aria-live="polite"></div></div><aside id="key"></aside></div>
 <footer><span id="hover">Click a hex to zoom in.</span><span><span id="support"></span>E9 Atlas {{ATLAS}}<span id="modver"></span> · <a href="#" id="creditbtn">Credits</a></span></footer>
@@ -641,6 +649,11 @@ document.getElementById('gridc').oninput = e => { GRIDC = e.target.value; try { 
 let GRIDA = .8; try { GRIDA = +(localStorage.getItem('e9-atlas-grida') || .8); } catch (e) {}  // and their opacity, 0.1 to 1
 document.getElementById('grida').value = Math.round(GRIDA * 100);
 document.getElementById('grida').oninput = e => { GRIDA = e.target.value / 100; try { localStorage.setItem('e9-atlas-grida', GRIDA); } catch (e_) {} redraw(); };
+{ const btn = document.getElementById('gridbtn'), pan = document.getElementById('gridpanel');
+  const show = on => { pan.hidden = !on; btn.setAttribute('aria-expanded', on); };
+  btn.onclick = e => { e.stopPropagation(); show(pan.hidden); };
+  document.addEventListener('click', e => { if (!pan.hidden && !e.target.closest('#gridbox')) show(false); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && !pan.hidden) { show(false); btn.focus(); } }); }
 document.getElementById('edges').onchange = e => { EDGES = e.target.checked; redraw(); };
 // Language box (Atlas 0.5.3): the module's own languages (the built module.json "languages", drawn language first); hidden with fewer than two
 function langs() { const LS = MOD.languages || (Object.keys(D.names || {}).length ? [{ code: 'ga', label: 'Gaeilge' }, { code: 'en', label: 'English' }] : []), sel = document.getElementById('lang');

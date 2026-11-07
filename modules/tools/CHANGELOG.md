@@ -2,10 +2,11 @@
 
 The E9 Atlas app and map tools (`modules/tools/`). The version lives in `ATLAS_VERSION`; every merged PR that touches the tools bumps the patch, each planned sprint bumps the minor. A module's own version is separate (see each module's CHANGELOG.md).
 
-## 0.5.x (in development, now 0.5.4)
+## 0.5.x (in development, now 0.5.5)
 
 Sprint: git and VTT integration (campaign repo, shared state file, referee and player views, VTT polish). See "Queued for 0.5" below.
 
+- 0.5.5: the hex grid controls fold into one ⬡ button in the header; clicking it drops down Hex edges, outline colour and opacity (greyed while Hex edges is off). A click outside or Escape closes it.
 - 0.5.4: the larger hex outlines no longer drop out after zooming (they checked the finer map tiles, which load a moment later; now they check the March, which is always loaded). They are white by default, with a colour picker and an opacity slider next to Hex Edges that this device remembers. The hex being looked at stays solid red.
 - 0.5.3: the Language box lists the module's own languages from a new module.json `languages` field ({code: label}, the drawn language first) and hides itself with fewer than two; the choice is remembered. The Atlas, the module viewer and the Companion's map controls all follow it. The map build cache now ignores `languages`, `credits`, the module version and the Atlas version (outside `--pdf`), so changing them no longer redraws the maps.
 - 0.5.2: with Hex Edges on, every hex of the next size up is outlined dashed red (only where the module has map), and the hex being looked at is solid red (still dashed with Hex Edges off). Roads read apart: a Roman road is dark brown and wider with its pale casing; a local road is a thinner mustard line with no casing.
