@@ -8,6 +8,16 @@ Sprint: git and VTT integration (campaign repo, shared state file, referee and p
 
 - Credits: a **Credits** link in the Atlas footer lists the tile art and the loaded module's data sources. Modules list their sources in a new `credits` field in `module.json` (copied into the built manifest, and shown in the module viewer's footer too). Beyond the Pale credits the Ireland castle dataset (CC BY 4.0), ESA WorldCover, SRTM and Natural Earth; Hansa the same minus the castles.
 
+- Encounter tool: a new `"dungeon"` style for built levels such as the B3 palace. It has a dark ground, flagstone rooms inside dressed-stone walls, and earthen caves. Other new features:
+  - Built floor shapes take a `"room"` id. Wherever two shapes with different ids touch, the tool draws an inner wall, and the VTT export gets that wall too.
+  - A `"partitions"` key holds extra inner walls, and `"openings"` now take inner walls out of the picture as well as the VTT walls.
+  - A `"cells"` floor shape for caves traced square by square from a scan. The steps are smoothed and kept within a set distance of the traced squares.
+  - A per-shape `"rough"` setting.
+  - Water with its own `"colour"`.
+  - Diagonal doors (`"dir": "d"` or `"a"`).
+  - New marks: statue, pillar, trapdoor (with `"up"` for one in the ceiling), portcullis and curtain.
+  - Existing maps come out unchanged.
+
 ### Queued for 0.5
 
 From `strategy/mvp-checklist.md` (project files) and ENCOUNTER_FORMAT.md sections 13–14:
