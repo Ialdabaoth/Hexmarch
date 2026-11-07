@@ -38,7 +38,7 @@ R = MOD['regions']; HX = MOD['atlas']['hex_mi']
 sites, seen, home = [], set(), {}
 for b in MOD['books']:
     for st in R[b['region']]['sites']:
-        if st[0] in seen: continue
+        if st[0] in seen or st[0] in MOD.get('site_parents', {}): continue  # a sub-place (Atlas 0.5.1) shows only in the Atlas; the print and overview maps show its parent
         seen.add(st[0]); sites.append(st); home[st[0]] = b
 
 # build cache (Heph 2026-11-07: fast small deploys): steps 1-4 are most of a site build, and most changes to a module

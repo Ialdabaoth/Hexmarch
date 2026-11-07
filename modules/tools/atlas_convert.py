@@ -245,6 +245,18 @@ for k, reg in MOD['regions'].items():
         if len(st) > 4 and st[4]: p['note'] = st[4]
         if MOD.get('site_encounters', {}).get(st[0]): p['encounter'] = MOD['site_encounters'][st[0]]  # Encounter-map pointers (ENCOUNTER_FORMAT.md section 4)
         pois.append(p)
+# PoI hierarchies (Heph 2026-11-07, ATLAS_FORMAT.md): module.json site_parents {sub-place: place it collapses into}, any depth
+PAR = MOD.get('site_parents', {})
+for ch, pa in PAR.items():
+    for nm in (ch, pa):
+        if nm not in _all: sys.exit(f'module.json site_parents: no site named {nm!r}')
+    seen_, up = {ch}, pa
+    while up in PAR:
+        if up in seen_: sys.exit(f'module.json site_parents: {ch!r} ends up inside itself')
+        seen_.add(up); up = PAR[up]
+_ids = {p['name']: p['id'] for p in pois}
+for p in pois:
+    if PAR.get(p['name']) in _ids: p['parent'] = _ids[PAR[p['name']]]  # a sub-place whose parent is off the map stands on its own
 
 la, lo = A['centroid'][1:3]
 J = {'format': 'e9-atlas/1', 'id': MOD['id'], 'title': MOD['title'], 'names': MOD.get('names', {}),

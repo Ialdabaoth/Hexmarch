@@ -23,6 +23,7 @@ def mi(a, b): return km(a, b) / MI_KM
 allsites = []
 for key in list(COUNTY) + list(DET):
     for st in A[key]['sites']:
+        if st[0] in MOD.get('site_parents', {}): continue  # sub-places (Atlas 0.5.1) show only in the Atlas; League pages show their parent
         if any(s[0] == st[0] and mi(s[1:3], st[1:3]) < 1 or mi(s[1:3], st[1:3]) < .15 for s in allsites): continue
         allsites.append(list(st[:5]) + [""] * (5 - len(st[:5])) + [key])
 # the March grid: each site belongs to the 3-mile hex whose centre is nearest
