@@ -18,8 +18,9 @@ button,select{font:inherit;font-size:14px;background:#fffaf0;border:1px solid #b
 #key .sw img{max-width:26px;max-height:22px}#key small{color:var(--dim)}
 #key .emb{font:inherit;font-size:12px;padding:0 6px;margin-top:2px;border-radius:10px;cursor:pointer}#key .emb:hover{background:#ebe3cf}
 #mod{color:var(--red)}
-#modules{border:1px solid #b8ab8c;border-radius:8px;background:var(--bg);color:var(--ink);padding:12px 16px;max-width:min(440px,92vw)}#modules::backdrop{background:#0004}
-#modules h2{font-size:16px;margin:0 0 8px;font-weight:normal}#modules ul{list-style:none;margin:0 0 10px;padding:0}
+#modules,#credits{border:1px solid #b8ab8c;border-radius:8px;background:var(--bg);color:var(--ink);padding:12px 16px;max-width:min(440px,92vw)}#modules::backdrop{background:#0004}
+#modules h2,#credits h2{font-size:16px;margin:0 0 8px;font-weight:normal}#modules ul,#credits ul{list-style:none;margin:0 0 10px;padding:0}
+#credits li{margin:4px 0;font-size:13px}#credits a{color:var(--red)}
 #modules li button{width:100%;text-align:left;margin:2px 0;padding:6px 10px}#modules li button[disabled]{opacity:.55;cursor:default}#modules li button.on{border-color:var(--red)}#modules small{color:var(--dim)}
 body.nokey #key{display:none}@media(max-width:700px){#key{position:absolute;right:0;top:0;bottom:0;box-shadow:-2px 0 8px #0003}}
 canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor:pointer}
@@ -36,8 +37,9 @@ footer a{color:var(--red)}
 <label><input type="checkbox" id="edges" checked> Hex Edges</label>
 <button id="out" title="Zoom out">−</button><button id="in" title="Zoom in">+</button><button id="fit">Fit</button><button id="routebtn" title="Plot a route and estimate the travel time">Route</button><button id="partybtn" title="Show, place or move the party">Party</button><button id="keybtn">Key</button><button id="modbtn" title="Load a different module">Modules</button></div></header>
 <div id="main"><div id="map"><canvas id="cv"></canvas><div id="route" hidden aria-live="polite"></div><div id="party" hidden aria-live="polite"></div></div><aside id="key"></aside></div>
-<footer><span id="hover">Click a hex to zoom in.</span><span><span id="support"></span>E9 Atlas {{ATLAS}}<span id="modver"></span></span></footer>
+<footer><span id="hover">Click a hex to zoom in.</span><span><span id="support"></span>E9 Atlas {{ATLAS}}<span id="modver"></span> · <a href="#" id="creditbtn">Credits</a></span></footer>
 <dialog id="modules"><h2>Load a module</h2><ul id="modlist"></ul><button id="modclose">Close</button></dialog>
+<dialog id="credits"><h2>Credits</h2><ul id="creditlist"></ul><button id="creditclose">Close</button></dialog>
 <!--CARD-->
 <script>
 "use strict";
@@ -618,6 +620,17 @@ function pick(id) { const u = new URL(location.href); u.searchParams.set('module
 function modList() {
   document.getElementById('modlist').innerHTML = MODS.map(m => `<li><button data-id="${esc(m.id)}"${m.ok ? '' : ' disabled'}${m === MOD ? ' class="on"' : ''}>${esc(m.title)}<br><small>${esc(m.path)}${m.version ? ' · v' + esc(plainVer(m.version).split(' ')[0]) : ''}${m === MOD ? ' · loaded' : m.ok ? '' : ' · no atlas map'}</small></button></li>`).join('');
 }
+// Credits (Atlas 0.5.0): the Atlas's own tile art, then the module's data sources from its module.json "credits" (MODULE_FORMAT.md)
+const ATLAS_CREDITS = [{ what: 'Hex tile art', by: 'C. Martins (Hex Tiles: Fantasy; edited icons by Heph)', license: 'CC BY-SA 4.0', url: 'https://cmartins.itch.io/hex-tiles-fantasy' }];
+const LIC = { 'CC BY 4.0': 'https://creativecommons.org/licenses/by/4.0/', 'CC BY-SA 4.0': 'https://creativecommons.org/licenses/by-sa/4.0/', 'ODbL': 'https://opendatacommons.org/licenses/odbl/' };
+function creditList() {
+  const link = (t, u) => /^https:\/\//.test(u || '') ? `<a href="${esc(u)}" target="_blank" rel="noopener">${esc(t || '')}</a>` : esc(t || '');
+  const row = c => `<li>${link(c.what, c.url)}: ${esc(c.by || '')}${c.license ? ' (' + link(c.license, LIC[c.license]) + ')' : ''}</li>`;
+  const mod = (MOD && MOD.credits) || [];
+  document.getElementById('creditlist').innerHTML = ATLAS_CREDITS.map(row).join('') + (mod.length ? `<li><small>${esc(MOD.title)}</small></li>` + mod.map(row).join('') : '');
+}
+document.getElementById('creditbtn').onclick = e => { e.preventDefault(); creditList(); document.getElementById('credits').showModal(); };
+document.getElementById('creditclose').onclick = () => document.getElementById('credits').close();
 document.getElementById('modbtn').onclick = () => { modList(); document.getElementById('modules').showModal(); };
 document.getElementById('modclose').onclick = () => document.getElementById('modules').close();
 document.getElementById('modlist').addEventListener('click', e => { const b = e.target.closest('button[data-id]'); if (b && !b.disabled) { if (MOD && b.dataset.id === MOD.id) document.getElementById('modules').close(); else pick(b.dataset.id); } });
@@ -625,7 +638,7 @@ async function loadModules() {
   const repo = await (await fetch(new URL('mm.json', SITE))).json();
   MODS = await Promise.all((repo.modules || []).map(async m => {
     const base = new URL(m.path.replace(/\/?$/, '/'), SITE).href, r = { id: m.id, path: m.path, title: m.id, version: '', base, ok: false };
-    try { const j = await (await fetch(base + 'module.json')).json(); Object.assign(r, { title: j.title || m.id, version: j.version || '', ok: !!j.atlas_map }); } catch (e) {}
+    try { const j = await (await fetch(base + 'module.json')).json(); Object.assign(r, { title: j.title || m.id, version: j.version || '', credits: j.credits || [], ok: !!j.atlas_map }); } catch (e) {}
     return r; }));
   const want = new URLSearchParams(location.search).get('module') || store.get('e9-atlas-module');
   MOD = MODS.find(m => m.id === want && m.ok) || MODS.find(m => m.ok);
