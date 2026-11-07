@@ -232,13 +232,14 @@ function curve(r) {  // moving average (+-2, ends pinned), then centripetal Catm
 
 // roads over the terrain (Heph 2026-11-05 classes): roman and local from the Region view, trails from the League view down; true width
 // in feet once zoomed in. Crossings (a bridge on roman roads, a ford on the others) show from the League view down
-const ROAD_STYLE = { roman: { w: 30, px: 3, c: '#6e4a26', dash: 0 }, local: { w: 15, px: 2, c: '#8a6a44', dash: 0 }, trail: { w: 6, px: 1.4, c: '#7a5f3e', dash: 1 } };
+// Heph 2026-11-07 (Atlas 0.5.2): local roads mustard yellow, thinner and without the casing (clear of the red hex lines), Roman roads dark brown and wider, so the two read apart at a glance
+const ROAD_STYLE = { roman: { w: 30, px: 3.4, c: '#5a3518', dash: 0 }, local: { w: 15, px: 2.6, c: '#a07812', dash: 0 }, trail: { w: 6, px: 1.4, c: '#7a5f3e', dash: 1 } };
 function drawRoads() {
   if (!ROADS.length) return; const far = V.lvl === 'region' || V.lvl === 'march';
   ctx.save(); ctx.setTransform(dpr * cam.s, 0, 0, dpr * cam.s, dpr * (W / 2 - cam.x * cam.s), dpr * (H / 2 - cam.y * cam.s)); ctx.lineCap = ctx.lineJoin = 'round';
   for (const pass of [0, 1]) for (const cls of ['trail', 'local', 'roman']) {
     if (far && cls === 'trail') continue; const st = ROAD_STYLE[cls], px = Math.max(st.px * (far ? .6 : 1), st.w * cam.s);
-    if (!pass && st.dash) continue;  // a trail has no casing
+    if (!pass && cls !== 'roman') continue;  // only a Roman road has a pale casing; local roads and trails are bare lines (Heph 2026-11-07: easier to tell apart)
     ctx.lineWidth = (px + (pass ? 0 : 2)) / cam.s; ctx.strokeStyle = pass ? st.c : '#f4efe1';
     ctx.setLineDash(pass && st.dash ? [Math.max(5, px * 2) / cam.s, Math.max(3, px * 1.5) / cam.s] : []);
     ctx.beginPath(); for (const rd of ROADS) if (rd.cls === cls) for (const [B, c1, c2, C] of rd.segs) { ctx.moveTo(B[0], B[1]); ctx.bezierCurveTo(c1[0], c1[1], c2[0], c2[1], C[0], C[1]); } ctx.stroke();
@@ -350,8 +351,14 @@ function draw() {
   }
   key(new Set(vis.map(v => v[2])), KP);
   // the hex being looked at, and the picked 100-ft hex
-  const own = LV[V.lvl].own;
-  if (own) { const [sx, sy] = S(...hexFt(V.i, V.j, own)); hexPath(sx, sy, own * 100 * cam.s / SQ3); ctx.setLineDash([9, 5]); ctx.strokeStyle = '#b3261e'; ctx.lineWidth = 2.5; ctx.stroke(); ctx.setLineDash([]); }
+  const own = LV[V.lvl].own, up = own || 1200;  // up: the next hex size above the drawn hexes (at Region, the Marches)
+  // Hex Edges on (Heph 2026-11-07, Atlas 0.5.2): every hex of the next size up dashed red, the one being looked at solid
+  if (EDGES) { const ux0 = Math.floor(x0 / (up * CW)) - 1, ux1 = Math.ceil(x1 / (up * CW)) + 1, uy0 = Math.floor(y0 / (up * 100)) - 2, uy1 = Math.ceil(y1 / (up * 100)) + 1;
+    if ((ux1 - ux0) * (uy1 - uy0) < 20000) { ctx.setLineDash([6, 4]); ctx.strokeStyle = 'rgba(179,38,30,.7)'; ctx.lineWidth = 1.2;
+      for (let i = ux0; i <= ux1; i++) for (let j = uy0; j <= uy1; j++) { if (own && i === V.i && j === V.j) continue; if (up === 1200 ? !MI.has(i + ',' + j) : !T(i, j, up)) continue;  // only where the module has land or sea
+        const [sx, sy] = S(...hexFt(i, j, up)); hexPath(sx, sy, up * 100 * cam.s / SQ3); ctx.stroke(); }
+      ctx.setLineDash([]); } }
+  if (own) { const [sx, sy] = S(...hexFt(V.i, V.j, own)); hexPath(sx, sy, own * 100 * cam.s / SQ3); if (!EDGES) ctx.setLineDash([9, 5]); ctx.strokeStyle = '#b3261e'; ctx.lineWidth = 2.5; ctx.stroke(); ctx.setLineDash([]); }
   if (V.sel) { const [sx, sy] = S(...ft(...V.sel)); hexPath(sx, sy, 100 * cam.s / SQ3); ctx.strokeStyle = '#b3261e'; ctx.lineWidth = 3; ctx.stroke(); }
   drawRoute(); drawParty();
   keepNear();
