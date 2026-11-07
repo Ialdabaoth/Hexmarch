@@ -21,6 +21,8 @@ roads or sites change a lot. Every decision is seeded on the global lattice, so 
 """
 import glob, json, math, os, sys
 import numpy as np
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from atlas_roads import smooth  # roads and rivers as the Atlas draws them
 from PIL import Image
 
 MDIR, MAPJ = sys.argv[1], sys.argv[2]; DRY = '--dry' in sys.argv
@@ -127,7 +129,7 @@ for mj in J['terrain']['marches']:
         ring = own & (d > rad) & (d <= rad + CUT_RING); t[ring & (t == F)] = W
     # 2. rivers
     for rv in J['rivers']:
-        cls = rv.get('class', 1); ch = trace([rv['points']], C0, R0)
+        cls = rv.get('class', 1); ch = trace([smooth(rv['points'])], C0, R0)
         if not ch.any(): continue
         bank = grow(ch, 60 + 40 * cls) & own
         t[ch & own & (t == F)] = W
@@ -145,7 +147,7 @@ for mj in J['terrain']['marches']:
             t[ww & (v >= .2) & (u < .5)] = G
     # 3. roads
     for rd in J['roads']:
-        cls = rd.get('class', 'local'); on = trace([rd['points']], C0, R0)
+        cls = rd.get('class', 'local'); on = trace([smooth(rd['points'])], C0, R0)
         if not on.any(): continue
         on &= own
         t[on & (t == F)] = W

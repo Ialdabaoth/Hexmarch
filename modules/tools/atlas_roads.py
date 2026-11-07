@@ -8,7 +8,9 @@ module.json atlas.roads lists each road as a name, a class and the places it run
 A via point is a site name (any site in the module) or [lat, lon]. Each leg between two via points follows the cheapest
 way on foot over the Field (half-mile) terrain in the tile cache, using the map's travel multipliers: no leg crosses sea
 or a lake, and the cheap ground (grass before bog and mountain) wins. The path is then straightened wherever a straight
-line stays on passable ground. Where a road meets a river, a crossing is written: a bridge on a roman road, a ford on the
+line stays on passable ground, and given a seeded sway (SWAY): no road of 1422 Ireland ran ruler-straight, so each
+wanders gently from side to side, trails most and the great roads least, pinned at its via points and never onto ground
+with no way on foot. Where a road meets a river, a crossing is written: a bridge on a roman road, a ford on the
 others, unless the road says "crossing": "bridge" or "ford". Writes map.json "roads" and "crossings" (points in feet).
 Run after atlas_cache.py: it reads cache/f/<march>.png.
 """
@@ -24,6 +26,8 @@ CLASSES = ('roman', 'local', 'trail')
 FIELD = 25
 STEP = FIELD * 100  # feet between neighbouring Field centres
 TOL = 600           # feet a straightened road may stray from the cheapest path
+SWAY = {'roman': 150, 'local': 200, 'trail': 260}  # feet of side-to-side wander (Heph 2026-11-07: "give the roads a little sway")
+SWAY_STEP = 400     # feet between the points of a swayed road
 
 
 def hex_round(px, py, s):  # as atlas_convert.py: nearest flat-top odd-q hex to a point
@@ -147,6 +151,22 @@ def main(modp, adir):
         ends = {tuple(int(v) for v in field_at(*p)), tuple(int(v) for v in field_at(*q))}
         return all(math.isfinite(cost(int(i), int(j))) or (int(i), int(j)) in ends for i, j in zip(fi, fj))
 
+    def sway(pts, amp, seed):  # resample every SWAY_STEP feet and push each point sideways along two slow seeded waves
+        out = [pts[0]]
+        for p, q in zip(pts, pts[1:]):
+            n = max(1, int(math.hypot(q[0] - p[0], q[1] - p[1]) // SWAY_STEP))
+            out += [(p[0] + (q[0] - p[0]) * k / n, p[1] + (q[1] - p[1]) * k / n) for k in range(1, n + 1)]
+        if len(out) < 3: return out
+        rng = np.random.default_rng(seed); w = [(rng.uniform(2600, 4200), rng.uniform(0, 2 * math.pi), .65), (rng.uniform(5500, 9000), rng.uniform(0, 2 * math.pi), .35)]
+        d = np.concatenate([[0], np.cumsum(np.hypot(*np.diff(np.array(out), axis=0).T))]); L = d[-1]; res = [out[0]]
+        for k in range(1, len(out) - 1):
+            tx, ty = out[k + 1][0] - out[k - 1][0], out[k + 1][1] - out[k - 1][1]; tl = math.hypot(tx, ty) or 1
+            pin = min(1.0, d[k] / 1500, (L - d[k]) / 1500)  # no sway at the via points: the road still reaches its places
+            off = amp * pin * sum(a * math.sin(2 * math.pi * d[k] / lam + ph) for lam, ph, a in w)
+            x, y = out[k][0] - ty / tl * off, out[k][1] + tx / tl * off
+            res.append((x, y) if math.isfinite(cost(*(int(v) for v in field_at(x, y)))) else out[k])
+        return list(LineString(res + [out[-1]]).simplify(60).coords)  # drop points the eye can't see, keeping map.json small
+
     def straighten(pts):  # Douglas-Peucker, but a shortcut must stay on passable ground
         if len(pts) < 3: return pts
         (ax, ay), (bx, by) = pts[0], pts[-1]; L = math.hypot(bx - ax, by - ay) or 1
@@ -163,7 +183,9 @@ def main(modp, adir):
         via = rd.get('via') or []
         if len(via) < 2: sys.exit(f'module.json atlas.roads {rname!r}: via needs at least two points')
         P = [where(v, rname) for v in via]; pts = [P[0]]
-        for a, b in zip(P, P[1:]): pts += straighten(path(a, b, rname))[1:]
+        for k, (a, b) in enumerate(zip(P, P[1:])):
+            seed = int.from_bytes(f'{rname}/{k}'.encode('utf-8'), 'little') % (2 ** 32)
+            pts += sway(straighten(path(a, b, rname)), SWAY[rd['class']], seed)[1:]
         pts = [[int(round(x)), int(round(y))] for x, y in pts]
         r = {'name': rd['name'], 'class': rd['class'], 'points': pts} if rd.get('name') else {'class': rd['class'], 'points': pts}
         roads.append(r)
