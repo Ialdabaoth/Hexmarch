@@ -12,7 +12,8 @@ module's own March masters (<module>/atlas/terrain/*.png, one pixel per 100-ft h
    floodplain where open ground and light woods become wet meadow with small pools of bog (the callows), its width
    by river class; riverside forest beyond the bank is left standing.
 3. Roads: thick forest along a road thins to light woods; light woods clears to grass on a seeded, patchy roll, more
-   often along Roman roads than trails. Roman roads also get a one-hex verge.
+   often along Roman roads than trails. Roman roads also get a ragged verge one hex either side: each verge hex rolls to
+   thin forest (half of them) or clear light woods (three in ten).
 
 Heph chose to bake the result into the masters once (2026-11-07), so his later paint always wins; re-run by hand when
 roads or sites change a lot. Every decision is seeded on the global lattice, so a re-run gives the same answer.
@@ -146,10 +147,14 @@ for mj in J['terrain']['marches']:
     for rd in J['roads']:
         cls = rd.get('class', 'local'); on = trace([rd['points']], C0, R0)
         if not on.any(): continue
-        on = (grow(on, 90) if cls == 'roman' else on) & own
+        on &= own
         t[on & (t == F)] = W
         stretch = vnoise(X, Y, 1500, 57) < ROAD_CLEAR[cls]
         t[on & (t == W) & (old != F) & stretch] = G  # woods that was light woods to begin with may clear to grass
+        if cls == 'roman':  # the verge: a ragged, partial clearing one hex either side, rolled per hex (Heph 2026-11-07)
+            verge = dilate(on, 1) & own & ~on; roll = _hash(C, R, 91)
+            t[verge & (t == F) & (roll < .5)] = W
+            t[verge & (t == W) & (old == W) & (roll < .3)] = G
     ch_ = own & (t != old)
     if ch_.any():
         for a, b in zip(old[ch_].tolist(), t[ch_].tolist()): total[(TYPES[a - 1], TYPES[b - 1])] = total.get((TYPES[a - 1], TYPES[b - 1]), 0) + 1
