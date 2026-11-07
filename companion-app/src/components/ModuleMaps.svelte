@@ -140,7 +140,7 @@
 {:else}
   <section class="card">
     <p class="small muted" style="margin-top:0">
-      No module maps on this device yet. Add the Beyond the Pale maps (Leinster, 1422), or add another module's site under Manage › Modules.
+      No module maps on this device yet. Add the Beyond the Pale maps (The Isle of Mists, 1422), or add another module's site under Manage › Modules.
     </p>
     <button class="primary" onclick={addBeyondThePale} disabled={busy}>{busy ? 'Adding…' : 'Add Beyond the Pale maps'}</button>
     {#if problem}<p class="small failure" role="alert">{problem}</p>{/if}

@@ -56,12 +56,16 @@ def map_key():
         if t.endswith('.py'):
             for m in re.findall(r'^\s*(?:from|import)\s+(\w+)', open(os.path.join(TOOLS, t)).read(), flags=re.M):
                 if os.path.isfile(os.path.join(TOOLS, m + '.py')): tools.add(m + '.py')
+    if not PDF: tools.discard('ATLAS_VERSION')
     paths = [os.path.join(mdir, 'module.json'), os.path.join(mdir, 'atlas'), os.path.normpath(os.path.join(mdir, MOD['admin'])),
              os.path.join(ROOT, 'geo'), os.path.join(ROOT, 'assets'), os.path.join(ROOT, 'requirements.txt')] + [os.path.join(TOOLS, t) for t in sorted(tools)]
     h = hashlib.sha256(f'pdf={PDF}'.encode())
     # module.json counts without its version: a version bump alone must not redraw every map. The maps never print the
     # version (only index.html and the manifest do, and step 5 always writes those); the print PDFs do, so with --pdf it counts
-    mj = json.load(open(paths[0])); mj.pop('version', None) if not PDF else None
+    # (Heph 2026-11-07, Atlas 0.5.3) nor do the manifest-only fields (languages, credits) or the Atlas version, which only the print pages show
+    mj = json.load(open(paths[0]))
+    if not PDF:
+        for k in ('version', 'languages', 'credits'): mj.pop(k, None)
     h.update(json.dumps(mj, sort_keys=True, ensure_ascii=False).encode()); paths = paths[1:]
     for p in paths:
         fs = [p] if os.path.isfile(p) else sorted(os.path.join(dp, f) for dp, dn, fn in os.walk(p) for f in fn if '__pycache__' not in dp)
@@ -228,6 +232,12 @@ if os.path.isdir(edir):
 for s_ in SITES:
     if MOD.get('site_encounters', {}).get(s_['name']): s_['encounter'] = MOD['site_encounters'][s_['name']]
 H0 = next(h for h in G['hexes'] if h['col'] == 0 and h['row'] == 0)
+# map languages (Heph 2026-11-07, Atlas 0.5.3): module.json "languages" {code: label}, the first being the language the names are drawn in;
+# a module with "names" but no "languages" keeps the old Gaeilge/English pair, and one with neither has no Language box
+_LG = MOD.get('languages')
+if _LG is not None and not (isinstance(_LG, dict) and _LG and all(isinstance(k, str) and isinstance(v, str) and k and v for k, v in _LG.items())):
+    sys.exit('module.json languages: {code: label}, e.g. {"de": "Deutsch", "en": "English"}, the drawn language first')
+LANGS = [{'code': k, 'label': v} for k, v in _LG.items()] if _LG else ([{'code': 'ga', 'label': 'Gaeilge'}, {'code': 'en', 'label': 'English'}] if MOD.get('names') else [])
 M = {'format': 'mm-module/1', 'id': MOD['id'], 'title': MOD['title'], 'short': MOD.get('short', MOD['title']), 'version': VER, 'atlas': ATLAS, 'license': MOD.get('license', 'CC0-1.0'),
      'scales': {'mile_ft': 5000, 'region_hex_mi': MOD['atlas']['page_hex_mi'], 'march_hex_mi': HX, 'league_hex_mi': MOD['league']['hex_mi'], 'field_hex_ft': 100, 'encounter_square_ft': 5},
      'books': MOD['books'],
@@ -242,7 +252,8 @@ M = {'format': 'mm-module/1', 'id': MOD['id'], 'title': MOD['title'], 'short': M
      **({'encounter_maps': EMAPS} if EMAPS else {}),
      **({'atlas_map': 'atlas/map.json'} if os.path.isdir(out + '/atlas') else {}),  # the E9 Atlas app (<site>/atlas/) lists modules that have one
      'credits': MOD.get('credits', []),  # data sources to credit wherever the map is shown [{what, by, license, url}] (Atlas 0.5.0)
-     'names': MOD.get('names', {}),  # label translations {name as on the map: {'en': ..., 'ga': ...}}; the viewer's Language box uses them
+     'names': MOD.get('names', {}),  # label translations {name as on the map: {<code>: ...}}; the viewer's Language box uses them
+     'languages': LANGS,  # the Language box's choices, drawn language first (Atlas 0.5.3)
      'links': {'world': '#world', 'march': '#march-<page>', 'league': '#l-<march hex>', 'site': '#l-<march hex>--<slug>', 'hex': '#<map>:<hex>'},
      'print': {'atlas': 'print/atlas.pdf', 'leagues': 'print/leagues.pdf'} if PDF else {}}
 json.dump(M, open(out + '/module.json', 'w'), ensure_ascii=False, indent=1)

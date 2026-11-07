@@ -90,7 +90,7 @@ if (new URLSearchParams(location.search).get('tools') === 'host') document.docum
 <header>
   <div class="crumb"><h1 id="title">Loading</h1></div>
   <div class="tools">
-    <select id="lang" aria-label="Language"><option value="ga">Gaeilge</option><option value="en">English</option></select>
+    <select id="lang" aria-label="Language" hidden></select>
     <label class="chk"><input type="checkbox" id="edges" checked> Hex Edges</label>
     <a class="btn" id="prev" hidden>‹ Prev</a><a class="btn" id="next" hidden>Next ›</a>
     <button id="zo" aria-label="Zoom out">−</button><span class="zoom" id="zl">100%</span><button id="zi" aria-label="Zoom in">+</button><button id="zf">Fit</button>
@@ -154,8 +154,12 @@ function edges() {
 }
 $('edges').addEventListener('change', () => { try { localStorage.setItem('mm-hex-edges', $('edges').checked ? 'on' : 'off'); } catch (e) {} edges(); tellTools(); });
 const SC_LEAGUE = '1 hex = 1 league (' + D.scales.march_hex_mi + ' miles)', SC_FIELD = '1 hex = 1 field (' + D.scales.league_hex_mi + ' miles)';
-// Language box: map labels, page titles and lists in Irish (the names as drawn) or English, from module.json "names"
-let LANG = 'ga'; try { LANG = localStorage.getItem('mm-lang') || 'ga'; } catch (e) {}
+// Language box: map labels, page titles and lists in the module's languages (module.json "languages", drawn language first; Atlas 0.5.3),
+// translated from module.json "names"; hidden when the module has fewer than two
+const LANGS = D.languages || (D.names && Object.keys(D.names).length ? [{ code: 'ga', label: 'Gaeilge' }, { code: 'en', label: 'English' }] : []);  // a manifest from before 0.5.3
+$('lang').replaceChildren(...LANGS.map(l => new Option(l.label, l.code))); $('lang').hidden = LANGS.length < 2;
+let LANG = ''; try { LANG = localStorage.getItem('mm-lang') || ''; } catch (e) {}
+if (!LANGS.some(l => l.code === LANG)) LANG = LANGS.length ? LANGS[0].code : '';
 $('lang').value = LANG;
 function L(s) { const n = D.names && D.names[s]; return (n && n[LANG]) || s; }
 function relabel() { if (svg) svg.querySelectorAll('text').forEach(t => { if (t.dataset.o === undefined) t.dataset.o = t.textContent; t.textContent = L(t.dataset.o); }); }

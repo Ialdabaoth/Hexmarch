@@ -34,7 +34,7 @@ footer{display:flex;justify-content:space-between;gap:12px;padding:4px 16px;font
 footer a{color:var(--red)}
 </style></head><body>
 <header><h1 id="crumbs"></h1>
-<div class="ctl"><select id="lang"><option value="ga">Gaeilge</option><option value="en">English</option></select>
+<div class="ctl"><select id="lang" aria-label="Language" hidden></select>
 <label><input type="checkbox" id="edges" checked> Hex Edges</label>
 <button id="out" title="Zoom out">−</button><button id="in" title="Zoom in">+</button><button id="fit">Fit</button><button id="routebtn" title="Plot a route and estimate the travel time">Route</button><button id="partybtn" title="Show, place or move the party">Party</button><button id="keybtn">Key</button><button id="modbtn" title="Load a different module">Modules</button></div></header>
 <div id="main"><div id="map"><canvas id="cv"></canvas><div id="route" hidden aria-live="polite"></div><div id="party" hidden aria-live="polite"></div></div><aside id="key"></aside></div>
@@ -65,7 +65,7 @@ function hexAt(x, y, N) {  // level-N hex (i, j) under a point in feet: the leve
 }
 const hexFt = (i, j, N) => { const [C, R] = centre(i, j, N); return N === 25 ? [C * CW, (R + 0.5 * (i & 1)) * 100] : ft(C, R); };
 const T_BG = {}, T_ICON = {}, HEX_FEATURES = new Set(['clearing', 'bushes', 'thorns', 'spider', 'great-tree', 'mushrooms', 'forest-cave', 'forest-hill', 'stone-circle']);
-let D, POIS = null, KIDS = null, TYPES = [], LBL, lang = 'ga', EDGES = true, CR = [];  // CR: the module's creatures (creatures.json from build.py)
+let D, POIS = null, KIDS = null, TYPES = [], LBL, lang = '', EDGES = true, CR = [];  // CR: the module's creatures (creatures.json from build.py)
 const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
 
 // ---- data ----
@@ -192,7 +192,7 @@ function clampCam() {
 }
 const S = (x, y) => [W / 2 + (x - cam.x) * cam.s, H / 2 + (y - cam.y) * cam.s];
 const F = (sx, sy) => [cam.x + (sx - W / 2) / cam.s, cam.y + (sy - H / 2) / cam.s];
-const name = n => lang === 'en' && D.names[n] && D.names[n].en ? D.names[n].en : n;
+const name = n => (D.names[n] && D.names[n][lang]) || n;  // the drawn name, or its translation in the chosen language (module.json names)
 function hexPath(sx, sy, r) { ctx.beginPath(); for (let k = 0; k < 6; k++) { const a = Math.PI / 3 * k; ctx.lineTo(sx + r * Math.cos(a), sy + r * Math.sin(a)); } ctx.closePath(); }
 const DIRS = odd => [[0, -1], [1, -1 + odd], [1, odd], [0, 1], [-1, odd], [-1, -1 + odd]];
 
@@ -632,7 +632,12 @@ function zoom(f, e) {
 document.getElementById('in').onclick = () => zoom(1.25); document.getElementById('out').onclick = () => zoom(.8);
 document.getElementById('fit').onclick = () => { fit(); redraw(); };
 document.getElementById('edges').onchange = e => { EDGES = e.target.checked; redraw(); };
-document.getElementById('lang').onchange = e => { lang = e.target.value; crumbs(); redraw(); };
+// Language box (Atlas 0.5.3): the module's own languages (the built module.json "languages", drawn language first); hidden with fewer than two
+function langs() { const LS = MOD.languages || (Object.keys(D.names || {}).length ? [{ code: 'ga', label: 'Gaeilge' }, { code: 'en', label: 'English' }] : []), sel = document.getElementById('lang');
+  sel.innerHTML = LS.map(l => `<option value="${esc(l.code)}">${esc(l.label)}</option>`).join(''); sel.hidden = LS.length < 2;
+  let want = null; try { want = localStorage.getItem('mm-lang'); } catch (e) {}
+  lang = LS.some(l => l.code === want) ? want : LS.length ? LS[0].code : ''; sel.value = lang; }
+document.getElementById('lang').onchange = e => { lang = e.target.value; try { localStorage.setItem('mm-lang', lang); } catch (e_) {} crumbs(); redraw(); };
 addEventListener('hashchange', go); addEventListener('resize', redraw);
 
 // ---- modules (Heph 2026-11-06): the Atlas is one app at /atlas/ that loads any module listed in the site's mm.json ----
@@ -662,7 +667,7 @@ async function loadModules() {
   const repo = await (await fetch(new URL('mm.json', SITE))).json();
   MODS = await Promise.all((repo.modules || []).map(async m => {
     const base = new URL(m.path.replace(/\/?$/, '/'), SITE).href, r = { id: m.id, path: m.path, title: m.id, version: '', base, ok: false };
-    try { const j = await (await fetch(base + 'module.json')).json(); Object.assign(r, { title: j.title || m.id, version: j.version || '', credits: j.credits || [], ok: !!j.atlas_map }); } catch (e) {}
+    try { const j = await (await fetch(base + 'module.json')).json(); Object.assign(r, { title: j.title || m.id, version: j.version || '', credits: j.credits || [], languages: j.languages, ok: !!j.atlas_map }); } catch (e) {}
     return r; }));
   const want = new URLSearchParams(location.search).get('module') || store.get('e9-atlas-module');
   MOD = MODS.find(m => m.id === want && m.ok) || MODS.find(m => m.ok);
@@ -673,7 +678,7 @@ async function loadModules() {
   if (!MOD) { document.getElementById('crumbs').textContent = 'No module with an atlas map was found.'; if (MODS.length) { modList(); document.getElementById('modules').showModal(); } return; }
   A = MOD.base + 'atlas/'; store.set('e9-atlas-module', MOD.id);
   document.title = MOD.title + ' · E9 Atlas'; document.getElementById('modver').textContent = ' · ' + MOD.title + (MOD.version ? ' v' + plainVer(MOD.version).split(' ')[0] : '');
-  D = await (await fetch(A + 'map.json', { cache: 'no-cache' })).json(); TYPES = D.terrain.types; LBL = D.labels;  // always the current map.json: an old one has no tile cache
+  D = await (await fetch(A + 'map.json', { cache: 'no-cache' })).json(); TYPES = D.terrain.types; LBL = D.labels; D.names = D.names || {}; langs();  // always the current map.json: an old one has no tile cache
   if (!D.cache) { document.getElementById('crumbs').textContent = 'This module\'s map was built for an older Atlas. Rebuild the site, then reload this page.'; return; }
   TYPES.forEach((t, k) => { T_BG[k + 1] = t.tile; if (t.icon) T_ICON[k + 1] = t.icon; });
   await loadCache();
