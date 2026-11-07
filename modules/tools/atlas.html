@@ -259,6 +259,22 @@ function draw() {
   ctx.textAlign = 'center'; ctx.lineJoin = 'round';
   if (V.lvl === 'region' || V.lvl === 'march') for (const g of D.regions) {
     const [sx, sy] = S(...g.label); ctx.font = 'italic bold 15px Georgia'; ctx.strokeStyle = '#f4efe1'; ctx.lineWidth = 4; ctx.strokeText(name(g.name), sx, sy); ctx.fillStyle = '#7a2e2e'; ctx.fillText(name(g.name), sx, sy); }
+  // anchored encounter maps (Heph 2026-11-07): a place's above-ground map drawn to scale on the 100-ft view, outlined on the Field view
+  FOOT = footprints();
+  if (V.lvl === 'furlong' || V.lvl === 'field') for (const f of FOOT) {
+    ctx.save(); const [sx, sy] = S(f.x, f.y); ctx.translate(sx, sy); ctx.rotate(f.rot); ctx.scale(cam.s, cam.s);
+    const [x0, y0, w, h] = f.rect;
+    if (V.lvl === 'furlong') {
+      ctx.beginPath(); ctx.rect(x0, y0, w, h); ctx.clip();  // only the part inside the map's size is drawn (ENCOUNTER_FORMAT.md)
+      for (const L of f.layers) { if (!L.im.complete || !L.im.naturalWidth) continue; const k = f.g / L.px;
+        ctx.save(); ctx.globalAlpha = L.opacity; ctx.translate(x0 + L.at[0] * f.g, y0 + L.at[1] * f.g); ctx.rotate(L.rotate * Math.PI / 180);
+        ctx.drawImage(L.im, 0, 0, L.im.naturalWidth * k, L.im.naturalHeight * k); ctx.restore(); }
+      ctx.restore(); ctx.save(); ctx.translate(sx, sy); ctx.rotate(f.rot);
+      ctx.strokeStyle = '#2b2418'; ctx.lineWidth = 2; ctx.strokeRect(x0 * cam.s, y0 * cam.s, w * cam.s, h * cam.s);
+    } else { ctx.fillStyle = 'rgba(179,38,30,.12)'; ctx.fillRect(x0, y0, w, h); ctx.restore(); ctx.save(); ctx.translate(sx, sy); ctx.rotate(f.rot);
+      ctx.setLineDash([5, 3]); ctx.strokeStyle = '#7a2e2e'; ctx.lineWidth = 1.5; ctx.strokeRect(x0 * cam.s, y0 * cam.s, w * cam.s, h * cam.s); }
+    ctx.restore();
+  }
   // points of interest
   const isz = V.lvl === 'region' ? Math.min(16, 3 * 150 * 100 * cam.s) : { march: 30, league: 44, field: 50, furlong: 56 }[V.lvl], /* Heph 2026-11-06: at Region, never wider than 3 League hexes */ fs = { region: 10, march: 12, league: 13, field: 13, furlong: 14 }[V.lvl];
   ctx.font = `bold ${fs}px Georgia`;
@@ -275,7 +291,10 @@ function draw() {
       if (put.some(q => Math.abs(q[0] - sx) < (q[2] + w) / 2 && Math.abs(q[1] - sy) < bh)) continue; put.push([sx, sy, w]); }
     if (sx >= 0 && sy >= 0 && sx <= W && sy <= H) KP.push(p);
     const im = p.icon && tile(p.icon);
-    if (V.lvl === 'furlong') { fieldPoi(p, im, sx, sy); continue; }
+    if (V.lvl === 'furlong') { const f = FOOT.find(q => q.p === p);
+      if (f) { const [lx, ly] = S(f.x, f.y + f.rect[1] + f.rect[3]); ctx.font = 'bold 14px Georgia'; ctx.textAlign = 'center'; ctx.strokeStyle = '#f4efe1'; ctx.lineWidth = 3.5;
+        ctx.strokeText(name(p.name), lx, ly + 14); ctx.fillStyle = '#2b2418'; ctx.fillText(name(p.name), lx, ly + 14); continue; }  // the map itself is the icon
+      fieldPoi(p, im, sx, sy); continue; }
     if (im) { const a = Math.max(.87, im.naturalHeight / im.naturalWidth); ctx.drawImage(im, sx - isz / 2, sy - isz * a / 2, isz, isz * a); }
     else { ctx.beginPath(); ctx.arc(sx, sy, 4, 0, 7); ctx.fillStyle = '#2b2418'; ctx.fill(); }
     if (V.lvl !== 'region') { const ty = sy + isz * .55 + fs; ctx.strokeStyle = '#f4efe1'; ctx.lineWidth = 3.5; ctx.strokeText(name(p.name), sx, ty); ctx.fillStyle = '#2b2418'; ctx.fillText(name(p.name), sx, ty); }
@@ -455,8 +474,37 @@ function fieldPoi(p, im, sx, sy) {
   ctx.textAlign = 'center'; ctx.strokeStyle = '#f4efe1'; ctx.lineWidth = 3; ctx.strokeText(label, sx, sy + ty + fs * .35); ctx.fillStyle = '#2b2418'; ctx.fillText(label, sx, sy + ty + fs * .35);
 }
 // the place with an encounter map under a point, at Furlong level (ENCOUNTER_FORMAT.md section 4): its icon, or its 100-ft hex
+// anchored maps (ENCOUNTER_FORMAT.md section 3): the map square anchor.square sits on lattice hex anchor.hex (default: the place's
+// own hex) plus anchor.ft, turned anchor.rotate degrees clockwise. The Atlas draws the map's "surface" picture (its above-ground
+// art, Heph 2026-11-07), or its layers if it has none. Map files load once through the encounter viewer.
+let FOOT = [];
+const EMJ = {};
+function emap(id) {
+  if (id in EMJ) return EMJ[id]; EMJ[id] = null;
+  if (!window.E9Map || !E9Map.load) return null;
+  E9Map.load(id).then(m => {
+    if (!m.anchor) { EMJ[id] = false; return; }
+    const src = m.surface ? [Object.assign({ at: [0, 0], rotate: 0, opacity: 1 }, m.surface)] : m.layers.filter(L => L.show !== 'referee');  // its above-ground picture, else the battle map
+    const layers = src.map(L => { const im = new Image(); im.onload = redraw; im.src = MOD.base + 'encounter-maps/' + L.src; return Object.assign({}, L, { im }); });
+    EMJ[id] = { m, layers }; redraw();
+  }).catch(() => { EMJ[id] = false; });
+  return null;
+}
+function footprints() {
+  const out = []; if (V.lvl !== 'furlong' && V.lvl !== 'field') return out;
+  for (const p of D.pois) for (const ptr of p.encounter || []) {
+    const e = emap(typeof ptr === 'string' ? ptr : ptr.map); if (!e) continue;
+    const m = e.m, a = m.anchor, g = m.grid.ft, [hx, hy] = ft(...(a.hex || p.hex)), o = a.ft || [0, 0], sq = a.square || [m.size[0] / 2, m.size[1] / 2];
+    if (out.some(f => f.m === m)) continue;  // one map, drawn once, even with several pointers
+    out.push({ p, m, layers: e.layers, g, x: hx + o[0], y: hy + o[1], rot: (a.rotate || 0) * Math.PI / 180, rect: [-sq[0] * g, -sq[1] * g, m.size[0] * g, m.size[1] * g] });
+  }
+  return out;
+}
 function mapPoiAt(x, y) {
   if (V.lvl !== 'furlong') return null; const [C, R] = hexAt(x, y, 1);
+  for (const f of FOOT) {  // anywhere on a drawn map opens it
+    const dx = x - f.x, dy = y - f.y, c = Math.cos(-f.rot), s = Math.sin(-f.rot), u = dx * c - dy * s, v = dx * s + dy * c;
+    if (u >= f.rect[0] && v >= f.rect[1] && u <= f.rect[0] + f.rect[2] && v <= f.rect[1] + f.rect[3]) return f.p; }
   return D.pois.find(p => p.encounter && p.hex[0] === C && p.hex[1] === R) || null;  // a place is its whole 100-ft hex
 }
 function goDown(x, y) {  // Heph's rule: anything clicked zooms in one level, centred on it; at Furlong level a place opens its Encounter map
