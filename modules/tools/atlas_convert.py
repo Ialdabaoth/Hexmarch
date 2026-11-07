@@ -211,7 +211,7 @@ for rv in rivers:
 
 # regions: the module's counties
 adm = json.load(open(os.path.normpath(os.path.join(MDIR, MOD['admin']))))
-cty = {f['properties']['name'].replace(' County', ''): shape(f['geometry']) for f in adm['features'] if f['properties'].get('admin') == 'Ireland'}
+cty = {f['properties']['name'].replace(' County', ''): shape(f['geometry']) for f in adm['features']}  # the module's own admin file (Ireland's counties, Hansa's period lands)
 regions = []
 for b in MOD['books']:
     reg = MOD['regions'][b['region']]; g = cty[b['county']].simplify(.003)
