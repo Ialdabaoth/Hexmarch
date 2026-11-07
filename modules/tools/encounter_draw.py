@@ -11,20 +11,26 @@ no traced art (Heph 2026-11-05: Encounter maps are feel-alikes with their own id
 Plan keys (all coordinates in squares, [x, y] from the top-left, y down):
   title, size [w, h], ft (square size, default 5), px (pixels per square, default 40), seed
   style   "cave" (rock everywhere, floor carved out, rough walls) | "outdoor" (ground everywhere)
+          | "dungeon" (a built palace or dungeon level: dark ground, flagstone rooms in dressed-stone walls, earthen caves)
   ground  outdoor ground colour: grass | bog | forest | heath | ravine
   floor   carved or open shapes: {"rect": [x,y,w,h]} | {"blob": [cx,cy,rx,ry]} | {"path": [[x,y],...], "w": 2}
           | {"poly": [[x,y],...], "holes": [[[x,y],...], ...]} (pillars and rock islands left standing)
-          add "built": true for straight masonry walls inside a cave plan
+          | {"cells": [[x,y,w,h], ...]} (squares joined, then roughened as one: a cave traced from a scan)
+          add "built": true for straight masonry walls inside a cave plan, and "room": "<id>" to give it inner walls:
+          wherever two built shapes with different room ids touch, a wall is drawn between them (doors cut it)
+  partitions  extra inner walls: [{"path": [[x,y], ...]}] (a door across a corridor, a screen wall)
   open    cave only: open sky inside a cave plan (a ravine the caves ring), drawn as the plan's ground with a
           hatched cliff edge; trees may stand on it
   rock    outdoor only: shapes drawn as cliff/rock (hatched), e.g. ravine walls; a path with "soft": "left"|"right"
           is a terrace cliff: hard inked face on the other side, that side blurred into the ledge ("fade" in squares)
-  water   shapes drawn as water (pools, streams)
+  water   shapes drawn as water (pools, streams); "colour": [r,g,b] for a pool of something else
   road    shapes drawn as a beaten path
   mounds  shapes drawn as raised ground (barrows, hummocks)
   trees   [{"in": shape, "n": count, "kind": "oak"|"pine"|"scrub"|"reed", "r": radius}] scattered, seeded
   marks   [{"t": kind, "at": [x,y], ...}] kinds: num, letter, cave (mouth, optional "size"), label (optional "rot" degrees, "size", \n for lines), pit, secret, door, locked, stairs,
-          fire, tent, web, bones, bed, table, chest, well, oak, sac, stake, garden, dotted, window
+          fire, tent, web, bones, bed, table, chest, well, oak, sac, stake, garden, dotted, window,
+          statue, pillar, trapdoor ("up": true for one in the ceiling), portcullis and curtain (both take "path")
+          door, locked, secret and window take "dir": h | v | d (diagonal, top-left to bottom-right) | a (bottom-left to top-right)
   areas, spawns, links, notes, credit   copied into the map file (spawns: entrances and spawn points, ENCOUNTER_FORMAT.md 14.1)
 
 Play surface (Atlas 0.4.0, for Universal VTT export, ENCOUNTER_FORMAT.md sections 3 and 7): the map file also gets
@@ -32,7 +38,8 @@ Play surface (Atlas 0.4.0, for Universal VTT export, ENCOUNTER_FORMAT.md section
           walls, towers and buildings, cut open where a door stands. Cliffs ("rock") and water stay open ground.
   doors   one per door, locked or secret mark: a one-square segment across the mark ("dir" h or v), closed
   lights  one per fire mark, 6 squares (30 ft), warm colour
-  plan key "openings": shapes that cut the walls without drawing anything (a gate passage, an open archway)
+  plan key "openings": shapes that cut the walls without drawing anything (a gate passage, an open archway); they
+          also take inner walls out of the picture
 `--json` rewrites only the map files and leaves the pictures alone (JPEG bytes differ between Pillow builds).
 """
 import json, math, os, random, re, sys
@@ -78,8 +85,16 @@ def shape(s, rough=0.0, nz=None):
         g = Polygon(s['poly'], s.get('holes') or ([s['hole']] if s.get('hole') else None))
     elif 'path' in s:
         g = LineString(s['path']).buffer(s.get('w', 2) / 2, cap_style=1, join_style=1)
+    elif 'cells' in s:
+        # many squares joined first and roughened as one cave (a floor traced square by square from a scan): the steps
+        # are smoothed away, and the rough wall never strays more than "clip" squares outside the traced squares
+        raw = unary_union([box(x, y, x + w, y + h) for x, y, w, h in s['cells']])
+        if s.get('built') or not rough: return raw
+        g = raw.simplify(.6).buffer(.4, join_style=1).buffer(-.4, join_style=1)
+        return roughen(g, rough, nz).intersection(raw.buffer(s.get('clip', .6)))
     else:
         raise ValueError(f'unknown shape {s}')
+    rough = s.get('rough', rough)  # a shape may ask for less (a short dug link between a cave and a built passage)
     if rough and not s.get('built'):
         g = roughen(g, rough, nz)
     return g
@@ -104,6 +119,21 @@ def union(lst, rough=0.0, nz=None):
 def polys(g):
     if g.is_empty: return []
     return [p for p in getattr(g, 'geoms', [g]) if p.geom_type == 'Polygon']
+
+
+def partition_lines(plan):
+    """Inner walls: where built floor shapes with different "room" ids touch, plus the plan's own "partitions"."""
+    keyed = [(s['room'], shape(s)) for s in plan.get('floor', []) if s.get('room')]
+    segs = []
+    for i, (ka, a) in enumerate(keyed):
+        for kb, b in keyed[i + 1:]:
+            if ka == kb or not a.intersects(b): continue
+            x = a.boundary.intersection(b.boundary)
+            segs += [g for g in getattr(x, 'geoms', [x]) if g.geom_type in ('LineString', 'MultiLineString') and g.length > .05]
+    segs += [LineString(p['path']) for p in plan.get('partitions', [])]
+    if not segs: return LineString()
+    u = unary_union(segs)
+    return linemerge(u) if u.geom_type == 'MultiLineString' else u
 
 
 def draw_poly(d, g, P, fill=None, outline=None, width=1):
@@ -186,7 +216,7 @@ def text_c(d, xy, s, f, fill=INK, stroke=None):
 
 
 def mark(d, m, P, rng, fonts):
-    t, (x, y) = m['t'], m['at']; X, Y = x * P, y * P
+    t, (x, y) = m['t'], m.get('at', (m.get('path') or [[0, 0]])[0]); X, Y = x * P, y * P
     if t in ('num', 'letter'):
         r = (.55 if t == 'num' else .8) * P
         d.ellipse([X - r, Y - r, X + r, Y + r], fill=(250, 244, 226) if t == 'num' else (120, 30, 24), outline=INK, width=3)
@@ -215,15 +245,39 @@ def mark(d, m, P, rng, fonts):
         s = .45 * P; d.rectangle([X - s, Y - s, X + s, Y + s], outline=INK, width=3)
         d.line([X - s, Y - s, X + s, Y + s], fill=INK, width=3); d.line([X - s, Y + s, X + s, Y - s], fill=INK, width=3)
     elif t in ('door', 'locked', 'secret', 'window'):
-        h = m.get('dir', 'h') == 'h'; L, T = .5 * P, .18 * P
-        r = [X - L, Y - T, X + L, Y + T] if h else [X - T, Y - L, X + T, Y + L]
+        a = DOOR_ANGLE[m.get('dir', 'h')]; L, T = .5 * P, .18 * P
+        ca, sa = math.cos(a), math.sin(a)
+        r = [(X + u * ca - v * sa, Y + u * sa + v * ca) for u, v in ((-L, -T), (L, -T), (L, T), (-L, T))]
         if t == 'secret':
             text_c(d, (X, Y), 'S', fonts['num'], fill=(120, 30, 24), stroke=(244, 236, 214))
         elif t == 'window':
-            d.rectangle(r, fill=(200, 200, 190), outline=INK, width=2)
+            d.polygon(r, fill=(200, 200, 190), outline=INK, width=2)
         else:
-            d.rectangle(r, fill=(150, 104, 60), outline=INK, width=3)
+            d.polygon(r, fill=(150, 104, 60), outline=INK, width=3)
             if t == 'locked': d.ellipse([X - .12 * P, Y - .12 * P, X + .12 * P, Y + .12 * P], fill=INK)
+    elif t == 'statue':
+        r = m.get('r', .45) * P
+        d.ellipse([X - r * 1.25, Y - r * 1.25, X + r * 1.25, Y + r * 1.25], fill=(150, 144, 134), outline=INK, width=2)
+        d.ellipse([X - r * .8, Y - r * .8, X + r * .8, Y + r * .8], fill=(226, 222, 212), outline=INK, width=2)
+        d.ellipse([X - r * .3, Y - r * .3, X + r * .3, Y + r * .3], fill=(186, 180, 168), outline=INK, width=1)
+    elif t == 'pillar':
+        r = m.get('r', .45) * P
+        d.ellipse([X - r - 3, Y - r - 3, X + r + 3, Y + r + 3], fill=(40, 34, 28, 120))
+        d.ellipse([X - r, Y - r, X + r, Y + r], fill=(150, 144, 134), outline=INK, width=3)
+    elif t == 'trapdoor':
+        s_ = .42 * P; d.rectangle([X - s_, Y - s_, X + s_, Y + s_], fill=(130, 92, 56), outline=INK, width=3)
+        for k in (-1, 1): d.line([X - s_ + 3, Y + k * s_ / 3, X + s_ - 3, Y + k * s_ / 3], fill=(90, 62, 36), width=2)
+        if m.get('up'): d.ellipse([X - .14 * P, Y - .14 * P, X + .14 * P, Y + .14 * P], fill=INK)
+    elif t == 'portcullis':
+        line = LineString(m['path'])
+        for k in range(int(line.length / .33) + 1):
+            q = line.interpolate(k * .33); r = .09 * P
+            d.ellipse([q.x * P - r, q.y * P - r, q.x * P + r, q.y * P + r], fill=(60, 58, 56), outline=INK)
+    elif t == 'curtain':
+        line = LineString(m['path']); pts = []
+        for k in range(int(line.length / .1) + 1):
+            q = line.interpolate(k * .1); pts.append((q.x * P, q.y * P + .12 * P * math.sin(k * 1.2)))
+        d.line(pts, fill=(140, 28, 36), width=max(3, int(.12 * P)))
     elif t == 'stairs':
         w, h = m.get('size', [2, 2]); a = m.get('dir', 'n'); x0, y0 = X - w * P / 2, Y - h * P / 2
         d.rectangle([x0, y0, x0 + w * P, y0 + h * P], fill=(226, 214, 184), outline=INK, width=3)
@@ -310,11 +364,40 @@ def mark(d, m, P, rng, fonts):
 def render(plan, rng):
     w, h = plan['size']; P = plan.get('px', 40); W, H = w * P, h * P
     nz = (Noise(rng, scale=plan.get('wobble', 1.2)), Noise(rng, scale=plan.get('wobble', 1.2)))
-    cave = plan.get('style', 'cave') == 'cave'
+    style = plan.get('style', 'cave'); dungeon = style == 'dungeon'; cave = style in ('cave', 'dungeon')
     rough = plan.get('rough', 1.4 if cave else .4)
     floor = union(plan.get('floor', []), rough if cave else 0, nz)
     frame = box(0, 0, w, h)
-    if cave:
+    built = unary_union([shape(s) for s in plan.get('floor', []) if s.get('built')] or [Polygon()])
+    walls_in = partition_lines(plan).intersection(floor.buffer(.05))
+    if plan.get('openings'): walls_in = walls_in.difference(union(plan['openings']))  # an archway leaves no wall
+    if dungeon:
+        # after the redraws Heph supplied for B3 (2026-11-07): rooms of pale flagstone inside dressed-stone walls on a dark
+        # ground, caves of bare earth inside rough rock; our own drawing, no art copied
+        im = texture(W, H, (24, 21, 19), rng, 6, 3)
+        d = ImageDraw.Draw(im, 'RGBA')
+        rim = floor.buffer(.55, join_style=2, mitre_limit=2.5)
+        draw_poly(d, rim.buffer(.25), P, fill=(0, 0, 0, 140))
+        im.paste(texture(W, H, (84, 72, 60), rng, 12, 2), (0, 0), mask_of(rim, W, H, P))
+        im.paste(texture(W, H, (112, 106, 98), rng, 10, 1), (0, 0), mask_of(rim.intersection(built.buffer(.6, join_style=2)), W, H, P))
+        d = ImageDraw.Draw(im, 'RGBA')
+        draw_poly(d, rim, P, outline=INK, width=3)
+        cavef = floor.difference(built)
+        im.paste(texture(W, H, (150, 128, 102), rng, 14, 2), (0, 0), mask_of(cavef, W, H, P))
+        inner = mask_of(cavef.buffer(-.4), W, H, P).filter(ImageFilter.GaussianBlur(P * .45))
+        shade = Image.composite(Image.new('L', (W, H), 0), mask_of(cavef, W, H, P).point(lambda v: 90 if v else 0), inner)
+        im.paste((92, 76, 60), (0, 0), shade)
+        im.paste(texture(W, H, (202, 194, 178), rng, 8, 1), (0, 0), mask_of(built, W, H, P))
+        d = ImageDraw.Draw(im, 'RGBA')
+        # flagstones: each square a shade lighter or darker, seeded
+        x0, y0, x1, y1 = built.bounds if not built.is_empty else (0, 0, 0, 0)
+        for yy in range(int(y0), int(math.ceil(y1))):
+            for xx in range(int(x0), int(math.ceil(x1))):
+                if built.contains(Point(xx + .5, yy + .5)):
+                    v = rng.randint(-14, 14); c = (128, 120, 108, abs(v) * 3) if v < 0 else (255, 250, 240, v * 3)
+                    d.rectangle([xx * P + 1, yy * P + 1, (xx + 1) * P - 1, (yy + 1) * P - 1], fill=c)
+        draw_poly(d, floor, P, outline=INK, width=3)
+    elif cave:
         im = texture(W, H, ROCK, rng, 14, 3)
         if plan.get('open'):
             og = union(plan['open'], .6, nz)
@@ -380,12 +463,15 @@ def render(plan, rng):
             im.paste(texture(W, H, PAPER, rng, 8, 2), (0, 0), mask_of(floor, W, H, P))
             d = ImageDraw.Draw(im, 'RGBA')
             draw_poly(d, floor, P, outline=INK, width=4)
-    water = union(plan.get('water', []), .35, nz)
+    water = union([q for q in plan.get('water', []) if not q.get('colour')], .35, nz)
     draw_poly(d, water.buffer(.15), P, fill=(70, 80, 70, 120))
     draw_poly(d, water, P, fill=WATER, outline=(44, 59, 69), width=3)
     for p in polys(water.buffer(-.5)):
         for k in range(0, len(p.exterior.coords) - 1, 6):
             x, y = p.exterior.coords[k]; d.line([(x - .3) * P, y * P, (x + .3) * P, y * P], fill=(170, 196, 198), width=2)
+    for q in [q for q in plan.get('water', []) if q.get('colour')]:  # a pool of another colour (ink, blood, sulphur)
+        g = shape(q, .35, nz); c = tuple(q['colour'])
+        draw_poly(d, g.buffer(.15), P, fill=(40, 30, 40, 120)); draw_poly(d, g, P, fill=c, outline=INK, width=3)
     # masonry: curtain walls, towers and roofed buildings (built maps such as the keep)
     STONE = (168, 160, 146)
     def building(b):
@@ -421,21 +507,28 @@ def render(plan, rng):
         for k in range(0, int(ring.length / .8)):
             q = ring.interpolate(k * .8); d.rectangle([(q.x - .15) * P, (q.y - .15) * P, (q.x + .15) * P, (q.y + .15) * P], fill=INK)
     # cave walls: a hatched band of rock along every wall, then a heavy ink line
-    if cave:
+    if cave and not dungeon:
         band = floor.buffer(.8).difference(floor).intersection(frame)
         hatch(d, band, P, rng, 12, .5, 2)
         draw_poly(d, floor, P, outline=INK, width=5)
-        # loose rubble and stalagmites along the walls, seeded
-        edge = floor.difference(floor.buffer(-1.1))
-        for x, y in scatter(edge, int(floor.area * plan.get('rubble', .05)), rng, .8):
+    if cave:
+        # loose rubble and stalagmites along the walls, seeded (in a dungeon, only in its caves)
+        rf = floor.difference(built.buffer(.8)) if dungeon else floor
+        edge = rf.difference(floor.buffer(-1.1))
+        for x, y in scatter(edge, int(rf.area * plan.get('rubble', .05)), rng, .8):
             r = rng.uniform(.12, .32); k = rng.randint(5, 7)
             pts = [((x + r * rng.uniform(.7, 1.2) * math.cos(a * 2 * math.pi / k)) * P, (y + r * rng.uniform(.7, 1.2) * math.sin(a * 2 * math.pi / k)) * P) for a in range(k)]
             d.polygon(pts, fill=(168, 156, 136), outline=INK)
+    # inner walls between rooms: a band of dressed stone with inked faces
+    wband = walls_in.buffer(.2, cap_style=2, join_style=2) if not walls_in.is_empty else Polygon()
+    if not wband.is_empty:
+        im.paste(texture(W, H, (112, 106, 98), rng, 10, 1), (0, 0), mask_of(wband, W, H, P))
+        d = ImageDraw.Draw(im, 'RGBA'); draw_poly(d, wband, P, outline=INK, width=3)
     # grid on the floor (caves) or everywhere (outdoor); a surface picture (below) has none
     SURF = plan.get('_surface')
-    gmask = mask_of(floor, W, H, P) if cave else Image.new('L', (W, H), 255)
+    gmask = mask_of(floor.difference(wband), W, H, P) if cave else Image.new('L', (W, H), 255)
     grid = Image.new('RGBA', (W, H), (0, 0, 0, 0)); gd = ImageDraw.Draw(grid)
-    gc = (90, 70, 46, 70) if cave else (40, 40, 20, 46)
+    gc = (60, 48, 36, 60) if dungeon else (90, 70, 46, 70) if cave else (40, 40, 20, 46)
     for i in range(w + 1): gd.line([i * P, 0, i * P, H], fill=gc, width=1)
     for j in range(h + 1): gd.line([0, j * P, W, j * P], fill=gc, width=1)
     if not SURF: im.paste(grid, (0, 0), Image.composite(grid, Image.new('RGBA', (W, H)), gmask))
@@ -463,6 +556,7 @@ def render(plan, rng):
 
 
 DOORS = ('door', 'locked', 'secret')
+DOOR_ANGLE = {'h': 0, 'v': math.pi / 2, 'd': math.pi / 4, 'a': -math.pi / 4}
 
 
 def play_surface(plan, floor):
@@ -470,15 +564,17 @@ def play_surface(plan, floor):
     w, h = plan['size']; frame = box(0, 0, w, h); r2 = lambda v: round(v, 2)
     doors, lights, cuts = [], [], []
     for m in plan.get('marks', []):
+        if 'at' not in m: continue
         x, y = m['at']
         if m['t'] in DOORS:
-            a, b = ([x - .5, y], [x + .5, y]) if m.get('dir', 'h') == 'h' else ([x, y - .5], [x, y + .5])
+            an = DOOR_ANGLE[m.get('dir', 'h')]; c, s_ = [0 if abs(v) < 1e-9 else (.5 if abs(v - .5) < 1e-9 else v) for v in (.5 * math.cos(an), .5 * math.sin(an))]
+            a, b = [x - c, y - s_], [x + c, y + s_]
             doors.append({'at': [[r2(v) for v in a], [r2(v) for v in b]], 'closed': True, 'secret': m['t'] == 'secret', **({'locked': True} if m['t'] == 'locked' else {})})
             cuts.append(box(x - .55, y - .55, x + .55, y + .55))
         elif m['t'] == 'fire':
             lights.append({'at': [r2(x), r2(y)], 'range': 6, 'colour': '#ffa04a', 'intensity': 1})
     masonry = unary_union([shape(s) for k in ('walls', 'towers', 'buildings') for s in plan.get(k, [])] or [Polygon()])
-    solid = unary_union([floor.intersection(frame).boundary, masonry.intersection(frame).boundary])
+    solid = unary_union([floor.intersection(frame).boundary, masonry.intersection(frame).boundary, partition_lines(plan)])
     solid = solid.difference(frame.exterior.buffer(.02))  # the map's own edge is not a wall
     cuts += [shape(o) for o in plan.get('openings', [])]
     if cuts: solid = solid.difference(unary_union(cuts))
