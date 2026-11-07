@@ -21,21 +21,22 @@ button,select{font:inherit;font-size:14px;background:#fffaf0;border:1px solid #b
 #modules{border:1px solid #b8ab8c;border-radius:8px;background:var(--bg);color:var(--ink);padding:12px 16px;max-width:min(440px,92vw)}#modules::backdrop{background:#0004}
 #modules h2{font-size:16px;margin:0 0 8px;font-weight:normal}#modules ul{list-style:none;margin:0 0 10px;padding:0}
 #modules li button{width:100%;text-align:left;margin:2px 0;padding:6px 10px}#modules li button[disabled]{opacity:.55;cursor:default}#modules li button.on{border-color:var(--red)}#modules small{color:var(--dim)}
-#key .support{margin:14px 0 4px;padding-top:8px;border-top:1px solid #d8cfb8;color:var(--dim)}#key .support a{color:var(--red)}
 body.nokey #key{display:none}@media(max-width:700px){#key{position:absolute;right:0;top:0;bottom:0;box-shadow:-2px 0 8px #0003}}
 canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor:pointer}
 footer{display:flex;justify-content:space-between;gap:12px;padding:4px 16px;font-size:12px;color:var(--dim);border-top:1px solid #d8cfb8}
 #hover{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-#route{position:absolute;left:10px;top:10px;z-index:2;max-width:calc(100% - 20px);background:#fffaf0ee;border:1px solid #b8ab8c;border-radius:6px;padding:6px 10px;font-size:13px;box-shadow:0 2px 8px #0002}
-#route[hidden]{display:none}#route b{color:var(--red)}#route small{color:var(--dim)}#route button{font-size:12px;padding:0 8px;margin:4px 6px 0 0}
-#routebtn.on{border-color:var(--red);color:var(--red)}
+#route,#party{position:absolute;left:10px;top:10px;z-index:2;max-width:calc(100% - 20px);background:#fffaf0ee;border:1px solid #b8ab8c;border-radius:6px;padding:6px 10px;font-size:13px;box-shadow:0 2px 8px #0002}
+#route[hidden],#party[hidden]{display:none}#route b,#party b{color:var(--red)}#route small,#party small{color:var(--dim)}#route button,#party button{font-size:12px;padding:0 8px;margin:4px 6px 0 0}
+#party{top:auto;bottom:10px}#party a{color:var(--red)}
+#routebtn.on,#partybtn.on{border-color:var(--red);color:var(--red)}
+footer a{color:var(--red)}
 </style></head><body>
 <header><h1 id="crumbs"></h1>
 <div class="ctl"><select id="lang"><option value="ga">Gaeilge</option><option value="en">English</option></select>
 <label><input type="checkbox" id="edges" checked> Hex Edges</label>
-<button id="out" title="Zoom out">−</button><button id="in" title="Zoom in">+</button><button id="fit">Fit</button><button id="routebtn" title="Plot a route and estimate the travel time">Route</button><button id="keybtn">Key</button><button id="modbtn" title="Load a different module">Modules</button></div></header>
-<div id="main"><div id="map"><canvas id="cv"></canvas><div id="route" hidden aria-live="polite"></div></div><aside id="key"></aside></div>
-<footer><span id="hover">Click a hex to zoom in.</span><span>E9 Atlas {{ATLAS}}<span id="modver"></span></span></footer>
+<button id="out" title="Zoom out">−</button><button id="in" title="Zoom in">+</button><button id="fit">Fit</button><button id="routebtn" title="Plot a route and estimate the travel time">Route</button><button id="partybtn" title="Show, place or move the party">Party</button><button id="keybtn">Key</button><button id="modbtn" title="Load a different module">Modules</button></div></header>
+<div id="main"><div id="map"><canvas id="cv"></canvas><div id="route" hidden aria-live="polite"></div><div id="party" hidden aria-live="polite"></div></div><aside id="key"></aside></div>
+<footer><span id="hover">Click a hex to zoom in.</span><span><span id="support"></span>E9 Atlas {{ATLAS}}<span id="modver"></span></span></footer>
 <dialog id="modules"><h2>Load a module</h2><ul id="modlist"></ul><button id="modclose">Close</button></dialog>
 <!--CARD-->
 <script>
@@ -284,7 +285,7 @@ function draw() {
   const own = LV[V.lvl].own;
   if (own) { const [sx, sy] = S(...hexFt(V.i, V.j, own)); hexPath(sx, sy, own * 100 * cam.s / SQ3); ctx.setLineDash([9, 5]); ctx.strokeStyle = '#b3261e'; ctx.lineWidth = 2.5; ctx.stroke(); ctx.setLineDash([]); }
   if (V.sel) { const [sx, sy] = S(...ft(...V.sel)); hexPath(sx, sy, 100 * cam.s / SQ3); ctx.strokeStyle = '#b3261e'; ctx.lineWidth = 3; ctx.stroke(); }
-  drawRoute();
+  drawRoute(); drawParty();
   keepNear();
 }
 
@@ -315,14 +316,16 @@ function routeBox() {
   let h = `<b>Route</b> · ${STOPS.length} stop${STOPS.length === 1 ? '' : 's'} · ${r.mi.toFixed(r.mi < 10 ? 1 : 0)} mi`;
   if (STOPS.length > 1) h += r.blocked ? ` · <b>crosses ${esc(TYPES.find(t => t.id === r.blocked).name.toLowerCase())}</b>: no way on foot`
     : ` · ${hm(r.hours)}${r.days >= .5 ? ` · ${r.days.toFixed(1)} days of ${P.hours_per_day || 8} h` : ''}`;
-  h += `<br><small>Terrain read from ${unit}${unknown > .05 ? `; ${unknown.toFixed(1)} mi unmapped, at normal pace` : ''}. No roads yet.</small><br><button data-r="undo">Undo</button><button data-r="clear">Clear</button><button data-r="done">Done</button>`;
+  h += `<br><small>Terrain read from ${unit}${unknown > .05 ? `; ${unknown.toFixed(1)} mi unmapped, at normal pace` : ''}. No roads yet.</small><br>${STOPS.length > 1 && !r.blocked ? `<button data-r="move" title="Put the party at the last stop and add the travel time">Move party here</button>` : ''}<button data-r="undo">Undo</button><button data-r="clear">Clear</button><button data-r="done">Done</button>`;
   box.innerHTML = h;
 }
 document.getElementById('route').addEventListener('click', e => { const b = e.target.closest('button[data-r]'); if (!b) return;
+  if (b.dataset.r === 'move') { moveParty(); return; }
   if (b.dataset.r === 'undo') STOPS.pop(); else if (b.dataset.r === 'clear') STOPS = []; else setRoute(false); routeBox(); redraw(); });
-function setRoute(on) { ROUTE = on; document.getElementById('routebtn').classList.toggle('on', on); document.getElementById('hover').textContent = on ? 'Route: click a hex to add a stop.' : 'Click a hex to zoom in.'; routeBox(); redraw(); }
+function setRoute(on) { ROUTE = on; document.getElementById('routebtn').classList.toggle('on', on); if (on && !STOPS.length && PARTY) STOPS.push(ft(...PARTY.hex)); hoverHint(); routeBox(); redraw(); }  // a route starts where the party stands
+const hoverHint = () => { document.getElementById('hover').textContent = PLACE ? 'Party: click a hex to put the party there.' : ROUTE ? 'Route: click a hex to add a stop.' : 'Click a hex to zoom in.'; };
 document.getElementById('routebtn').onclick = () => setRoute(!ROUTE);
-addEventListener('keydown', e => { if (e.key === 'Escape' && ROUTE) setRoute(false); });
+addEventListener('keydown', e => { if (e.key !== 'Escape') return; if (PLACE) { PLACE = false; partyBox(); hoverHint(); } else if (ROUTE) setRoute(false); });
 function drawRoute() {
   if (!STOPS.length) return;
   ctx.lineJoin = ctx.lineCap = 'round';
@@ -331,6 +334,57 @@ function drawRoute() {
   ctx.setLineDash([]);
   STOPS.forEach((p, k) => { const [sx, sy] = S(...p); ctx.beginPath(); ctx.arc(sx, sy, k ? 5 : 6, 0, 7); ctx.fillStyle = k ? '#7a2e2e' : '#f4efe1'; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = '#7a2e2e'; ctx.stroke(); });
   if (ROUTE && !drawRoute.q) drawRoute.q = setTimeout(() => { drawRoute.q = 0; routeBox(); }, 150);  // tiles landing change the sums
+}
+
+// ---- the party marker (Heph 2026-11-07, Atlas 0.4.17; ATLAS_FORMAT.md "Party marker"): where the party stands, always one 100-ft hex,
+// drawn at every zoom, kept per module in this browser, and told to an app that embeds the Atlas. Moving it along a route adds the travel time.
+let PARTY = null, PLACE = false, PBOX = false;  // PARTY: {hex: [C, R], hours}; PLACE: the next click puts the party there; PBOX: its box is open
+const partyKey = () => 'e9-atlas-party:' + MOD.id;
+function loadParty() {
+  try { const p = JSON.parse(store.get(partyKey()) || 'null'); const q = p && typeof p.hex === 'string' && parse('#' + p.hex); if (q && q.sel) PARTY = { hex: q.sel, hours: +p.hours || 0 }; } catch (e) {}
+}
+function setParty(hex, hours, quiet) {
+  PARTY = hex ? { hex, hours: hours || 0 } : null;
+  store.set(partyKey(), PARTY ? JSON.stringify({ hex: addr(...hex).slice(1), hours: PARTY.hours }) : '');
+  if (!quiet && parent !== window) parent.postMessage({ type: 'e9-atlas', event: 'party', module: MOD.id, hex: PARTY ? addr(...hex).slice(1) : null, hours: PARTY ? PARTY.hours : 0 }, '*');
+  partyBox(); redraw();
+}
+function placeParty(x, y) {  // the centre 100-ft hex of the hex clicked at this level
+  const N = LV[V.lvl].draw, [i, j] = hexAt(x, y, N); if (!T(i, j, N)) return;
+  PLACE = false; hoverHint(); setParty(N === 1 ? [i, j] : centre(i, j, N), PARTY ? PARTY.hours : 0);
+}
+function moveParty() {  // along the route: to its last stop, adding the route's time; the route then starts again from there
+  const { legs } = routeLegs(), r = E9Atlas.travel(legs.map(g => ({ mi: g.mi, terrain: g.terrain || 'unknown' }))); if (r.blocked || STOPS.length < 2) return;
+  const end = STOPS[STOPS.length - 1]; setParty(hexAt(end[0], end[1], 1), (PARTY ? PARTY.hours : 0) + r.hours);
+  STOPS = [ft(...PARTY.hex)]; routeBox(); redraw();
+}
+function partyBox() {
+  const box = document.getElementById('party'); box.hidden = !(PBOX || PLACE); document.getElementById('partybtn').classList.toggle('on', !box.hidden); if (box.hidden) return;
+  const P = (D.travel || {}).pace || {}, day = P.hours_per_day || 8;
+  if (PLACE) { box.innerHTML = '<b>Party</b> · click a hex to put the party there. <small>Esc cancels.</small><br><button data-p="cancel">Cancel</button>'; return; }
+  if (!PARTY) { box.innerHTML = '<b>Party</b> · not on the map yet.<br><button data-p="place">Place the party</button><button data-p="close">Close</button>'; return; }
+  const [C, R] = PARTY.hex, t = T(C, R, 1), h = addr(C, R), lbl = h.slice(7);
+  box.innerHTML = `<b>Party</b> · at <a href="${h}">${lbl}</a>${t ? ' · ' + esc(TYPES[t - 1].name.toLowerCase()) : ''}<br><small>Travelled ${hm(PARTY.hours)}${PARTY.hours >= day / 2 ? ` (${(PARTY.hours / day).toFixed(1)} days of ${day} h)` : ''}</small><br>`
+    + '<button data-p="go">Go to</button><button data-p="place">Move</button><button data-p="reset" title="Set the travel time back to zero">Reset time</button><button data-p="remove">Remove</button><button data-p="close">Close</button>';
+}
+document.getElementById('party').addEventListener('click', e => { const b = e.target.closest('button[data-p]'); if (!b) return; const a = b.dataset.p;
+  if (a === 'place') { PLACE = true; hoverHint(); } else if (a === 'cancel') { PLACE = false; hoverHint(); } else if (a === 'close') PBOX = false;
+  else if (a === 'go') location.hash = addr(...PARTY.hex); else if (a === 'reset') setParty(PARTY.hex, 0); else if (a === 'remove') setParty(null);
+  partyBox(); });
+document.getElementById('partybtn').onclick = () => { if (PBOX || PLACE) { PBOX = PLACE = false; hoverHint(); } else { PBOX = true; if (!PARTY) { PLACE = true; hoverHint(); } } partyBox(); };
+// an app that embeds the Atlas may set the party ({type: 'e9-atlas', party: {hex: 'world:LLLL:HHHH', hours} | null}); it is not told back
+addEventListener('message', e => { const d = e.data; if (!D || !MOD || !d || d.type !== 'e9-atlas' || !('party' in d)) return;
+  if (d.party === null) { setParty(null, 0, true); return; }
+  const q = d.party && typeof d.party.hex === 'string' && parse('#' + d.party.hex); if (q && q.sel) setParty(q.sel, +d.party.hours || 0, true); });
+function drawParty() {  // a red pennant planted on the party's hex centre, over everything; the hex itself shaded once it is big enough to see
+  if (!PARTY) return; const [sx, sy] = S(...ft(...PARTY.hex)), F = 100 * cam.s;
+  if (PBOX && !drawParty.q) drawParty.q = setTimeout(() => { drawParty.q = 0; partyBox(); }, 150);  // the hex's terrain once its tile lands
+  if (sx < -60 || sy < -60 || sx > W + 60 || sy > H + 60) return;
+  if (F > 20) { hexPath(sx, sy, F / SQ3); ctx.fillStyle = 'rgba(179,38,30,.16)'; ctx.fill(); ctx.strokeStyle = '#b3261e'; ctx.lineWidth = 2; ctx.stroke(); }
+  const h = 28; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(sx, sy - h); ctx.strokeStyle = '#f4efe1'; ctx.lineWidth = 5; ctx.stroke(); ctx.strokeStyle = '#2b2418'; ctx.lineWidth = 2; ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(sx + 1, sy - h); ctx.lineTo(sx + 18, sy - h + 6); ctx.lineTo(sx + 1, sy - h + 12); ctx.closePath(); ctx.fillStyle = '#b3261e'; ctx.fill(); ctx.strokeStyle = '#f4efe1'; ctx.lineWidth = 1.5; ctx.stroke();
+  ctx.beginPath(); ctx.arc(sx, sy, 3.5, 0, 7); ctx.fillStyle = '#2b2418'; ctx.fill(); ctx.strokeStyle = '#f4efe1'; ctx.lineWidth = 1.5; ctx.stroke();
 }
 
 // travel (Heph 2026-11-06, ATLAS_FORMAT.md "Travel"): each terrain type's time multiplier against the module's pace, and the roads'.
@@ -348,7 +402,8 @@ window.E9Atlas = { travel(legs) {
 
 // the map key (Heph 2026-11-05: "get the map keys back"): terrain in view, then the places in view; a place zooms in like a click
 let KEYHTML = '';
-const PATREON = {{PATREON}};  // from links.json at build time; empty hides the link
+const PATREON = {{PATREON}};  // from links.json at build time; empty hides the link. In the footer (Heph 2026-11-07), no longer in the key
+if (PATREON) document.getElementById('support').innerHTML = `<a href="${String(PATREON).replace(/[&<>"]/g, '')}" target="_blank" rel="noopener">Support E9 on Patreon</a> · `;
 const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 function key(ts, ps) {
   let h = '<h2>Terrain</h2>';
@@ -366,7 +421,6 @@ function key(ts, ps) {
     for (const c of here) { const n = c.troupe && Object.values(c.troupe)[0];
       h += `<div class="row pl cr" data-cr="${esc(c.id)}"><span>${esc(c.name)}${n ? ' <small>×' + esc(n) + '</small>' : ''}<br><small>${esc(c.kind === 'npc' ? 'NPC' : c.kind)}${c.is ? ' · ' + esc(c.is) : ''}${c.site_name ? ' · ' + esc(name(c.site_name)) : ''}</small></span></div>`; }
   }
-  if (PATREON) h += `<p class="support">Enjoying E9? <a href="${esc(PATREON)}" target="_blank" rel="noopener">Support it on Patreon</a></p>`;
   if (h !== KEYHTML) document.getElementById('key').innerHTML = KEYHTML = h;
 }
 document.getElementById('key').addEventListener('click', e => {
@@ -446,7 +500,7 @@ cv.addEventListener('pointermove', e => {
 });
 cv.addEventListener('pointerup', e => {
   if (!drag) return; const moved = drag.moved; drag = null; if (moved) return;
-  const b = cv.getBoundingClientRect(), at = F(e.clientX - b.left, e.clientY - b.top); if (ROUTE) addStop(...at); else goDown(...at);
+  const b = cv.getBoundingClientRect(), at = F(e.clientX - b.left, e.clientY - b.top); if (PLACE) placeParty(...at); else if (ROUTE) addStop(...at); else goDown(...at);
 });
 cv.addEventListener('wheel', e => { e.preventDefault(); zoom(e.deltaY < 0 ? 1.25 : .8, e); }, { passive: false });
 function zoom(f, e) {
@@ -494,6 +548,6 @@ async function loadModules() {
   try { const j = await (await fetch(A + 'creatures.json')).json(); CR = j.creatures || []; SC = j.scenes || {}; } catch (e) { CR = []; }  // a module without creatures has no file
   if (window.E9Map) Object.assign(E9Map, { base: MOD.base, module: MOD.id, creatures: CR, scenes: SC,
     places: D.pois.filter(p => p.encounter).map(p => ({ get name() { return name(p.name); }, pointers: p.encounter, go: () => { location.hash = addr(...p.hex); } })) });  // ways out lead back to the place's 100-ft hex  // encounter maps sit in the module folder
-  smoothRivers(); go();
+  loadParty(); smoothRivers(); go();
 })();
 </script></body></html>
