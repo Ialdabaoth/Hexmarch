@@ -10,7 +10,7 @@ Print PDFs are off by default until the print process is settled (Heph 2026-11-0
 Creatures (CREATURES_FORMAT.md): every *.json with an "encounters" block merges into <out>/encounters.json,
 bestiary/<ruleset>.json files are copied, and the viewers get a resolved list of who lives at which site.
 """
-import datetime, json, os, re, shutil, subprocess, sys, unicodedata, urllib.request
+import datetime, json, os, re, shutil, subprocess, sys, time, unicodedata, urllib.request
 
 TOOLS = os.path.dirname(os.path.abspath(__file__)); ROOT = os.path.dirname(TOOLS)
 mdir, out = os.path.abspath(sys.argv[1]), os.path.abspath(sys.argv[2]); PDF = '--pdf' in sys.argv
@@ -23,15 +23,7 @@ def slug(t):
     t = unicodedata.normalize('NFKD', t).encode('ascii', 'ignore').decode().lower()
     return re.sub(r'[^a-z0-9]+', '-', t).strip('-')
 
-# terrain data: SRTM tiles are fetched once into modules/.cache/geo
 geo = os.path.join(ROOT, '.cache', 'geo'); os.makedirs(geo, exist_ok=True)
-la0, la1, lo0, lo1 = MOD['dem']
-for la in range(la0, la1 + 1):
-    for lo in range(lo0, lo1 + 1):
-        t = f"{'N' if la >= 0 else 'S'}{abs(la):02d}{'E' if lo >= 0 else 'W'}{abs(lo):03d}"
-        f = os.path.join(geo, t + '.hgt.gz')
-        if not os.path.exists(f):
-            print('fetching', t); urllib.request.urlretrieve(f'https://s3.amazonaws.com/elevation-tiles-prod/skadi/{t[:3]}/{t}.hgt.gz', f)
 try: sha = subprocess.run(['git', 'rev-parse', '--short', 'HEAD'], capture_output=True, text=True, cwd=ROOT).stdout.strip()
 except Exception: sha = ''
 ATLAS = open(TOOLS + '/ATLAS_VERSION').read().strip()  # the E9 Atlas app and tools (Heph 2026-11-05); patch per PR, separate from each module's version
@@ -48,52 +40,112 @@ for b in MOD['books']:
     for st in R[b['region']]['sites']:
         if st[0] in seen: continue
         seen.add(st[0]); sites.append(st); home[st[0]] = b
-world = dict(MOD['world'], hex_mi=HX, px=round(96 / (HX * MI_KM), 4), master=True, title=MOD['title'], subtitle='', sites=sites)
-json.dump({'world': world}, open(work + '/world.json', 'w'), ensure_ascii=False)
-run(*PY, TOOLS + '/hexmap.py', geo, work, work + '/world.json')
-# atlas.land = "island": the E9 Atlas covers every county on the island (Heph 2026-11-06, all of Ireland), while the print maps
-# stay on the books' counties; this second, unprinted run only gives atlas_convert.py its Marches and the island's rivers
-if MOD['atlas'].get('land') == 'island':
-    json.dump({'island': dict(world, counties='*', sites=[])}, open(work + '/island.json', 'w'), ensure_ascii=False)
-    run(*PY, TOOLS + '/hexmap.py', geo, work, work + '/island.json')
-# 2. March pages (the print atlas: one 24-mile hex per page), 3. League pages (one 3-mile hex per page)
-run(*PY, TOOLS + '/atlas_pages.py', work + '/world.svg', work + '/world-grid.json', work + '/atlas.html')
-run(*PY, TOOLS + '/league_pages.py', os.path.join(mdir, 'module.json'), work + '/atlas-index.json', work + '/world-grid.json', work + '/league')
-# E9 Atlas format (ATLAS_FORMAT.md): the same terrain as one map JSON + one PNG per March, for the dynamic renderer
-if 'centroid' in MOD['atlas']:
-    run(*PY, TOOLS + '/atlas_convert.py', os.path.join(mdir, 'module.json'), work, out + '/atlas')
-    run(*PY, TOOLS + '/atlas_cache.py', out + '/atlas')  # the pieces the Atlas loads around the view (rebuilt when a March PNG changes)
-    run(*PY, TOOLS + '/atlas_roads.py', os.path.join(mdir, 'module.json'), out + '/atlas')  # module.json atlas.roads, laid over the Field terrain in the cache
-    # the dynamic renderer (preview): atlas/index.html draws every level from map.json + the March PNGs, with the shared tiles
-    AJ = json.load(open(out + '/atlas/map.json')); os.makedirs(out + '/atlas/tiles', exist_ok=True)
-    TD = os.path.join(ROOT, 'assets', 'tiles', 'icons')
-    want = {t['icon'] for t in AJ['terrain']['types'] if t.get('icon')} | {p['icon'] for p in AJ['pois'] if p.get('icon')}
-    want |= {t['tile'] for t in AJ['terrain']['types']}
-    for n in sorted(want | {n + '-x' for n in want if n.startswith('bg-')}):  # full RGBA, as drawn
-        if os.path.exists(f'{TD}/{n}.png'): shutil.copy(f'{TD}/{n}.png', f'{out}/atlas/tiles/{n}.png')
-    # blends: not the 96 bleed tiles (4 MB) but Heph's edge and corner masks, rotated, as 8-bit greyscale (Heph 2026-11-05);
-    # the renderer multiplies each into the colour's own tile on the phone, exactly as tiles_blend.py does
-    from PIL import Image
-    MD = os.path.join(ROOT, 'assets', 'tiles', 'masks')
-    for kind, f in (('e', 'edge.png'), ('c', 'corner.png')):
-        m = Image.open(os.path.join(MD, f)).getchannel('A')
-        for k in range(6):
-            r = m.rotate(-60 * k, resample=Image.BICUBIC, center=(m.width / 2, m.height / 2))
-            r.save(f'{out}/atlas/tiles/mask-{kind}{k}.png', optimize=True)
-            x = Image.new('L', (r.width + 8, r.height + 8)); x.paste(r, (4, 4))  # the -x twins' 4 px margin, edge pixels repeated
-            for p_ in range(4):
-                x.paste(r.crop((0, 0, r.width, 1)), (4, p_)); x.paste(r.crop((0, r.height - 1, r.width, r.height)), (4, r.height + 4 + p_))
-            for p_ in range(4):
-                x.paste(x.crop((4, 0, 5, x.height)), (p_, 0)); x.paste(x.crop((r.width + 3, 0, r.width + 4, x.height)), (r.width + 4 + p_, 0))
-            x.save(f'{out}/atlas/tiles/mask-{kind}{k}-x.png', optimize=True)
-    # the app itself lives once at <site>/atlas/ (atlas_app.py, Atlas 0.3.0); this old address forwards there, keeping the #link
-    open(out + '/atlas/index.html', 'w').write(f'<!doctype html><meta charset="utf-8"><title>{MOD["title"]} · E9 Atlas</title><meta name="robots" content="noindex">'
-        f'<script>location.replace("../../../atlas/?module={MOD["id"]}" + location.hash)</script><p>The E9 Atlas moved to <a href="../../../atlas/?module={MOD["id"]}">its own page</a>.</p>')
-# 4. PDFs
-if PDF:
-    os.makedirs(out + '/print', exist_ok=True)
-    for src, dst in ((work + '/atlas.html', 'atlas.pdf'), (work + '/league/leagues.html', 'leagues.pdf')):
-        run('node', TOOLS + '/pdf.js', src, 'none'); shutil.move(src.replace('.html', '.pdf'), out + '/print/' + dst)
+
+# build cache (Heph 2026-11-07: fast small deploys): steps 1-4 are most of a site build, and most changes to a module
+# (encounters, bestiary, encounter maps) never touch them. Their results (_work, <out>/atlas, <out>/print) are kept in
+# modules/.cache/build/<module id>/<key>, where <key> hashes every file those steps read: module.json, the module's
+# atlas/ folder, its admin file, the shared geo data and tile art, the map tools and requirements.txt. A changed file
+# changes the key, and a missing or partial entry is a miss, so a miss always rebuilds. BUILD_CACHE=0 turns it off.
+# The maps carry no version stamp, so a cached one never shows a stale version.
+import hashlib
+MAP_TOOLS = ['build.py', 'hexmap.py', 'atlas_pages.py', 'league_pages.py', 'atlas_convert.py', 'atlas_cache.py', 'atlas_roads.py',
+             'realmap.py', 'dymaxion.py', 'pdf.js', 'ATLAS_VERSION']  # a tool a map step starts to read belongs here (local imports are found below)
+def map_key():
+    tools = set(MAP_TOOLS)
+    for t in list(tools):  # and any tools/*.py a listed script imports
+        if t.endswith('.py'):
+            for m in re.findall(r'^\s*(?:from|import)\s+(\w+)', open(os.path.join(TOOLS, t)).read(), flags=re.M):
+                if os.path.isfile(os.path.join(TOOLS, m + '.py')): tools.add(m + '.py')
+    paths = [os.path.join(mdir, 'module.json'), os.path.join(mdir, 'atlas'), os.path.normpath(os.path.join(mdir, MOD['admin'])),
+             os.path.join(ROOT, 'geo'), os.path.join(ROOT, 'assets'), os.path.join(ROOT, 'requirements.txt')] + [os.path.join(TOOLS, t) for t in sorted(tools)]
+    h = hashlib.sha256(f'pdf={PDF}'.encode())
+    # module.json counts without its version: a version bump alone must not redraw every map. The maps never print the
+    # version (only index.html and the manifest do, and step 5 always writes those); the print PDFs do, so with --pdf it counts
+    mj = json.load(open(paths[0])); mj.pop('version', None) if not PDF else None
+    h.update(json.dumps(mj, sort_keys=True, ensure_ascii=False).encode()); paths = paths[1:]
+    for p in paths:
+        fs = [p] if os.path.isfile(p) else sorted(os.path.join(dp, f) for dp, dn, fn in os.walk(p) for f in fn if '__pycache__' not in dp)
+        if not fs: h.update(b'\0none ' + p.encode())
+        for f in fs: h.update(b'\0' + os.path.relpath(f, ROOT).encode() + b'\0' + hashlib.sha256(open(f, 'rb').read()).digest())
+    return h.hexdigest()[:24]
+CBASE = os.path.join(ROOT, '.cache', 'build', MOD['id']); KEY = map_key(); CDIR = os.path.join(CBASE, KEY)
+PARTS = (('work', work), ('atlas', out + '/atlas'), ('print', out + '/print'))
+HIT = os.environ.get('BUILD_CACHE', '1') != '0' and os.path.isfile(os.path.join(CDIR, 'complete'))
+def cache_get():
+    for n, dst in PARTS:
+        if os.path.isdir(os.path.join(CDIR, n)): shutil.rmtree(dst, ignore_errors=True); shutil.copytree(os.path.join(CDIR, n), dst)
+def cache_put():
+    tmp = CDIR + '.tmp'; shutil.rmtree(tmp, ignore_errors=True)
+    for n, src in PARTS:
+        if os.path.isdir(src): shutil.copytree(src, os.path.join(tmp, n), ignore=shutil.ignore_patterns('creatures.json', '*.html' if n == 'work' else 'creatures.json'))  # step 5 reads no _work page
+    open(os.path.join(tmp, 'complete'), 'w').write(KEY)  # written last: an entry without it is never used
+    for old in os.listdir(CBASE) if os.path.isdir(CBASE) else []:  # one entry per module, so the cache does not grow without end
+        if old != KEY + '.tmp': shutil.rmtree(os.path.join(CBASE, old), ignore_errors=True)
+    os.replace(tmp, CDIR)
+
+def map_stages():  # steps 1-4: everything drawn from the terrain (most of a site build)
+    global world
+    # terrain data: SRTM tiles are fetched once into modules/.cache/geo (only when the maps are drawn)
+    la0, la1, lo0, lo1 = MOD['dem']
+    for la in range(la0, la1 + 1):
+        for lo in range(lo0, lo1 + 1):
+            t = f"{'N' if la >= 0 else 'S'}{abs(la):02d}{'E' if lo >= 0 else 'W'}{abs(lo):03d}"
+            f = os.path.join(geo, t + '.hgt.gz')
+            if not os.path.exists(f):
+                print('fetching', t); urllib.request.urlretrieve(f'https://s3.amazonaws.com/elevation-tiles-prod/skadi/{t[:3]}/{t}.hgt.gz', f)
+    world = dict(MOD['world'], hex_mi=HX, px=round(96 / (HX * MI_KM), 4), master=True, title=MOD['title'], subtitle='', sites=sites)
+    json.dump({'world': world}, open(work + '/world.json', 'w'), ensure_ascii=False)
+    run(*PY, TOOLS + '/hexmap.py', geo, work, work + '/world.json')
+    # atlas.land = "island": the E9 Atlas covers every county on the island (Heph 2026-11-06, all of Ireland), while the print maps
+    # stay on the books' counties; this second, unprinted run only gives atlas_convert.py its Marches and the island's rivers
+    if MOD['atlas'].get('land') == 'island':
+        json.dump({'island': dict(world, counties='*', sites=[])}, open(work + '/island.json', 'w'), ensure_ascii=False)
+        run(*PY, TOOLS + '/hexmap.py', geo, work, work + '/island.json')
+    # 2. March pages (the print atlas: one 24-mile hex per page), 3. League pages (one 3-mile hex per page)
+    run(*PY, TOOLS + '/atlas_pages.py', work + '/world.svg', work + '/world-grid.json', work + '/atlas.html')
+    run(*PY, TOOLS + '/league_pages.py', os.path.join(mdir, 'module.json'), work + '/atlas-index.json', work + '/world-grid.json', work + '/league')
+    # E9 Atlas format (ATLAS_FORMAT.md): the same terrain as one map JSON + one PNG per March, for the dynamic renderer
+    if 'centroid' in MOD['atlas']:
+        run(*PY, TOOLS + '/atlas_convert.py', os.path.join(mdir, 'module.json'), work, out + '/atlas')
+        run(*PY, TOOLS + '/atlas_cache.py', out + '/atlas')  # the pieces the Atlas loads around the view (rebuilt when a March PNG changes)
+        run(*PY, TOOLS + '/atlas_roads.py', os.path.join(mdir, 'module.json'), out + '/atlas')  # module.json atlas.roads, laid over the Field terrain in the cache
+        # the dynamic renderer (preview): atlas/index.html draws every level from map.json + the March PNGs, with the shared tiles
+        AJ = json.load(open(out + '/atlas/map.json')); os.makedirs(out + '/atlas/tiles', exist_ok=True)
+        TD = os.path.join(ROOT, 'assets', 'tiles', 'icons')
+        want = {t['icon'] for t in AJ['terrain']['types'] if t.get('icon')} | {p['icon'] for p in AJ['pois'] if p.get('icon')}
+        want |= {t['tile'] for t in AJ['terrain']['types']}
+        for n in sorted(want | {n + '-x' for n in want if n.startswith('bg-')}):  # full RGBA, as drawn
+            if os.path.exists(f'{TD}/{n}.png'): shutil.copy(f'{TD}/{n}.png', f'{out}/atlas/tiles/{n}.png')
+        # blends: not the 96 bleed tiles (4 MB) but Heph's edge and corner masks, rotated, as 8-bit greyscale (Heph 2026-11-05);
+        # the renderer multiplies each into the colour's own tile on the phone, exactly as tiles_blend.py does
+        from PIL import Image
+        MD = os.path.join(ROOT, 'assets', 'tiles', 'masks')
+        for kind, f in (('e', 'edge.png'), ('c', 'corner.png')):
+            m = Image.open(os.path.join(MD, f)).getchannel('A')
+            for k in range(6):
+                r = m.rotate(-60 * k, resample=Image.BICUBIC, center=(m.width / 2, m.height / 2))
+                r.save(f'{out}/atlas/tiles/mask-{kind}{k}.png', optimize=True)
+                x = Image.new('L', (r.width + 8, r.height + 8)); x.paste(r, (4, 4))  # the -x twins' 4 px margin, edge pixels repeated
+                for p_ in range(4):
+                    x.paste(r.crop((0, 0, r.width, 1)), (4, p_)); x.paste(r.crop((0, r.height - 1, r.width, r.height)), (4, r.height + 4 + p_))
+                for p_ in range(4):
+                    x.paste(x.crop((4, 0, 5, x.height)), (p_, 0)); x.paste(x.crop((r.width + 3, 0, r.width + 4, x.height)), (r.width + 4 + p_, 0))
+                x.save(f'{out}/atlas/tiles/mask-{kind}{k}-x.png', optimize=True)
+        # the app itself lives once at <site>/atlas/ (atlas_app.py, Atlas 0.3.0); this old address forwards there, keeping the #link
+        open(out + '/atlas/index.html', 'w').write(f'<!doctype html><meta charset="utf-8"><title>{MOD["title"]} · E9 Atlas</title><meta name="robots" content="noindex">'
+            f'<script>location.replace("../../../atlas/?module={MOD["id"]}" + location.hash)</script><p>The E9 Atlas moved to <a href="../../../atlas/?module={MOD["id"]}">its own page</a>.</p>')
+    # 4. PDFs
+    if PDF:
+        os.makedirs(out + '/print', exist_ok=True)
+        for src, dst in ((work + '/atlas.html', 'atlas.pdf'), (work + '/league/leagues.html', 'leagues.pdf')):
+            run('node', TOOLS + '/pdf.js', src, 'none'); shutil.move(src.replace('.html', '.pdf'), out + '/print/' + dst)
+
+if HIT:
+    cache_get(); print(f"{MOD['id']}: maps unchanged (cache {KEY}), steps 1-4 skipped")
+else:
+    t0 = time.time(); map_stages()
+    if os.environ.get('BUILD_CACHE', '1') != '0': cache_put()
+    print(f"{MOD['id']}: maps built in {time.time() - t0:.0f} s (cache {KEY})")
 
 # 5. web: the same SVGs, one shared icon set, plus the manifest
 AI = json.load(open(work + '/atlas-index.json')); PI = json.load(open(work + '/league/league-index.json')); G = json.load(open(work + '/world-grid.json'))
