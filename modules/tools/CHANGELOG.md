@@ -2,10 +2,11 @@
 
 The E9 Atlas app and map tools (`modules/tools/`). The version lives in `ATLAS_VERSION`; every merged PR that touches the tools bumps the patch, each planned sprint bumps the minor. A module's own version is separate (see each module's CHANGELOG.md).
 
-## 0.5.x (in development, now 0.5.1)
+## 0.5.x (in development, now 0.5.2)
 
 Sprint: git and VTT integration (campaign repo, shared state file, referee and player views, VTT polish). See "Queued for 0.5" below.
 
+- 0.5.2: with Hex Edges on, every hex of the next size up is outlined dashed red (only where the module has map), and the hex being looked at is solid red (still dashed with Hex Edges off). Roads read apart: a Roman road is dark brown and wider with its pale casing; a local road is a thinner mustard line with no casing.
 - 0.5.1: PoI hierarchies. A module names the place each sub-place collapses into (`site_parents` in module.json, `parent` in map.json). The Atlas draws a place as itself while its sub-places would overlap and as its sub-places once they come apart (always at Furlong). The key lists the places in view in every view, with ▶ in front of one that has sub-places; clicking it turns to ▼ and shows them indented underneath.
 - 0.5.0: Credits: a **Credits** link in the Atlas footer lists the tile art and the loaded module's data sources. Modules list their sources in a new `credits` field in `module.json` (copied into the built manifest, and shown in the module viewer's footer too). Beyond the Pale credits the Ireland castle dataset (CC BY 4.0), ESA WorldCover, SRTM and Natural Earth; Hansa the same minus the castles.
 
