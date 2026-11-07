@@ -8,10 +8,11 @@ module's own March masters (<module>/atlas/terrain/*.png, one pixel per 100-ft h
 
 1. Towns and forts: no trees inside a radius that depends on the kind of place (SETTLE_R); forest just outside thins to
    light woods (cut-over ground). An anchored encounter map clears its own footprint. Bog, hills and water stay.
-2. Rivers: no thick forest on the channel. Small streams get a ragged strip of bankside woods; big lowland rivers get a
+2. Rivers: forest along the banks thins raggedly to light woods (each hex rolls, likelier nearer the water). Small
+   streams also get a ragged strip of bankside woods; big lowland rivers get a
    floodplain where open ground and light woods become wet meadow with small pools of bog (the callows), its width
    by river class; riverside forest beyond the bank is left standing.
-3. Roads: thick forest along a road thins to light woods; light woods clears to grass on a seeded, patchy roll, more
+3. Roads: thick forest along a road thins to light woods on a seeded roll per hex (ROAD_THIN), so the line breaks up; light woods clears to grass on a seeded, patchy roll, more
    often along Roman roads than trails. Roman roads also get a ragged verge one hex either side: each verge hex rolls to
    thin forest (half of them) or clear light woods (three in ten).
 
@@ -36,6 +37,7 @@ SEED = int.from_bytes(MOD['id'].encode()[:8].ljust(8, b'\0'), 'little') & 0xFFFF
 # settlement radius in feet by kind (rank 1 towns are the walled ports and county towns)
 SETTLE_R = {'town': 600, 'town1': 900, 'castle': 150, 'abbey': 300}
 CUT_RING = 400   # feet of cut-over ground (forest -> light woods) outside the cleared radius
+ROAD_THIN = {'roman': .9, 'local': .75, 'trail': .6}  # share of a road's forest hexes thinned to light woods
 ROAD_CLEAR = {'roman': .8, 'local': .6, 'trail': .35}  # share of a road's light-woods stretches cleared to grass
 
 def nearest(C, R, N):
@@ -131,14 +133,19 @@ for mj in J['terrain']['marches']:
     for rv in J['rivers']:
         cls = rv.get('class', 1); ch = trace([smooth(rv['points'])], C0, R0)
         if not ch.any(): continue
-        bank = grow(ch, 60 + 40 * cls) & own
-        t[ch & own & (t == F)] = W
+        # the bank thins raggedly: each hex rolls, likelier to thin the nearer it is to the water (Heph: not a solid band)
+        n = max(1, int(round((60 + 40 * cls) / 90))); roll = _hash(C, R, 113 + cls); ring, near = ch, ch
+        thin = np.zeros_like(ch)
+        for k in range(n + 1):
+            thin |= ring & (roll < .85 * (1 - k / (n + 1)))
+            nxt = dilate(near, 1); ring, near = nxt & ~near, nxt
+        bank = near & own; thin &= own
+        t[thin & (t == F)] = W
         u = vnoise(X, Y, 600, 31 + cls)
         if cls <= 2:  # streams: a ragged strip of bankside woods
-            t[bank & (t == F)] = W; t[bank & (t == G) & (u > .55)] = W
+            t[thin & (t == G) & (u > .55)] = W
         else:  # rivers: floodplain on low ground
             fp = grow(ch, 150 * (cls - 1)) & own & low
-            t[bank & (t == F)] = W
             # wild stays wild (Heph): riverside forest is left alone past the bank; open ground and light woods on the
             # floodplain become callows, wet meadow with pools of bog, in small patches
             v = vnoise(X, Y, 800, 77 + cls)
@@ -150,7 +157,7 @@ for mj in J['terrain']['marches']:
         cls = rd.get('class', 'local'); on = trace([smooth(rd['points'])], C0, R0)
         if not on.any(): continue
         on &= own
-        t[on & (t == F)] = W
+        t[on & (t == F) & (_hash(C, R, 73) < ROAD_THIN[cls])] = W  # a seeded roll per hex, so the line breaks up (Heph)
         stretch = vnoise(X, Y, 1500, 57) < ROAD_CLEAR[cls]
         t[on & (t == W) & (old != F) & stretch] = G  # woods that was light woods to begin with may clear to grass
         if cls == 'roman':  # the verge: a ragged, partial clearing one hex either side, rolled per hex (Heph 2026-11-07)
