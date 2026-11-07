@@ -9,6 +9,7 @@ header{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;padding:8px 1
 h1{font-size:16px;margin:0;font-weight:normal;flex:1 1 320px}
 h1 a{color:var(--red);text-decoration:none;white-space:nowrap}h1 a:hover{text-decoration:underline}h1 b{white-space:nowrap}
 .ctl{display:flex;gap:6px;align-items:center;font-size:14px}
+#gridc{width:26px;height:22px;padding:0 1px;border:1px solid #b8ab8c;border-radius:4px;background:none;cursor:pointer}#grida{width:60px}body:has(#edges:not(:checked)) #gridc,body:has(#edges:not(:checked)) #grida{display:none}
 button,select{font:inherit;font-size:14px;background:#fffaf0;border:1px solid #b8ab8c;border-radius:4px;padding:2px 8px;color:var(--ink)}
 #main{flex:1;display:flex;min-height:0;position:relative}#map{flex:1;position:relative;min-height:0}
 #key{width:250px;overflow:auto;border-left:1px solid #d8cfb8;padding:8px 12px;font-size:13px;background:var(--bg)}
@@ -35,7 +36,7 @@ footer a{color:var(--red)}
 </style></head><body>
 <header><h1 id="crumbs"></h1>
 <div class="ctl"><select id="lang" aria-label="Language" hidden></select>
-<label><input type="checkbox" id="edges" checked> Hex Edges</label>
+<label><input type="checkbox" id="edges" checked> Hex Edges</label><input type="color" id="gridc" value="#ffffff" title="Colour of the larger hex outlines"><input type="range" id="grida" min="10" max="100" value="80" title="Opacity of the larger hex outlines">
 <button id="out" title="Zoom out">−</button><button id="in" title="Zoom in">+</button><button id="fit">Fit</button><button id="routebtn" title="Plot a route and estimate the travel time">Route</button><button id="partybtn" title="Show, place or move the party">Party</button><button id="keybtn">Key</button><button id="modbtn" title="Load a different module">Modules</button></div></header>
 <div id="main"><div id="map"><canvas id="cv"></canvas><div id="route" hidden aria-live="polite"></div><div id="party" hidden aria-live="polite"></div></div><aside id="key"></aside></div>
 <footer><span id="hover">Click a hex to zoom in.</span><span><span id="support"></span>E9 Atlas {{ATLAS}}<span id="modver"></span> · <a href="#" id="creditbtn">Credits</a></span></footer>
@@ -354,10 +355,12 @@ function draw() {
   const own = LV[V.lvl].own, up = own || 1200;  // up: the next hex size above the drawn hexes (at Region, the Marches)
   // Hex Edges on (Heph 2026-11-07, Atlas 0.5.2): every hex of the next size up dashed red, the one being looked at solid
   if (EDGES) { const ux0 = Math.floor(x0 / (up * CW)) - 1, ux1 = Math.ceil(x1 / (up * CW)) + 1, uy0 = Math.floor(y0 / (up * 100)) - 2, uy1 = Math.ceil(y1 / (up * 100)) + 1;
-    if ((ux1 - ux0) * (uy1 - uy0) < 20000) { ctx.setLineDash([6, 4]); ctx.strokeStyle = 'rgba(179,38,30,.7)'; ctx.lineWidth = 1.2;
-      for (let i = ux0; i <= ux1; i++) for (let j = uy0; j <= uy1; j++) { if (own && i === V.i && j === V.j) continue; if (up === 1200 ? !MI.has(i + ',' + j) : !T(i, j, up)) continue;  // only where the module has land or sea
+    if ((ux1 - ux0) * (uy1 - uy0) < 20000) { ctx.setLineDash([6, 4]); ctx.strokeStyle = GRIDC; ctx.globalAlpha = GRIDA; ctx.lineWidth = 1.2;
+      for (let i = ux0; i <= ux1; i++) for (let j = uy0; j <= uy1; j++) { if (own && i === V.i && j === V.j) continue;
+        // only where the module has map: judged by the March the hex's centre falls in, which is always loaded (the finer tiles may not be yet)
+        const [Cu, Ru] = up === 1200 ? [0, 0] : centre(i, j, up); if (!MI.has(up === 1200 ? i + ',' + j : nearest(Cu, Ru, 1200).join(','))) continue;
         const [sx, sy] = S(...hexFt(i, j, up)); hexPath(sx, sy, up * 100 * cam.s / SQ3); ctx.stroke(); }
-      ctx.setLineDash([]); } }
+      ctx.setLineDash([]); ctx.globalAlpha = 1; } }
   if (own) { const [sx, sy] = S(...hexFt(V.i, V.j, own)); hexPath(sx, sy, own * 100 * cam.s / SQ3); if (!EDGES) ctx.setLineDash([9, 5]); ctx.strokeStyle = '#b3261e'; ctx.lineWidth = 2.5; ctx.stroke(); ctx.setLineDash([]); }
   if (V.sel) { const [sx, sy] = S(...ft(...V.sel)); hexPath(sx, sy, 100 * cam.s / SQ3); ctx.strokeStyle = '#b3261e'; ctx.lineWidth = 3; ctx.stroke(); }
   drawRoute(); drawParty();
@@ -631,6 +634,13 @@ function zoom(f, e) {
 }
 document.getElementById('in').onclick = () => zoom(1.25); document.getElementById('out').onclick = () => zoom(.8);
 document.getElementById('fit').onclick = () => { fit(); redraw(); };
+// grid colour (Heph 2026-11-07, Atlas 0.5.4): the larger hex outlines, white by default, remembered on this device
+let GRIDC = '#ffffff'; try { GRIDC = localStorage.getItem('e9-atlas-gridc') || GRIDC; } catch (e) {}
+document.getElementById('gridc').value = GRIDC;
+document.getElementById('gridc').oninput = e => { GRIDC = e.target.value; try { localStorage.setItem('e9-atlas-gridc', GRIDC); } catch (e_) {} redraw(); };
+let GRIDA = .8; try { GRIDA = +(localStorage.getItem('e9-atlas-grida') || .8); } catch (e) {}  // and their opacity, 0.1 to 1
+document.getElementById('grida').value = Math.round(GRIDA * 100);
+document.getElementById('grida').oninput = e => { GRIDA = e.target.value / 100; try { localStorage.setItem('e9-atlas-grida', GRIDA); } catch (e_) {} redraw(); };
 document.getElementById('edges').onchange = e => { EDGES = e.target.checked; redraw(); };
 // Language box (Atlas 0.5.3): the module's own languages (the built module.json "languages", drawn language first); hidden with fewer than two
 function langs() { const LS = MOD.languages || (Object.keys(D.names || {}).length ? [{ code: 'ga', label: 'Gaeilge' }, { code: 'en', label: 'English' }] : []), sel = document.getElementById('lang');
