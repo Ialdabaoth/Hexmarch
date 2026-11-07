@@ -5,7 +5,8 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IM+Fell+English+SC&family=Alegreya+Sans:ital,wght@0,400;0,500;0,700;1,400&display=swap">
 <style>
 /* Module viewer. Layout: map stage fills the left, gazetteer rail on the right (stacks under the map on phones).
-   The maps are the same SVGs the print PDFs are made from; page numbers match the books. */
+   The maps are the same SVGs the print pages are drawn from. Print page numbers and PDF links are hidden until the print
+   process is settled (Heph 2026-11-07); Marches are named by their id. */
 :root {
   --bg: #e9ecdf; --panel: #f7f8f1; --ink: #1f2a1d; --muted: #5b6855; --accent: #7a2e2e; --line: #cdd4c1; --hi: #f2d66b; --paper: #f4efe1;
   --display: "IM Fell English SC", "Palatino Linotype", Georgia, serif;
@@ -167,7 +168,7 @@ function pageHexes() {
     const l = document.createElementNS(NS, 'a'); l.setAttribute('href', '#march-' + a.page); l.setAttribute('class', 'pagehex'); l.dataset.page = a.page;
     const p = document.createElementNS(NS, 'polygon'); p.setAttribute('points', hexPts(a.center_px[0], a.center_px[1], a.radius_px));
     const t = document.createElementNS(NS, 'text'); t.setAttribute('x', a.center_px[0]); t.setAttribute('y', a.center_px[1] - a.radius_px * .78); t.setAttribute('text-anchor', 'middle');
-    t.textContent = 'p. ' + a.page; l.append(p, t); g.append(l);
+    t.textContent = 'March ' + a.id; l.append(p, t); g.append(l);
   }
   // sit under the site icons so sites stay clickable
   const first = svg.querySelector('g.site');
@@ -350,14 +351,13 @@ function item(href, name, tag, alt = '') {
 }
 function sec(title, lis) { const d = document.createElement('section'); const u = document.createElement('ul'); u.append(...lis); d.append(Object.assign(document.createElement('h2'), { textContent: title }), u); return d; }
 function build() {
-  lists.append(sec('Marches', [item('#world', 'The whole region', D.scales.march_hex_mi + ' mi'), ...D.marches.map(a => item('#march-' + a.page, 'March ' + a.id, 'p. ' + a.page + ' · ' + a.sites.length + ' sites'))]));
+  lists.append(sec('Marches', [item('#world', 'The whole region', D.scales.march_hex_mi + ' mi'), ...D.marches.map(a => item('#march-' + a.page, 'March ' + a.id, a.sites.length + ' sites'))]));
   for (const b of D.books) {
     const ps = D.leagues.filter(p => p.book === b.id);
     if (ps.length) lists.append(sec(b.id + ' · ' + b.title, ps.map(p => item('#' + p.key, L(p.title), 'L ' + p.hex, p.title))));
   }
-  const pr = D.print && D.print.atlas ? `Print: <a href="${D.print.atlas}">atlas PDF</a> · <a href="${D.print.leagues}">league PDF</a>. ` : '';
   $('ver').textContent = 'Atlas ' + (D.atlas || '?') + ' · ' + D.short + ' ' + D.version;
-  $('foot').innerHTML = pr + `Links for the companion app: <code>#world</code>, <code>#march-7</code>, <code>#l-1330</code>, <code>#&lt;map&gt;--&lt;site&gt;</code>, <code>#&lt;map&gt;:&lt;hex&gt;</code>; data in <code>module.json</code>. ${D.version} · ${D.license}. Map icons: <a href="https://cmartins.itch.io/hex-tiles-fantasy">Hex Tiles: Fantasy</a> by cmartins, <a href="https://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a>; bonus art by C. Martins, CC BY.`;
+  $('foot').innerHTML = `Links for the companion app: <code>#world</code>, <code>#march-7</code>, <code>#l-1330</code>, <code>#&lt;map&gt;--&lt;site&gt;</code>, <code>#&lt;map&gt;:&lt;hex&gt;</code>; data in <code>module.json</code>. ${D.version} · ${D.license}. Map icons: <a href="https://cmartins.itch.io/hex-tiles-fantasy">Hex Tiles: Fantasy</a> by cmartins, <a href="https://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a>; bonus art by C. Martins, CC BY.`;
 }
 function mark(h) { lists.querySelectorAll('a').forEach(a => a.classList.toggle('on', a.dataset.h === h || h.startsWith(a.dataset.h + '--') || h.startsWith(a.dataset.h + ':'))); }
 $('q').addEventListener('input', e => {
