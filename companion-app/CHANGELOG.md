@@ -4,7 +4,9 @@ The version lives in `package.json` (see README "Versioning"). Every merged PR b
 
 ## 0.5.0 (in development)
 
-Sprint: git and VTT integration. Version bump only so far.
+Sprint: git and VTT integration.
+
+- 0.5.1: the empty-maps hint names Beyond the Pale as The Isle of Mists, 1422.
 
 ### Queued for 0.5
 

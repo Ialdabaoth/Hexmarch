@@ -1,7 +1,7 @@
 # Print atlas: a 24-mile hex grid over the 3-mile master map; one 11x8.5in page per 24-mile hex.
 # usage: python3 -I atlas_pages.py <master.svg> <master-grid.json> <out.html>
 import json, math, re, sys, html, os
-TITLE = os.environ.get('MODTITLE', 'Beyond the Pale · Leinster, 1422'); VER = os.environ.get('MODVER', 'dev'); ATLAS = os.environ.get('MODATLAS', 'dev')
+TITLE = os.environ.get('MODTITLE', 'Beyond the Pale · The Isle of Mists, 1422'); VER = os.environ.get('MODVER', 'dev'); ATLAS = os.environ.get('MODATLAS', 'dev')
 svg_path, grid_path, out = sys.argv[1:4]
 G = json.load(open(grid_path)); S = open(svg_path).read()
 DPI = 96; MX, MY, MW, MH = 24, 24, 840, 768          # map frame: 8.75 x 8 in inside the 0.25 in border
