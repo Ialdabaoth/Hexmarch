@@ -16,6 +16,7 @@ import gzip, math, os, urllib.request
 import numpy as np
 
 WC_URL = 'https://esa-worldcover.s3.eu-central-1.amazonaws.com/v200/2021/map/ESA_WorldCover_10m_2021_v200_{t}_Map.tif'
+WC_KEEP, DEM_KEEP = 4, 12  # tiles held in memory at once (WorldCover 1.3 GB each, SRTM about 100 MB each)
 RULES = dict(hills_m=200, hills_slope=9, mount_m=450, bog_slope=1.2, bog_max_m=130, bog_east_of=-6.75,
              clear_mi=2.0, wild_mi=6.0, wild_forest=.55)
 
@@ -36,7 +37,9 @@ class Real:
             import tifffile
             d = os.path.join(self.cache, 'worldcover'); os.makedirs(d, exist_ok=True); f = os.path.join(d, name + '.tif')
             if not os.path.exists(f): print('fetching WorldCover', name); urllib.request.urlretrieve(WC_URL.format(t=name), f)
+            while len(self.wc) >= WC_KEEP: self.wc.pop(next(iter(self.wc)))  # 1.3 GB each: keep only the latest few (Hansa needs 8)
             self.wc[name] = tifffile.imread(f)  # 36000 x 36000, 1/12000 degree per pixel, NW corner at (la + 3, lo)
+        else: self.wc[name] = self.wc.pop(name)  # most recently used goes last
         return self.wc[name]
 
     def landcover(self, lat, lon):
@@ -61,7 +64,9 @@ class Real:
         return out
 
     def _dem_tile(self, la, lo):
-        if (la, lo) not in self.dem:
+        if (la, lo) in self.dem: self.dem[la, lo] = self.dem.pop((la, lo))  # most recently used goes last
+        else:
+            while len(self.dem) >= DEM_KEEP: self.dem.pop(next(iter(self.dem)))  # about 100 MB each
             f = os.path.join(self.cache, 'geo', f"{'N' if la >= 0 else 'S'}{abs(la):02d}{'E' if lo >= 0 else 'W'}{abs(lo):03d}.hgt.gz")
             if not os.path.exists(f): self.dem[la, lo] = None
             else:

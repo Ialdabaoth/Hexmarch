@@ -69,15 +69,17 @@ def drainage(dem, r0, r1, c0, c1, cell):
     return sub, flat, parent, acc, NC
 
 _counties = None; _all = []
-def county(name):
+def _load_admin():
     global _counties
     if _counties is None:
         adm = json.load(open(os.environ.get("HEXADMIN", f"{D}/ne_10m_admin_1_states_provinces.geojson")))
-        _counties = {f["properties"]["name"].replace(" County", ""): shape(f["geometry"]) for f in adm["features"] if f["properties"].get("admin") == "Ireland"}
-        _all.extend(shape(f["geometry"]) for f in adm["features"])  # every feature: the file holds only this island, and some names repeat (Cork city and county)
-    return _counties[name]
+        # the file is the module's own: Ireland's counties, or Hansa's period lands from admin_lands.py
+        _counties = {f["properties"]["name"].replace(" County", ""): shape(f["geometry"]) for f in adm["features"]}
+        _all.extend(shape(f["geometry"]) for f in adm["features"])  # every feature: some names repeat (Cork city and county)
+def county(name):
+    _load_admin(); return _counties[name]
 def all_counties():
-    county("Meath"); return _all
+    _load_admin(); return _all
 
 TERRAIN = {"grass": ("#dfe8b5", "Grassland / pasture"), "forest": ("#9cc28a", "Forest"), "woods": ("#bcd69e", "Light woods / scrub"), "bog": ("#c9b98f", "Bog"),
            "hills": ("#d9c08c", "Hills"), "mount": ("#b49a78", "Mountains")}
