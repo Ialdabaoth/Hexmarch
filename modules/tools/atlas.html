@@ -193,10 +193,26 @@ const name = n => lang === 'en' && D.names[n] && D.names[n].en ? D.names[n].en :
 function hexPath(sx, sy, r) { ctx.beginPath(); for (let k = 0; k < 6; k++) { const a = Math.PI / 3 * k; ctx.lineTo(sx + r * Math.cos(a), sy + r * Math.sin(a)); } ctx.closePath(); }
 const DIRS = odd => [[0, -1], [1, -1 + odd], [1, odd], [0, 1], [-1, odd], [-1, -1 + odd]];
 
-let RIV = null;
-function smoothRivers() {  // moving average (+-2, ends pinned), then centripetal Catmull-Rom, as in hexmap.py
-  RIV = D.rivers.map(rv => {
-    const r = rv.points, n = r.length, p = r.map((q, k) => {
+let RIV = null, ROADS = [], RB = new Map();  // RB: road segments by 2-mile bucket, for the Route tool and the hover line
+function smoothRivers() {
+  RIV = D.rivers.map(rv => ({ cls: rv['class'], segs: curve(rv.points).filter(([B]) => T(...hexAt(B[0], B[1], 150), 150)) }));  // only over mapped land
+  // roads (Atlas 0.4.18, atlas_roads.py): smoothed the same way; the raw polylines go in buckets so a point can find the road under it
+  ROADS = (D.roads || []).map(rd => ({ name: rd.name, cls: rd['class'], segs: curve(rd.points) }));
+  (D.roads || []).forEach(rd => { for (let k = 1; k < rd.points.length; k++) { const a = rd.points[k - 1], b = rd.points[k];
+    for (let bx = Math.floor(Math.min(a[0], b[0]) / 10000); bx <= Math.floor(Math.max(a[0], b[0]) / 10000); bx++)
+      for (let by = Math.floor(Math.min(a[1], b[1]) / 10000); by <= Math.floor(Math.max(a[1], b[1]) / 10000); by++) {
+        const q = bx + ',' + by; if (!RB.has(q)) RB.set(q, []); RB.get(q).push([a, b, rd]); } } });
+}
+function roadAt(x, y, tol) {  // the fastest road within tol feet of a point, or null
+  const RD = (D.travel || {}).roads || {}; let best = null;
+  for (let bx = Math.floor((x - tol) / 10000); bx <= Math.floor((x + tol) / 10000); bx++) for (let by = Math.floor((y - tol) / 10000); by <= Math.floor((y + tol) / 10000); by++)
+    for (const [a, b, rd] of RB.get(bx + ',' + by) || []) {
+      const dx = b[0] - a[0], dy = b[1] - a[1], L = dx * dx + dy * dy || 1, t = Math.max(0, Math.min(1, ((x - a[0]) * dx + (y - a[1]) * dy) / L));
+      if (Math.hypot(a[0] + t * dx - x, a[1] + t * dy - y) <= tol && (!best || (RD[rd['class']] ?? 1) < (RD[best['class']] ?? 1))) best = rd; }
+  return best;
+}
+function curve(r) {  // moving average (+-2, ends pinned), then centripetal Catmull-Rom, as in hexmap.py: [[B, c1, c2, C], ...] cubic pieces
+  const n = r.length, p = r.map((q, k) => {
       if (k === 0 || k === n - 1) return q; let sx = 0, sy = 0, c = 0;
       for (let t = Math.max(0, k - 2); t < Math.min(n, k + 3); t++) { sx += r[t][0]; sy += r[t][1]; c++; } return [sx / c, sy / c]; });
     const segs = [];
@@ -208,8 +224,34 @@ function smoothRivers() {  // moving average (+-2, ends pinned), then centripeta
       const m2 = [0, 1].map(k => (C[k] - B[k]) / t2 - (E[k] - B[k]) / (t2 + t3) + (E[k] - C[k]) / t3);
       segs.push([B, [B[0] + m1[0] * t2 / 3, B[1] + m1[1] * t2 / 3], [C[0] - m2[0] * t2 / 3, C[1] - m2[1] * t2 / 3], C]);
     }
-    return { cls: rv['class'], segs: segs.filter(([B]) => T(...hexAt(B[0], B[1], 150), 150)) };  // only over mapped land
-  });
+  return segs;
+}
+
+// roads over the terrain (Heph 2026-11-05 classes): roman and local from the Region view, trails from the League view down; true width
+// in feet once zoomed in. Crossings (a bridge on roman roads, a ford on the others) show from the League view down
+const ROAD_STYLE = { roman: { w: 30, px: 3, c: '#6e4a26', dash: 0 }, local: { w: 15, px: 2, c: '#8a6a44', dash: 0 }, trail: { w: 6, px: 1.4, c: '#7a5f3e', dash: 1 } };
+function drawRoads() {
+  if (!ROADS.length) return; const far = V.lvl === 'region' || V.lvl === 'march';
+  ctx.save(); ctx.setTransform(dpr * cam.s, 0, 0, dpr * cam.s, dpr * (W / 2 - cam.x * cam.s), dpr * (H / 2 - cam.y * cam.s)); ctx.lineCap = ctx.lineJoin = 'round';
+  for (const pass of [0, 1]) for (const cls of ['trail', 'local', 'roman']) {
+    if (far && cls === 'trail') continue; const st = ROAD_STYLE[cls], px = Math.max(st.px * (far ? .6 : 1), st.w * cam.s);
+    if (!pass && st.dash) continue;  // a trail has no casing
+    ctx.lineWidth = (px + (pass ? 0 : 2)) / cam.s; ctx.strokeStyle = pass ? st.c : '#f4efe1';
+    ctx.setLineDash(pass && st.dash ? [Math.max(5, px * 2) / cam.s, Math.max(3, px * 1.5) / cam.s] : []);
+    ctx.beginPath(); for (const rd of ROADS) if (rd.cls === cls) for (const [B, c1, c2, C] of rd.segs) { ctx.moveTo(B[0], B[1]); ctx.bezierCurveTo(c1[0], c1[1], c2[0], c2[1], C[0], C[1]); } ctx.stroke();
+  }
+  ctx.restore(); ctx.setLineDash([]);
+  if (far) return;
+  for (const c of D.crossings || []) {  // Heph is drawing bridge and ford icons; until then, plain marks, laid along the road across the river
+    const [sx, sy] = S(...(c.at || ft(...c.hex))), rw = (ROAD_STYLE[(ROADS.find(r => r.name === c.road) || {}).cls] || ROAD_STYLE.local).w;
+    const L = Math.max(14, (c.span || 60) * cam.s), Wd = Math.max(10, rw * 1.8 * cam.s); if (sx < -L || sy < -L || sx > W + L || sy > H + L) continue;
+    ctx.save(); ctx.translate(sx, sy); ctx.rotate((c.angle || 0) * Math.PI / 180);
+    if (c.kind === 'bridge') { ctx.beginPath(); ctx.roundRect(-L / 2, -Wd / 2, L, Wd, Wd * .2); ctx.fillStyle = '#6e4a26'; ctx.fill(); ctx.strokeStyle = '#f4efe1'; ctx.lineWidth = 1.5; ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-L * .42, -Wd * .2); ctx.lineTo(L * .42, -Wd * .2); ctx.moveTo(-L * .42, Wd * .2); ctx.lineTo(L * .42, Wd * .2); ctx.strokeStyle = '#d9c08c'; ctx.lineWidth = 1; ctx.stroke(); }
+    else { const n = Math.max(3, Math.min(7, Math.round(L / Wd))), r = Math.min(Wd * .32, L / n * .4);  // stepping stones
+      for (let k = 0; k < n; k++) { ctx.beginPath(); ctx.arc(-L / 2 + L * (k + .5) / n, (k & 1 ? 1 : -1) * Wd * .12, r, 0, 7); ctx.fillStyle = '#c9b98f'; ctx.fill(); ctx.strokeStyle = '#2b2418'; ctx.lineWidth = 1; ctx.stroke(); } }
+    ctx.restore();
+  }
 }
 
 function redraw() { if (!D || redraw.q) return; redraw.q = requestAnimationFrame(() => { redraw.q = 0; draw(); }); }
@@ -252,6 +294,7 @@ function draw() {
   }
   ctx.restore();
   for (const [n, sx, sy] of top) { const im = tile(n); if (im) ctx.drawImage(im, sx - bw * .39, sy - hh * .39, bw * .78, hh * .78); }
+  drawRoads();
   // county lines and names
   ctx.setLineDash([7, 4]); ctx.strokeStyle = '#7a2e2e'; ctx.lineWidth = 2;
   for (const g of D.regions) { ctx.beginPath(); for (const p of g.outline) ctx.lineTo(...S(p[0], p[1])); ctx.closePath(); ctx.stroke(); }
@@ -300,9 +343,10 @@ function routeLegs() {  // [{mi, terrain}] along the route, one sample per quart
   for (let k = 1; k < STOPS.length; k++) {
     const [ax, ay] = STOPS[k - 1], [bx, by] = STOPS[k], d = Math.hypot(bx - ax, by - ay), n = Math.max(1, Math.ceil(d / step));
     for (let s = 0; s < n; s++) {
-      const f = (s + .5) / n, t = T(...hexAt(ax + (bx - ax) * f, ay + (by - ay) * f, N), N), id = t ? TYPES[t - 1].id : null, mi = d / n / 5000;
-      if (!t) unknown += mi;
-      const last = legs[legs.length - 1]; if (last && last.terrain === id) last.mi += mi; else legs.push({ mi, terrain: id });
+      const f = (s + .5) / n, px = ax + (bx - ax) * f, py = ay + (by - ay) * f, t = T(...hexAt(px, py, N), N), id = t ? TYPES[t - 1].id : null, mi = d / n / 5000;
+      const rd = roadAt(px, py, Math.max(150, N * 35)), road = rd ? rd['class'] : undefined;  // on a road: within about a third of a hex of it
+      if (!t && !road) unknown += mi;
+      const last = legs[legs.length - 1]; if (last && last.terrain === id && last.road === road) last.mi += mi; else legs.push({ mi, terrain: id, road });
     }
   }
   return { legs, unknown };
@@ -311,12 +355,12 @@ const hm = h => { const m = Math.round(h * 60); return m < 60 ? m + ' min' : Mat
 function routeBox() {
   const box = document.getElementById('route'); box.hidden = !ROUTE; if (!ROUTE) return;
   if (!STOPS.length) { box.innerHTML = '<b>Route</b> · click hexes to add stops. <small>Drag still moves the map.</small><br><button data-r="done">Done</button>'; return; }
-  const { legs, unknown } = routeLegs(), r = E9Atlas.travel(legs.map(g => ({ mi: g.mi, terrain: g.terrain || 'unknown' }))), P = (D.travel || {}).pace || {};
+  const { legs, unknown } = routeLegs(), r = E9Atlas.travel(legs.map(g => ({ mi: g.mi, terrain: g.terrain || 'unknown', road: g.road }))), P = (D.travel || {}).pace || {}, onRoad = legs.reduce((a, g) => a + (g.road ? g.mi : 0), 0);
   const unit = { region: 'Leagues', march: 'Leagues', league: 'Fields', field: 'Furlongs', furlong: '100-ft hexes' }[V.lvl];
   let h = `<b>Route</b> · ${STOPS.length} stop${STOPS.length === 1 ? '' : 's'} · ${r.mi.toFixed(r.mi < 10 ? 1 : 0)} mi`;
   if (STOPS.length > 1) h += r.blocked ? ` · <b>crosses ${esc(TYPES.find(t => t.id === r.blocked).name.toLowerCase())}</b>: no way on foot`
     : ` · ${hm(r.hours)}${r.days >= .5 ? ` · ${r.days.toFixed(1)} days of ${P.hours_per_day || 8} h` : ''}`;
-  h += `<br><small>Terrain read from ${unit}${unknown > .05 ? `; ${unknown.toFixed(1)} mi unmapped, at normal pace` : ''}. No roads yet.</small><br>${STOPS.length > 1 && !r.blocked ? `<button data-r="move" title="Put the party at the last stop and add the travel time">Move party here</button>` : ''}<button data-r="undo">Undo</button><button data-r="clear">Clear</button><button data-r="done">Done</button>`;
+  h += `<br><small>Terrain read from ${unit}${unknown > .05 ? `; ${unknown.toFixed(1)} mi unmapped, at normal pace` : ''}${onRoad > .05 ? `; ${onRoad.toFixed(onRoad < 10 ? 1 : 0)} mi on roads` : ''}.</small><br>${STOPS.length > 1 && !r.blocked ? `<button data-r="move" title="Put the party at the last stop and add the travel time">Move party here</button>` : ''}<button data-r="undo">Undo</button><button data-r="clear">Clear</button><button data-r="done">Done</button>`;
   box.innerHTML = h;
 }
 document.getElementById('route').addEventListener('click', e => { const b = e.target.closest('button[data-r]'); if (!b) return;
@@ -354,7 +398,7 @@ function placeParty(x, y) {  // the centre 100-ft hex of the hex clicked at this
   PLACE = false; hoverHint(); setParty(N === 1 ? [i, j] : centre(i, j, N), PARTY ? PARTY.hours : 0);
 }
 function moveParty() {  // along the route: to its last stop, adding the route's time; the route then starts again from there
-  const { legs } = routeLegs(), r = E9Atlas.travel(legs.map(g => ({ mi: g.mi, terrain: g.terrain || 'unknown' }))); if (r.blocked || STOPS.length < 2) return;
+  const { legs } = routeLegs(), r = E9Atlas.travel(legs.map(g => ({ mi: g.mi, terrain: g.terrain || 'unknown', road: g.road }))); if (r.blocked || STOPS.length < 2) return;
   const end = STOPS[STOPS.length - 1]; setParty(hexAt(end[0], end[1], 1), (PARTY ? PARTY.hours : 0) + r.hours);
   STOPS = [ft(...PARTY.hex)]; routeBox(); redraw();
 }
@@ -409,6 +453,10 @@ function key(ts, ps) {
   let h = '<h2>Terrain</h2>';
   TYPES.forEach((t, k) => { if (!ts.has(k + 1)) return;
     h += `<div class="row"><span class="sw" style="background-color:${t.color};background-image:url(${A}tiles/${t.tile}.png)">${t.icon ? `<img src="${A}tiles/${t.icon}.png" alt="">` : ''}</span><span>${esc(t.name)}<br><small>${travelNote(t)}</small></span></div>`; });
+  const RC = new Set((D.roads || []).map(r => r['class'])), RDm = (D.travel || {}).roads || {}, mph = ((D.travel || {}).pace || {}).mi_per_hour || 3;
+  if (RC.size) { h += '<h2>Roads</h2>';
+    for (const c of ['roman', 'local', 'trail']) if (RC.has(c)) { const st = ROAD_STYLE[c], k = RDm[c] ?? 1;
+      h += `<div class="row"><span class="sw"><svg width="30" height="10"><line x1="1" y1="5" x2="29" y2="5" stroke="${st.c}" stroke-width="${st.px}"${st.dash ? ' stroke-dasharray="5 3"' : ''}/></svg></span><span>${{ roman: 'Roman road', local: 'Local road', trail: 'Trail' }[c]}<br><small>${k === 1 ? 'normal pace' : '×' + k + ' travel time'} · ${+(mph / k).toFixed(1)} mi/h${c === 'roman' ? ' · bridges' : ' · fords'}</small></span></div>`; } }
   if (ps.length) {
     h += '<h2>Places</h2>';
     for (const p of ps.slice().sort((a, b) => name(a.name).localeCompare(name(b.name))))
@@ -496,7 +544,7 @@ cv.addEventListener('pointermove', e => {
     if (drag.moved) { cam.x = drag.cx - dx / cam.s; cam.y = drag.cy - dy / cam.s; redraw(); } return; }
   const N = LV[V.lvl].draw, [i, j] = hexAt(x, y, N), t = T(i, j, N), [C, R] = N === 1 ? [i, j] : centre(i, j, N);
   const mp = mapPoiAt(x, y);
-  document.getElementById('hover').textContent = mp ? `${name(mp.name)} · click to open the encounter map` : t ? `${N === 1 ? addr(C, R) : N === 5 ? 'Furlong ' + addr(C, R).slice(12) : N === 25 ? 'Field ' + addr(C, R).slice(12) : leagueAddr(i, j)} · ${TYPES[t - 1].name}` : '';
+  document.getElementById('hover').textContent = mp ? `${name(mp.name)} · click to open the encounter map` : t ? `${N === 1 ? addr(C, R) : N === 5 ? 'Furlong ' + addr(C, R).slice(12) : N === 25 ? 'Field ' + addr(C, R).slice(12) : leagueAddr(i, j)} · ${TYPES[t - 1].name}${(rd => rd ? ' · ' + (rd.name ? name(rd.name) + ', ' : '') + rd['class'] + (rd['class'] === 'trail' ? '' : ' road') : '')(RB.size && roadAt(x, y, Math.max(60, 6 / cam.s)))}` : '';
 });
 cv.addEventListener('pointerup', e => {
   if (!drag) return; const moved = drag.moved; drag = null; if (moved) return;
