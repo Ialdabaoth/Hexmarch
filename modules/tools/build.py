@@ -1,18 +1,19 @@
 #!/usr/bin/env python3
-"""Build one module: print PDFs, web viewer and app manifest from the same maps.
+"""Build one module: web viewer, E9 Atlas map and app manifest from the same maps (print PDFs only with --pdf).
 
-usage: python3 -I modules/tools/build.py <module dir> <out dir> [--no-pdf]
+usage: python3 -I modules/tools/build.py <module dir> <out dir> [--pdf]
   e.g. python3 -I modules/tools/build.py modules/isle-of-mists dist/modules/isle-of-mists
 
 Writes <out>/index.html (viewer), <out>/module.json (manifest for the companion app),
-<out>/maps/*.svg and <out>/print/{atlas,leagues}.pdf. See modules/MODULE_FORMAT.md.
+<out>/maps/*.svg, and with --pdf <out>/print/{atlas,leagues}.pdf. See modules/MODULE_FORMAT.md.
+Print PDFs are off by default until the print process is settled (Heph 2026-11-07); --pdf still makes them (needs Playwright).
 Creatures (CREATURES_FORMAT.md): every *.json with an "encounters" block merges into <out>/encounters.json,
 bestiary/<ruleset>.json files are copied, and the viewers get a resolved list of who lives at which site.
 """
 import datetime, json, os, re, shutil, subprocess, sys, unicodedata, urllib.request
 
 TOOLS = os.path.dirname(os.path.abspath(__file__)); ROOT = os.path.dirname(TOOLS)
-mdir, out = os.path.abspath(sys.argv[1]), os.path.abspath(sys.argv[2]); PDF = '--no-pdf' not in sys.argv
+mdir, out = os.path.abspath(sys.argv[1]), os.path.abspath(sys.argv[2]); PDF = '--pdf' in sys.argv
 MOD = json.load(open(os.path.join(mdir, 'module.json')))
 work = os.path.join(out, '_work'); os.makedirs(work, exist_ok=True); os.makedirs(out + '/maps', exist_ok=True)
 PY = [sys.executable, '-I']
