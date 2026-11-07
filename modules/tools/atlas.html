@@ -16,6 +16,7 @@ button,select{font:inherit;font-size:14px;background:#fffaf0;border:1px solid #b
 #key .row{display:flex;align-items:center;gap:8px;padding:2px 0}#key .pl{cursor:pointer;border-radius:4px}#key .pl:hover{background:#ebe3cf}
 #key .sw{width:30px;height:26px;flex:none;background-size:cover;background-position:center;display:flex;align-items:center;justify-content:center}
 #key .sw img{max-width:26px;max-height:22px}#key small{color:var(--dim)}
+#key .tg{font:inherit;font-size:11px;width:16px;padding:0;border:0;background:none;color:var(--dim);cursor:pointer;flex:none}#key .tg0{width:16px;flex:none}
 #key .emb{font:inherit;font-size:12px;padding:0 6px;margin-top:2px;border-radius:10px;cursor:pointer}#key .emb:hover{background:#ebe3cf}
 #mod{color:var(--red)}
 #modules,#credits{border:1px solid #b8ab8c;border-radius:8px;background:var(--bg);color:var(--ink);padding:12px 16px;max-width:min(440px,92vw)}#modules::backdrop{background:#0004}
@@ -64,7 +65,7 @@ function hexAt(x, y, N) {  // level-N hex (i, j) under a point in feet: the leve
 }
 const hexFt = (i, j, N) => { const [C, R] = centre(i, j, N); return N === 25 ? [C * CW, (R + 0.5 * (i & 1)) * 100] : ft(C, R); };
 const T_BG = {}, T_ICON = {}, HEX_FEATURES = new Set(['clearing', 'bushes', 'thorns', 'spider', 'great-tree', 'mushrooms', 'forest-cave', 'forest-hill', 'stone-circle']);
-let D, POIS = null, TYPES = [], LBL, lang = 'ga', EDGES = true, CR = [];  // CR: the module's creatures (creatures.json from build.py)
+let D, POIS = null, KIDS = null, TYPES = [], LBL, lang = 'ga', EDGES = true, CR = [];  // CR: the module's creatures (creatures.json from build.py)
 const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
 
 // ---- data ----
@@ -327,9 +328,12 @@ function draw() {
   // place ranks (Heph 2026-11-06): 1 shows from the Region view, 2 from March, 3 from League down; then, most important first,
   // a place whose icon (and name) would overlap one already drawn waits for a closer zoom
   const maxRank = { region: 1, march: 2 }[V.lvl] || 3, put = [], bh = isz + (V.lvl === 'region' ? 0 : fs * 1.6);
-  POIS = POIS || D.pois.slice().sort((a, b) => (a.rank || 3) - (b.rank || 3));
-  for (const p of POIS) {
-    if ((p.rank || 3) > maxRank) continue;
+  POIS = POIS || D.pois.filter(p => !p.parent || !poiById(p.parent)).sort((a, b) => (a.rank || 3) - (b.rank || 3));  // top-level places; sub-places hang off them
+  // PoI hierarchies (Atlas 0.5.1, ATLAS_FORMAT.md "PoI hierarchies"): a place with sub-places (cave mouths, city gates) is drawn as itself
+  // while its sub-places would crowd each other on screen, and as its sub-places once they are two icons apart (always at Furlong, where each fills its own hex)
+  const apart = ks => V.lvl === 'furlong' || ks.every((a, i) => ks.every((b, j) => { if (j <= i) return true; const [ax, ay] = S(...ft(...a.hex)), [bx, by] = S(...ft(...b.hex)); return Math.hypot(ax - bx, ay - by) >= 2 * isz; }));  // two icons apart, so names fit too
+  const open = p => { const ks = kidsOf(p); return ks.length && apart(ks) ? ks.flatMap(open) : [p]; };
+  for (const p of POIS.filter(q => (q.rank || 3) <= maxRank).flatMap(open)) {
     const [sx, sy] = S(...ft(...p.hex));  // a place is always one 100-ft hex (Heph 2026-11-06): drawn at its centre
     if (sx < -100 || sy < -100 || sx > W + 100 || sy > H + 100) continue;
     if (V.lvl !== 'furlong') { const w = Math.max(isz, ctx.measureText(name(p.name)).width * (V.lvl === 'region' ? 0 : 1));
@@ -480,8 +484,12 @@ function key(ts, ps) {
       h += `<div class="row"><span class="sw"><svg width="30" height="10"><line x1="1" y1="5" x2="29" y2="5" stroke="${st.c}" stroke-width="${st.px}"${st.dash ? ' stroke-dasharray="5 3"' : ''}/></svg></span><span>${{ roman: 'Roman road', local: 'Local road', trail: 'Trail' }[c]}<br><small>${k === 1 ? 'normal pace' : '×' + k + ' travel time'} · ${+(mph / k).toFixed(1)} mi/h${c === 'roman' ? ' · bridges' : ' · fords'}</small></span></div>`; } }
   if (ps.length) {
     h += '<h2>Places</h2>';
-    for (const p of ps.slice().sort((a, b) => name(a.name).localeCompare(name(b.name))))
-      h += `<div class="row pl" data-id="${esc(p.id)}"><span class="sw">${p.icon ? `<img src="${A}tiles/${p.icon}.png" alt="">` : ''}</span><span>${esc(name(p.name))}<br><small>${esc(p.kind)}${p.book ? ' · ' + esc(p.book) : ''}</small>${p.encounter && window.E9Map ? `<br><button class="emb" data-id="${esc(p.id)}">${p.encounter.length > 1 ? p.encounter.length + ' encounter maps' : 'Encounter map'}</button>` : ''}</span></div>`;
+    // every view (Heph 2026-11-07): the places in view, with ▶ in front of one that has sub-places; clicking ▶ turns it to ▼ and lists them under it
+    const row = (p, d) => { const ks = kidsOf(p), on = OPEN.has(p.id);
+      let r = `<div class="row pl" data-id="${esc(p.id)}" style="padding-left:${d * 14}px">${ks.length ? `<button class="tg" data-id="${esc(p.id)}" aria-expanded="${on}" title="${on ? 'Hide' : 'Show'} the places inside">${on ? '▼' : '▶'}</button>` : '<span class="tg0"></span>'}<span class="sw">${p.icon ? `<img src="${A}tiles/${p.icon}.png" alt="">` : ''}</span><span>${esc(name(p.name))}<br><small>${esc(p.kind)}${p.book ? ' · ' + esc(p.book) : ''}</small>${p.encounter && window.E9Map ? `<br><button class="emb" data-id="${esc(p.id)}">${p.encounter.length > 1 ? p.encounter.length + ' encounter maps' : 'Encounter map'}</button>` : ''}</span></div>`;
+      if (on) for (const k of ks.slice().sort((a, b) => name(a.name).localeCompare(name(b.name)))) r += row(k, d + 1);
+      return r; };
+    for (const p of ps.slice().sort((a, b) => name(a.name).localeCompare(name(b.name)))) h += row(p, 0);
   }
   // creatures in the hex being looked at (the dashed one): their lair is a place in it, or a 100-ft hex address in it
   const here = creaturesHere();
@@ -491,8 +499,17 @@ function key(ts, ps) {
       h += `<div class="row pl cr" data-cr="${esc(c.id)}"><span>${esc(c.name)}${n ? ' <small>×' + esc(n) + '</small>' : ''}<br><small>${esc(c.kind === 'npc' ? 'NPC' : c.kind)}${c.is ? ' · ' + esc(c.is) : ''}${c.site_name ? ' · ' + esc(name(c.site_name)) : ''}</small></span></div>`; }
   }
   if (h !== KEYHTML) document.getElementById('key').innerHTML = KEYHTML = h;
+  KEYARGS = [ts, ps];
 }
+let KEYARGS = null; const OPEN = new Set();  // OPEN: places whose sub-places the key lists
+function poiById(id) {
+  if (!KIDS) { KIDS = { by: new Map(D.pois.map(p => [p.id, p])), kids: new Map() };
+    for (const p of D.pois) if (p.parent && KIDS.by.has(p.parent)) { if (!KIDS.kids.has(p.parent)) KIDS.kids.set(p.parent, []); KIDS.kids.get(p.parent).push(p); } }
+  return KIDS.by.get(id);
+}
+function kidsOf(p) { poiById(p.id); return KIDS.kids.get(p.id) || []; }
 document.getElementById('key').addEventListener('click', e => {
+  const tg = e.target.closest('.tg'); if (tg) { const id = tg.dataset.id; OPEN.has(id) ? OPEN.delete(id) : OPEN.add(id); if (KEYARGS) key(...KEYARGS); return; }
   const em = e.target.closest('.emb'); if (em) { openMaps(D.pois.find(q => q.id === em.dataset.id)); return; }
   const cr = e.target.closest('.cr'); if (cr) { const c = CR.find(x => x.id === cr.dataset.cr); if (c && window.E9Card) E9Card.show(c); return; }
   const r = e.target.closest('.pl'); if (!r) return; const p = D.pois.find(q => q.id === r.dataset.id); if (!p) return;

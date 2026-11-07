@@ -2,11 +2,12 @@
 
 The E9 Atlas app and map tools (`modules/tools/`). The version lives in `ATLAS_VERSION`; every merged PR that touches the tools bumps the patch, each planned sprint bumps the minor. A module's own version is separate (see each module's CHANGELOG.md).
 
-## 0.5.0 (in development)
+## 0.5.x (in development, now 0.5.1)
 
 Sprint: git and VTT integration (campaign repo, shared state file, referee and player views, VTT polish). See "Queued for 0.5" below.
 
-- Credits: a **Credits** link in the Atlas footer lists the tile art and the loaded module's data sources. Modules list their sources in a new `credits` field in `module.json` (copied into the built manifest, and shown in the module viewer's footer too). Beyond the Pale credits the Ireland castle dataset (CC BY 4.0), ESA WorldCover, SRTM and Natural Earth; Hansa the same minus the castles.
+- 0.5.1: PoI hierarchies. A module names the place each sub-place collapses into (`site_parents` in module.json, `parent` in map.json). The Atlas draws a place as itself while its sub-places would overlap and as its sub-places once they come apart (always at Furlong). The key lists the places in view in every view, with ▶ in front of one that has sub-places; clicking it turns to ▼ and shows them indented underneath.
+- 0.5.0: Credits: a **Credits** link in the Atlas footer lists the tile art and the loaded module's data sources. Modules list their sources in a new `credits` field in `module.json` (copied into the built manifest, and shown in the module viewer's footer too). Beyond the Pale credits the Ireland castle dataset (CC BY 4.0), ESA WorldCover, SRTM and Natural Earth; Hansa the same minus the castles.
 
 ### Queued for 0.5
 
@@ -15,6 +16,7 @@ From `strategy/mvp-checklist.md` (project files) and ENCOUNTER_FORMAT.md section
 - `view=player`: party marker plus revealed hexes and places only; referee layers, keyed text, monsters and unrevealed sites hidden.
 - Referee reveal controls (by hand, and automatically for hexes the party enters).
 - Site finder: search places by name in Irish or English.
+- PoI hierarchies, next steps: Route and party arrive at the nearest sub-place (gate); parent footprint shaded on the Field view; player view shows only found sub-places.
 - Module pinning: the campaign file names the module and exact version every device loads.
 - VTT: test the E9 Bridge (0.1.0) in a live Foundry v12/v13 world; Owlbear Rodeo extension on the `e9-vtt/1` protocol; per-campaign "Open in Foundry/Roll20/Owlbear" scene links (section 13); `.e9vtt` file drop for VTTs that can't host a page.
 - Rights check on encounter maps traced from PDFs before any public play.
