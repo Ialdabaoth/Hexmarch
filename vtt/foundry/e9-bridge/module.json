@@ -7,5 +7,5 @@
   "authors": [{ "name": "Heph (Bakagaijin Productions)" }],
   "esmodules": ["scripts/e9-bridge.js"],
   "url": "https://github.com/Ialdabaoth/MateriaMundiRPG",
-  "license": "CC0-1.0"
+  "license": "CC-BY-4.0"
 }
