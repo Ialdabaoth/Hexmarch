@@ -6,6 +6,7 @@ The version lives in `package.json` (see README "Versioning"). Every merged PR b
 
 Sprint: git and VTT integration.
 
+- 0.5.10: a character is saved in four parts, stats, gear, knowledge, and flavor (name, portrait, notes), each exported and loaded on its own (CHARACTER_FORMAT.md, sheet version 4; Heph 2026-11-08). The sheet's Manage section has Export one part only and Load a part; a part replaces only that part of the character with the same id. Sheets gain dated `knowledge` entries. Older sheets still import.
 - 0.5.9: the installed app is named "⬢ Companion" (short name "Companion"), matching "⬢ Atlas" and "⬢ Scribe" (Heph 2026-11-08).
 - 0.5.8: the Atlas address typed without its trailing slash (`/Hexmarch/atlas`) opened the Companion once the Companion had been loaded on that device: its offline copy answered for any page it did not recognise. It now leaves `atlas`, `modules` and `scribe` alone with or without the slash, so the server forwards to `atlas/`.
 - 0.5.7: the apps moved to their own repository, and each app has its own icon (Heph 2026-11-08). The Companion's icon is now just the die, without "E9"; the Atlas's is the map's heavy woods hex and Scribe's 📜 with 🪶 (Twemoji, CC BY 4.0) (`icons/`). The Companion opens the Atlas that ships beside it and passes the module's site, and its home module repository comes from `site.json`.

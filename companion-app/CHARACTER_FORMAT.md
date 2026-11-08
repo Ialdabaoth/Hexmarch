@@ -18,36 +18,56 @@ loads or changes, with current HP and temporary effects layered on top:
 Damage taken and temporary effects are kept on the device with the character but
 are not part of the exported sheet.
 
-"Export JSON" on a sheet writes one character sheet. "Export all" writes
-`{ "format": "materia-mundi-characters", "version": 1, "characters": [ ... ] }`.
-Import accepts either, so sheets can also be written or edited by hand.
+## Four parts
+
+A character is saved and exported in **four parts**, so each can be shared, kept secret or replaced on its own (Heph 2026-11-08):
+
+| Part | Holds |
+|---|---|
+| `stats` | `origin`, `class` (XP and level-ups), `abilities`, `followers` |
+| `gear` | the inventory: armor, weapons, items, what's worn and wielded, spellbook and preparations |
+| `knowledge` | what the character knows: dated entries pointing into a module (see below) |
+| `flavor` | `name`, `portrait`, `notes` |
+
+Every file starts with the same header (`format`, `version`, `id`, `rules`, and `campaign` and `owner` when set), so any part finds its character by `id`. A file with all four parts is a whole character; in a campaign repository each character can be kept as four files, `campaign/characters/<id>/stats.json`, `gear.json`, `knowledge.json` and `flavor.json`, each holding the header and its one part.
+
+- **Export JSON** on a sheet writes the whole character. Below it, **Export one part only** writes a file with the header and that one part (Stats, Gear, Knowledge, or Name, portrait and notes). A gear file carries the custom equipment it uses.
+- **Load a part** on a sheet, or Import on the Party tab, reads any of these files. The parts in the file replace the same parts of the character with that `id`; the parts it leaves out stay as they are. A file without `stats` needs the character to be on the device already.
+- **Export all** writes `{ "format": "materia-mundi-characters", "version": 4, "characters": [ ... ] }`, each one a whole character. Import accepts any of these, so sheets can also be written or edited by hand.
+- Older files, with every field at the top level (version 3 and before), still import. The device keeps its own copy in that flat layout.
 
 ```json
 {
   "format": "materia-mundi-character",
-  "version": 3,
-  "rules": "mm",
+  "version": 4,
   "id": "c0ffee00-0000-4000-8000-000000000001",
-  "name": "Holly",
-  "portrait": "",
-  "origin": "human",
-  "class": {
-    "name": "scout",
-    "xp": 1,
-    "levelups": [
-      { "level": 1, "hp": 5, "stealth": 1 },
-      { "level": 2, "hp": 3, "stealth": 1, "feat": "Promised the Abbot a favor" }
-    ]
+  "rules": "mm",
+  "flavor": {
+    "name": "Holly",
+    "portrait": "",
+    "notes": ""
   },
-  "abilities": {
-    "con": -1,
-    "str": 0,
-    "dex": { "score": 2, "agility": 1, "finesse": 1 },
-    "int": { "score": 0 },
-    "wis": { "score": -1, "alertness": -1 },
-    "cha": { "score": 1, "wit": 1 }
+  "stats": {
+    "origin": "human",
+    "class": {
+      "name": "scout",
+      "xp": 1,
+      "levelups": [
+        { "level": 1, "hp": 5, "stealth": 1 },
+        { "level": 2, "hp": 3, "stealth": 1, "feat": "Promised the Abbot a favor" }
+      ]
+    },
+    "abilities": {
+      "con": -1,
+      "str": 0,
+      "dex": { "score": 2, "agility": 1, "finesse": 1 },
+      "int": { "score": 0 },
+      "wis": { "score": -1, "alertness": -1 },
+      "cha": { "score": 1, "wit": 1 }
+    },
+    "followers": []
   },
-  "inventory": {
+  "gear": {
     "armor": [
       { "id": "a1", "ref": "mm:light-armor", "name": "Light armor" }
     ],
@@ -66,10 +86,16 @@ Import accepts either, so sheets can also be written or edited by hand.
     "book": [],
     "prepared": []
   },
-  "followers": [],
-  "notes": ""
+  "knowledge": [
+    { "session": 3, "module": "isle-of-mists", "place": "crom-cave-g", "how": "scouted alone" },
+    { "session": 3, "module": "isle-of-mists", "hex": "world:6950:2611" }
+  ]
 }
 ```
+
+## Knowledge
+
+What one character knows is kept on their own sheet, as dated entries, not on the map (modules/WORKFLOWS.md in the data repo, "Knowledge per creature"). Each entry has the `session` it was learned in and the `module` it belongs to, and points at one thing: a 100-ft `hex` address, a `place` slug, a `handout`, or a free-text `note`. `how` says how it was learned. Entries that point at nothing are dropped. What everyone knows stays in the campaign state's `revealed` set (STATE_FORMAT.md).
 
 ## Changes are tallies
 
@@ -99,6 +125,8 @@ When typing a sheet by hand, `"+"`, `"+1"`, `"-"` and `"+3"` are accepted too, a
 level 1 `hp` can be left out (it is the starting HP from the rules).
 
 ## Other fields
+
+Field names below are the ones inside each part (`inventory.armor` is `gear.armor` in an exported file).
 
 - `portrait`: a link to an image. Empty for none.
   - `https://...`: a picture on the web, loaded from there each time.

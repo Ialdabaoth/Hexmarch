@@ -114,7 +114,7 @@ describe('equipment references (format version 3)', () => {
     const s = warrior();
     s.inventory.weapons[0].bonus = 1;
     const saved = writeSheet(s) as any;
-    expect(saved.version).toBe(3);
+    expect(saved.version).toBe(4);
     expect(saved.inventory.weapons[0]).toEqual({ id: s.inventory.weapons[0].id, ref: 'mm:longsword', name: 'Longsword', bonus: 1 });
     expect(saved.inventory.armor[0]).toEqual({ id: s.inventory.armor[0].id, ref: 'mm:heavy-armor', name: 'Heavy armor' });
     expect(JSON.stringify(saved.inventory)).not.toMatch(/"size"|"encumbrance"|"properties"/);
