@@ -4,13 +4,17 @@ import type { LogEntry } from './checks';
 import { postToDiscord, isWebhookUrl } from './discord';
 import {
   DEFAULT_SETTINGS, loadLive, loadLog, loadModuleList, loadSettings, loadSheets, saveLive, saveLog, saveModuleList, saveSettings, saveSheets,
-  unreadableSheets, type Settings
+  unreadableSheets, loadStateFile, saveStateFile, type PartyAt, type Settings
 } from './storage';
+import {
+  StateError, blankState, closeSession, moveParty, openSession, passTime, readState, setStart, withCharacters, withRules, writeState, type CampaignState, type StateRules
+} from './state';
 import { loadRepo, type SavedModule } from './modules';
 import {
-  absorbCustom, activateCampaign, blankLocal, fetchCampaign, loadCampaigns, loadFallbacks, loadLocal, registerCampaign, saveCampaigns,
+  absorbCustom, activateCampaign, blankLocal, campaignRulesId, fetchCampaign, loadCampaigns, loadFallbacks, loadLocal, registerCampaign, saveCampaigns,
   saveLocal, type CampaignCache
 } from './campaign';
+import { CORE_RULES } from '../rules/core-modules';
 import { hasEquipment, registerEquipment, type EquipmentFileData } from '../equipment/equipment';
 import { preloadDice, showDice } from './dice3d';
 import { portraitFromFile } from './portrait';
@@ -55,6 +59,8 @@ class AppState {
   modules = $state<SavedModule[]>([]);
   // Saved characters the app can't read (kept, not shown).
   unreadable = $state(0);
+  // The active campaign's state file: party, clock, reveals, session, characters (lib/state.ts).
+  state = $state<CampaignState>(blankState(''));
   private toastTimer: ReturnType<typeof setTimeout> | undefined;
 
   get campaign(): CampaignCache | null {
@@ -95,6 +101,7 @@ class AppState {
     } catch (e) {
       console.warn('Portraits unavailable', e);
     }
+    await this.loadState();
     this.loaded = true;
     if (await this.cacheInlinePortraits(this.sheets)) await this.persist();
     if (this.settings.dice3d) preloadDice();
@@ -127,6 +134,76 @@ class AppState {
       }
     }
     activateCampaign(this.campaign);
+  }
+
+  // The state file of the campaign now in use. A party placed before 0.5.5 was kept in the
+  // settings, for every campaign at once; it moves into This device's state.
+  private async loadState() {
+    const id = this.campaignId;
+    let s = blankState(id);
+    try {
+      const saved = await loadStateFile(id);
+      if (saved) s = readState(saved, id);
+    } catch (e) {
+      console.warn('Campaign state unreadable; starting a fresh one', e);
+    }
+    this.state = s;
+    await this.saveState(withRules(s, this.stateRules()));
+    if (this.settings.partyAt) {
+      const old = this.settings.partyAt;
+      if (!id && !s.party) await this.saveState(moveParty(s, old));
+      await this.updateSettings({ partyAt: null });
+    }
+  }
+
+  // The rules this campaign plays with: the campaign file's ruleset, or the builder's for This device.
+  stateRules(): StateRules {
+    const ruleset = this.campaign ? campaignRulesId(this.campaign) : this.settings.rules;
+    const core = CORE_RULES[ruleset];
+    return core ? { ruleset, module: core.module, option: core.option, version: core.version } : { ruleset, module: '', option: '', version: '' };
+  }
+
+  private async saveState(next: CampaignState) {
+    if (next === this.state) return;
+    this.state = next;
+    await saveStateFile(next.campaign, writeState(next)).catch((e) => console.warn('Could not save the campaign state', e));
+  }
+
+  async setParty(party: PartyAt | null) {
+    await this.saveState(moveParty($state.snapshot(this.state) as CampaignState, party));
+  }
+
+  async passTime(hours: number) {
+    await this.saveState(passTime($state.snapshot(this.state) as CampaignState, hours));
+  }
+
+  async setStartDate(start: string) {
+    await this.saveState(setStart($state.snapshot(this.state) as CampaignState, start));
+  }
+
+  async openSession() {
+    await this.saveState(openSession($state.snapshot(this.state) as CampaignState));
+  }
+
+  async closeSession() {
+    await this.saveState(closeSession($state.snapshot(this.state) as CampaignState));
+  }
+
+  // The state file as it would be shared: the party list brought up to date first.
+  async exportState(): Promise<CampaignState> {
+    const s = withRules($state.snapshot(this.state) as CampaignState, this.stateRules());
+    await this.saveState(withCharacters(s, this.party.map((c) => ({ id: c.id, name: c.name }))));
+    return writeState($state.snapshot(this.state) as CampaignState);
+  }
+
+  // Replaces this campaign's state with a file (say, one the referee shared). Throws with a message.
+  async importState(data: unknown) {
+    const s = readState(data, this.campaignId);
+    if (s.revision < this.state.revision && !confirm(`That file is older than this device's copy (change ${s.revision}, this device has ${this.state.revision}). Use it anyway?`)) {
+      throw new StateError('Kept the state on this device');
+    }
+    this.state = s;
+    await saveStateFile(s.campaign, writeState(s));
   }
 
   // Views read catalogs through characters, so new characters make them redraw.
@@ -363,8 +440,10 @@ class AppState {
   }
 
   async updateSettings(patch: Partial<Settings>) {
+    const was = this.campaignId;
     this.settings = { ...this.settings, ...patch };
     await saveSettings(this.settings).catch((e) => console.warn("Could not save", e));
+    if (this.loaded && this.campaignId !== was) await this.loadState();
   }
 
   get diceColors() {

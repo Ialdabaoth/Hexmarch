@@ -5,6 +5,7 @@
   import Modules from './Modules.svelte';
   import Art from './Art.svelte';
   import Creatures from './Creatures.svelte';
+  import CampaignState from './CampaignState.svelte';
 
   // The game being played (the campaign itself is chosen in Settings): its parties, maps, events, history and
   // procedures, and who is in it. Shared campaigns arrive with sign-in; for now
@@ -35,7 +36,7 @@
   {#if app.party.length}
     <ul class="tree">
       <li>
-        <strong>Party</strong> <span class="small muted">· active{app.settings.partyAt ? ` · hex ${app.settings.partyAt.label}` : ''}</span>
+        <strong>Party</strong> <span class="small muted">· active{app.state.party ? ` · hex ${app.state.party.label}` : ''}</span>
         <ul>
           {#each app.party as c (c.id)}
             <li>
@@ -56,6 +57,11 @@
   {:else}
     <p class="small muted">No characters yet. Roll one up in the Party tab.</p>
   {/if}
+</details>
+
+<details class="section" open>
+  <summary><h2>State</h2></summary>
+  <CampaignState />
 </details>
 
 <details class="section" open>
