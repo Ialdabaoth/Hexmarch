@@ -9,5 +9,6 @@
     "resolveJsonModule": true,
     "types": ["vite/client", "vite-plugin-pwa/client"]
   },
-  "include": ["src/**/*.ts", "src/**/*.svelte"]
+  "include": ["src/**/*.ts", "src/**/*.svelte", "../engine/**/*.ts"],
+  "exclude": ["../engine/**/*.test.ts"]
 }

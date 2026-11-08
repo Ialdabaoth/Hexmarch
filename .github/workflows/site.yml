@@ -48,6 +48,8 @@ jobs:
           python-version: '3.12'
       - name: E9 Atlas
         run: python3 -I modules/tools/atlas_app.py companion-app/dist
+      - name: E9 Scribe
+        run: python3 -I scribe/scribe_app.py companion-app/dist
       - uses: actions/upload-pages-artifact@v3
         if: github.event_name != 'pull_request'
         with:
