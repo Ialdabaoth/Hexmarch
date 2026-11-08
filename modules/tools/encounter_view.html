@@ -1,0 +1,267 @@
+<!-- Encounter map viewer (ENCOUNTER_FORMAT.md), shared by the module viewer and the E9 Atlas; build.py inlines it into both pages after the creature card -->
+<style>
+#e9map{border:1px solid #8a7f66;border-radius:6px;padding:0;width:min(1200px,calc(100vw - 16px));height:calc(100vh - 32px);max-width:none;max-height:none;background:#f4efe1;color:#2b2418;font-family:Georgia,serif;box-shadow:0 6px 24px #0005;overflow:hidden}
+#e9map[open]{display:flex;flex-direction:column}
+#e9map::backdrop{background:#0006}
+#e9map .hd{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:2px solid #7a2e2e;flex:none}
+#e9map .hd h3{margin:0;font-size:17px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#e9map .hd button{font:inherit;font-size:14px;background:#fffaf0;border:1px solid #b8ab8c;border-radius:4px;padding:1px 8px;color:#2b2418;cursor:pointer}
+#e9map .hd .x{border:0;background:none;font-size:20px;line-height:1;color:#6b604c}
+#e9map .body{flex:1;display:grid;grid-template-columns:1fr 300px;min-height:0}
+#e9map .vp{overflow:auto;position:relative;display:grid;background:#3a342b;cursor:grab;touch-action:none}#e9map .vp.drag{cursor:grabbing}
+#e9map .pg{position:relative;--q:40px;margin:auto;overflow:hidden}
+#e9map .pg svg.ps{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+#e9map .hd button.on{background:#7a2e2e;color:#fffaf0;border-color:#7a2e2e}
+#e9map .pg img{position:absolute;display:block;user-select:none;-webkit-user-drag:none;pointer-events:none}
+#e9map .ar{position:absolute;border:2px solid transparent;border-radius:3px;cursor:pointer}
+#e9map .ar:hover{border-color:#7a2e2ecc;background:#7a2e2e14}
+#e9map .ar.on{border-color:#b3261e;background:#b3261e1f;box-shadow:0 0 0 2px #fffaf099}
+#e9map .ln{position:absolute;transform:translate(-50%,-50%);font:12px Georgia,serif;background:#7a2e2e;color:#fffaf0;border:1px solid #fffaf0;border-radius:10px;padding:1px 7px;cursor:pointer;white-space:nowrap}
+#e9map .side{overflow:auto;border-left:1px solid #d8cfb8;padding:10px 14px;font-size:13px}
+#e9map .side h4{margin:0 0 6px;font-size:15px}#e9map .side p{margin:0 0 6px}
+#e9map .lb{color:#6b604c;font-size:11px;text-transform:uppercase;letter-spacing:.05em}
+#e9map .sc{border-top:1px solid #d8cfb8;padding-top:8px;margin-top:8px}
+#e9map .pl{font-style:italic}
+#e9map ul.al{list-style:none;margin:0;padding:0}#e9map ul.al button{font:inherit;font-size:13px;background:none;border:0;padding:3px 4px;text-align:left;width:100%;cursor:pointer;border-radius:4px;color:#2b2418}
+#e9map ul.al button:hover{background:#ebe3cf}#e9map ul.al small,#e9map .side small{color:#6b604c}
+#e9map .pick{padding:16px;display:grid;gap:8px;align-content:start;justify-items:start}
+#e9map .pick button{font:inherit;font-size:15px;background:#fffaf0;border:1px solid #b8ab8c;border-radius:6px;padding:6px 14px;cursor:pointer;color:#2b2418}
+#e9map .pick button:hover{background:#ebe3cf}
+#e9map .ft{font-size:11px;color:#6b604c;padding:3px 12px;border-top:1px solid #d8cfb8;flex:none}
+@media(max-width:760px){#e9map .body{grid-template-columns:1fr;grid-template-rows:1fr minmax(120px,40%)}#e9map .side{border-left:0;border-top:1px solid #d8cfb8}}
+</style>
+<dialog id="e9map" aria-labelledby="e9map-h"></dialog>
+<script>
+"use strict";
+// E9Map.open(pointers, title): one pointer opens its map at the pointed area; several show a picker first.
+// The page sets E9Map.base (the module folder, ending in /), E9Map.module (its id), E9Map.creatures (as for E9Card) and E9Map.scenes (encounters.scenes).
+// E9Map.load(id) gives a map file with its defaults filled in (the one place export and import code should read maps from).
+// E9Map.place(map, where, tokens, taken) -> one [x, y] per token (ENCOUNTER_FORMAT.md 14.1); where is a spawn id, an area id or [x, y, w, h].
+// E9Map.places: the world's places with maps, [{name, pointers, go()}]; a map lists the ones it leads back out to (section 14.3).
+// E9Map.actions: header buttons for the map on screen, [{label, title, show(map) -> bool, run(map, pointer)}]; VTT export and links plug in here.
+window.E9Map = (() => {
+  const dlg = document.getElementById('e9map'), cache = {};
+  const e = t => String(t ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+  const api = { base: '', module: '', creatures: [], scenes: {}, actions: [], places: [], open, show, load, place };
+  const pref = { get(k) { try { return localStorage.getItem('e9map-' + k); } catch (x) { return null; } }, set(k, v) { try { localStorage.setItem('e9map-' + k, v); } catch (x) {} } };
+  let st = null, back = [];  // st: the map on screen; back: where Back returns to
+  dlg.addEventListener('click', ev => { if (ev.target === dlg) dlg.close(); });
+  dlg.addEventListener('close', () => { st = null; back = []; });
+  const shell = (title, inner) => {
+    dlg.innerHTML = `<div class="hd">${back.length ? '<button class="bk" title="Back">‹ Back</button>' : ''}<h3 id="e9map-h">${e(title)}</h3><span class="zm"></span><button class="x" aria-label="Close">×</button></div>${inner}`;
+    dlg.querySelector('.x').onclick = () => dlg.close();
+    const b = dlg.querySelector('.bk'); if (b) b.onclick = () => { const f = back.pop(); f(); };
+    if (!dlg.open) dlg.showModal();
+  };
+  function open(ptrs, title) {
+    ptrs = (Array.isArray(ptrs) ? ptrs : [ptrs]).map(p => typeof p === 'string' ? { map: p } : p);
+    if (ptrs.length === 1) return show(ptrs[0]);
+    const pick = () => {
+      shell(title || 'Encounter maps', '<div class="pick"><p>Which map?</p></div>');
+      const box = dlg.querySelector('.pick');
+      for (const p of ptrs) { const b = document.createElement('button'); b.textContent = p.label || p.map; b.onclick = () => { back.push(pick); show(p); }; box.append(b); }
+    };
+    pick();
+  }
+  // defaults from ENCOUNTER_FORMAT.md section 3, so nothing downstream has to know them
+  function normalise(m, id) {
+    m.id = m.id || id; m.grid = Object.assign({ ft: 5, show: true }, m.grid);
+    m.layers = (m.layers || []).map(L => Object.assign({ at: [0, 0], px: 40, rotate: 0, opacity: 1, show: 'all' }, L));
+    m.ground = m.ground || (m.anchor ? 'generate' : 'none');
+    for (const k of ['walls', 'doors', 'lights']) m[k] = m[k] || [];
+    m.areas = m.areas || {}; m.links = m.links || []; m.spawns = m.spawns || {}; m.environment = m.environment || {};
+    return m;
+  }
+  // ---- placement (section 14.1): nearest the centre first, skip walled and taken squares, spill ring by ring,
+  // and only into squares a token could walk to from the spawn rectangle without crossing a wall or closed door
+  function hits(ax, ay, bx, by, x0, y0, x1, y1) {  // does segment a-b touch box x0..x1, y0..y1? (Liang-Barsky)
+    const dx = bx - ax, dy = by - ay; let t0 = 0, t1 = 1;
+    for (const [p, q] of [[-dx, ax - x0], [dx, x1 - ax], [-dy, ay - y0], [dy, y1 - ay]]) {
+      if (p === 0) { if (q < 0) return false; continue; }
+      const r = q / p; if (p < 0) { if (r > t1) return false; if (r > t0) t0 = r; } else { if (r < t0) return false; if (r < t1) t1 = r; }
+    }
+    return t0 <= t1;
+  }
+  const crossing = (ax, ay, bx, by, cx, cy, dx, dy) => {  // do segments a-b and c-d cross?
+    const o = (px, py, qx, qy, rx, ry) => Math.sign((qx - px) * (ry - py) - (qy - py) * (rx - px));
+    return o(ax, ay, bx, by, cx, cy) * o(ax, ay, bx, by, dx, dy) <= 0 && o(cx, cy, dx, dy, ax, ay) * o(cx, cy, dx, dy, bx, by) <= 0;
+  };
+  const segs = walls => walls.flatMap(wl => wl.slice(1).map((b, k) => [wl[k][0], wl[k][1], b[0], b[1]]));
+  const blocked = (S, x0, y0, x1, y1) => S.some(([ax, ay, bx, by]) => hits(ax, ay, bx, by, x0, y0, x1, y1));
+  function place(m, where, tokens, taken) {
+    const sp = typeof where === 'string' ? m.spawns[where] : null;
+    const area = sp ? (sp.area && m.areas[sp.area]) : typeof where === 'string' ? m.areas[where] : null;
+    let r = sp && sp.squares ? (Array.isArray(sp.squares[0]) ? sp.squares[0] : sp.squares) : area ? rects(area)[0] : Array.isArray(where) ? where : [0, 0, m.size[0], m.size[1]];
+    r = r.map(Math.round);
+    const [W, H] = m.size, S = segs(m.walls.concat(m.doors.map(d => d.at))), K = (x, y) => x + ',' + y;
+    const inR = (x, y) => x >= r[0] && y >= r[1] && x < r[0] + r[2] && y < r[1] + r[3];
+    const cut = {}, open = (x, y) => { const k = K(x, y); if (!(k in cut)) cut[k] = !blocked(S, x + .3, y + .3, x + .7, y + .7); return cut[k]; };  // a wall may clip a corner, not the middle
+    // flood from the open square nearest the rectangle's centre (anywhere on the map if the rectangle has none), so a rectangle
+    // that overlaps solid rock still fills its floor; a step is barred where a wall crosses the line between the two squares' centres
+    const cx = r[0] + r[2] / 2, cy = r[1] + r[3] / 2, dist = ([x, y]) => Math.hypot(x + .5 - cx, y + .5 - cy);
+    let inside = []; for (let y = r[1]; y < r[1] + r[3]; y++) for (let x = r[0]; x < r[0] + r[2]; x++) if (x >= 0 && y >= 0 && x < W && y < H && open(x, y)) inside.push([x, y]);
+    if (!inside.length) for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (open(x, y)) inside.push([x, y]);
+    inside.sort((a, b) => dist(a) - dist(b) || a[1] - b[1] || a[0] - b[0]);
+    const seen = new Set(inside.length ? [K(...inside[0])] : []), q = inside.slice(0, 1);
+    for (let i = 0; i < q.length; i++) {
+      const [x, y] = q[i];
+      for (const [nx, ny] of [[x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]]) {
+        if (nx < 0 || ny < 0 || nx >= W || ny >= H || seen.has(K(nx, ny)) || !open(nx, ny) || S.some(([ax, ay, bx, by]) => crossing(ax, ay, bx, by, x + .5, y + .5, nx + .5, ny + .5))) continue;
+        seen.add(K(nx, ny)); q.push([nx, ny]);
+      }
+    }
+    const ring = ([x, y]) => Math.max(r[0] - x, x - (r[0] + r[2] - 1), r[1] - y, y - (r[1] + r[3] - 1), 0);
+    const cand = q.sort((a, b) => ring(a) - ring(b) || dist(a) - dist(b) || a[1] - b[1] || a[0] - b[0]);
+    const used = new Set((taken || []).map(p => K(...p))), out = [];
+    for (const t of tokens) {
+      const n = Math.max(1, Math.round(t.size || 1));
+      let got = cand.find(([x, y]) => { for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) if (used.has(K(x + i, y + j)) || !seen.has(K(x + i, y + j))) return false; return true; });
+      if (!got) got = cand.find(([x, y]) => !used.has(K(x, y))) || [r[0], r[1]];  // no room for the block: one square, else stack on the corner
+      for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) used.add(K(got[0] + i, got[1] + j));
+      out.push(got);
+    }
+    return out;
+  }
+  async function load(id) {
+    if (!cache[id]) cache[id] = fetch(api.base + 'encounter-maps/' + encodeURIComponent(id) + '.json').then(r => { if (!r.ok) throw new Error(r.status); return r.json(); }).then(m => normalise(m, id));
+    try { return await cache[id]; } catch (err) { delete cache[id]; throw err; }
+  }
+  const rects = a => Array.isArray(a.squares[0]) ? a.squares : [a.squares];
+  const scenesFor = id => Object.entries(api.scenes || {}).filter(([, s]) => s.map && (s.map === id || s.map.map === id));
+  async function show(p) {
+    let m;
+    try { m = await load(p.map); } catch (err) { shell(p.label || p.map, `<div class="pick"><p>Could not load the map “${e(p.map)}”.</p></div>`); return; }
+    shell(m.title || m.id, `<div class="body"><div class="vp"><div class="pg"></div></div><div class="side"></div></div><div class="ft">${e([m.grid && m.grid.ft ? `1 square = ${m.grid.ft} ft` : '', m.credit, m.licence].filter(Boolean).join(' · '))}</div>`);
+    const zm = dlg.querySelector('.zm');
+    zm.innerHTML = '<button data-z="0.8" title="Zoom out">−</button> <button data-z="1.25" title="Zoom in">+</button> <button data-z="fit">Fit</button>';
+    // map actions: the walls overlay, then whatever the page plugged in (VTT export and links)
+    const spawns = Object.entries(m.spawns), ps = m.walls.length + m.doors.length + m.lights.length + spawns.length;
+    if (ps) { const b = document.createElement('button'); b.textContent = 'Walls'; b.title = 'Show the walls, doors, lights, entrances and spawn points a VTT export carries'; b.className = pref.get('walls') === '1' ? 'on' : '';
+      b.onclick = () => { const on = !b.classList.contains('on'); b.classList.toggle('on', on); pref.set('walls', on ? '1' : '0'); dlg.querySelector('svg.ps').style.display = on ? '' : 'none'; }; zm.append(' ', b); }
+    for (const a of api.actions) if (!a.show || a.show(m)) { const b = document.createElement('button'); b.textContent = a.label; if (a.title) b.title = a.title; b.onclick = () => a.run(m, st.p); zm.append(' ', b); }
+    const vp = dlg.querySelector('.vp'), pg = dlg.querySelector('.pg'), [w, h] = m.size;
+    st = { m, p, vp, pg, sel: null, s: 1 };  // p: the pointer the map was opened by
+    // everything is placed in squares; --q is one square's size on screen
+    const q = n => `calc(${n} * var(--q))`;
+    pg.style.width = q(w); pg.style.height = q(h);
+    if (m.ground !== 'none' && m.ground !== 'generate') pg.style.background = m.ground;  // a colour (generated ground comes later)
+    for (const L of m.layers) {
+      const im = new Image(); im.alt = ''; im.src = api.base + 'encounter-maps/' + L.src;
+      Object.assign(im.style, { left: q(L.at[0]), top: q(L.at[1]), opacity: L.opacity, transformOrigin: '0 0', transform: L.rotate ? `rotate(${L.rotate}deg)` : '' });
+      im.onload = () => { im.style.width = q(im.naturalWidth / L.px); }; pg.append(im);
+    }
+    if (ps) {  // play surface (section 3): walls red, doors blue (dashed if secret), lights as their reach; entrances green, spawn points orange (section 14)
+      const pts = a => a.map(p => p.join(',')).join(' ');
+      const spr = ([id, s]) => (s.squares ? (Array.isArray(s.squares[0]) ? s.squares : [s.squares]) : s.area && m.areas[s.area] ? rects(m.areas[s.area]) : []).map(([x, y, sw, sh]) => {
+        const c = s.kind === 'entrance' ? '#1f8a3a' : '#d06a10';
+        return `<rect x="${x}" y="${y}" width="${sw}" height="${sh}" fill="${c}26" stroke="${c}" stroke-width=".12" stroke-dasharray="${s.hidden ? '.3 .2' : ''}"><title>${e((s.kind === 'entrance' ? 'Entrance: ' : 'Spawn point: ') + (s.title || id))}</title></rect>`; }).join('');
+      pg.insertAdjacentHTML('beforeend', `<svg class="ps" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" style="display:${pref.get('walls') === '1' ? '' : 'none'}">`
+        + spawns.map(spr).join('') + m.lights.map(l => `<circle cx="${l.at[0]}" cy="${l.at[1]}" r="${l.range}" fill="#ffa04a22" stroke="#e07a1f" stroke-width=".08" stroke-dasharray=".3 .2"/>`).join('')
+        + m.walls.map(wl => `<polyline points="${pts(wl)}" fill="none" stroke="#d01c1c" stroke-width=".18" stroke-linejoin="round" stroke-linecap="round"/>`).join('')
+        + m.doors.map(d => `<polyline points="${pts(d.at)}" stroke="#1c5bd0" stroke-width=".3" stroke-linecap="round"${d.secret ? ' stroke-dasharray=".2 .12"' : ''}/>`).join('') + '</svg>');
+    }
+    for (const [id, a] of Object.entries(m.areas)) for (const [x, y, aw, ah] of rects(a)) {  // an area may be several rectangles
+      const d = document.createElement('div'); d.className = 'ar'; d.dataset.a = id; d.title = a.title || id;
+      Object.assign(d.style, { left: q(x), top: q(y), width: q(aw), height: q(ah) });
+      pg.append(d);
+    }
+    for (const L of m.links) {
+      const b = document.createElement('button'); b.className = 'ln'; b.textContent = L.label || 'Link';
+      Object.assign(b.style, { left: q(L.from[0] + .5), top: q(L.from[1] + .5) });
+      b.onclick = ev => { ev.stopPropagation(); const cur = { ...p }; back.push(() => show(cur)); show({ ...L.to, map: L.to.map || m.id }); };
+      pg.append(b);
+    }
+    pg.addEventListener('click', ev => { const a = ev.target.closest('.ar'); if (a && !st.dragged) pickArea(a.dataset.a); });
+    zm.onclick = ev => { const z = ev.target.dataset.z; if (!z) return; z === 'fit' ? fit() : zoom(+z); };
+    // drag to pan
+    let dr = null;
+    vp.addEventListener('pointerdown', ev => { if (ev.target.closest('.ln')) return; dr = { x: ev.clientX, y: ev.clientY, l: vp.scrollLeft, t: vp.scrollTop }; st.dragged = false; });
+    vp.addEventListener('pointermove', ev => { if (!dr) return; const dx = ev.clientX - dr.x, dy = ev.clientY - dr.y;
+      if (!st.dragged && Math.hypot(dx, dy) > 5) { st.dragged = true; vp.classList.add('drag'); vp.setPointerCapture(ev.pointerId); }
+      if (st.dragged) { vp.scrollLeft = dr.l - dx; vp.scrollTop = dr.t - dy; } });
+    const end = () => { dr = null; vp.classList.remove('drag'); setTimeout(() => { if (st) st.dragged = false; }, 0); };
+    vp.addEventListener('pointerup', end); vp.addEventListener('pointercancel', end);
+    vp.addEventListener('wheel', ev => { if (!ev.ctrlKey && !ev.metaKey) return; ev.preventDefault(); zoom(ev.deltaY < 0 ? 1.25 : .8, ev); }, { passive: false });
+    fit();
+    const ent = p.entrance && m.spawns[p.entrance], esq = ent && (ent.squares ? (Array.isArray(ent.squares[0]) ? ent.squares[0] : ent.squares) : ent.area && m.areas[ent.area] ? rects(m.areas[ent.area])[0] : null);
+    const sq = esq ? esq : p.area && m.areas[p.area] ? rects(m.areas[p.area])[0] : p.squares || (p.square ? [p.square[0], p.square[1], 1, 1] : null);
+    if (sq) { if (p.area) pickArea(p.area); else side(); if (sq[2] * sq[3] < w * h / 4) { st.s = Math.min(1.25, Math.max(st.s, fitScale() * 2)); apply(); } centreOn(sq); }
+    else side();
+  }
+  const fitScale = () => Math.min(st.vp.clientWidth / (st.m.size[0] * 40), st.vp.clientHeight / (st.m.size[1] * 40));
+  function apply() { st.pg.style.setProperty('--q', 40 * st.s + 'px'); }
+  function fit() { st.s = fitScale(); apply(); }
+  function zoom(f, ev) {
+    const { vp } = st, b = vp.getBoundingClientRect(), px = ev ? ev.clientX - b.left : vp.clientWidth / 2, py = ev ? ev.clientY - b.top : vp.clientHeight / 2;
+    const x = (vp.scrollLeft + px) / st.s, y = (vp.scrollTop + py) / st.s;
+    st.s = Math.max(fitScale() * .5, Math.min(3, st.s * f)); apply(); vp.scrollLeft = x * st.s - px; vp.scrollTop = y * st.s - py;
+  }
+  function centreOn([x, y, w, h]) { const { vp, s } = st; vp.scrollLeft = (x + w / 2) * 40 * s - vp.clientWidth / 2; vp.scrollTop = (y + h / 2) * 40 * s - vp.clientHeight / 2; }
+  function pickArea(id) {
+    st.sel = st.sel === id ? null : id;
+    st.pg.querySelectorAll('.ar').forEach(d => d.classList.toggle('on', d.dataset.a === st.sel));
+    side();
+  }
+  function who(list) {
+    const ul = document.createElement('ul'); ul.className = 'e9cr';
+    for (const w of list || []) {
+      const c = api.creatures.find(x => x.id === w.creature), li = document.createElement('li'), b = document.createElement('button'); b.type = 'button';
+      b.textContent = c ? c.name : w.creature;
+      const n = [w.count !== undefined && w.count !== 1 ? '×' + w.count : '', w.chance ? '(' + w.chance + ')' : ''].filter(Boolean).join(' ');
+      if (n) b.append(' ', Object.assign(document.createElement('small'), { textContent: n }));
+      if (c && window.E9Card) b.onclick = () => E9Card.show(c); else b.disabled = true;
+      li.append(b); ul.append(li);
+    }
+    return ul;
+  }
+  function side() {
+    const { m, sel } = st, box = dlg.querySelector('.side'); box.replaceChildren();
+    const add = h => { const d = document.createElement('div'); d.innerHTML = h; box.append(...d.childNodes); };
+    const all = scenesFor(m.id);
+    if (!sel) {
+      add(`<h4>${e(m.title || m.id)}</h4>${m.notes ? `<p><small>${e(m.notes)}</small></p>` : ''}<p class="lb">Areas</p>`);
+      const ul = document.createElement('ul'); ul.className = 'al';
+      const nat = (a, b) => (a[1].title || a[0]).localeCompare(b[1].title || b[0], undefined, { numeric: true });
+      for (const [id, a] of Object.entries(m.areas || {}).sort(nat)) {
+        const n = all.filter(([, s]) => s.map.area === id).length, b = document.createElement('button');
+        b.innerHTML = `${e(a.title || id)}${n ? ` <small>· ${n === 1 ? 'encounter' : n + ' encounters'}</small>` : ''}`;
+        b.onclick = () => { pickArea(id); centreOn(rects(a)[0]); }; const li = document.createElement('li'); li.append(b); ul.append(li);
+      }
+      box.append(ul);
+      // ways out (section 14.3): every place in the world whose pointer enters this map, by its entrance (or pointed area)
+      const outs = api.places.flatMap(pl => (pl.pointers || []).filter(q => (typeof q === 'string' ? q : q.map) === m.id).map(q => ({ pl, q })));
+      if (outs.length) {
+        add('<p class="lb">Ways out</p>'); const ol = document.createElement('ul'); ol.className = 'al';
+        for (const { pl, q } of outs) {
+          const where = q.entrance && m.spawns[q.entrance] ? m.spawns[q.entrance].title || q.entrance : q.area && m.areas[q.area] ? m.areas[q.area].title || q.area : '';
+          const b = document.createElement('button'); b.innerHTML = `Out to ${e(pl.name)}${where ? ` <small>· ${e(where)}</small>` : ''}`;
+          b.onclick = () => { dlg.close(); pl.go(); }; const li = document.createElement('li'); li.append(b); ol.append(li);
+        }
+        box.append(ol);
+      }
+      const loose = all.filter(([, s]) => !s.map.area);
+      for (const [, s] of loose) scene(box, s);
+      return;
+    }
+    const a = m.areas[sel], here = all.filter(([, s]) => s.map.area === sel);
+    add(`<p><button type="button" class="lb" style="background:none;border:0;padding:0;cursor:pointer">‹ All areas</button></p><h4>${e(a.title || sel)}</h4>`);
+    box.querySelector('button.lb').onclick = () => pickArea(sel);
+    if (!here.length) add('<p><small>Nothing keyed here.</small></p>');
+    for (const [, s] of here) scene(box, s, here.length === 1 && s.title === a.title);
+  }
+  function scene(box, s, untitled) {
+    const d = document.createElement('div'); d.className = 'sc';
+    let h = untitled ? '' : `<p><b>${e(s.title)}</b></p>`;
+    if (s.players) h += `<p class="pl">${e(s.players)}</p>`;
+    if (s.description) h += `<p>${e(s.description)}</p>`;
+    const tag = [s.disposition, s.threat].filter(Boolean).join(' · '); if (tag) h += `<p><span class="lb">${e(tag)}</span></p>`;
+    d.innerHTML = h;
+    if (s.who && s.who.length) d.append(who(s.who));
+    let t = '';
+    for (const [k, l] of [['wants', 'Wants'], ['tactics', 'Tactics'], ['treasure', 'Treasure']]) if (s[k]) t += `<p><span class="lb">${l}</span> ${e(s[k])}</p>`;
+    if (t) { const x = document.createElement('div'); x.style.marginTop = '6px'; x.innerHTML = t; d.append(x); }
+    box.append(d);
+  }
+  return api;
+})();
+</script>

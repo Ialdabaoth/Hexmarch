@@ -1,0 +1,65 @@
+name: Site (E9 apps)
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# PR builds and main deploys queue separately, so a PR build can never cancel a deploy
+concurrency:
+  group: site-${{ github.event_name == 'pull_request' && github.ref || 'deploy' }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - id: data
+        run: echo "repo=$(jq -r .data.repo site.json)" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ steps.data.outputs.repo }}
+          path: .data
+      - name: Data from the data repo (mm-core, links.json)
+        run: scripts/data.sh .data
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: companion-app/package-lock.json
+      - name: E9 Companion
+        working-directory: companion-app
+        run: |
+          npm ci
+          npm run check
+          npm test
+          npm run build
+        env:
+          BASE_PATH: /${{ github.event.repository.name }}/
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: E9 Atlas
+        run: python3 -I modules/tools/atlas_app.py companion-app/dist
+      - uses: actions/upload-pages-artifact@v3
+        if: github.event_name != 'pull_request'
+        with:
+          path: companion-app/dist
+
+  deploy:
+    if: github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

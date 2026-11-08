@@ -1,0 +1,12 @@
+{
+ "format": "e9-rules/1",
+ "kind": "rules",
+ "id": "e9-core",
+ "title": "E9",
+ "version": "0.1.0",
+ "license": "CC-BY-SA-4.0",
+ "ruleset": "e9",
+ "source": "E9 System Reference Handbook (revised, 2026), CC BY-SA 4.0",
+ "rules": "rules.json",
+ "equipment": "equipment.json"
+}

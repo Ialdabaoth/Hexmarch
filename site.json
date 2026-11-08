@@ -1,0 +1,9 @@
+{
+  "_comment": "The one place that names this apps repo and its data repo. The site path (/<repo>/) comes from the GitHub repo name, so renaming the repo needs no code change; update the data repo's links.json \"apps\" link too.",
+  "name": "Hexmarch",
+  "data": {
+    "repo": "Ialdabaoth/MateriaMundiRPG",
+    "url": "https://ialdabaoth.github.io/MateriaMundiRPG/",
+    "copy": ["modules/mm-core", "links.json"]
+  }
+}

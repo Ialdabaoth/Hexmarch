@@ -1,0 +1,230 @@
+<meta charset="utf-8">
+<title>{{TITLE}}</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IM+Fell+English+SC&family=Alegreya+Sans:ital,wght@0,400;0,500;0,700;1,400&display=swap">
+<style>
+/* The module page (Heph 2026-11-08, Atlas 0.5.7): a module's text and reference (places, scenes, creatures, factions, credits,
+   changelog), with every place linked to its spot in the E9 Atlas. It carries no map renders: the maps are the Atlas's to draw.
+   Encounter maps open here in the same encounter viewer the Atlas uses. */
+:root {
+  --bg: #e9ecdf; --panel: #f7f8f1; --ink: #1f2a1d; --muted: #5b6855; --accent: #7a2e2e; --line: #cdd4c1; --hi: #f2d66b; --chip: #fffaf0;
+  --display: "IM Fell English SC", "Palatino Linotype", Georgia, serif;
+  --body: "Alegreya Sans", "Gill Sans", "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #121812; --panel: #1a221a; --ink: #e4e9dc; --muted: #9aa893; --accent: #e09a88; --line: #2e3a2d; --chip: #222b21; color-scheme: dark } }
+:root[data-theme="dark"] { --bg: #121812; --panel: #1a221a; --ink: #e4e9dc; --muted: #9aa893; --accent: #e09a88; --line: #2e3a2d; --chip: #222b21; color-scheme: dark }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.5 var(--body) }
+header { position: sticky; top: 0; z-index: 5; background: var(--panel); border-bottom: 1px solid var(--line);
+  padding: 10px max(16px, env(safe-area-inset-right, 0px)) 0 max(16px, env(safe-area-inset-left, 0px)) }
+.top { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; max-width: 1000px; margin: 0 auto }
+.ttl { flex: 1 1 280px; min-width: 0 }
+h1 { font: 26px/1.15 var(--display); margin: 0; text-wrap: balance } .sub { color: var(--muted); font-size: 13.5px; font-variant-numeric: tabular-nums }
+.tools { display: flex; gap: 8px; align-items: center; flex-wrap: wrap }
+button, .btn, select { font: 500 14px var(--body); color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 5px 11px; cursor: pointer; text-decoration: none; display: inline-block }
+button:hover, .btn:hover { border-color: var(--accent) } :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px }
+.btn.main { background: var(--accent); color: #fff; border-color: var(--accent) } .btn.main:hover { filter: brightness(1.1) }
+nav { display: flex; gap: 2px 14px; flex-wrap: wrap; max-width: 1000px; margin: 8px auto 0; align-items: center }
+nav a { color: var(--muted); text-decoration: none; padding: 4px 0 7px; border-bottom: 3px solid transparent; font-weight: 500 }
+nav a:hover, nav a.on { color: var(--ink); border-bottom-color: var(--accent) }
+nav input { margin-left: auto; flex: 0 1 220px; min-width: 140px; font: 15px var(--body); color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 4px 10px; margin-bottom: 6px }
+main { max-width: 1000px; margin: 0 auto; padding: 8px max(16px, env(safe-area-inset-right, 0px)) 48px max(16px, env(safe-area-inset-left, 0px)) }
+section { scroll-margin-top: 110px } section > h2 { font: 24px var(--display); color: var(--accent); margin: 28px 0 4px; letter-spacing: .01em }
+.lead { color: var(--muted); margin: 0 0 12px; font-size: 14.5px }
+h3 { font: 18px var(--display); margin: 22px 0 8px; padding-bottom: 3px; border-bottom: 1px solid var(--line); display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap }
+h3 small { font: 13.5px var(--body); color: var(--muted) } h3 .btn { font-size: 12.5px; padding: 2px 9px; margin-left: auto }
+.list { display: grid; gap: 8px }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; display: grid; gap: 5px; scroll-margin-top: 110px }
+.card.hit { box-shadow: 0 0 0 2px var(--hi) }
+.card h4 { margin: 0; font-size: 16.5px; display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap }
+.card h4 small, .meta { color: var(--muted); font-size: 13.5px; font-weight: 400 }
+.card p { margin: 0 } .acts { display: flex; flex-wrap: wrap; gap: 6px; align-items: center } .acts .btn, .acts button { font-size: 13px; padding: 2px 10px }
+.sub-places { display: grid; gap: 6px; margin-left: 14px; padding-left: 10px; border-left: 2px solid var(--line) }
+.sub-places .card { background: var(--bg) }
+.lb { color: var(--muted); font-size: 11.5px; text-transform: uppercase; letter-spacing: .06em; margin-right: 4px }
+details.card > summary { cursor: pointer; list-style: none; display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap }
+details.card > summary::-webkit-details-marker { display: none }
+details.card > summary::before { content: "▶"; font-size: 11px; color: var(--muted); width: 12px } details.card[open] > summary::before { content: "▼" }
+details.card > summary b { font-size: 16px } details.card > div { display: grid; gap: 6px; padding: 6px 0 2px 20px }
+.chip { font-size: 12px; border-radius: 10px; padding: 0 8px; border: 1px solid var(--line); color: var(--muted) }
+.chip.hostile { color: #b3261e; border-color: #e3a49f } .chip.friendly { color: #2e6b34; border-color: #a7cfa9 }
+.read { border-left: 3px solid var(--hi); padding-left: 8px; font-style: italic }
+.e9cr { display: flex; flex-wrap: wrap; gap: 4px 6px; margin: 0; padding: 0; list-style: none }
+.rel { margin: 0; padding-left: 18px } .rel li { font-size: 14.5px }
+#changes h3 { font-size: 17px } #changes ul { margin: 4px 0 8px; padding-left: 20px } #changes p { margin: 4px 0 }
+#changes code, .card code { font-size: 13px; background: var(--panel); padding: 0 4px; border-radius: 3px }
+#credits ul { padding-left: 20px } a { color: var(--accent) }
+.none { color: var(--muted); font-style: italic }
+[hidden] { display: none !important }
+@media (max-width: 640px) { h1 { font-size: 22px } nav input { flex-basis: 100%; margin-left: 0 } section { scroll-margin-top: 150px } }
+</style>
+<header>
+  <div class="top">
+    <div class="ttl"><h1 id="title"></h1><div class="sub" id="ver"></div></div>
+    <div class="tools"><select id="lang" aria-label="Language" hidden></select><a class="btn main" id="atlas" hidden>Open in the Atlas</a></div>
+  </div>
+  <nav id="nav"><input id="q" type="search" placeholder="Find a place, scene or creature" aria-label="Find a place, scene or creature"></nav>
+</header>
+<main id="main"></main>
+<!--CARD-->
+<script type="application/json" id="module-data">/*DATA*/</script>
+<script>
+"use strict";
+const D = JSON.parse(document.getElementById('module-data').textContent);
+const ATLAS = '../../atlas/?module=' + encodeURIComponent(D.id);
+// links into the old map pages (#world, #l-1330--site, #march-7, #atlas-7, #p-site) open that place in the Atlas, which reads them (Atlas 0.5.6)
+{ const h = location.hash.replace(/^#/, '');
+  if (D.atlas_map && /^(world(:\d{4})?$|l-|march-|atlas-|p-)/.test(h)) location.replace(ATLAS + (h === 'world' ? '#world' : /^world:\d{4}$/.test(h) ? '#legacy:' + h : '#' + h)); }
+const $ = id => document.getElementById(id);
+const esc = v => String(v ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html !== undefined) e.innerHTML = html; return e; };
+const cap = t => t ? t[0].toUpperCase() + t.slice(1) : '';
+// Language box: names in the module's languages (module.json "languages", drawn language first), translated from "names"
+const LANGS = D.languages || [];
+$('lang').replaceChildren(...LANGS.map(l => new Option(l.label, l.code))); $('lang').hidden = LANGS.length < 2;
+let LANG = ''; try { LANG = localStorage.getItem('mm-lang') || ''; } catch (e) {}
+if (!LANGS.some(l => l.code === LANG)) LANG = LANGS.length ? LANGS[0].code : '';
+$('lang').value = LANG;
+function L(s) { const n = D.names && D.names[s]; return (n && n[LANG]) || s; }
+$('lang').addEventListener('change', () => { LANG = $('lang').value; try { localStorage.setItem('mm-lang', LANG); } catch (e) {} draw(); });
+
+const SITE = Object.fromEntries(D.sites.map(s => [s.slug, s]));
+const CR = Object.fromEntries((D.creatures || []).map(c => [c.id, c]));
+const FA = Object.fromEntries((D.factions || []).map(f => [f.id, f]));
+const SCENES = Object.entries(D.scenes || {}).map(([id, s]) => ({ id, ...s }));
+const onMap = slug => D.atlas_map ? `<a class="btn" href="${esc(ATLAS + '#site:' + slug)}" title="Open this place in the E9 Atlas">Show on the map</a>` : '';
+const siteName = slug => SITE[slug] ? L(SITE[slug].name) : slug;
+if (window.E9Map) Object.assign(E9Map, { base: '', module: D.id, creatures: D.creatures || [], scenes: D.scenes || {},
+  places: D.sites.filter(s => s.encounter).map(s => ({ get name() { return L(s.name); }, pointers: s.encounter, go: () => { if (D.atlas_map) location.href = ATLAS + '#site:' + s.slug; } })) });
+function crButton(id, extra) {
+  const c = CR[id], b = el('button', '', esc(c ? c.name : id) + (extra ? ` <small>${esc(extra)}</small>` : '')); b.type = 'button';
+  if (c && window.E9Card) b.onclick = () => E9Card.show(c); else b.disabled = true;
+  const li = el('li'); li.append(b); return li;
+}
+function chips(items) { const ul = el('ul', 'e9cr'); ul.append(...items); return ul; }
+
+function placeCard(s, kids) {
+  const c = el('article', 'card'); c.id = 'site-' + s.slug;
+  const alt = L(s.name) !== s.name ? s.name : (D.names && D.names[s.name] && Object.values(D.names[s.name]).find(v => v !== s.name)) || '';
+  const sc = SCENES.filter(x => x.where && x.where.site === s.slug).length, here = (D.creatures || []).filter(x => x.site === s.slug);
+  c.innerHTML = `<h4>${esc(L(s.name))}${alt ? ` <small>${esc(alt)}</small>` : ''}</h4><div class="meta">${esc(cap(s.kind))}${s.county ? ' · ' + esc(s.county) : ''}</div>${s.note ? `<p>${esc(s.note)}</p>` : ''}`;
+  const acts = el('div', 'acts', onMap(s.slug));
+  for (const p of s.encounter || []) { const b = el('button', '', esc(p.label || p.map)); b.type = 'button'; b.title = 'Open the encounter map'; b.onclick = () => E9Map.show(p); if (window.E9Map) acts.append(b); }
+  if (sc) acts.append(Object.assign(el('a'), { href: '#scenes-' + s.slug, textContent: sc + (sc > 1 ? ' scenes' : ' scene') }));
+  if (acts.childNodes.length) c.append(acts);
+  if (here.length) { const p = el('div', 'acts', '<span class="lb">Lives here</span>'); p.append(chips(here.map(x => crButton(x.id)))); c.append(p); }
+  c.dataset.q = [s.name, L(s.name), alt, s.kind, s.note, s.county].join(' ').toLowerCase();
+  if (kids.length) { const k = el('div', 'sub-places'); k.append(...kids.map(x => placeCard(x, []))); c.append(k); c.dataset.q += ' ' + kids.map(x => x.name + ' ' + L(x.name)).join(' ').toLowerCase(); }
+  return c;
+}
+function places() {
+  const sec = el('section'); sec.id = 'places';
+  sec.innerHTML = `<h2>Places</h2><p class="lead">${D.sites.length} places, by book. ${D.atlas_map ? '“Show on the map” opens the place in the E9 Atlas.' : ''}</p>`;
+  for (const b of D.books) {
+    const top = D.sites.filter(s => s.book === b.id && !s.parent).sort((x, y) => L(x.name).localeCompare(L(y.name)));
+    if (!top.length) continue;
+    sec.append(el('h3', '', `${esc(b.id)} · ${esc(b.title)} <small>${esc(b.county || '')}</small>`));
+    const l = el('div', 'list'); l.append(...top.map(s => placeCard(s, D.sites.filter(x => x.parent === s.slug)))); sec.append(l);
+  }
+  return sec;
+}
+function scenes() {
+  if (!SCENES.length) return null;
+  const sec = el('section'); sec.id = 'scenes';
+  sec.innerHTML = `<h2>Scenes</h2><p class="lead">${SCENES.length} scenes, by place. Open one for its text; a scene with a map opens it at its room.</p>`;
+  const by = new Map(); for (const s of SCENES) { const k = (s.where && s.where.site) || ''; if (!by.has(k)) by.set(k, []); by.get(k).push(s); }
+  for (const [slug, list] of [...by].sort((a, b) => siteName(a[0]).localeCompare(siteName(b[0])))) {
+    const h = el('h3', '', `${esc(siteName(slug) || 'Elsewhere')} <small>${list.length}</small>${slug ? onMap(slug) : ''}`); h.id = 'scenes-' + slug; h.style.scrollMarginTop = '110px'; sec.append(h);
+    const l = el('div', 'list');
+    for (const s of list) {
+      const d = el('details', 'card'); d.id = 'scene-' + s.id;
+      const disp = s.disposition ? `<span class="chip ${esc(s.disposition)}">${esc(s.disposition)}</span>` : '';
+      d.innerHTML = `<summary><b>${esc(s.title || s.id)}</b>${disp}${s.threat ? `<span class="chip hostile">${esc(s.threat)}</span>` : ''}</summary>`;
+      const body = el('div');
+      if (s.players) body.append(el('p', 'read', `<span class="lb">The players see</span>${esc(s.players)}`));
+      if (s.description) body.append(el('p', '', esc(s.description)));
+      for (const [k, t] of [['wants', 'Wants'], ['tactics', 'Tactics'], ['treasure', 'Treasure']]) if (s[k]) body.append(el('p', '', `<span class="lb">${t}</span>${esc(s[k])}`));
+      if (s.who && s.who.length) { const p = el('div', 'acts', '<span class="lb">Who</span>'); p.append(chips(s.who.map(w => crButton(w.creature, [w.count ? '×' + w.count : '', w.chance ? w.chance : ''].filter(Boolean).join(' '))))); body.append(p); }
+      if (s.map && window.E9Map) { const ptr = typeof s.map === 'string' ? { map: s.map } : s.map, b = el('button', '', 'Encounter map'); b.type = 'button'; b.onclick = () => E9Map.show(ptr); const p = el('div', 'acts'); p.append(b); body.append(p); }
+      d.append(body);
+      d.dataset.q = [s.title, s.description, s.players, siteName(slug), ...(s.who || []).map(w => CR[w.creature] ? CR[w.creature].name : w.creature)].join(' ').toLowerCase();
+      l.append(d);
+    }
+    sec.append(l);
+  }
+  return sec;
+}
+function creatures() {
+  const cs = D.creatures || []; if (!cs.length || !window.E9Card) return null;
+  const sec = el('section'); sec.id = 'creatures';
+  sec.innerHTML = `<h2>Creatures and NPCs</h2><p class="lead">${cs.length} entries. Each opens its index card.</p>`;
+  const KIND = { npc: 'NPCs', monster: 'Monsters' }, by = {};
+  for (const c of cs) (by[c.kind || 'monster'] ||= []).push(c);
+  for (const k of Object.keys(by).sort((a, b) => (a === 'npc' ? -1 : b === 'npc' ? 1 : a.localeCompare(b)))) {
+    sec.append(el('h3', '', `${esc(KIND[k] || cap(k) + 's')} <small>${by[k].length}</small>`));
+    const ul = chips(by[k].sort((a, b) => a.name.localeCompare(b.name)).map(c => { const li = crButton(c.id, c.site_name ? L(c.site_name) : ''); li.dataset.q = [c.name, c.is, c.site_name, c.faction].join(' ').toLowerCase(); return li; }));
+    sec.append(ul);
+  }
+  return sec;
+}
+function factions() {
+  const fs = D.factions || []; if (!fs.length) return null;
+  const sec = el('section'); sec.id = 'factions';
+  sec.innerHTML = `<h2>Factions</h2><p class="lead">${fs.length} factions and how they stand with each other.</p>`;
+  const l = el('div', 'list'), who = id => FA[id] ? FA[id].name : CR[id] ? CR[id].name : siteName(id);
+  for (const f of fs) {
+    const c = el('article', 'card'); c.id = 'faction-' + f.id;
+    c.innerHTML = `<h4>${esc(f.name)} <small>${esc(cap(f.kind))}</small></h4>`;
+    const acts = el('div', 'acts');
+    if (f.seat) acts.append(el('span', 'meta', `<span class="lb">Seat</span>${esc(siteName(f.seat))}`)), acts.insertAdjacentHTML('beforeend', onMap(f.seat));
+    if (f.leader) { acts.append(el('span', 'lb', 'Leader')); acts.append(chips([crButton(f.leader)])); }
+    c.append(acts);
+    const rel = Object.entries(f.relations || {});
+    if (rel.length) c.append(el('ul', 'rel', rel.map(([k, v]) => `<li>${esc(who(k))}: ${esc(v)}</li>`).join('')));
+    c.dataset.q = [f.name, f.kind, ...rel.map(([k]) => who(k))].join(' ').toLowerCase();
+    l.append(c);
+  }
+  sec.append(l); return sec;
+}
+function credits() {
+  const sec = el('section'); sec.id = 'credits';
+  const cr = (D.credits || []).map(c => `<li>${esc(c.what)}: ${c.url && /^https?:\/\//.test(c.url) ? `<a href="${esc(c.url)}">${esc(c.by)}</a>` : esc(c.by)}${c.license ? ' (' + esc(c.license) + ')' : ''}</li>`).join('');
+  sec.innerHTML = `<h2>Credits</h2><p>This module is licensed ${esc(D.license === 'CC-BY-4.0' ? 'CC BY 4.0' : D.license)}. Hex tile art by cmartins, CC BY-SA 4.0.</p>${cr ? `<ul>${cr}</ul>` : ''}`;
+  return sec;
+}
+function changes() {
+  if (!D.changelog) return null;
+  const sec = el('section'); sec.id = 'changes';
+  sec.append(el('h2', '', 'Changes'), el('div', '', D.changelog));  // built from the module's own CHANGELOG.md, escaped by build.py
+  return sec;
+}
+const TABS = [['places', 'Places'], ['scenes', 'Scenes'], ['creatures', 'Creatures'], ['factions', 'Factions'], ['credits', 'Credits'], ['changes', 'Changes']];
+function draw() {
+  const y = scrollY;
+  $('title').textContent = D.title; document.title = D.title;
+  $('ver').textContent = `Version ${D.version} · E9 Atlas ${D.atlas || '?'}`;
+  if (D.atlas_map) { $('atlas').href = ATLAS; $('atlas').hidden = false; }
+  const secs = [places(), scenes(), creatures(), factions(), credits(), changes()].filter(Boolean);
+  $('main').replaceChildren(...secs);
+  $('nav').querySelectorAll('a').forEach(a => a.remove());
+  for (const [id, t] of TABS) if ($(id)) $('q').before(Object.assign(el('a'), { href: '#' + id, textContent: t }));
+  filter(); scrollTo(0, y);
+}
+function filter() {
+  const q = $('q').value.trim().toLowerCase();
+  document.querySelectorAll('[data-q]').forEach(e => { e.hidden = q && !e.dataset.q.includes(q); });
+  document.querySelectorAll('#main .list, #main .e9cr').forEach(l => {
+    const h = l.previousElementSibling; if (h && h.tagName === 'H3') h.hidden = q && ![...l.children].some(c => !c.hidden);
+  });
+}
+$('q').addEventListener('input', filter);
+draw();
+// a #site-, #scene- or #faction- link opens and marks that entry
+function focusHash() {
+  const t = document.getElementById(decodeURIComponent(location.hash.slice(1))); if (!t) return;
+  if (t.tagName === 'DETAILS') t.open = true;
+  document.querySelectorAll('.hit').forEach(e => e.classList.remove('hit')); if (t.classList.contains('card')) t.classList.add('hit');
+  t.scrollIntoView({ block: 'start' });
+}
+addEventListener('hashchange', focusHash); focusHash();
+</script>

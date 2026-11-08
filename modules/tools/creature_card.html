@@ -1,0 +1,64 @@
+<!-- Creature index card (CREATURES_FORMAT.md), shared by the module viewer and the E9 Atlas; build.py inlines it into both pages -->
+<style>
+#e9card{border:1px solid #8a7f66;border-radius:6px;padding:0;max-width:min(380px,calc(100vw - 32px));width:100%;background:#fffaf0;color:#2b2418;font-family:Georgia,serif;box-shadow:0 6px 24px #0005}
+#e9card::backdrop{background:#0004}
+#e9card .hd{display:flex;align-items:baseline;gap:8px;padding:10px 14px 6px;border-bottom:2px solid #7a2e2e}
+#e9card .hd h3{margin:0;font-size:18px;flex:1}#e9card .hd small{color:#6b604c;font-size:12px}
+#e9card .x{font:inherit;font-size:18px;line-height:1;background:none;border:0;color:#6b604c;cursor:pointer;padding:0 2px}
+#e9card .bd{padding:8px 14px 12px;font-size:13px;display:grid;gap:6px}
+#e9card .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;text-align:center}
+#e9card .stats div{border:1px solid #d8cfb8;border-radius:4px;padding:2px}#e9card .stats b{display:block;font-size:14px}#e9card .stats span{font-size:10px;color:#6b604c;text-transform:uppercase;letter-spacing:.04em}
+#e9card .ab{grid-template-columns:repeat(6,1fr)}
+#e9card p{margin:0}#e9card ul{margin:0;padding-left:18px}#e9card .lb{color:#6b604c;font-size:11px;text-transform:uppercase;letter-spacing:.05em}
+#e9card .ru{color:#6b604c;font-size:11px;text-align:right}
+.e9cr{display:flex;flex-wrap:wrap;gap:4px 6px;margin:0;padding:0;list-style:none}
+.e9cr button{font:inherit;font-size:13px;background:#fffaf0;border:1px solid #b8ab8c;border-radius:12px;padding:1px 9px;color:#2b2418;cursor:pointer}
+.e9cr button:hover{background:#ebe3cf}.e9cr small{color:#6b604c}
+</style>
+<dialog id="e9card" aria-labelledby="e9card-h"></dialog>
+<script>
+"use strict";
+window.E9Card = (() => {
+  const TAL = { agility: 'Agility', finesse: 'Finesse', stealth: 'Stealth', lore: 'Lore', medicine: 'Medicine', science: 'Science', alertness: 'Alertness',
+    intuition: 'Intuition', survival: 'Survival', bearing: 'Bearing', charm: 'Charm', wit: 'Wit' };
+  const RULES = { mm: 'Materia Mundi', ose: 'Old-School Essentials', e9: 'E9' };
+  const e = t => String(t ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+  const cap = t => t === 'npc' ? 'NPC' : t ? t[0].toUpperCase() + t.slice(1) : '';
+  const sgn = n => (n > 0 ? '+' : n < 0 ? '−' : '±') + Math.abs(n);
+  const box = (v, l) => `<div><b>${e(v)}</b><span>${e(l)}</span></div>`;
+  const att = a => typeof a === 'string' ? a : a.name + (a.damage ? ` (${a.damage}${a.note ? ' ' + a.note : ''})` : '');
+  const count = c => { const t = c.troupe; if (!t) return ''; const v = Object.entries(t).map(([k, n]) => `${n} ${k === 'keep' || k === 'lair' ? 'at home' : k}`); return v.join(', '); };
+  function html(c) {
+    const r = Object.keys(c.stats || {})[0], s = r && c.stats[r];
+    let h = `<div class="hd"><h3 id="e9card-h">${e(c.name)}</h3><small>${e(cap(c.kind))}${c.is ? ' · ' + e(cap(c.is)) : ''}</small><button class="x" aria-label="Close" onclick="this.closest('dialog').close()">×</button></div><div class="bd">`;
+    const where = [c.site_name, count(c)].filter(Boolean).join(' · ');
+    if (where) h += `<p><span class="lb">Found</span> ${e(where)}</p>`;
+    if (c.description) h += `<p>${e(c.description)}</p>`;
+    if (s) {
+      h += `<div class="stats">${box(s.level ?? '–', 'Level')}${box(s.armor ?? '–', 'Armor')}${box(s.hp ?? '–', 'HP')}${box(s.movement ?? '–', 'Move')}</div>`;
+      if (s.abilities) h += `<div class="stats ab">${['con', 'str', 'dex', 'int', 'wis', 'cha'].map(k => box(sgn(s.abilities[k] || 0), k)).join('')}</div>`;
+      if (s.attacks && s.attacks.length) h += `<div><span class="lb">Attacks</span><ul>${s.attacks.map(a => `<li>${e(att(a))}</li>`).join('')}</ul></div>`;
+      if (s.talents && s.talents.length) h += `<p><span class="lb">Talents</span> ${e(s.talents.map(t => TAL[t] || t).join(', '))}${s.talentThreshold ? ` <small>(threshold ${e(s.talentThreshold)})</small>` : ''}</p>`;
+      if (s.special && s.special.length) h += `<div><span class="lb">Special</span><ul>${s.special.map(x => `<li>${e(x)}</li>`).join('')}</ul></div>`;
+      if (s.size && s.size !== 'Medium') h += `<p><span class="lb">Size</span> ${e(s.size)}</p>`;
+    } else h += '<p><small>No stat block for this creature yet.</small></p>';
+    for (const k of ['wants', 'knows']) if (c[k]) h += `<p><span class="lb">${cap(k)}</span> ${e(Array.isArray(c[k]) ? c[k].join('; ') : c[k])}</p>`;
+    if (r) h += `<p class="ru">${e(RULES[r] || r)} stats</p>`;
+    return h + '</div>';
+  }
+  const dlg = document.getElementById('e9card');
+  dlg.addEventListener('click', ev => { if (ev.target === dlg) dlg.close(); });  // a click on the backdrop closes it
+  // A list of creature buttons, each opening its card.
+  function list(cs) {
+    const ul = document.createElement('ul'); ul.className = 'e9cr';
+    for (const c of cs.slice().sort((a, b) => a.name.localeCompare(b.name))) {
+      const b = document.createElement('button'); b.type = 'button'; b.textContent = c.name;
+      const n = c.troupe && Object.values(c.troupe)[0]; if (n) b.append(' ', Object.assign(document.createElement('small'), { textContent: '×' + n }));
+      b.onclick = () => show(c); const li = document.createElement('li'); li.append(b); ul.append(li);
+    }
+    return ul;
+  }
+  function show(c) { dlg.innerHTML = html(c); dlg.showModal(); }
+  return { show, list };
+})();
+</script>
