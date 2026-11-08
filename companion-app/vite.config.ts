@@ -52,6 +52,8 @@ export default defineConfig({
     })
   ],
   test: {
-    include: ['src/**/*.test.ts']
+    include: ['src/**/*.test.ts'],
+    // Module layouts read their layout.css as text (lib/layout/layouts.ts).
+    css: { include: [/layout\/layout\.css/] }
   }
 });

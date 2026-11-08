@@ -6,6 +6,7 @@ The version lives in `package.json` (see README "Versioning"). Every merged PR b
 
 Sprint: git and VTT integration.
 
+- 0.5.11: the index card and the full page are drawn from the ruleset's module layout (SHEET_LAYOUT.md in the data repo; e9-core 0.1.1 ships today's card and page, so nothing changes on screen). The Companion keeps the surfaces (the 5×3 card's two faces, the letter page), the dice, the editors and print; a layout is checked on load against a whitelist of elements and CSS, and can only place values, roll buttons and taps. Engine: `src/lib/layout/` (parser, CSS scoping, named values, the sheet's d.* values) and `components/layout/LayoutNodes.svelte`.
 - 0.5.10: a character is saved in four parts, stats, gear, knowledge, and flavor (name, portrait, notes), each exported and loaded on its own (CHARACTER_FORMAT.md, sheet version 4; Heph 2026-11-08). The sheet's Manage section has Export one part only and Load a part; a part replaces only that part of the character with the same id. Sheets gain dated `knowledge` entries. Older sheets still import.
 - 0.5.9: the installed app is named "⬢ Companion" (short name "Companion"), matching "⬢ Atlas" and "⬢ Scribe" (Heph 2026-11-08).
 - 0.5.8: the Atlas address typed without its trailing slash (`/Hexmarch/atlas`) opened the Companion once the Companion had been loaded on that device: its offline copy answered for any page it did not recognise. It now leaves `atlas`, `modules` and `scribe` alone with or without the slash, so the server forwards to `atlas/`.
