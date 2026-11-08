@@ -111,6 +111,12 @@ if (new URLSearchParams(location.search).get('tools') === 'host') document.docum
 <script type="application/json" id="module-data">/*DATA*/</script>
 <script>
 const D = JSON.parse(document.getElementById('module-data').textContent);
+// a module with an E9 Atlas map opens there (Heph 2026-11-08: one map app; Atlas 0.5.6): old links keep their place, read as the
+// Atlas's #legacy: links. ?viewer=1 still shows these pages, and an app that embeds them (?mode=...) keeps them
+if (D.atlas_map && window === top && !/[?&](mode|viewer)=/.test(location.search)) {
+  const h = location.hash.replace(/^#/, ''), to = !h || h === 'world' ? '#world' : /^world:\d{4}$/.test(h) ? '#legacy:' + h : '#' + h;
+  location.replace('../../atlas/?module=' + encodeURIComponent(D.id) + to);
+}
 if (window.E9Map) Object.assign(E9Map, { base: '', module: D.id, creatures: D.creatures || [], scenes: D.scenes || {},
   places: D.sites.filter(s => s.encounter && s.league).map(s => ({ get name() { return L(s.name); }, pointers: s.encounter, go: () => { location.hash = '#' + s.league + '--' + s.slug; } })) });
 const stage = document.getElementById('stage'), lists = document.getElementById('lists'), NS = 'http://www.w3.org/2000/svg';

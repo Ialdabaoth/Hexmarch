@@ -158,7 +158,17 @@ const fieldAddr = (C, R) => '#field:' + addr(C, R).slice(7);  // a Field, named 
 const leagueAddr = (i, j) => '#world:' + lab(i - LBL.league[0]) + lab(j - LBL.league[1]);
 const marchAddr = (i, j) => '#march:' + lab(i - LBL.march[0]) + lab(j - LBL.march[1]);
 function parse(h) {
-  h = decodeURIComponent(h).replace(/^#/, '').toUpperCase(); let m;
+  h = decodeURIComponent(h).replace(/^#/, ''); let m;
+  // old links (the module viewer's #l-1330, #l-1330--site, #march-7, #atlas-7, #p-site, and #legacy:world:0706, whose world:CCRR would read as
+  // a League today; Atlas 0.5.6, ATLAS_FORMAT.md "Old links"): a place named in the link opens its 100-ft hex, anything else the
+  // League or March that map.json "legacy" gives for the old page or hex
+  const old = h.startsWith('legacy:') ? h.slice(7) : /^(l-|march-|atlas-|p-)/.test(h) ? h : null;
+  if (old !== null) {
+    if ((m = old.match(/--([a-z0-9-]+)$/) || old.match(/^p-([a-z0-9-]+)$/))) { const p = D.pois.find(q => q.id === m[1]); if (p) return parse(addr(...p.hex)); }
+    const k = old.replace(/^atlas-/, 'march-').replace(/--.*$/, '').replace(/^(\w+-\w+):\d{4}$/, '$1');  // a hex inside an old League page: that page
+    return D.legacy && D.legacy[k] ? parse('#' + D.legacy[k]) : { lvl: 'region' };
+  }
+  h = h.toUpperCase();
   if ((m = h.match(/^MARCH:(..)(..)$/))) return { lvl: 'march', i: unlab(m[1]) + LBL.march[0], j: unlab(m[2]) + LBL.march[1] };
   if ((m = h.match(/^(WORLD|FIELD):(..)(..)(?::(..)(..))?$/))) {
     const li = unlab(m[2]) + LBL.league[0], lj = unlab(m[3]) + LBL.league[1];
@@ -459,10 +469,15 @@ document.getElementById('party').addEventListener('click', e => { const b = e.ta
   else if (a === 'go') location.hash = addr(...PARTY.hex); else if (a === 'reset') setParty(PARTY.hex, 0); else if (a === 'remove') setParty(null);
   partyBox(); });
 document.getElementById('partybtn').onclick = () => { if (PBOX || PLACE) { PBOX = PLACE = false; hoverHint(); } else { PBOX = true; if (!PARTY) { PLACE = true; hoverHint(); } } partyBox(); };
+// an app that embeds the Atlas may show an address ({type: 'e9-atlas', show: '#world:LLLL:HHHH'}, Atlas 0.5.6)
+addEventListener('message', e => { const d = e.data; if (D && d && d.type === 'e9-atlas' && typeof d.show === 'string' && /^#[\w:-]{0,60}$/.test(d.show)) location.hash = d.show; });
 // an app that embeds the Atlas may set the party ({type: 'e9-atlas', party: {hex: 'world:LLLL:HHHH', hours} | null}); it is not told back
 addEventListener('message', e => { const d = e.data; if (!D || !MOD || !d || d.type !== 'e9-atlas' || !('party' in d)) return;
   if (d.party === null) { setParty(null, 0, true); return; }
-  const q = d.party && typeof d.party.hex === 'string' && parse('#' + d.party.hex); if (q && q.sel) setParty(q.sel, +d.party.hours || 0, true); });
+  const q = d.party && typeof d.party.hex === 'string' && parse('#' + d.party.hex); if (!q) return;
+  if (q.sel) setParty(q.sel, +d.party.hours || 0, true);
+  else if (q.lvl === 'league') setParty(centre(q.i, q.j, 150), +d.party.hours || 0);  // an old 3-mile hex: the centre of its League, told back in the new form
+});
 function drawParty() {  // a red pennant planted on the party's hex centre, over everything; the hex itself shaded once it is big enough to see
   if (!PARTY) return; const [sx, sy] = S(...ft(...PARTY.hex)), F = 100 * cam.s;
   if (PBOX && !drawParty.q) drawParty.q = setTimeout(() => { drawParty.q = 0; partyBox(); }, 150);  // the hex's terrain once its tile lands
@@ -606,7 +621,7 @@ function goDown(x, y) {  // Heph's rule: anything clicked zooms in one level, ce
   else location.hash = addr(C, R);
 }
 function crumbs() {
-  const out = [`<a id="mod" href="${esc(MOD.base)}" title="Loaded module: ${esc(MOD.path)} (opens its map viewer)"><b>${esc(D.title)}</b></a>`, `<a href="#world">Region</a>`];
+  const out = [`<a id="mod" href="#" title="Loaded module: ${esc(MOD.path)} (load another)"><b>${esc(D.title)}</b></a>`, `<a href="#world">Region</a>`];
   let C, R;
   if (V.lvl !== 'region') [C, R] = V.lvl === 'march' ? centre(V.i, V.j, 1200) : V.sel || centre(V.i, V.j, LV[V.lvl].own);
   if (C !== undefined) {
@@ -618,7 +633,11 @@ function crumbs() {
   out.push({ region: '1 hex = 1 league (3 miles)', march: '1 hex = 1 league (3 miles)', league: '1 hex = 1 field (½ mile)', field: '1 hex = 1 furlong (500 ft)', furlong: '1 hex = 100 ft' }[V.lvl]);
   document.getElementById('crumbs').innerHTML = out.join(' · ');
 }
-function go() { V = parse(location.hash); fit(); crumbs(); redraw(); }
+function go() {
+  V = parse(location.hash); fit(); crumbs(); redraw();
+  // an app that embeds the Atlas (the E9 Companion) hears where it is, for its own links ({type: 'e9-atlas', event: 'view', hash})
+  if (parent !== window) parent.postMessage({ type: 'e9-atlas', event: 'view', module: MOD.id, hash: location.hash || '#world' }, '*');
+}
 
 // ---- input: drag to pan, wheel or buttons to zoom, click a hex to go down a level ----
 let drag = null;
@@ -684,6 +703,7 @@ function creditList() {
 document.getElementById('creditbtn').onclick = e => { e.preventDefault(); creditList(); document.getElementById('credits').showModal(); };
 document.getElementById('creditclose').onclick = () => document.getElementById('credits').close();
 document.getElementById('modbtn').onclick = () => { modList(); document.getElementById('modules').showModal(); };
+document.getElementById('crumbs').addEventListener('click', e => { if (e.target.closest('#mod')) { e.preventDefault(); modList(); document.getElementById('modules').showModal(); } });  // the module's name loads another (Atlas 0.5.6; it used to open the old viewer)
 document.getElementById('modclose').onclick = () => document.getElementById('modules').close();
 document.getElementById('modlist').addEventListener('click', e => { const b = e.target.closest('button[data-id]'); if (b && !b.disabled) { if (MOD && b.dataset.id === MOD.id) document.getElementById('modules').close(); else pick(b.dataset.id); } });
 async function loadModules() {

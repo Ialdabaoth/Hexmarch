@@ -1,9 +1,10 @@
 <script lang="ts">
   import { app } from '../lib/app.svelte';
   import { viewerUrl, type SavedModule } from '../lib/modules';
+  import { atlasUrl } from '../lib/atlas';
 
-  // Module repositories added on this device. Their maps open in Campaign › Maps;
-  // each module's viewer can also open in its own page.
+  // Module repositories added on this device. Their maps open in Campaign › Maps, and Open
+  // shows a module's E9 Atlas map in its own page (or the module's own pages if it has no map).
   let address = $state('');
   let busy = $state(false);
   let problem = $state('');
@@ -47,8 +48,7 @@
             <div class="small muted">{m.manifest.books?.length ?? 0} books</div>
           </div>
           <div class="row">
-            <a class="button-like" href={viewerUrl(m.base, m.path ?? `${m.id}/`)} target="_blank" rel="noopener">Open</a>
-            {#if m.manifest.atlas_map}<a class="button-like" href={new URL(`atlas/?module=${encodeURIComponent(m.id)}`, m.base).href} target="_blank" rel="noopener">Atlas</a>{/if}
+            <a class="button-like" href={m.manifest.atlas_map ? atlasUrl(m.base, m.id) : viewerUrl(m.base, m.path ?? `${m.id}/`)} target="_blank" rel="noopener">Open</a>
             <button class="ghost" onclick={() => remove(m)} aria-label="Remove {m.manifest.title}">Remove</button>
           </div>
         </li>

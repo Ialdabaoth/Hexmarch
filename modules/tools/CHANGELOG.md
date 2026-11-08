@@ -2,10 +2,11 @@
 
 The E9 Atlas app and map tools (`modules/tools/`). The version lives in `ATLAS_VERSION`; every merged PR that touches the tools bumps the patch, each planned sprint bumps the minor. A module's own version is separate (see each module's CHANGELOG.md).
 
-## 0.5.x (in development, now 0.5.5)
+## 0.5.x (in development, now 0.5.6)
 
 Sprint: git and VTT integration (campaign repo, shared state file, referee and player views, VTT polish). See "Queued for 0.5" below.
 
+- 0.5.6: old links work in the Atlas. map.json gains a `legacy` table (old 3-mile hexes, League pages and March pages to the nearest new address), and `#l-1330`, `#march-7`, `#atlas-7`, `#p-<site>` and `#legacy:world:0706` open the matching place. The old module viewer page forwards to the Atlas when the module has an Atlas map. The Atlas tells an embedding app what it shows (`view` message) and takes `show`; the module name in the header opens the Modules box instead of the old viewer.
 - 0.5.5: the hex grid controls fold into one ⬡ button in the header; clicking it drops down Hex edges, outline colour and opacity (greyed while Hex edges is off). A click outside or Escape closes it.
 - 0.5.4: the larger hex outlines no longer drop out after zooming (they checked the finer map tiles, which load a moment later; now they check the March, which is always loaded). They are white by default, with a colour picker and an opacity slider next to Hex Edges that this device remembers. The hex being looked at stays solid red.
 - 0.5.3: the Language box lists the module's own languages from a new module.json `languages` field ({code: label}, the drawn language first) and hides itself with fewer than two; the choice is remembered. The Atlas, the module viewer and the Companion's map controls all follow it. The map build cache now ignores `languages`, `credits`, the module version and the Atlas version (outside `--pdf`), so changing them no longer redraws the maps.
