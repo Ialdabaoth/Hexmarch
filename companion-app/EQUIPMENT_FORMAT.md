@@ -28,7 +28,7 @@ an editable custom file.
 | `local` | This device's custom equipment | Yes |
 | any id  | A custom file named by a campaign URL (see Campaigns) | No, the referee republishes it |
 
-Published files live in `src/equipment/` (`mm-equipment.json`, `e9-equipment.json`).
+Published files live in `src/equipment/` (`mm-equipment.json`) and in rules modules (`modules/e9-core/equipment.json`).
 The weapon and armor catalogs move out of the ruleset files' `gear` block into these.
 The rulesets keep the *mechanics* (what light, medium and heavy mean, two-weapon
 rules, wizard armor limits); the equipment files hold the *things*.

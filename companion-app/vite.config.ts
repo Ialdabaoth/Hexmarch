@@ -11,6 +11,8 @@ const pwa = !process.env.PREVIEW;
 
 export default defineConfig({
   base,
+  // rules modules (../modules/e9-core etc.) are imported at build time; let the dev server read them
+  server: { fs: { allow: ['.', '../modules'] } },
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
     // ../links.json is shared with the E9 Atlas; an empty link is hidden
