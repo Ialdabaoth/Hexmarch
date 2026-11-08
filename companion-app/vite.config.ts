@@ -52,7 +52,8 @@ export default defineConfig({
     })
   ],
   test: {
-    include: ['src/**/*.test.ts'],
+    // ../engine is the shared editing engine (E9 Scribe); its tests run here too
+    include: ['src/**/*.test.ts', '../engine/**/*.test.ts'],
     // Module layouts read their layout.css as text (lib/layout/layouts.ts).
     css: { include: [/layout\/layout\.css/] }
   }

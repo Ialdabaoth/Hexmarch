@@ -103,6 +103,8 @@ class AppState {
     }
     await this.loadState();
     this.loaded = true;
+    // The E9 Atlas in another tab of this site saves party moves into the same file (Atlas 0.5.11): read it again on coming back.
+    if (typeof document !== 'undefined') document.addEventListener('visibilitychange', () => { if (!document.hidden) void this.refreshState(); });
     if (await this.cacheInlinePortraits(this.sheets)) await this.persist();
     if (this.settings.dice3d) preloadDice();
     void this.refreshCampaign();
@@ -153,6 +155,19 @@ class AppState {
       const old = this.settings.partyAt;
       if (!id && !s.party) await this.saveState(moveParty(s, old));
       await this.updateSettings({ partyAt: null });
+    }
+  }
+
+  // Takes the saved state file when it is newer than the one in memory (another tab, such as the Atlas, changed it).
+  async refreshState() {
+    const id = this.campaignId;
+    try {
+      const saved = await loadStateFile(id);
+      if (!saved) return;
+      const s = readState(saved, id);
+      if (s.revision > this.state.revision) this.state = s;
+    } catch (e) {
+      console.warn('Campaign state unreadable', e);
     }
   }
 
