@@ -305,7 +305,7 @@ class AppState {
   async importCharacters(data: unknown): Promise<SheetData[]> {
     const local = await absorbCustom(data, JSON.parse(JSON.stringify(this.local)));
     if (local) await this.saveLocal(local);
-    const imported = importFile(data);
+    const imported = importFile(data, (id) => this.sheets.find((s) => s.id === id));
     await this.upsert(imported);
     return imported;
   }

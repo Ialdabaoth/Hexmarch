@@ -9,6 +9,7 @@
   import { damageRoll, expressionRoll, thresholdCheck, type DamagePart } from '../lib/checks';
   import { downloadJson, slug } from '../lib/storage';
   import { exportSheet } from '../lib/campaign';
+  import { PARTS, partsIn, type Part } from '../lib/sheet';
   import { isWebImageUrl } from '../lib/portraits';
   import { ABILITIES, TALENTS, type Difficulty } from '../rules/rules';
   import { holdRoll } from '../lib/hold.svelte';
@@ -31,6 +32,25 @@
   let c = $derived(app.character(id)) as Character | undefined;
   let cls = $derived(c ? c.rules.getClass(c.classId) : undefined);
   let confirmDelete = $state(false);
+  let partInput = $state<HTMLInputElement>();
+  const PART_LABELS: Record<Part, string> = { stats: 'Stats', gear: 'Gear', knowledge: 'Knowledge', flavor: 'Name, portrait and notes' };
+
+  // A part file (or a whole character) for this character: its parts replace the ones here.
+  async function loadPart(e: Event) {
+    const input = e.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file || !c) return;
+    try {
+      const data = JSON.parse(await file.text());
+      if (data?.id !== c.id) throw new Error(`That file is for another character${data?.flavor?.name ? ` (${data.flavor.name})` : ''}`);
+      await app.importCharacters(data);
+      const got = partsIn(data);
+      app.notify(`Loaded ${got.length ? got.map((p) => PART_LABELS[p].toLowerCase()).join(', ') : 'the whole sheet'}`);
+    } catch (err) {
+      app.notify(err instanceof SyntaxError ? "That file isn't JSON" : (err as Error).message);
+    }
+  }
   let portrait = $derived(c ? app.portraitSrc(c.data.portrait) : '');
   let webUrl = $state<string | null>(null);
 
@@ -265,12 +285,20 @@
     <button class="primary" onclick={() => (app.view = { name: 'render', id: c!.id, mode: 'postcard' })}>Postcard / PDF</button>
     <button onclick={() => (app.view = { name: 'render', id: c!.id, mode: 'page' })}>Full page</button>
     <button onclick={() => downloadJson(`${slug(c!.name)}.json`, exportSheet(c!.data))}>Export JSON</button>
+    <button onclick={() => partInput?.click()}>Load a part</button>
+    <input bind:this={partInput} type="file" accept="application/json,.json" hidden onchange={loadPart} />
     {#if confirmDelete}
       <button class="primary" onclick={remove}>Really delete</button>
       <button class="ghost" onclick={() => (confirmDelete = false)}>Keep</button>
     {:else}
       <button class="ghost failure" onclick={() => (confirmDelete = true)}>Delete</button>
     {/if}
+  </div>
+  <p class="small muted" style="margin:0.4rem 0 0.2rem">Export one part only:</p>
+  <div class="row">
+    {#each PARTS as part (part)}
+      <button class="ghost" onclick={() => downloadJson(`${slug(c!.name)}-${part}.json`, exportSheet(c!.data, [part]))}>{PART_LABELS[part]}</button>
+    {/each}
   </div>
   {#if pickingGear}<GearPicker character={c} slot={pickingGear} onclose={() => (pickingGear = null)} />{/if}
 {:else}
