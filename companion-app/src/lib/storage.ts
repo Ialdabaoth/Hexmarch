@@ -21,7 +21,8 @@ export interface Settings {
   diceInk: string;
   // The campaign file's link, or '' for "This device".
   campaign: string;
-  // Where the party stands on a module's maps, or null when it hasn't been placed.
+  // Where the party stood before Companion 0.5.5. It now lives in the campaign state file
+  // (lib/state.ts); a value left here is moved into This device's state on load and cleared.
   partyAt: PartyAt | null;
 }
 
@@ -144,4 +145,13 @@ export async function loadCreatures(campaign: string): Promise<Creature[]> {
 
 export async function saveCreatures(campaign: string, list: Creature[]): Promise<void> {
   await set(`creatures:${campaign}`, JSON.parse(JSON.stringify(list)));
+}
+
+// The campaign state file (lib/state.ts), one per campaign ("" is This device), as last saved.
+export async function loadStateFile(campaign: string): Promise<unknown> {
+  return await get(`state:${campaign}`);
+}
+
+export async function saveStateFile(campaign: string, data: unknown): Promise<void> {
+  await set(`state:${campaign}`, JSON.parse(JSON.stringify(data)));
 }

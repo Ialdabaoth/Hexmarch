@@ -6,7 +6,7 @@
 
   // A module's map is the E9 Atlas (<site>/atlas/?module=<id>), embedded whole: its own key,
   // Route and Party tools. The Atlas tells this page where it is (for the full-screen link) and
-  // where the party stands, which is kept in the settings and handed back each time the map opens.
+  // where the party stands, which is kept in the campaign state file and handed back each time the map opens.
   const HOME_MODULES = 'https://ialdabaoth.github.io/MateriaMundiRPG/';
 
   let frame = $state<HTMLIFrameElement>();
@@ -17,7 +17,7 @@
 
   const keyOf = (m: SavedModule) => `${m.base}${m.id}`;
   let current = $derived(app.modules.find((m) => keyOf(m) === chosen) ?? app.modules[0]);
-  let at = $derived(app.settings.partyAt);
+  let at = $derived(app.state.party);
   let here = $derived(!!current && !!at && at.base === current.base && at.module === current.id);
   let atlas = $derived(current?.manifest.atlas_map ? atlasUrl(current.base, current.id) : '');
   // The first view: the party's hex if it is on the new grid, or the whole region. Later moves
@@ -39,9 +39,9 @@
     if (d.module !== current.id) return;
     if (d.event === 'view') showing = d.hash;
     else if (d.hex === null) {
-      if (here) await app.updateSettings({ partyAt: null });
+      if (here) await app.setParty(null);
     } else {
-      await app.updateSettings({ partyAt: { base: current.base, module: current.id, map: 'atlas', hex: d.hex, label: d.hex.slice(6), hours: d.hours } });
+      await app.setParty({ base: current.base, module: current.id, map: 'atlas', hex: d.hex, label: d.hex.slice(6), hours: d.hours });
     }
   }
 

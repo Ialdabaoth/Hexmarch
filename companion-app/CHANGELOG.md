@@ -6,6 +6,7 @@ The version lives in `package.json` (see README "Versioning"). Every merged PR b
 
 Sprint: git and VTT integration.
 
+- 0.5.5: the campaign state file (`modules/STATE_FORMAT.md`). Campaign › State shows the game clock (+1 hour, +8 hours, +1 day, start date), where the party stands, the session (Start and End) and what the party has found, and saves or loads the file as `state.json`. Each campaign has its own; the party's place moved there from the settings, and Atlas travel time passes on the clock.
 - 0.5.4: the licence is now CC BY 4.0 for the app code and its Materia Mundi rules data (it was CC0); credit "E9 / Materia Mundi by Heph (Bakagaijin Productions), CC BY 4.0". Third-party data licences are unchanged.
 - 0.5.3: the app icon reads E9 instead of MM. The app's code is CC0 1.0, like the E9 Atlas tools (LICENSE.md here and at the repository root); its rules data keeps its sources' licences.
 - 0.5.2: Campaign › Maps is the E9 Atlas itself (its own key, Route and Party tools) instead of the old module viewer; the party's place is kept from the Atlas's Party marker, and a party placed on the old 3-mile grid moves to the centre of its League. Manage › Modules › Open opens the Atlas.
@@ -14,7 +15,8 @@ Sprint: git and VTT integration.
 ### Queued for 0.5
 
 From `strategy/mvp-checklist.md` (project files); MVP path decided by Heph 2026-11-07, referee writes and players read by link:
-- Referee sign-in with a pasted GitHub token; create the campaign repo from a module; write the shared campaign state file (`partyAt` moves into it).
+- Referee sign-in with a pasted GitHub token; create the campaign repo from a module; commit the campaign state file as `campaign/state.json`.
+- Rules from modules: the E9, MM and E9MM rulesets and their equipment load from their own modules (0.1.0 each, built in the module threads) instead of being compiled into the app.
 - Join by invite link or QR, pick or roll a character, send it to the referee.
 - Referee Inbox: character requests shown in place, Approve or Send back.
 - Player mode: hide Creatures, module stat blocks and referee maps.
