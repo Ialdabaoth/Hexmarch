@@ -18,7 +18,7 @@ module's own March masters (<module>/atlas/terrain/*.png, one pixel per 100-ft h
 
 Heph chose to bake the result into the masters once (2026-11-07), so his later paint always wins; re-run by hand when
 roads or sites change a lot. Every decision is seeded on the global lattice, so a re-run gives the same answer.
---dry prints what would change and writes nothing. CC0 like the rest of the tools.
+--dry prints what would change and writes nothing. CC BY 4.0 like the rest of the tools.
 """
 import glob, json, math, os, sys
 import numpy as np

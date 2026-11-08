@@ -168,6 +168,8 @@ function parse(h) {
     const k = old.replace(/^atlas-/, 'march-').replace(/--.*$/, '').replace(/^(\w+-\w+):\d{4}$/, '$1');  // a hex inside an old League page: that page
     return D.legacy && D.legacy[k] ? parse('#' + D.legacy[k]) : { lvl: 'region' };
   }
+  // a place by its id (the module page's "Show on the map", Atlas 0.5.7): its 100-ft hex
+  if ((m = h.match(/^site:([a-z0-9-]+)$/))) { const p = D.pois.find(q => q.id === m[1]); return p ? parse(addr(...p.hex)) : { lvl: 'region' }; }
   h = h.toUpperCase();
   if ((m = h.match(/^MARCH:(..)(..)$/))) return { lvl: 'march', i: unlab(m[1]) + LBL.march[0], j: unlab(m[2]) + LBL.march[1] };
   if ((m = h.match(/^(WORLD|FIELD):(..)(..)(?::(..)(..))?$/))) {
