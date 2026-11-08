@@ -2,7 +2,12 @@ import { defineConfig } from 'vite';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { VitePWA } from 'vite-plugin-pwa';
 import pkg from './package.json' with { type: 'json' };
-import links from '../links.json' with { type: 'json' };
+import { existsSync, readFileSync } from 'node:fs';
+
+// ../site.json names the apps' data repository; ../links.json is copied in from it by scripts/data.sh
+const readJson = (path: string) => (existsSync(path) ? JSON.parse(readFileSync(path, 'utf8')) : {});
+const site = readJson(new URL('../site.json', import.meta.url).pathname);
+const links = readJson(new URL('../links.json', import.meta.url).pathname);
 
 // GitHub Pages serves the app from /<repo>/, so the workflow sets BASE_PATH.
 const base = process.env.BASE_PATH ?? '/';
@@ -16,17 +21,17 @@ export default defineConfig({
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
     // ../links.json is shared with the E9 Atlas; an empty link is hidden
-    __PATREON_URL__: JSON.stringify(links.patreon ?? '')
+    __PATREON_URL__: JSON.stringify(links.patreon ?? ''),
+    __DATA_URL__: JSON.stringify(site.data?.url ?? '')
   },
   plugins: [
     svelte(),
     pwa && VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['icon.svg', 'apple-touch-icon.png'],
-      // modules/ (map viewers, PDFs, module.json) is published beside the app, under the same base
-      // (/MateriaMundiRPG/modules/…). The app's offline shell must not answer for those pages, or a
-      // map viewer opens as another copy of the app.
-      workbox: { navigateFallbackDenylist: [/\/modules\//, /\/atlas\//] }, // static pages beside the app: the module viewers and the E9 Atlas
+      // The E9 Atlas is published beside the app (<base>atlas/); module pages live on the data site.
+      // The app's offline shell must not answer for those pages, or a map opens as another copy of the app.
+      workbox: { navigateFallbackDenylist: [/\/modules\//, /\/atlas\//] },
       manifest: {
         name: 'E9 Companion',
         short_name: 'E9',

@@ -7,7 +7,7 @@
   // A module's map is the E9 Atlas (<site>/atlas/?module=<id>), embedded whole: its own key,
   // Route and Party tools. The Atlas tells this page where it is (for the full-screen link) and
   // where the party stands, which is kept in the campaign state file and handed back each time the map opens.
-  const HOME_MODULES = 'https://ialdabaoth.github.io/MateriaMundiRPG/';
+  const HOME_MODULES = __DATA_URL__; // site.json "data.url": the Materia Mundi module site
 
   let frame = $state<HTMLIFrameElement>();
   let chosen = $state('');

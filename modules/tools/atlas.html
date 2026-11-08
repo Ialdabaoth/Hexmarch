@@ -687,7 +687,9 @@ addEventListener('hashchange', go); addEventListener('resize', redraw);
 // ---- modules (Heph 2026-11-06): the Atlas is one app at /atlas/ that loads any module listed in the site's mm.json ----
 // ?module=<id> picks one (else the last one opened, else the first with an atlas); A is that module's atlas folder
 let MODS = [], MOD = null, A = '';
-const SITE = new URL('../', location.href), store = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} } };
+// SITE is the module repository's site, where mm.json sits: ?site=<https url> (the Companion passes the module's own site), else the
+// data site set at build time from site.json (atlas_app.py), else the folder above /atlas/ (a module repo that hosts the Atlas itself)
+const SITE = (() => { const q = new URLSearchParams(location.search).get('site'); try { if (q && /^https:\/\//.test(q)) return new URL(q.replace(/\/?$/, '/')); } catch (e) {} return new URL({{DATA}} || '../', location.href); })(), store = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} } };
 const plainVer = v => String(v || '').replace(/^v/, '');
 function pick(id) { const u = new URL(location.href); u.searchParams.set('module', id); u.hash = ''; location.href = u.href; }
 function modList() {

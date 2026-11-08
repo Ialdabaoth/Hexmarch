@@ -1,0 +1,6 @@
+# copied from the data repo by scripts/data.sh (site.json "data.copy")
+.data/
+modules/mm-core/
+links.json
+node_modules/
+dist/

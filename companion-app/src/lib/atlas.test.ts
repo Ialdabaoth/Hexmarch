@@ -3,7 +3,9 @@ import { atlasUrl, isAtlasMessage, partyHex } from './atlas';
 
 describe('atlas', () => {
   it('builds the Atlas address for a module', () => {
-    expect(atlasUrl('https://ialdabaoth.github.io/MateriaMundiRPG/', 'isle-of-mists')).toBe('https://ialdabaoth.github.io/MateriaMundiRPG/atlas/?module=isle-of-mists');
+    expect(atlasUrl('https://ialdabaoth.github.io/MateriaMundiRPG/', 'isle-of-mists', 'https://ialdabaoth.github.io/apps/atlas/')).toBe(
+      'https://ialdabaoth.github.io/apps/atlas/?module=isle-of-mists&site=https%3A%2F%2Fialdabaoth.github.io%2FMateriaMundiRPG%2F'
+    );
   });
 
   it('accepts view and party messages', () => {

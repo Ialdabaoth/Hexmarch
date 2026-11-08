@@ -13,9 +13,13 @@ import json, os, sys
 TOOLS = os.path.dirname(os.path.abspath(__file__)); REPO = os.path.dirname(os.path.dirname(TOOLS))
 site = os.path.abspath(sys.argv[1])
 ATLAS = open(TOOLS + '/ATLAS_VERSION').read().strip()
-PATREON = json.load(open(os.path.join(REPO, 'links.json'))).get('patreon', '')  # shared with the E9 Companion; empty hides the link
+LINKS = os.path.join(REPO, 'links.json')  # copied in from the data repo (scripts/data.sh); shared with the E9 Companion
+PATREON = json.load(open(LINKS)).get('patreon', '') if os.path.exists(LINKS) else ''  # empty hides the link
+# Where the Atlas finds mm.json and the modules: site.json "data.url" (the apps repo), else '' = the folder above /atlas/
+SITE_JSON = os.path.join(REPO, 'site.json')
+DATA = os.environ.get('E9_DATA_URL') or (json.load(open(SITE_JSON)).get('data', {}).get('url', '') if os.path.exists(SITE_JSON) else '')
 CARD = open(TOOLS + '/creature_card.html').read() + open(TOOLS + '/encounter_view.html').read() + open(TOOLS + '/vtt_export.html').read() + open(TOOLS + '/vtt_bridge.html').read()  # index card and encounter map viewer
-html = open(TOOLS + '/atlas.html').read().replace('{{ATLAS}}', ATLAS).replace('<!--CARD-->', CARD).replace('{{PATREON}}', json.dumps(PATREON))
+html = open(TOOLS + '/atlas.html').read().replace('{{ATLAS}}', ATLAS).replace('<!--CARD-->', CARD).replace('{{PATREON}}', json.dumps(PATREON)).replace('{{DATA}}', json.dumps(DATA))
 os.makedirs(site + '/atlas', exist_ok=True)
 open(site + '/atlas/index.html', 'w').write(html)
 print(f'E9 Atlas {ATLAS} -> {site}/atlas/index.html')
