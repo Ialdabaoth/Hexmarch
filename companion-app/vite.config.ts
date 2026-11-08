@@ -31,7 +31,8 @@ export default defineConfig({
       includeAssets: ['icon.svg', 'apple-touch-icon.png'],
       // The E9 Atlas is published beside the app (<base>atlas/); module pages live on the data site.
       // The app's offline shell must not answer for those pages, or a map opens as another copy of the app.
-      workbox: { navigateFallbackDenylist: [/\/modules\//, /\/atlas\//] },
+      // Match each with or without its trailing slash: /Hexmarch/atlas (as typed or bookmarked) used to open the Companion.
+      workbox: { navigateFallbackDenylist: [/\/(modules|atlas|scribe)(\/|\?|$)/] },
       manifest: {
         name: 'E9 Companion',
         short_name: 'E9',
