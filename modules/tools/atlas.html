@@ -1,0 +1,736 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>E9 Atlas</title>
+<style>
+:root{--bg:#f4efe1;--ink:#2b2418;--dim:#6b604c;--line:#8a7f66;--red:#7a2e2e}
+*{box-sizing:border-box}html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:Georgia,serif}
+body{display:flex;flex-direction:column}
+header{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;padding:8px 16px;border-bottom:1px solid #d8cfb8}
+h1{font-size:16px;margin:0;font-weight:normal;flex:1 1 320px}
+h1 a{color:var(--red);text-decoration:none;white-space:nowrap}h1 a:hover{text-decoration:underline}h1 b{white-space:nowrap}
+.ctl{display:flex;gap:6px;align-items:center;font-size:14px}
+/* hex grid controls (Heph 2026-11-07, Atlas 0.5.5): one ⬡ button that drops down Hex edges, outline colour and opacity */
+#gridbox{position:relative}#gridbtn{font-size:16px;line-height:1;padding:2px 7px}#gridbtn[aria-expanded=true]{border-color:var(--red);color:var(--red)}
+#gridpanel{position:absolute;right:0;top:calc(100% + 4px);z-index:5;display:flex;flex-direction:column;gap:8px;min-width:190px;padding:10px 12px;background:#fffaf0;border:1px solid #b8ab8c;border-radius:6px;box-shadow:0 2px 8px #0003;font-size:13px}
+#gridpanel[hidden]{display:none}#gridpanel label{display:flex;align-items:center;gap:8px;justify-content:space-between;white-space:nowrap}#gridpanel label:first-child{justify-content:flex-start}#gridpanel input{accent-color:var(--red)}
+#gridc{width:30px;height:22px;padding:0 1px;border:1px solid #b8ab8c;border-radius:4px;background:none;cursor:pointer}#grida{width:90px}
+#gridpanel:has(#edges:not(:checked)) .gr{opacity:.45;pointer-events:none}
+button,select{font:inherit;font-size:14px;background:#fffaf0;border:1px solid #b8ab8c;border-radius:4px;padding:2px 8px;color:var(--ink)}
+#main{flex:1;display:flex;min-height:0;position:relative}#map{flex:1;position:relative;min-height:0}
+#key{width:250px;overflow:auto;border-left:1px solid #d8cfb8;padding:8px 12px;font-size:13px;background:var(--bg)}
+#key h2{font-size:13px;margin:10px 0 4px;color:var(--dim);font-weight:normal;text-transform:uppercase;letter-spacing:.05em}
+#key .row{display:flex;align-items:center;gap:8px;padding:2px 0}#key .pl{cursor:pointer;border-radius:4px}#key .pl:hover{background:#ebe3cf}
+#key .sw{width:30px;height:26px;flex:none;background-size:cover;background-position:center;display:flex;align-items:center;justify-content:center}
+#key .sw img{max-width:26px;max-height:22px}#key small{color:var(--dim)}
+#key .tg{font:inherit;font-size:11px;width:16px;padding:0;border:0;background:none;color:var(--dim);cursor:pointer;flex:none}#key .tg0{width:16px;flex:none}
+#key .emb{font:inherit;font-size:12px;padding:0 6px;margin-top:2px;border-radius:10px;cursor:pointer}#key .emb:hover{background:#ebe3cf}
+#mod{color:var(--red)}
+#modules,#credits{border:1px solid #b8ab8c;border-radius:8px;background:var(--bg);color:var(--ink);padding:12px 16px;max-width:min(440px,92vw)}#modules::backdrop{background:#0004}
+#modules h2,#credits h2{font-size:16px;margin:0 0 8px;font-weight:normal}#modules ul,#credits ul{list-style:none;margin:0 0 10px;padding:0}
+#credits li{margin:4px 0;font-size:13px}#credits a{color:var(--red)}
+#modules li button{width:100%;text-align:left;margin:2px 0;padding:6px 10px}#modules li button[disabled]{opacity:.55;cursor:default}#modules li button.on{border-color:var(--red)}#modules small{color:var(--dim)}
+body.nokey #key{display:none}@media(max-width:700px){#key{position:absolute;right:0;top:0;bottom:0;box-shadow:-2px 0 8px #0003}}
+canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor:pointer}
+footer{display:flex;justify-content:space-between;gap:12px;padding:4px 16px;font-size:12px;color:var(--dim);border-top:1px solid #d8cfb8}
+#hover{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#route,#party{position:absolute;left:10px;top:10px;z-index:2;max-width:calc(100% - 20px);background:#fffaf0ee;border:1px solid #b8ab8c;border-radius:6px;padding:6px 10px;font-size:13px;box-shadow:0 2px 8px #0002}
+#route[hidden],#party[hidden]{display:none}#route b,#party b{color:var(--red)}#route small,#party small{color:var(--dim)}#route button,#party button{font-size:12px;padding:0 8px;margin:4px 6px 0 0}
+#party{top:auto;bottom:10px}#party a{color:var(--red)}
+#routebtn.on,#partybtn.on{border-color:var(--red);color:var(--red)}
+footer a{color:var(--red)}
+</style></head><body>
+<header><h1 id="crumbs"></h1>
+<div class="ctl"><select id="lang" aria-label="Language" hidden></select>
+<div id="gridbox"><button id="gridbtn" title="Hex grid" aria-haspopup="true" aria-expanded="false" aria-controls="gridpanel">⬡</button>
+<div id="gridpanel" hidden><label><input type="checkbox" id="edges" checked> Hex edges</label>
+<label class="gr">Outline colour <input type="color" id="gridc" value="#ffffff"></label>
+<label class="gr">Opacity <input type="range" id="grida" min="10" max="100" value="80"></label></div></div>
+<button id="out" title="Zoom out">−</button><button id="in" title="Zoom in">+</button><button id="fit">Fit</button><button id="routebtn" title="Plot a route and estimate the travel time">Route</button><button id="partybtn" title="Show, place or move the party">Party</button><button id="keybtn">Key</button><button id="modbtn" title="Load a different module">Modules</button></div></header>
+<div id="main"><div id="map"><canvas id="cv"></canvas><div id="route" hidden aria-live="polite"></div><div id="party" hidden aria-live="polite"></div></div><aside id="key"></aside></div>
+<footer><span id="hover">Click a hex to zoom in.</span><span><span id="support"></span>E9 Atlas {{ATLAS}}<span id="modver"></span> · <a href="#" id="creditbtn">Credits</a></span></footer>
+<dialog id="modules"><h2>Load a module</h2><ul id="modlist"></ul><button id="modclose">Close</button></dialog>
+<dialog id="credits"><h2>Credits</h2><ul id="creditlist"></ul><button id="creditclose">Close</button></dialog>
+<!--CARD-->
+<script>
+"use strict";
+const CW = 50 * Math.sqrt(3), SQ3 = Math.sqrt(3), LAB = '0123456789ABCDEFGHJKLMNPRSTUVWXYZ';
+const lab = n => n < 100 ? String(n).padStart(2, '0') : LAB[10 + Math.floor((n - 100) / 10)] + (n % 10);
+const unlab = s => { const a = LAB.indexOf(s[0]); return a < 10 ? +s : 100 + (a - 10) * 10 + +s[1]; };
+const centre = (i, j, N) => [N * i, N * j + (N >> 1) * (i & 1)];
+const ft = (C, R) => [C * CW, (R + 0.5 * (C & 1)) * 100];
+function nearest(C, R, N) {  // owner of lattice hex (C, R) at spacing N: nearest centre, ties to higher i then j (ATLAS_FORMAT.md)
+  const off = N >> 1, i0 = Math.floor(C / N); let b = null;
+  for (let di = -1; di <= 2; di++) { const i = i0 + di, Cc = N * i, j0 = Math.floor((R - off * (i & 1)) / N);
+    for (let dj = -1; dj <= 2; dj++) { const j = j0 + dj, Rc = N * j + off * (i & 1), d = 3 * (C - Cc) ** 2 + (2 * (R - Rc) + (C & 1) - (Cc & 1)) ** 2;
+      if (!b || d < b[0] || (d === b[0] && (i > b[1] || (i === b[1] && j > b[2])))) b = [d, i, j]; } }
+  return [b[1], b[2]];
+}
+function hexAt(x, y, N) {  // level-N hex (i, j) under a point in feet: the level-N centres form a regular odd-q grid N times the lattice
+  const s = 100 / SQ3, px = x / N, py = y / N, q = (2 / 3 * px) / s, r = (-px / 3 + SQ3 / 3 * py) / s;
+  let rx = Math.round(q), rz = Math.round(r), ry = Math.round(-q - r);
+  const dx = Math.abs(rx - q), dy = Math.abs(ry + q + r), dz = Math.abs(rz - r);
+  if (dx > dy && dx > dz) rx = -ry - rz; else if (dz >= dy) rz = -rx - ry;
+  return [rx, rz + (rx - (rx & 1)) / 2];
+}
+const hexFt = (i, j, N) => { const [C, R] = centre(i, j, N); return N === 25 ? [C * CW, (R + 0.5 * (i & 1)) * 100] : ft(C, R); };
+const T_BG = {}, T_ICON = {}, HEX_FEATURES = new Set(['clearing', 'bushes', 'thorns', 'spider', 'great-tree', 'mushrooms', 'forest-cave', 'forest-hill', 'stone-circle']);
+let D, POIS = null, KIDS = null, TYPES = [], LBL, lang = '', EDGES = true, CR = [];  // CR: the module's creatures (creatures.json from build.py)
+const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+
+// ---- data ----
+const IMG = {};
+function tile(n) {
+  const bl = n.match(/^bleed-(\w+)-([ec]\d)(-x)?$/);
+  if (bl) {  // a blend tile, made here: the colour's own tile times Heph's greyscale mask (as tiles_blend.py makes them)
+    if (IMG[n]) return IMG[n];
+    const bg = tile('bg-' + bl[1] + (bl[3] || '')), mk = tile('mask-' + bl[2] + (bl[3] || '')); if (!bg || !mk) return null;
+    const c = document.createElement('canvas'); c.width = bg.width; c.height = bg.height; const g = c.getContext('2d');
+    const m = document.createElement('canvas'); m.width = c.width; m.height = c.height; const h = m.getContext('2d');
+    h.drawImage(mk, 0, 0, c.width, c.height); const d = h.getImageData(0, 0, c.width, c.height), p = d.data;
+    for (let q = 0; q < p.length; q += 4) { p[q + 3] = p[q]; p[q] = p[q + 1] = p[q + 2] = 0; } h.putImageData(d, 0, 0);
+    g.drawImage(bg, 0, 0); g.globalCompositeOperation = 'destination-in'; g.drawImage(m, 0, 0);
+    return IMG[n] = c;
+  }
+  let im = IMG[n]; if (!im) { im = IMG[n] = new Image(); im.onload = redraw; im.src = A + 'tiles/' + n + '.png'; }
+  if (!(im instanceof HTMLImageElement)) return im;
+  if (!im.complete || !im.naturalWidth) return null;
+  if (n.startsWith('bg-')) {  // background tiles become canvases too, so they are resampled exactly like the blend tiles drawn over them
+    const c = document.createElement('canvas'); c.width = im.naturalWidth; c.height = im.naturalHeight; c.getContext('2d').drawImage(im, 0, 0);
+    return IMG[n] = c;
+  }
+  return im;
+}
+// the map arrives in pieces (Heph 2026-11-06, Atlas 0.4.9; atlas_cache.py, ATLAS_FORMAT.md "Tile cache"): one small overview of every League,
+// then tiles of Fields (per March), Furlongs and 100-ft hexes (per League), fetched around the view as it moves and dropped when far away
+let OV = null, CA = null, KEY = {}, FRAME = 0;
+const TL = new Map(), HAS = { f: new Set(), u: new Set(), h: new Set() }, MI = new Map();  // MI: March (i, j) -> its id, Field origin and summary
+const RING = { f: 5, u: 4, h: 3 }, AROUND = { league: 'f', field: 'u', furlong: 'h' };  // what each level draws from, and how far round the centre it keeps
+const hexDist = (a, b, c, d) => { const z1 = b - (a - (a & 1)) / 2, z2 = d - (c - (c & 1)) / 2, dx = a - c, dz = z1 - z2; return Math.max(Math.abs(dx), Math.abs(dz), Math.abs(dx + dz)); };
+async function decode(url, w, h) {  // a palette PNG -> one terrain index per pixel (0 = nothing)
+  const bm = await createImageBitmap(await (await fetch(url + '?v=' + (CA.stamp || ''))).blob(), { colorSpaceConversion: 'none', premultiplyAlpha: 'none' });
+  const c = new OffscreenCanvas(w, h), g = c.getContext('2d'); g.drawImage(bm, 0, 0);
+  const px = g.getImageData(0, 0, w, h).data, a = new Uint8Array(w * h);
+  for (let p = 0, q = 0; q < a.length; p += 4, q++) { const v = (px[p] << 16) | (px[p + 1] << 8) | px[p + 2]; if (v) a[q] = KEY[v] || 0; }
+  return a;
+}
+function piece(kind, name) {  // a cached tile's pixels, or null while it loads (the map redraws when it lands)
+  const k = kind + name, e = TL.get(k);
+  if (e) { e.seen = FRAME; return e.a; }
+  const s = CA[{ f: 'fields', u: 'furlongs', h: 'hexes' }[kind]], ent = { a: null, seen: FRAME, kind };
+  TL.set(k, ent);
+  decode(A + s.dir + name + '.png', s.w, s.h).then(a => { ent.a = a; redraw(); }, () => { ent.a = new Uint8Array(s.w * s.h); });
+  return null;
+}
+function keepNear() {  // fetch the ring round the view's centre at this level, and forget tiles of that kind outside it and not drawn this frame
+  const kind = AROUND[V.lvl]; if (!kind) return;
+  const r = RING[kind], N = kind === 'f' ? 1200 : 150, [ci, cj] = hexAt(cam.x, cam.y, N), want = new Set();
+  for (let i = ci - r; i <= ci + r; i++) for (let j = cj - r - 1; j <= cj + r + 1; j++) {
+    if (hexDist(i, j, ci, cj) > r) continue; const name = kind === 'f' ? (MI.get(i + ',' + j) || {}).id : i + '_' + j;
+    if (name && HAS[kind].has(name)) { want.add(kind + name); piece(kind, name); } }
+  for (const [k, e] of TL) if (e.kind === kind && e.seen < FRAME && !want.has(k)) TL.delete(k);
+}
+async function loadCache() {
+  CA = D.cache; TYPES.forEach((t, k) => KEY[parseInt(t.color.slice(1), 16)] = k + 1);
+  for (const m of D.terrain.marches) { const [Cm, Rm] = centre(m.i, m.j, 1200); MI.set(m.i + ',' + m.j, { id: m.id, t: m.t || 0, Cm, Rm, F: nearest(Cm, Rm, 25) }); HAS.f.add(m.id); }
+  for (const kind of ['u', 'h']) for (const [i, j] of CA[kind === 'u' ? 'furlongs' : 'hexes'].leagues) HAS[kind].add(i + '_' + j);
+  OV = Object.assign({ a: await decode(A + CA.overview.png, CA.overview.w, CA.overview.h) }, CA.overview);
+}
+function T(i, j, N) {  // terrain index (0 = none, or not loaded yet) of hex (i, j) at level N: 1 (100-ft), 5 (Furlong), 25 (Field), 150 (League) or 1200 (March)
+  if (N === 150) { const u = i - OV.i0, v = j - OV.j0; return u >= 0 && v >= 0 && u < OV.w && v < OV.h ? OV.a[v * OV.w + u] : 0; }
+  if (N === 1200) { const m = MI.get(i + ',' + j); return m ? m.t : 0; }
+  if (N === 25) {
+    const [C, R] = centre(i, j, 25), [mi, mj] = nearest(C, R, 1200), m = MI.get(mi + ',' + mj); if (!m) return 0;
+    const a = piece('f', m.id), s = CA.fields; return a ? a[(j - m.F[1] + s.dv) * s.w + i - m.F[0] + s.du] : 0;
+  }
+  const [C, R] = N === 1 ? [i, j] : centre(i, j, N), [li, lj] = nearest(C, R, 150), kind = N === 1 ? 'h' : 'u', name = li + '_' + lj;
+  if (!HAS[kind].has(name)) return 0;
+  const a = piece(kind, name); if (!a) return 0;
+  const [Cl, Rl] = centre(li, lj, 150), s = CA[N === 1 ? 'hexes' : 'furlongs'];
+  return N === 1 ? a[(j - Rl + s.dv) * s.w + i - Cl + s.du] : a[(j - Math.floor(Rl / 5) + s.dv) * s.w + i - Math.floor(Cl / 5) + s.du];
+}
+
+// ---- addresses: #world:LLLL[:HHHH] (ATLAS_FORMAT.md), #world, #march:MMMM ----
+function addr(C, R) {
+  const [li, lj] = nearest(C, R, 150), [Cl, Rl] = centre(li, lj, 150);
+  return '#world:' + lab(li - LBL.league[0]) + lab(lj - LBL.league[1]) + ':' + lab(C - Cl + 100) + lab(R - Rl + 75);
+}
+const fieldAddr = (C, R) => '#field:' + addr(C, R).slice(7);  // a Field, named by any 100-ft hex in it
+const leagueAddr = (i, j) => '#world:' + lab(i - LBL.league[0]) + lab(j - LBL.league[1]);
+const marchAddr = (i, j) => '#march:' + lab(i - LBL.march[0]) + lab(j - LBL.march[1]);
+function parse(h) {
+  h = decodeURIComponent(h).replace(/^#/, ''); let m;
+  // old links (the module viewer's #l-1330, #l-1330--site, #march-7, #atlas-7, #p-site, and #legacy:world:0706, whose world:CCRR would read as
+  // a League today; Atlas 0.5.6, ATLAS_FORMAT.md "Old links"): a place named in the link opens its 100-ft hex, anything else the
+  // League or March that map.json "legacy" gives for the old page or hex
+  const old = h.startsWith('legacy:') ? h.slice(7) : /^(l-|march-|atlas-|p-)/.test(h) ? h : null;
+  if (old !== null) {
+    if ((m = old.match(/--([a-z0-9-]+)$/) || old.match(/^p-([a-z0-9-]+)$/))) { const p = D.pois.find(q => q.id === m[1]); if (p) return parse(addr(...p.hex)); }
+    const k = old.replace(/^atlas-/, 'march-').replace(/--.*$/, '').replace(/^(\w+-\w+):\d{4}$/, '$1');  // a hex inside an old League page: that page
+    return D.legacy && D.legacy[k] ? parse('#' + D.legacy[k]) : { lvl: 'region' };
+  }
+  // a place by its id (the module page's "Show on the map", Atlas 0.5.7): its 100-ft hex
+  if ((m = h.match(/^site:([a-z0-9-]+)$/))) { const p = D.pois.find(q => q.id === m[1]); return p ? parse(addr(...p.hex)) : { lvl: 'region' }; }
+  h = h.toUpperCase();
+  if ((m = h.match(/^MARCH:(..)(..)$/))) return { lvl: 'march', i: unlab(m[1]) + LBL.march[0], j: unlab(m[2]) + LBL.march[1] };
+  if ((m = h.match(/^(WORLD|FIELD):(..)(..)(?::(..)(..))?$/))) {
+    const li = unlab(m[2]) + LBL.league[0], lj = unlab(m[3]) + LBL.league[1];
+    if (!m[4]) return { lvl: 'league', i: li, j: lj };
+    const [Cl, Rl] = centre(li, lj, 150), C = Cl - 100 + unlab(m[4]), R = Rl - 75 + unlab(m[5]);
+    if (m[1] === 'FIELD') { const [fi, fj] = nearest(C, R, 25); return { lvl: 'field', i: fi, j: fj }; }
+    const [ui, uj] = nearest(C, R, 5);  // a 100-ft hex address opens its Furlong, with that hex picked
+    return { lvl: 'furlong', i: ui, j: uj, sel: [C, R] };
+  }
+  return { lvl: 'region' };
+}
+
+// ---- view ----
+const LV = { region: { draw: 150, own: 0, fit: 0 }, march: { draw: 150, own: 1200, fit: 1350 }, league: { draw: 25, own: 150, fit: 175 }, field: { draw: 5, own: 25, fit: 32 }, furlong: { draw: 1, own: 5, fit: 7 } };
+let V = { lvl: 'region' }, cam = { x: 0, y: 0, s: 1 }, W = 0, H = 0, dpr = 1, AIM = null;  // AIM: feet to centre on after a click (Heph: a click always zooms in one level, centred on the hex clicked)
+function focusFt() { return V.lvl === 'region' ? null : hexFt(V.i, V.j, LV[V.lvl].own); }
+let STAY = false;  // true while a Furlong click picks a hex: keep the camera where it is
+function fit() {
+  W = cv.clientWidth; H = cv.clientHeight; if (STAY) { STAY = false; return; } const f = focusFt();
+  if (f) { [cam.x, cam.y] = AIM || (V.sel ? ft(...V.sel) : f); AIM = null; cam.s = Math.min(H / (LV[V.lvl].fit * 100), W / (LV[V.lvl].fit * 100 * 1.16)); return; }
+  const [x0, y0, x1, y1] = regionBox();
+  cam.x = (x0 + x1) / 2; cam.y = (y0 + y1) / 2; cam.s = Math.min(W / (x1 - x0), H / (y1 - y0)) * .96;
+}
+const FAR = {};  // a terrain's colour when its hex is too small for the icon: a type with an icon is drawn darker, so woods and hills stand out from grass
+function farColour(t) {
+  if (FAR[t]) return FAR[t]; const c = TYPES[t - 1].color, k = T_ICON[t] ? .72 : 1;
+  return FAR[t] = '#' + [1, 3, 5].map(o => Math.round(parseInt(c.slice(o, o + 2), 16) * k).toString(16).padStart(2, '0')).join('');
+}
+function regionBox() {  // the region's extent in feet: every March, whole
+  let x0 = 1e12, y0 = 1e12, x1 = -1e12, y1 = -1e12;
+  for (const m of MI.values()) { const [x, y] = ft(m.Cm, m.Rm); x0 = Math.min(x0, x - 800 * CW); x1 = Math.max(x1, x + 800 * CW); y0 = Math.min(y0, y - 60000); y1 = Math.max(y1, y + 60000); }
+  return [x0, y0, x1, y1];
+}
+// a user report (2026-11-06): zooming far out blanked the map and the way back was lost. The camera now stays between half the
+// whole-region view and a 100-ft hex about 1200 px across, and its centre stays over the region
+function clampCam() {
+  const [x0, y0, x1, y1] = regionBox(), lo = Math.max(Math.min(W / (x1 - x0), H / (y1 - y0)) * .5, 3 / 15000);  // and never below 3 px per League (Heph: about a pixel per hex)
+  cam.s = Math.min(12, Math.max(lo, cam.s || lo));
+  cam.x = Math.min(x1, Math.max(x0, isFinite(cam.x) ? cam.x : (x0 + x1) / 2)); cam.y = Math.min(y1, Math.max(y0, isFinite(cam.y) ? cam.y : (y0 + y1) / 2));
+}
+const S = (x, y) => [W / 2 + (x - cam.x) * cam.s, H / 2 + (y - cam.y) * cam.s];
+const F = (sx, sy) => [cam.x + (sx - W / 2) / cam.s, cam.y + (sy - H / 2) / cam.s];
+const name = n => (D.names[n] && D.names[n][lang]) || n;  // the drawn name, or its translation in the chosen language (module.json names)
+function hexPath(sx, sy, r) { ctx.beginPath(); for (let k = 0; k < 6; k++) { const a = Math.PI / 3 * k; ctx.lineTo(sx + r * Math.cos(a), sy + r * Math.sin(a)); } ctx.closePath(); }
+const DIRS = odd => [[0, -1], [1, -1 + odd], [1, odd], [0, 1], [-1, odd], [-1, -1 + odd]];
+
+let RIV = null, ROADS = [], RB = new Map();  // RB: road segments by 2-mile bucket, for the Route tool and the hover line
+function smoothRivers() {
+  RIV = D.rivers.map(rv => ({ cls: rv['class'], segs: curve(rv.points).filter(([B]) => T(...hexAt(B[0], B[1], 150), 150)) }));  // only over mapped land
+  // roads (Atlas 0.4.18, atlas_roads.py): smoothed the same way; the raw polylines go in buckets so a point can find the road under it
+  ROADS = (D.roads || []).map(rd => ({ name: rd.name, cls: rd['class'], segs: curve(rd.points) }));
+  (D.roads || []).forEach(rd => { for (let k = 1; k < rd.points.length; k++) { const a = rd.points[k - 1], b = rd.points[k];
+    for (let bx = Math.floor(Math.min(a[0], b[0]) / 10000); bx <= Math.floor(Math.max(a[0], b[0]) / 10000); bx++)
+      for (let by = Math.floor(Math.min(a[1], b[1]) / 10000); by <= Math.floor(Math.max(a[1], b[1]) / 10000); by++) {
+        const q = bx + ',' + by; if (!RB.has(q)) RB.set(q, []); RB.get(q).push([a, b, rd]); } } });
+}
+function roadAt(x, y, tol) {  // the fastest road within tol feet of a point, or null
+  const RD = (D.travel || {}).roads || {}; let best = null;
+  for (let bx = Math.floor((x - tol) / 10000); bx <= Math.floor((x + tol) / 10000); bx++) for (let by = Math.floor((y - tol) / 10000); by <= Math.floor((y + tol) / 10000); by++)
+    for (const [a, b, rd] of RB.get(bx + ',' + by) || []) {
+      const dx = b[0] - a[0], dy = b[1] - a[1], L = dx * dx + dy * dy || 1, t = Math.max(0, Math.min(1, ((x - a[0]) * dx + (y - a[1]) * dy) / L));
+      if (Math.hypot(a[0] + t * dx - x, a[1] + t * dy - y) <= tol && (!best || (RD[rd['class']] ?? 1) < (RD[best['class']] ?? 1))) best = rd; }
+  return best;
+}
+function curve(r) {  // moving average (+-2, ends pinned), then centripetal Catmull-Rom, as in hexmap.py: [[B, c1, c2, C], ...] cubic pieces
+  const n = r.length, p = r.map((q, k) => {
+      if (k === 0 || k === n - 1) return q; let sx = 0, sy = 0, c = 0;
+      for (let t = Math.max(0, k - 2); t < Math.min(n, k + 3); t++) { sx += r[t][0]; sy += r[t][1]; c++; } return [sx / c, sy / c]; });
+    const segs = [];
+    for (let q = 0; q < n - 1; q++) {
+      let A = p[Math.max(0, q - 1)], B = p[q], C = p[q + 1], E = p[Math.min(n - 1, q + 2)];
+      if (A === B) A = [2 * B[0] - C[0], 2 * B[1] - C[1]]; if (E === C) E = [2 * C[0] - B[0], 2 * C[1] - B[1]];
+      const t = (u, v) => Math.max(1e-6, Math.hypot(v[0] - u[0], v[1] - u[1]) ** .5), t1 = t(A, B), t2 = t(B, C), t3 = t(C, E);
+      const m1 = [0, 1].map(k => (C[k] - B[k]) / t2 - (C[k] - A[k]) / (t1 + t2) + (B[k] - A[k]) / t1);
+      const m2 = [0, 1].map(k => (C[k] - B[k]) / t2 - (E[k] - B[k]) / (t2 + t3) + (E[k] - C[k]) / t3);
+      segs.push([B, [B[0] + m1[0] * t2 / 3, B[1] + m1[1] * t2 / 3], [C[0] - m2[0] * t2 / 3, C[1] - m2[1] * t2 / 3], C]);
+    }
+  return segs;
+}
+
+// roads over the terrain (Heph 2026-11-05 classes): roman and local from the Region view, trails from the League view down; true width
+// in feet once zoomed in. Crossings (a bridge on roman roads, a ford on the others) show from the League view down
+// Heph 2026-11-07 (Atlas 0.5.2): local roads mustard yellow, thinner and without the casing (clear of the red hex lines), Roman roads dark brown and wider, so the two read apart at a glance
+const ROAD_STYLE = { roman: { w: 30, px: 3.4, c: '#5a3518', dash: 0 }, local: { w: 15, px: 2.6, c: '#a07812', dash: 0 }, trail: { w: 6, px: 1.4, c: '#7a5f3e', dash: 1 } };
+function drawRoads() {
+  if (!ROADS.length) return; const far = V.lvl === 'region' || V.lvl === 'march';
+  ctx.save(); ctx.setTransform(dpr * cam.s, 0, 0, dpr * cam.s, dpr * (W / 2 - cam.x * cam.s), dpr * (H / 2 - cam.y * cam.s)); ctx.lineCap = ctx.lineJoin = 'round';
+  for (const pass of [0, 1]) for (const cls of ['trail', 'local', 'roman']) {
+    if (far && cls === 'trail') continue; const st = ROAD_STYLE[cls], px = Math.max(st.px * (far ? .6 : 1), st.w * cam.s);
+    if (!pass && cls !== 'roman') continue;  // only a Roman road has a pale casing; local roads and trails are bare lines (Heph 2026-11-07: easier to tell apart)
+    ctx.lineWidth = (px + (pass ? 0 : 2)) / cam.s; ctx.strokeStyle = pass ? st.c : '#f4efe1';
+    ctx.setLineDash(pass && st.dash ? [Math.max(5, px * 2) / cam.s, Math.max(3, px * 1.5) / cam.s] : []);
+    ctx.beginPath(); for (const rd of ROADS) if (rd.cls === cls) for (const [B, c1, c2, C] of rd.segs) { ctx.moveTo(B[0], B[1]); ctx.bezierCurveTo(c1[0], c1[1], c2[0], c2[1], C[0], C[1]); } ctx.stroke();
+  }
+  ctx.restore(); ctx.setLineDash([]);
+  if (far) return;
+  for (const c of D.crossings || []) {  // Heph is drawing bridge and ford icons; until then, plain marks, laid along the road across the river
+    const [sx, sy] = S(...(c.at || ft(...c.hex))), rw = (ROAD_STYLE[(ROADS.find(r => r.name === c.road) || {}).cls] || ROAD_STYLE.local).w;
+    const L = Math.max(14, (c.span || 60) * cam.s), Wd = Math.max(10, rw * 1.8 * cam.s); if (sx < -L || sy < -L || sx > W + L || sy > H + L) continue;
+    ctx.save(); ctx.translate(sx, sy); ctx.rotate((c.angle || 0) * Math.PI / 180);
+    if (c.kind === 'bridge') { ctx.beginPath(); ctx.roundRect(-L / 2, -Wd / 2, L, Wd, Wd * .2); ctx.fillStyle = '#6e4a26'; ctx.fill(); ctx.strokeStyle = '#f4efe1'; ctx.lineWidth = 1.5; ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-L * .42, -Wd * .2); ctx.lineTo(L * .42, -Wd * .2); ctx.moveTo(-L * .42, Wd * .2); ctx.lineTo(L * .42, Wd * .2); ctx.strokeStyle = '#d9c08c'; ctx.lineWidth = 1; ctx.stroke(); }
+    else { const n = Math.max(3, Math.min(7, Math.round(L / Wd))), r = Math.min(Wd * .32, L / n * .4);  // stepping stones
+      for (let k = 0; k < n; k++) { ctx.beginPath(); ctx.arc(-L / 2 + L * (k + .5) / n, (k & 1 ? 1 : -1) * Wd * .12, r, 0, 7); ctx.fillStyle = '#c9b98f'; ctx.fill(); ctx.strokeStyle = '#2b2418'; ctx.lineWidth = 1; ctx.stroke(); } }
+    ctx.restore();
+  }
+}
+
+function redraw() { if (!D || redraw.q) return; redraw.q = requestAnimationFrame(() => { redraw.q = 0; draw(); }); }
+function draw() {
+  dpr = window.devicePixelRatio || 1; W = cv.clientWidth; H = cv.clientHeight;
+  if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)) { cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.fillStyle = '#f4efe1'; ctx.fillRect(0, 0, W, H); FRAME++; clampCam();
+  const [x0, y0] = F(0, 0), [x1, y1] = F(W, H);
+  let N = LV[V.lvl].draw;  // zoomed out past this level's detail: draw the next coarser hexes instead of nothing
+  while (N < 150 && ((x1 - x0) / (N * CW) + 3) * ((y1 - y0) / (N * 100) + 4) > 40000) N = { 1: 5, 5: 25, 25: 150 }[N];
+  const hh = N * 100 * cam.s, r = hh / SQ3, bw = 2 * r;  // hex height (flat to flat) and corner radius in px
+  const i0 = Math.floor(x0 / (N * CW)) - 1, i1 = Math.ceil(x1 / (N * CW)) + 1, j0 = Math.floor(y0 / (N * 100)) - 2, j1 = Math.ceil(y1 / (N * 100)) + 1;
+  if ((i1 - i0) * (j1 - j0) > (N === 150 ? 250000 : 40000)) return;  // Leagues come from the small overview, so many are cheap
+  const vis = [], top = [];
+  for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) { const t = T(i, j, N); if (t) vis.push([i, j, t]); }
+  const sfx = EDGES ? '' : '-x', pad = EDGES ? 0 : 4 / 238;
+  for (const [i, j, t] of vis) {
+    const [sx, sy] = S(...hexFt(i, j, N)), bg = T_BG[t];
+    // one rect for the tile and its blends, snapped to device pixels so they can never resample differently
+    const sn = v => Math.round(v * dpr) / dpr, X = sn(sx - bw / 2 - pad * bw), Y = sn(sy - hh / 2 - pad * bw);
+    const w_ = sn(sx + bw / 2 + pad * bw) - X, h_ = sn(sy + hh / 2 + pad * bw) - Y;
+    const im = r > 5 && bg && tile(bg + sfx);  // too small for its icon: the hex takes the terrain's own colour, so forest still reads as forest (Heph 2026-11-06)
+    if (im) ctx.drawImage(im, X, Y, w_, h_); else { hexPath(sx, sy, r); ctx.fillStyle = farColour(t); ctx.fill(); }
+    if (bg && im) {  // blends: each border bleeds both ways at 40% (hexmap.py BLEED_ALPHA)
+      const ring = DIRS(i & 1).map(([di, dj]) => { const nb = T_BG[T(i + di, j + dj, N)]; return nb && nb !== bg ? nb.slice(3) : null; });
+      ctx.globalAlpha = .4;
+      ring.forEach((c, k) => { if (!c) return;
+        for (const n of ['bleed-' + c + '-e' + k].concat(ring[(k + 5) % 6] === c ? ['bleed-' + c + '-c' + k] : [])) { const b = tile(n + sfx); if (b) ctx.drawImage(b, X, Y, w_, h_); } });
+      ctx.globalAlpha = 1;
+    }
+    if (EDGES && r > 3) { hexPath(sx, sy, r); ctx.strokeStyle = '#8a7f66'; ctx.lineWidth = .6; ctx.stroke(); }
+    if (T_ICON[t] && r > 5) top.push([T_ICON[t], sx, sy]);
+  }
+  // rivers: realistic width in feet once zoomed in, never thinner than a map line
+  ctx.save(); ctx.setTransform(dpr * cam.s, 0, 0, dpr * cam.s, dpr * (W / 2 - cam.x * cam.s), dpr * (H / 2 - cam.y * cam.s)); ctx.lineCap = ctx.lineJoin = 'round';
+  for (const pass of [0, 1]) for (const rv of RIV) {
+    const px = Math.max((V.lvl === 'region' ? .4 : 1) * (0.8 + rv.cls * 0.6), [0, 15, 30, 60, 120, 200][rv.cls] * cam.s);  // map line, or true width (ft) once zoomed in
+    ctx.lineWidth = (px + (pass ? 0 : V.lvl === 'region' ? 1 : 2)) / cam.s; ctx.strokeStyle = pass ? '#3f7fa8' : 'rgba(27,42,51,.85)';
+    ctx.beginPath(); for (const [B, c1, c2, C] of rv.segs) { ctx.moveTo(B[0], B[1]); ctx.bezierCurveTo(c1[0], c1[1], c2[0], c2[1], C[0], C[1]); } ctx.stroke();
+  }
+  ctx.restore();
+  for (const [n, sx, sy] of top) { const im = tile(n); if (im) ctx.drawImage(im, sx - bw * .39, sy - hh * .39, bw * .78, hh * .78); }
+  drawRoads();
+  // county lines and names
+  ctx.setLineDash([7, 4]); ctx.strokeStyle = '#7a2e2e'; ctx.lineWidth = 2;
+  for (const g of D.regions) { ctx.beginPath(); for (const p of g.outline) ctx.lineTo(...S(p[0], p[1])); ctx.closePath(); ctx.stroke(); }
+  ctx.setLineDash([]);
+  ctx.textAlign = 'center'; ctx.lineJoin = 'round';
+  if (V.lvl === 'region' || V.lvl === 'march') for (const g of D.regions) {
+    const [sx, sy] = S(...g.label); ctx.font = 'italic bold 15px Georgia'; ctx.strokeStyle = '#f4efe1'; ctx.lineWidth = 4; ctx.strokeText(name(g.name), sx, sy); ctx.fillStyle = '#7a2e2e'; ctx.fillText(name(g.name), sx, sy); }
+  // anchored encounter maps (Heph 2026-11-07): a place's above-ground map drawn to scale on the 100-ft view, outlined on the Field view
+  FOOT = footprints();
+  if (V.lvl === 'furlong' || V.lvl === 'field') for (const f of FOOT) {
+    ctx.save(); const [sx, sy] = S(f.x, f.y); ctx.translate(sx, sy); ctx.rotate(f.rot); ctx.scale(cam.s, cam.s);
+    const [x0, y0, w, h] = f.rect;
+    if (V.lvl === 'furlong') {
+      ctx.beginPath(); ctx.rect(x0, y0, w, h); ctx.clip();  // only the part inside the map's size is drawn (ENCOUNTER_FORMAT.md)
+      for (const L of f.layers) { if (!L.im.complete || !L.im.naturalWidth) continue; const k = f.g / L.px;
+        ctx.save(); ctx.globalAlpha = L.opacity; ctx.translate(x0 + L.at[0] * f.g, y0 + L.at[1] * f.g); ctx.rotate(L.rotate * Math.PI / 180);
+        ctx.drawImage(L.im, 0, 0, L.im.naturalWidth * k, L.im.naturalHeight * k); ctx.restore(); }
+      ctx.restore(); ctx.save(); ctx.translate(sx, sy); ctx.rotate(f.rot);
+      ctx.strokeStyle = '#2b2418'; ctx.lineWidth = 2; ctx.strokeRect(x0 * cam.s, y0 * cam.s, w * cam.s, h * cam.s);
+    } else { ctx.fillStyle = 'rgba(179,38,30,.12)'; ctx.fillRect(x0, y0, w, h); ctx.restore(); ctx.save(); ctx.translate(sx, sy); ctx.rotate(f.rot);
+      ctx.setLineDash([5, 3]); ctx.strokeStyle = '#7a2e2e'; ctx.lineWidth = 1.5; ctx.strokeRect(x0 * cam.s, y0 * cam.s, w * cam.s, h * cam.s); }
+    ctx.restore();
+  }
+  // points of interest
+  const isz = V.lvl === 'region' ? Math.min(16, 3 * 150 * 100 * cam.s) : { march: 30, league: 44, field: 50, furlong: 56 }[V.lvl], /* Heph 2026-11-06: at Region, never wider than 3 League hexes */ fs = { region: 10, march: 12, league: 13, field: 13, furlong: 14 }[V.lvl];
+  ctx.font = `bold ${fs}px Georgia`;
+  const KP = [];
+  // place ranks (Heph 2026-11-06): 1 shows from the Region view, 2 from March, 3 from League down; then, most important first,
+  // a place whose icon (and name) would overlap one already drawn waits for a closer zoom
+  const maxRank = { region: 1, march: 2 }[V.lvl] || 3, put = [], bh = isz + (V.lvl === 'region' ? 0 : fs * 1.6);
+  POIS = POIS || D.pois.filter(p => !p.parent || !poiById(p.parent)).sort((a, b) => (a.rank || 3) - (b.rank || 3));  // top-level places; sub-places hang off them
+  // PoI hierarchies (Atlas 0.5.1, ATLAS_FORMAT.md "PoI hierarchies"): a place with sub-places (cave mouths, city gates) is drawn as itself
+  // while its sub-places would crowd each other on screen, and as its sub-places once they are two icons apart (always at Furlong, where each fills its own hex)
+  const apart = ks => V.lvl === 'furlong' || ks.every((a, i) => ks.every((b, j) => { if (j <= i) return true; const [ax, ay] = S(...ft(...a.hex)), [bx, by] = S(...ft(...b.hex)); return Math.hypot(ax - bx, ay - by) >= 2 * isz; }));  // two icons apart, so names fit too
+  const open = p => { const ks = kidsOf(p); return ks.length && apart(ks) ? ks.flatMap(open) : [p]; };
+  for (const p of POIS.filter(q => (q.rank || 3) <= maxRank).flatMap(open)) {
+    const [sx, sy] = S(...ft(...p.hex));  // a place is always one 100-ft hex (Heph 2026-11-06): drawn at its centre
+    if (sx < -100 || sy < -100 || sx > W + 100 || sy > H + 100) continue;
+    if (V.lvl !== 'furlong') { const w = Math.max(isz, ctx.measureText(name(p.name)).width * (V.lvl === 'region' ? 0 : 1));
+      if (put.some(q => Math.abs(q[0] - sx) < (q[2] + w) / 2 && Math.abs(q[1] - sy) < bh)) continue; put.push([sx, sy, w]); }
+    if (sx >= 0 && sy >= 0 && sx <= W && sy <= H) KP.push(p);
+    const im = p.icon && tile(p.icon);
+    if (V.lvl === 'furlong') { const f = FOOT.find(q => q.p === p);
+      if (f) { const [lx, ly] = S(f.x, f.y + f.rect[1] + f.rect[3]); ctx.font = 'bold 14px Georgia'; ctx.textAlign = 'center'; ctx.strokeStyle = '#f4efe1'; ctx.lineWidth = 3.5;
+        ctx.strokeText(name(p.name), lx, ly + 14); ctx.fillStyle = '#2b2418'; ctx.fillText(name(p.name), lx, ly + 14); continue; }  // the map itself is the icon
+      fieldPoi(p, im, sx, sy); continue; }
+    if (im) { const a = Math.max(.87, im.naturalHeight / im.naturalWidth); ctx.drawImage(im, sx - isz / 2, sy - isz * a / 2, isz, isz * a); }
+    else { ctx.beginPath(); ctx.arc(sx, sy, 4, 0, 7); ctx.fillStyle = '#2b2418'; ctx.fill(); }
+    if (V.lvl !== 'region') { const ty = sy + isz * .55 + fs; ctx.strokeStyle = '#f4efe1'; ctx.lineWidth = 3.5; ctx.strokeText(name(p.name), sx, ty); ctx.fillStyle = '#2b2418'; ctx.fillText(name(p.name), sx, ty); }
+  }
+  key(new Set(vis.map(v => v[2])), KP);
+  // the hex being looked at, and the picked 100-ft hex
+  const own = LV[V.lvl].own, up = own || 1200;  // up: the next hex size above the drawn hexes (at Region, the Marches)
+  // Hex Edges on (Heph 2026-11-07, Atlas 0.5.2): every hex of the next size up dashed red, the one being looked at solid
+  if (EDGES) { const ux0 = Math.floor(x0 / (up * CW)) - 1, ux1 = Math.ceil(x1 / (up * CW)) + 1, uy0 = Math.floor(y0 / (up * 100)) - 2, uy1 = Math.ceil(y1 / (up * 100)) + 1;
+    if ((ux1 - ux0) * (uy1 - uy0) < 20000) { ctx.setLineDash([6, 4]); ctx.strokeStyle = GRIDC; ctx.globalAlpha = GRIDA; ctx.lineWidth = 1.2;
+      for (let i = ux0; i <= ux1; i++) for (let j = uy0; j <= uy1; j++) { if (own && i === V.i && j === V.j) continue;
+        // only where the module has map: judged by the March the hex's centre falls in, which is always loaded (the finer tiles may not be yet)
+        const [Cu, Ru] = up === 1200 ? [0, 0] : centre(i, j, up); if (!MI.has(up === 1200 ? i + ',' + j : nearest(Cu, Ru, 1200).join(','))) continue;
+        const [sx, sy] = S(...hexFt(i, j, up)); hexPath(sx, sy, up * 100 * cam.s / SQ3); ctx.stroke(); }
+      ctx.setLineDash([]); ctx.globalAlpha = 1; } }
+  if (own) { const [sx, sy] = S(...hexFt(V.i, V.j, own)); hexPath(sx, sy, own * 100 * cam.s / SQ3); if (!EDGES) ctx.setLineDash([9, 5]); ctx.strokeStyle = '#b3261e'; ctx.lineWidth = 2.5; ctx.stroke(); ctx.setLineDash([]); }
+  if (V.sel) { const [sx, sy] = S(...ft(...V.sel)); hexPath(sx, sy, 100 * cam.s / SQ3); ctx.strokeStyle = '#b3261e'; ctx.lineWidth = 3; ctx.stroke(); }
+  drawRoute(); drawParty();
+  keepNear();
+}
+
+// ---- the path tool (Heph 2026-11-06, Atlas 0.4.12): Route mode turns clicks into stops; the route is measured on the terrain the
+// current level draws (Leagues, Fields, Furlongs or 100-ft hexes), sampled along each straight leg, and timed with E9Atlas.travel
+let ROUTE = false, STOPS = [];
+function addStop(x, y) {
+  const N = LV[V.lvl].draw, [i, j] = hexAt(x, y, N); STOPS.push(hexFt(i, j, N)); routeBox(); redraw();
+}
+function routeLegs() {  // [{mi, terrain}] along the route, one sample per quarter hex, merged where the terrain stays the same
+  const N = LV[V.lvl].draw, step = N * 25, legs = []; let unknown = 0;
+  for (let k = 1; k < STOPS.length; k++) {
+    const [ax, ay] = STOPS[k - 1], [bx, by] = STOPS[k], d = Math.hypot(bx - ax, by - ay), n = Math.max(1, Math.ceil(d / step));
+    for (let s = 0; s < n; s++) {
+      const f = (s + .5) / n, px = ax + (bx - ax) * f, py = ay + (by - ay) * f, t = T(...hexAt(px, py, N), N), id = t ? TYPES[t - 1].id : null, mi = d / n / 5000;
+      const rd = roadAt(px, py, Math.max(150, N * 35)), road = rd ? rd['class'] : undefined;  // on a road: within about a third of a hex of it
+      if (!t && !road) unknown += mi;
+      const last = legs[legs.length - 1]; if (last && last.terrain === id && last.road === road) last.mi += mi; else legs.push({ mi, terrain: id, road });
+    }
+  }
+  return { legs, unknown };
+}
+const hm = h => { const m = Math.round(h * 60); return m < 60 ? m + ' min' : Math.floor(m / 60) + ' h' + (m % 60 ? ' ' + m % 60 + ' min' : ''); };
+function routeBox() {
+  const box = document.getElementById('route'); box.hidden = !ROUTE; if (!ROUTE) return;
+  if (!STOPS.length) { box.innerHTML = '<b>Route</b> · click hexes to add stops. <small>Drag still moves the map.</small><br><button data-r="done">Done</button>'; return; }
+  const { legs, unknown } = routeLegs(), r = E9Atlas.travel(legs.map(g => ({ mi: g.mi, terrain: g.terrain || 'unknown', road: g.road }))), P = (D.travel || {}).pace || {}, onRoad = legs.reduce((a, g) => a + (g.road ? g.mi : 0), 0);
+  const unit = { region: 'Leagues', march: 'Leagues', league: 'Fields', field: 'Furlongs', furlong: '100-ft hexes' }[V.lvl];
+  let h = `<b>Route</b> · ${STOPS.length} stop${STOPS.length === 1 ? '' : 's'} · ${r.mi.toFixed(r.mi < 10 ? 1 : 0)} mi`;
+  if (STOPS.length > 1) h += r.blocked ? ` · <b>crosses ${esc(TYPES.find(t => t.id === r.blocked).name.toLowerCase())}</b>: no way on foot`
+    : ` · ${hm(r.hours)}${r.days >= .5 ? ` · ${r.days.toFixed(1)} days of ${P.hours_per_day || 8} h` : ''}`;
+  h += `<br><small>Terrain read from ${unit}${unknown > .05 ? `; ${unknown.toFixed(1)} mi unmapped, at normal pace` : ''}${onRoad > .05 ? `; ${onRoad.toFixed(onRoad < 10 ? 1 : 0)} mi on roads` : ''}.</small><br>${STOPS.length > 1 && !r.blocked ? `<button data-r="move" title="Put the party at the last stop and add the travel time">Move party here</button>` : ''}<button data-r="undo">Undo</button><button data-r="clear">Clear</button><button data-r="done">Done</button>`;
+  box.innerHTML = h;
+}
+document.getElementById('route').addEventListener('click', e => { const b = e.target.closest('button[data-r]'); if (!b) return;
+  if (b.dataset.r === 'move') { moveParty(); return; }
+  if (b.dataset.r === 'undo') STOPS.pop(); else if (b.dataset.r === 'clear') STOPS = []; else setRoute(false); routeBox(); redraw(); });
+function setRoute(on) { ROUTE = on; document.getElementById('routebtn').classList.toggle('on', on); if (on && !STOPS.length && PARTY) STOPS.push(ft(...PARTY.hex)); hoverHint(); routeBox(); redraw(); }  // a route starts where the party stands
+const hoverHint = () => { document.getElementById('hover').textContent = PLACE ? 'Party: click a hex to put the party there.' : ROUTE ? 'Route: click a hex to add a stop.' : 'Click a hex to zoom in.'; };
+document.getElementById('routebtn').onclick = () => setRoute(!ROUTE);
+addEventListener('keydown', e => { if (e.key !== 'Escape') return; if (PLACE) { PLACE = false; partyBox(); hoverHint(); } else if (ROUTE) setRoute(false); });
+function drawRoute() {
+  if (!STOPS.length) return;
+  ctx.lineJoin = ctx.lineCap = 'round';
+  for (const [w, c, dash] of [[6, '#f4efe1', []], [3, '#7a2e2e', [10, 6]]]) {
+    ctx.beginPath(); for (const p of STOPS) ctx.lineTo(...S(...p)); ctx.setLineDash(dash); ctx.lineWidth = w; ctx.strokeStyle = c; ctx.stroke(); }
+  ctx.setLineDash([]);
+  STOPS.forEach((p, k) => { const [sx, sy] = S(...p); ctx.beginPath(); ctx.arc(sx, sy, k ? 5 : 6, 0, 7); ctx.fillStyle = k ? '#7a2e2e' : '#f4efe1'; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = '#7a2e2e'; ctx.stroke(); });
+  if (ROUTE && !drawRoute.q) drawRoute.q = setTimeout(() => { drawRoute.q = 0; routeBox(); }, 150);  // tiles landing change the sums
+}
+
+// ---- the party marker (Heph 2026-11-07, Atlas 0.4.17; ATLAS_FORMAT.md "Party marker"): where the party stands, always one 100-ft hex,
+// drawn at every zoom, kept per module in this browser, and told to an app that embeds the Atlas. Moving it along a route adds the travel time.
+let PARTY = null, PLACE = false, PBOX = false;  // PARTY: {hex: [C, R], hours}; PLACE: the next click puts the party there; PBOX: its box is open
+const partyKey = () => 'e9-atlas-party:' + MOD.id;
+function loadParty() {
+  try { const p = JSON.parse(store.get(partyKey()) || 'null'); const q = p && typeof p.hex === 'string' && parse('#' + p.hex); if (q && q.sel) PARTY = { hex: q.sel, hours: +p.hours || 0 }; } catch (e) {}
+}
+function setParty(hex, hours, quiet) {
+  PARTY = hex ? { hex, hours: hours || 0 } : null;
+  store.set(partyKey(), PARTY ? JSON.stringify({ hex: addr(...hex).slice(1), hours: PARTY.hours }) : '');
+  if (!quiet && parent !== window) parent.postMessage({ type: 'e9-atlas', event: 'party', module: MOD.id, hex: PARTY ? addr(...hex).slice(1) : null, hours: PARTY ? PARTY.hours : 0 }, '*');
+  partyBox(); redraw();
+}
+function placeParty(x, y) {  // the centre 100-ft hex of the hex clicked at this level
+  const N = LV[V.lvl].draw, [i, j] = hexAt(x, y, N); if (!T(i, j, N)) return;
+  PLACE = false; hoverHint(); setParty(N === 1 ? [i, j] : centre(i, j, N), PARTY ? PARTY.hours : 0);
+}
+function moveParty() {  // along the route: to its last stop, adding the route's time; the route then starts again from there
+  const { legs } = routeLegs(), r = E9Atlas.travel(legs.map(g => ({ mi: g.mi, terrain: g.terrain || 'unknown', road: g.road }))); if (r.blocked || STOPS.length < 2) return;
+  const end = STOPS[STOPS.length - 1]; setParty(hexAt(end[0], end[1], 1), (PARTY ? PARTY.hours : 0) + r.hours);
+  STOPS = [ft(...PARTY.hex)]; routeBox(); redraw();
+}
+function partyBox() {
+  const box = document.getElementById('party'); box.hidden = !(PBOX || PLACE); document.getElementById('partybtn').classList.toggle('on', !box.hidden); if (box.hidden) return;
+  const P = (D.travel || {}).pace || {}, day = P.hours_per_day || 8;
+  if (PLACE) { box.innerHTML = '<b>Party</b> · click a hex to put the party there. <small>Esc cancels.</small><br><button data-p="cancel">Cancel</button>'; return; }
+  if (!PARTY) { box.innerHTML = '<b>Party</b> · not on the map yet.<br><button data-p="place">Place the party</button><button data-p="close">Close</button>'; return; }
+  const [C, R] = PARTY.hex, t = T(C, R, 1), h = addr(C, R), lbl = h.slice(7);
+  box.innerHTML = `<b>Party</b> · at <a href="${h}">${lbl}</a>${t ? ' · ' + esc(TYPES[t - 1].name.toLowerCase()) : ''}<br><small>Travelled ${hm(PARTY.hours)}${PARTY.hours >= day / 2 ? ` (${(PARTY.hours / day).toFixed(1)} days of ${day} h)` : ''}</small><br>`
+    + '<button data-p="go">Go to</button><button data-p="place">Move</button><button data-p="reset" title="Set the travel time back to zero">Reset time</button><button data-p="remove">Remove</button><button data-p="close">Close</button>';
+}
+document.getElementById('party').addEventListener('click', e => { const b = e.target.closest('button[data-p]'); if (!b) return; const a = b.dataset.p;
+  if (a === 'place') { PLACE = true; hoverHint(); } else if (a === 'cancel') { PLACE = false; hoverHint(); } else if (a === 'close') PBOX = false;
+  else if (a === 'go') location.hash = addr(...PARTY.hex); else if (a === 'reset') setParty(PARTY.hex, 0); else if (a === 'remove') setParty(null);
+  partyBox(); });
+document.getElementById('partybtn').onclick = () => { if (PBOX || PLACE) { PBOX = PLACE = false; hoverHint(); } else { PBOX = true; if (!PARTY) { PLACE = true; hoverHint(); } } partyBox(); };
+// an app that embeds the Atlas may show an address ({type: 'e9-atlas', show: '#world:LLLL:HHHH'}, Atlas 0.5.6)
+addEventListener('message', e => { const d = e.data; if (D && d && d.type === 'e9-atlas' && typeof d.show === 'string' && /^#[\w:-]{0,60}$/.test(d.show)) location.hash = d.show; });
+// an app that embeds the Atlas may set the party ({type: 'e9-atlas', party: {hex: 'world:LLLL:HHHH', hours} | null}); it is not told back
+addEventListener('message', e => { const d = e.data; if (!D || !MOD || !d || d.type !== 'e9-atlas' || !('party' in d)) return;
+  if (d.party === null) { setParty(null, 0, true); return; }
+  const q = d.party && typeof d.party.hex === 'string' && parse('#' + d.party.hex); if (!q) return;
+  if (q.sel) setParty(q.sel, +d.party.hours || 0, true);
+  else if (q.lvl === 'league') setParty(centre(q.i, q.j, 150), +d.party.hours || 0);  // an old 3-mile hex: the centre of its League, told back in the new form
+});
+function drawParty() {  // a red pennant planted on the party's hex centre, over everything; the hex itself shaded once it is big enough to see
+  if (!PARTY) return; const [sx, sy] = S(...ft(...PARTY.hex)), F = 100 * cam.s;
+  if (PBOX && !drawParty.q) drawParty.q = setTimeout(() => { drawParty.q = 0; partyBox(); }, 150);  // the hex's terrain once its tile lands
+  if (sx < -60 || sy < -60 || sx > W + 60 || sy > H + 60) return;
+  if (F > 20) { hexPath(sx, sy, F / SQ3); ctx.fillStyle = 'rgba(179,38,30,.16)'; ctx.fill(); ctx.strokeStyle = '#b3261e'; ctx.lineWidth = 2; ctx.stroke(); }
+  const h = 28; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(sx, sy - h); ctx.strokeStyle = '#f4efe1'; ctx.lineWidth = 5; ctx.stroke(); ctx.strokeStyle = '#2b2418'; ctx.lineWidth = 2; ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(sx + 1, sy - h); ctx.lineTo(sx + 18, sy - h + 6); ctx.lineTo(sx + 1, sy - h + 12); ctx.closePath(); ctx.fillStyle = '#b3261e'; ctx.fill(); ctx.strokeStyle = '#f4efe1'; ctx.lineWidth = 1.5; ctx.stroke();
+  ctx.beginPath(); ctx.arc(sx, sy, 3.5, 0, 7); ctx.fillStyle = '#2b2418'; ctx.fill(); ctx.strokeStyle = '#f4efe1'; ctx.lineWidth = 1.5; ctx.stroke();
+}
+
+// travel (Heph 2026-11-06, ATLAS_FORMAT.md "Travel"): each terrain type's time multiplier against the module's pace, and the roads'.
+// E9Atlas.travel(legs) adds up a route for the path tool to come: legs = [{mi, terrain: id, road?: class}] -> {hours, days, mi}
+const travelNote = t => t.travel === null ? 'no travel on foot' : t.travel === undefined ? '' : (() => { const p = (D.travel || {}).pace || {}, mph = (p.mi_per_hour || 3) / t.travel;
+  return `${t.travel === 1 ? 'normal pace' : '×' + t.travel + ' travel time'} · ${+mph.toFixed(1)} mi/h`; })();
+window.E9Atlas = { travel(legs) {
+  const P = (D.travel || {}).pace || {}, mph = P.mi_per_hour || 3, day = P.hours_per_day || 8, RD = (D.travel || {}).roads || {};
+  let hours = 0, mi = 0;
+  for (const g of legs) { const t = TYPES.find(x => x.id === g.terrain), k = g.road && RD[g.road] !== undefined ? RD[g.road] : t ? t.travel : 1;
+    if (k === null) return { hours: Infinity, days: Infinity, mi: mi + g.mi, blocked: g.terrain };  // no travel on foot (sea, lake): boats come later
+    hours += g.mi * (k ?? 1) / mph; mi += g.mi; }
+  return { hours, days: hours / day, mi };
+} };
+
+// the map key (Heph 2026-11-05: "get the map keys back"): terrain in view, then the places in view; a place zooms in like a click
+let KEYHTML = '';
+const PATREON = {{PATREON}};  // from links.json at build time; empty hides the link. In the footer (Heph 2026-11-07), no longer in the key
+if (PATREON) document.getElementById('support').innerHTML = `<a href="${String(PATREON).replace(/[&<>"]/g, '')}" target="_blank" rel="noopener">Support E9 on Patreon</a> · `;
+const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+function key(ts, ps) {
+  let h = '<h2>Terrain</h2>';
+  TYPES.forEach((t, k) => { if (!ts.has(k + 1)) return;
+    h += `<div class="row"><span class="sw" style="background-color:${t.color};background-image:url(${A}tiles/${t.tile}.png)">${t.icon ? `<img src="${A}tiles/${t.icon}.png" alt="">` : ''}</span><span>${esc(t.name)}<br><small>${travelNote(t)}</small></span></div>`; });
+  const RC = new Set((D.roads || []).map(r => r['class'])), RDm = (D.travel || {}).roads || {}, mph = ((D.travel || {}).pace || {}).mi_per_hour || 3;
+  if (RC.size) { h += '<h2>Roads</h2>';
+    for (const c of ['roman', 'local', 'trail']) if (RC.has(c)) { const st = ROAD_STYLE[c], k = RDm[c] ?? 1;
+      h += `<div class="row"><span class="sw"><svg width="30" height="10"><line x1="1" y1="5" x2="29" y2="5" stroke="${st.c}" stroke-width="${st.px}"${st.dash ? ' stroke-dasharray="5 3"' : ''}/></svg></span><span>${{ roman: 'Roman road', local: 'Local road', trail: 'Trail' }[c]}<br><small>${k === 1 ? 'normal pace' : '×' + k + ' travel time'} · ${+(mph / k).toFixed(1)} mi/h${c === 'roman' ? ' · bridges' : ' · fords'}</small></span></div>`; } }
+  if (ps.length) {
+    h += '<h2>Places</h2>';
+    // every view (Heph 2026-11-07): the places in view, with ▶ in front of one that has sub-places; clicking ▶ turns it to ▼ and lists them under it
+    const row = (p, d) => { const ks = kidsOf(p), on = OPEN.has(p.id);
+      let r = `<div class="row pl" data-id="${esc(p.id)}" style="padding-left:${d * 14}px">${ks.length ? `<button class="tg" data-id="${esc(p.id)}" aria-expanded="${on}" title="${on ? 'Hide' : 'Show'} the places inside">${on ? '▼' : '▶'}</button>` : '<span class="tg0"></span>'}<span class="sw">${p.icon ? `<img src="${A}tiles/${p.icon}.png" alt="">` : ''}</span><span>${esc(name(p.name))}<br><small>${esc(p.kind)}${p.book ? ' · ' + esc(p.book) : ''}</small>${p.encounter && window.E9Map ? `<br><button class="emb" data-id="${esc(p.id)}">${p.encounter.length > 1 ? p.encounter.length + ' encounter maps' : 'Encounter map'}</button>` : ''}</span></div>`;
+      if (on) for (const k of ks.slice().sort((a, b) => name(a.name).localeCompare(name(b.name)))) r += row(k, d + 1);
+      return r; };
+    for (const p of ps.slice().sort((a, b) => name(a.name).localeCompare(name(b.name)))) h += row(p, 0);
+  }
+  // creatures in the hex being looked at (the dashed one): their lair is a place in it, or a 100-ft hex address in it
+  const here = creaturesHere();
+  if (here.length) {
+    h += `<h2>Creatures here</h2>`;
+    for (const c of here) { const n = c.troupe && Object.values(c.troupe)[0];
+      h += `<div class="row pl cr" data-cr="${esc(c.id)}"><span>${esc(c.name)}${n ? ' <small>×' + esc(n) + '</small>' : ''}<br><small>${esc(c.kind === 'npc' ? 'NPC' : c.kind)}${c.is ? ' · ' + esc(c.is) : ''}${c.site_name ? ' · ' + esc(name(c.site_name)) : ''}</small></span></div>`; }
+  }
+  if (h !== KEYHTML) document.getElementById('key').innerHTML = KEYHTML = h;
+  KEYARGS = [ts, ps];
+}
+let KEYARGS = null; const OPEN = new Set();  // OPEN: places whose sub-places the key lists
+function poiById(id) {
+  if (!KIDS) { KIDS = { by: new Map(D.pois.map(p => [p.id, p])), kids: new Map() };
+    for (const p of D.pois) if (p.parent && KIDS.by.has(p.parent)) { if (!KIDS.kids.has(p.parent)) KIDS.kids.set(p.parent, []); KIDS.kids.get(p.parent).push(p); } }
+  return KIDS.by.get(id);
+}
+function kidsOf(p) { poiById(p.id); return KIDS.kids.get(p.id) || []; }
+document.getElementById('key').addEventListener('click', e => {
+  const tg = e.target.closest('.tg'); if (tg) { const id = tg.dataset.id; OPEN.has(id) ? OPEN.delete(id) : OPEN.add(id); if (KEYARGS) key(...KEYARGS); return; }
+  const em = e.target.closest('.emb'); if (em) { openMaps(D.pois.find(q => q.id === em.dataset.id)); return; }
+  const cr = e.target.closest('.cr'); if (cr) { const c = CR.find(x => x.id === cr.dataset.cr); if (c && window.E9Card) E9Card.show(c); return; }
+  const r = e.target.closest('.pl'); if (!r) return; const p = D.pois.find(q => q.id === r.dataset.id); if (!p) return;
+  goDown(...ft(...p.hex));
+});
+document.getElementById('keybtn').onclick = () => { document.body.classList.toggle('nokey'); redraw(); };
+if (matchMedia('(max-width:700px)').matches) document.body.classList.add('nokey');
+function creaturesHere() {
+  const own = LV[V.lvl].own; if (!own || !CR.length) return [];
+  const inHex = (C, R) => { const [i, j] = own === 1200 ? nearest(C, R, 1200) : nearest(C, R, own); return i === V.i && j === V.j; };
+  return CR.filter(c => {
+    if (c.site) { const p = D.pois.find(q => q.id === c.site); return p ? inHex(...p.hex) : false; }
+    if (c.hex && /^world:/i.test(c.hex)) { const q = parse('#' + c.hex); return q.sel ? inHex(...q.sel) : false; }
+    return false;
+  }).sort((a, b) => a.name.localeCompare(b.name));
+}
+function openMaps(p) { if (p && p.encounter && window.E9Map) E9Map.open(p.encounter, name(p.name)); }
+// at Furlong level (100-ft hexes) a place fills its own 100-ft hex and never spills out of it (Heph 2026-11-06): the icon in the upper part,
+// the name below it, shrunk to the hex's width there, or left to the key when the hex is too small to read it
+function fieldPoi(p, im, sx, sy) {
+  const F = 100 * cam.s, R = F / SQ3, half = y => R - Math.abs(y) / SQ3;  // flat-top hex: half its width at height y from the centre
+  const a = im ? Math.max(.87, im.naturalHeight / im.naturalWidth) : 1, s = Math.min(.5 * F / a, .5 * F), cy = sy - .1 * F;
+  if (im) ctx.drawImage(im, sx - s / 2, cy - s * a / 2, s, s * a); else { ctx.beginPath(); ctx.arc(sx, cy, Math.min(4, F / 10), 0, 7); ctx.fillStyle = '#2b2418'; ctx.fill(); }
+  const ty = .3 * F, label = name(p.name);
+  let fs = Math.min(14, F * .13); ctx.font = `bold ${fs}px Georgia`;
+  const room = 2 * half(ty + fs / 2) - 6, w = ctx.measureText(label).width;
+  if (w > room) { fs *= room / w; ctx.font = `bold ${fs}px Georgia`; }
+  if (fs < 8) return;
+  ctx.textAlign = 'center'; ctx.strokeStyle = '#f4efe1'; ctx.lineWidth = 3; ctx.strokeText(label, sx, sy + ty + fs * .35); ctx.fillStyle = '#2b2418'; ctx.fillText(label, sx, sy + ty + fs * .35);
+}
+// the place with an encounter map under a point, at Furlong level (ENCOUNTER_FORMAT.md section 4): its icon, or its 100-ft hex
+// anchored maps (ENCOUNTER_FORMAT.md section 3): the map square anchor.square sits on lattice hex anchor.hex (default: the place's
+// own hex) plus anchor.ft, turned anchor.rotate degrees clockwise. The Atlas draws the map's "surface" picture (its above-ground
+// art, Heph 2026-11-07), or its layers if it has none. Map files load once through the encounter viewer.
+let FOOT = [];
+const EMJ = {};
+function emap(id) {
+  if (id in EMJ) return EMJ[id]; EMJ[id] = null;
+  if (!window.E9Map || !E9Map.load) return null;
+  E9Map.load(id).then(m => {
+    if (!m.anchor) { EMJ[id] = false; return; }
+    const src = m.surface ? [Object.assign({ at: [0, 0], rotate: 0, opacity: 1 }, m.surface)] : m.layers.filter(L => L.show !== 'referee');  // its above-ground picture, else the battle map
+    const layers = src.map(L => { const im = new Image(); im.onload = redraw; im.src = MOD.base + 'encounter-maps/' + L.src; return Object.assign({}, L, { im }); });
+    EMJ[id] = { m, layers }; redraw();
+  }).catch(() => { EMJ[id] = false; });
+  return null;
+}
+function footprints() {
+  const out = []; if (V.lvl !== 'furlong' && V.lvl !== 'field') return out;
+  for (const p of D.pois) for (const ptr of p.encounter || []) {
+    const e = emap(typeof ptr === 'string' ? ptr : ptr.map); if (!e) continue;
+    const m = e.m, a = m.anchor, g = m.grid.ft, [hx, hy] = ft(...(a.hex || p.hex)), o = a.ft || [0, 0], sq = a.square || [m.size[0] / 2, m.size[1] / 2];
+    if (out.some(f => f.m === m)) continue;  // one map, drawn once, even with several pointers
+    out.push({ p, m, layers: e.layers, g, x: hx + o[0], y: hy + o[1], rot: (a.rotate || 0) * Math.PI / 180, rect: [-sq[0] * g, -sq[1] * g, m.size[0] * g, m.size[1] * g] });
+  }
+  return out;
+}
+function mapPoiAt(x, y) {
+  if (V.lvl !== 'furlong') return null; const [C, R] = hexAt(x, y, 1);
+  for (const f of FOOT) {  // anywhere on a drawn map opens it
+    const dx = x - f.x, dy = y - f.y, c = Math.cos(-f.rot), s = Math.sin(-f.rot), u = dx * c - dy * s, v = dx * s + dy * c;
+    if (u >= f.rect[0] && v >= f.rect[1] && u <= f.rect[0] + f.rect[2] && v <= f.rect[1] + f.rect[3]) return f.p; }
+  return D.pois.find(p => p.encounter && p.hex[0] === C && p.hex[1] === R) || null;  // a place is its whole 100-ft hex
+}
+function goDown(x, y) {  // Heph's rule: anything clicked zooms in one level, centred on it; at Furlong level a place opens its Encounter map
+  const N = LV[V.lvl].draw, [i, j] = hexAt(x, y, N);
+  if (V.lvl === 'furlong') {  // a click picks that 100-ft hex without moving the map; a place with an encounter map also opens it
+    if (T(i, j, 1)) { const h = addr(i, j); if (location.hash !== h) { STAY = true; location.hash = h; } }
+    openMaps(mapPoiAt(x, y)); return; }
+  if (!T(i, j, N)) return;
+  const [C, R] = N === 1 ? [i, j] : centre(i, j, N);
+  AIM = hexFt(i, j, N);
+  if (V.lvl === 'region') { const [mi, mj] = nearest(C, R, 1200); location.hash = marchAddr(mi, mj); }
+  else if (V.lvl === 'march') location.hash = leagueAddr(i, j);
+  else if (V.lvl === 'league') location.hash = fieldAddr(C, R);
+  else location.hash = addr(C, R);
+}
+function crumbs() {
+  const out = [`<a id="mod" href="#" title="Loaded module: ${esc(MOD.path)} (load another)"><b>${esc(D.title)}</b></a>`, `<a href="#world">Region</a>`];
+  let C, R;
+  if (V.lvl !== 'region') [C, R] = V.lvl === 'march' ? centre(V.i, V.j, 1200) : V.sel || centre(V.i, V.j, LV[V.lvl].own);
+  if (C !== undefined) {
+    const [mi, mj] = V.lvl === 'march' ? [V.i, V.j] : nearest(C, R, 1200); out.push(`<a href="${marchAddr(mi, mj)}">March ${marchAddr(mi, mj).slice(7)}</a>`);
+    if (V.lvl !== 'march') { const [li, lj] = nearest(C, R, 150); out.push(`<a href="${leagueAddr(li, lj)}">League ${leagueAddr(li, lj).slice(7)}</a>`); }
+    if (V.lvl === 'field' || V.lvl === 'furlong') { const [fi, fj] = V.lvl === 'field' ? [V.i, V.j] : nearest(C, R, 25), [fc, fr] = centre(fi, fj, 25); out.push(`<a href="${fieldAddr(fc, fr)}">Field ${addr(fc, fr).slice(12)}</a>`); }
+    if (V.lvl === 'furlong') { const [uc, ur] = centre(V.i, V.j, 5); out.push(`<a href="${addr(uc, ur)}">Furlong ${addr(uc, ur).slice(12)}</a>`); }
+  }
+  out.push({ region: '1 hex = 1 league (3 miles)', march: '1 hex = 1 league (3 miles)', league: '1 hex = 1 field (½ mile)', field: '1 hex = 1 furlong (500 ft)', furlong: '1 hex = 100 ft' }[V.lvl]);
+  document.getElementById('crumbs').innerHTML = out.join(' · ');
+}
+function go() {
+  V = parse(location.hash); fit(); crumbs(); redraw();
+  // an app that embeds the Atlas (the E9 Companion) hears where it is, for its own links ({type: 'e9-atlas', event: 'view', hash})
+  if (parent !== window) parent.postMessage({ type: 'e9-atlas', event: 'view', module: MOD.id, hash: location.hash || '#world' }, '*');
+}
+
+// ---- input: drag to pan, wheel or buttons to zoom, click a hex to go down a level ----
+let drag = null;
+cv.addEventListener('pointerdown', e => { drag = { x: e.clientX, y: e.clientY, cx: cam.x, cy: cam.y, moved: false }; cv.setPointerCapture(e.pointerId); });
+cv.addEventListener('pointermove', e => {
+  const b = cv.getBoundingClientRect(), [x, y] = F(e.clientX - b.left, e.clientY - b.top);
+  if (drag) { const dx = e.clientX - drag.x, dy = e.clientY - drag.y; if (Math.hypot(dx, dy) > 5) drag.moved = true;
+    if (drag.moved) { cam.x = drag.cx - dx / cam.s; cam.y = drag.cy - dy / cam.s; redraw(); } return; }
+  const N = LV[V.lvl].draw, [i, j] = hexAt(x, y, N), t = T(i, j, N), [C, R] = N === 1 ? [i, j] : centre(i, j, N);
+  const mp = mapPoiAt(x, y);
+  document.getElementById('hover').textContent = mp ? `${name(mp.name)} · click to open the encounter map` : t ? `${N === 1 ? addr(C, R) : N === 5 ? 'Furlong ' + addr(C, R).slice(12) : N === 25 ? 'Field ' + addr(C, R).slice(12) : leagueAddr(i, j)} · ${TYPES[t - 1].name}${(rd => rd ? ' · ' + (rd.name ? name(rd.name) + ', ' : '') + rd['class'] + (rd['class'] === 'trail' ? '' : ' road') : '')(RB.size && roadAt(x, y, Math.max(60, 6 / cam.s)))}` : '';
+});
+cv.addEventListener('pointerup', e => {
+  if (!drag) return; const moved = drag.moved; drag = null; if (moved) return;
+  const b = cv.getBoundingClientRect(), at = F(e.clientX - b.left, e.clientY - b.top); if (PLACE) placeParty(...at); else if (ROUTE) addStop(...at); else goDown(...at);
+});
+cv.addEventListener('wheel', e => { e.preventDefault(); zoom(e.deltaY < 0 ? 1.25 : .8, e); }, { passive: false });
+function zoom(f, e) {
+  const b = cv.getBoundingClientRect(), px = e ? e.clientX - b.left : W / 2, py = e ? e.clientY - b.top : H / 2, [x, y] = F(px, py);
+  cam.s *= f; clampCam(); cam.x = x - (px - W / 2) / cam.s; cam.y = y - (py - H / 2) / cam.s; clampCam(); redraw();
+}
+document.getElementById('in').onclick = () => zoom(1.25); document.getElementById('out').onclick = () => zoom(.8);
+document.getElementById('fit').onclick = () => { fit(); redraw(); };
+// grid colour (Heph 2026-11-07, Atlas 0.5.4): the larger hex outlines, white by default, remembered on this device
+let GRIDC = '#ffffff'; try { GRIDC = localStorage.getItem('e9-atlas-gridc') || GRIDC; } catch (e) {}
+document.getElementById('gridc').value = GRIDC;
+document.getElementById('gridc').oninput = e => { GRIDC = e.target.value; try { localStorage.setItem('e9-atlas-gridc', GRIDC); } catch (e_) {} redraw(); };
+let GRIDA = .8; try { GRIDA = +(localStorage.getItem('e9-atlas-grida') || .8); } catch (e) {}  // and their opacity, 0.1 to 1
+document.getElementById('grida').value = Math.round(GRIDA * 100);
+document.getElementById('grida').oninput = e => { GRIDA = e.target.value / 100; try { localStorage.setItem('e9-atlas-grida', GRIDA); } catch (e_) {} redraw(); };
+{ const btn = document.getElementById('gridbtn'), pan = document.getElementById('gridpanel');
+  const show = on => { pan.hidden = !on; btn.setAttribute('aria-expanded', on); };
+  btn.onclick = e => { e.stopPropagation(); show(pan.hidden); };
+  document.addEventListener('click', e => { if (!pan.hidden && !e.target.closest('#gridbox')) show(false); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && !pan.hidden) { show(false); btn.focus(); } }); }
+document.getElementById('edges').onchange = e => { EDGES = e.target.checked; redraw(); };
+// Language box (Atlas 0.5.3): the module's own languages (the built module.json "languages", drawn language first); hidden with fewer than two
+function langs() { const LS = MOD.languages || (Object.keys(D.names || {}).length ? [{ code: 'ga', label: 'Gaeilge' }, { code: 'en', label: 'English' }] : []), sel = document.getElementById('lang');
+  sel.innerHTML = LS.map(l => `<option value="${esc(l.code)}">${esc(l.label)}</option>`).join(''); sel.hidden = LS.length < 2;
+  let want = null; try { want = localStorage.getItem('mm-lang'); } catch (e) {}
+  lang = LS.some(l => l.code === want) ? want : LS.length ? LS[0].code : ''; sel.value = lang; }
+document.getElementById('lang').onchange = e => { lang = e.target.value; try { localStorage.setItem('mm-lang', lang); } catch (e_) {} crumbs(); redraw(); };
+addEventListener('hashchange', go); addEventListener('resize', redraw);
+
+// ---- modules (Heph 2026-11-06): the Atlas is one app at /atlas/ that loads any module listed in the site's mm.json ----
+// ?module=<id> picks one (else the last one opened, else the first with an atlas); A is that module's atlas folder
+let MODS = [], MOD = null, A = '';
+const SITE = new URL('../', location.href), store = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} } };
+const plainVer = v => String(v || '').replace(/^v/, '');
+function pick(id) { const u = new URL(location.href); u.searchParams.set('module', id); u.hash = ''; location.href = u.href; }
+function modList() {
+  document.getElementById('modlist').innerHTML = MODS.map(m => `<li><button data-id="${esc(m.id)}"${m.ok ? '' : ' disabled'}${m === MOD ? ' class="on"' : ''}>${esc(m.title)}<br><small>${esc(m.path)}${m.version ? ' · v' + esc(plainVer(m.version).split(' ')[0]) : ''}${m === MOD ? ' · loaded' : m.ok ? '' : ' · no atlas map'}</small></button></li>`).join('');
+}
+// Credits (Atlas 0.5.0): the Atlas's own tile art, then the module's data sources from its module.json "credits" (MODULE_FORMAT.md)
+const ATLAS_CREDITS = [{ what: 'Hex tile art', by: 'C. Martins (Hex Tiles: Fantasy; edited icons by Heph)', license: 'CC BY-SA 4.0', url: 'https://cmartins.itch.io/hex-tiles-fantasy' }];
+const LIC = { 'CC BY 4.0': 'https://creativecommons.org/licenses/by/4.0/', 'CC BY-SA 4.0': 'https://creativecommons.org/licenses/by-sa/4.0/', 'ODbL': 'https://opendatacommons.org/licenses/odbl/' };
+function creditList() {
+  const link = (t, u) => /^https:\/\//.test(u || '') ? `<a href="${esc(u)}" target="_blank" rel="noopener">${esc(t || '')}</a>` : esc(t || '');
+  const row = c => `<li>${link(c.what, c.url)}: ${esc(c.by || '')}${c.license ? ' (' + link(c.license, LIC[c.license]) + ')' : ''}</li>`;
+  const mod = (MOD && MOD.credits) || [];
+  document.getElementById('creditlist').innerHTML = ATLAS_CREDITS.map(row).join('') + (mod.length ? `<li><small>${esc(MOD.title)}</small></li>` + mod.map(row).join('') : '');
+}
+document.getElementById('creditbtn').onclick = e => { e.preventDefault(); creditList(); document.getElementById('credits').showModal(); };
+document.getElementById('creditclose').onclick = () => document.getElementById('credits').close();
+document.getElementById('modbtn').onclick = () => { modList(); document.getElementById('modules').showModal(); };
+document.getElementById('crumbs').addEventListener('click', e => { if (e.target.closest('#mod')) { e.preventDefault(); modList(); document.getElementById('modules').showModal(); } });  // the module's name loads another (Atlas 0.5.6; it used to open the old viewer)
+document.getElementById('modclose').onclick = () => document.getElementById('modules').close();
+document.getElementById('modlist').addEventListener('click', e => { const b = e.target.closest('button[data-id]'); if (b && !b.disabled) { if (MOD && b.dataset.id === MOD.id) document.getElementById('modules').close(); else pick(b.dataset.id); } });
+async function loadModules() {
+  const repo = await (await fetch(new URL('mm.json', SITE))).json();
+  MODS = await Promise.all((repo.modules || []).map(async m => {
+    const base = new URL(m.path.replace(/\/?$/, '/'), SITE).href, r = { id: m.id, path: m.path, title: m.id, version: '', base, ok: false };
+    try { const j = await (await fetch(base + 'module.json')).json(); Object.assign(r, { title: j.title || m.id, version: j.version || '', credits: j.credits || [], languages: j.languages, ok: !!j.atlas_map }); } catch (e) {}
+    return r; }));
+  const want = new URLSearchParams(location.search).get('module') || store.get('e9-atlas-module');
+  MOD = MODS.find(m => m.id === want && m.ok) || MODS.find(m => m.ok);
+}
+
+(async () => {
+  try { await loadModules(); } catch (e) {}
+  if (!MOD) { document.getElementById('crumbs').textContent = 'No module with an atlas map was found.'; if (MODS.length) { modList(); document.getElementById('modules').showModal(); } return; }
+  A = MOD.base + 'atlas/'; store.set('e9-atlas-module', MOD.id);
+  document.title = MOD.title + ' · E9 Atlas'; document.getElementById('modver').textContent = ' · ' + MOD.title + (MOD.version ? ' v' + plainVer(MOD.version).split(' ')[0] : '');
+  D = await (await fetch(A + 'map.json', { cache: 'no-cache' })).json(); TYPES = D.terrain.types; LBL = D.labels; D.names = D.names || {}; langs();  // always the current map.json: an old one has no tile cache
+  if (!D.cache) { document.getElementById('crumbs').textContent = 'This module\'s map was built for an older Atlas. Rebuild the site, then reload this page.'; return; }
+  TYPES.forEach((t, k) => { T_BG[k + 1] = t.tile; if (t.icon) T_ICON[k + 1] = t.icon; });
+  await loadCache();
+  let SC = {};
+  try { const j = await (await fetch(A + 'creatures.json')).json(); CR = j.creatures || []; SC = j.scenes || {}; } catch (e) { CR = []; }  // a module without creatures has no file
+  if (window.E9Map) Object.assign(E9Map, { base: MOD.base, module: MOD.id, creatures: CR, scenes: SC,
+    places: D.pois.filter(p => p.encounter).map(p => ({ get name() { return name(p.name); }, pointers: p.encounter, go: () => { location.hash = addr(...p.hex); } })) });  // ways out lead back to the place's 100-ft hex  // encounter maps sit in the module folder
+  loadParty(); smoothRivers(); go();
+})();
+</script></body></html>
