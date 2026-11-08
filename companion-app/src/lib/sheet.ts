@@ -20,7 +20,21 @@ export const FORMAT = 'materia-mundi-character';
 // Version 3 points items at equipment files ("ref": "mm:longsword") instead of copying
 // their numbers. Version 2 made armor and weapons items with their own properties;
 // version 1 had an armor rating and weapons as name, damage and melee/ranged. All load.
-export const FORMAT_VERSION = 3;
+// Version 4 adds knowledge and writes exported files in four parts (creature-parts.ts).
+export const FORMAT_VERSION = 4;
+
+// Something one creature knows, dated by the session it was learned in (WORKFLOWS.md, "Knowledge
+// per creature"). It points into a module by id: a 100-ft hex, a place slug or a handout, or is a note.
+export interface KnowledgeEntry {
+  session?: number;
+  module?: string;
+  hex?: string;
+  place?: string;
+  handout?: string;
+  // How it was learned ("scouted alone", "told by the abbot").
+  how?: string;
+  note?: string;
+}
 
 // Changes are tallies keyed by what they change: "agility": 1 improves Agility one
 // step (5+ to 4+), "agility": -1 worsens it, "hp": 3 adds hit points. A talent's
@@ -113,7 +127,23 @@ export interface SheetData {
     prepared: Preparation[];
   };
   followers: Follower[];
+  // What this character knows, oldest first.
+  knowledge: KnowledgeEntry[];
   notes: string;
+}
+
+export function readKnowledge(v: unknown): KnowledgeEntry[] {
+  if (!Array.isArray(v)) return [];
+  return v.flatMap((r) => {
+    if (!r || typeof r !== 'object') return [];
+    const o = r as Record<string, unknown>;
+    const e: KnowledgeEntry = {};
+    if (Number.isInteger(o.session) && (o.session as number) >= 0) e.session = o.session as number;
+    for (const k of ['module', 'hex', 'place', 'handout', 'how', 'note'] as const) {
+      if (typeof o[k] === 'string' && (o[k] as string).trim()) e[k] = (o[k] as string).trim();
+    }
+    return e.hex || e.place || e.handout || e.note ? [e] : [];
+  });
 }
 
 export const TALENT_ABILITIES = ['dex', 'int', 'wis', 'cha'] as const;
@@ -270,6 +300,7 @@ export function createSheet(d: DraftCharacter): SheetData {
       prepared: []
     },
     followers: [],
+    knowledge: [],
     notes: ''
   };
 }
@@ -512,9 +543,11 @@ export { blankFollowerFields as blankFollower };
 
 // Checks a sheet from a file (or storage) and returns a clean copy.
 // Hand-written files may use "+"/"-" tallies and "+3" hit points.
-export function readSheet(raw: unknown): SheetData {
+export function readSheet(raw: unknown, existing?: (id: string) => SheetData | undefined): SheetData {
   if (typeof raw !== 'object' || raw === null) throw new SheetError('This file has a character the app does not recognize');
-  const f = raw as Record<string, any>;
+  // Files in parts (stats, gear, knowledge, flavor) are joined first; a file holding only some
+  // parts takes the rest from the character with the same id already on the device.
+  const f = (isInParts(raw) ? joinParts(raw, existing) : raw) as Record<string, any>;
   const name = typeof f.name === 'string' ? f.name : '';
   if (f.format !== FORMAT) fail(name, 'not a Materia Mundi character sheet');
   const rules = findRules(f.rules);
@@ -591,15 +624,17 @@ export function readSheet(raw: unknown): SheetData {
       const base = blankFollowerFields(x?.kind === 'beast' ? 'beast' : 'follower');
       return { ...base, ...x, kind: base.kind, id: typeof x?.id === 'string' ? x.id : base.id, abilities: { ...base.abilities, ...x?.abilities } };
     }),
+    knowledge: readKnowledge(f.knowledge),
     notes: String(f.notes ?? '')
   };
 }
 
-// Accepts one sheet, a bundle from "Export all", or a plain array of sheets.
-export function importFile(data: unknown): SheetData[] {
+// Accepts one sheet, a bundle from "Export all", or a plain array of sheets. `existing` finds the
+// characters already on the device, which a file holding only some parts updates.
+export function importFile(data: unknown, existing?: (id: string) => SheetData | undefined): SheetData[] {
   const list = Array.isArray(data) ? data : (data as { characters?: unknown })?.characters ?? [data];
   if (!Array.isArray(list) || !list.length) throw new SheetError('No characters found in this file');
-  return list.map(readSheet);
+  return list.map((r) => readSheet(r, existing));
 }
 
 // The sheet as saved and exported: referenced items keep only their ref and what's
@@ -621,6 +656,79 @@ export function writeSheet(d: SheetData): object {
   };
 }
 
+// ---- Parts -------------------------------------------------------------------------------
+// An exported character is four parts, each of which can be saved or loaded on its own:
+//   stats      origin, class (XP and level-ups), abilities, followers
+//   gear       inventory: armor, weapons, items, what's worn and wielded, spellbook and preparations
+//   knowledge  what the character knows (dated entries)
+//   flavor     name, portrait, notes
+// Every file carries the header (format, version, id, rules, campaign, owner) so a part finds its
+// character. A file with all four is a whole character; CHARACTER_FORMAT.md has the layout.
+export const PARTS = ['stats', 'gear', 'knowledge', 'flavor'] as const;
+export type Part = (typeof PARTS)[number];
+
+// A flat sheet (version 3, and the device's own storage) has "knowledge" too, beside "class".
+export function isInParts(raw: unknown): boolean {
+  const o = raw as Record<string, unknown> | null;
+  if (!o || typeof o !== 'object') return false;
+  return 'stats' in o || 'gear' in o || 'flavor' in o || ('knowledge' in o && !('class' in o));
+}
+
+// The parts a file holds; none for a flat sheet.
+export function partsIn(raw: unknown): Part[] {
+  const o = raw as Record<string, unknown> | null;
+  return isInParts(o) ? PARTS.filter((p) => p in (o as object)) : [];
+}
+
+// Turns a file in parts back into the flat layout readSheet checks.
+function joinParts(raw: object, existing?: (id: string) => SheetData | undefined): Record<string, unknown> {
+  const f = raw as Record<string, any>;
+  const have = partsIn(f);
+  const old = typeof f.id === 'string' && existing ? existing(f.id) : undefined;
+  const missing = PARTS.filter((p) => !have.includes(p));
+  if (missing.includes('stats') && !old) {
+    const who = typeof f.flavor?.name === 'string' && f.flavor.name ? `"${f.flavor.name}"` : 'This character';
+    throw new SheetError(`${who}: this file holds only their ${have.join(' and ')}. Load it on a device that has the character, or load their stats first.`);
+  }
+  const base = old ? (writeSheet(old) as Record<string, any>) : {};
+  const stats = f.stats ?? {}, flavor = f.flavor ?? {};
+  return {
+    format: f.format,
+    version: f.version,
+    rules: f.rules ?? base.rules,
+    ...(f.campaign ?? base.campaign ? { campaign: f.campaign ?? base.campaign } : {}),
+    ...(f.owner ?? base.owner ? { owner: f.owner ?? base.owner } : {}),
+    id: f.id ?? base.id,
+    name: have.includes('flavor') ? flavor.name : base.name,
+    portrait: have.includes('flavor') ? flavor.portrait : base.portrait,
+    notes: have.includes('flavor') ? flavor.notes : base.notes,
+    origin: have.includes('stats') ? stats.origin : base.origin,
+    class: have.includes('stats') ? stats.class : base.class,
+    abilities: have.includes('stats') ? stats.abilities : base.abilities,
+    followers: have.includes('stats') ? stats.followers : base.followers,
+    inventory: have.includes('gear') ? f.gear : base.inventory,
+    knowledge: have.includes('knowledge') ? f.knowledge : base.knowledge
+  };
+}
+
+// The character as exported: the header and the parts asked for (all four by default).
+export function writeParts(d: SheetData, parts: readonly Part[] = PARTS): Record<string, unknown> {
+  const w = writeSheet(d) as Record<string, any>;
+  const out: Record<string, unknown> = {
+    format: FORMAT,
+    version: FORMAT_VERSION,
+    id: w.id,
+    rules: w.rules,
+    ...(w.campaign ? { campaign: w.campaign } : {}),
+    ...(w.owner ? { owner: w.owner } : {})
+  };
+  if (parts.includes('flavor')) out.flavor = { name: w.name, portrait: w.portrait, notes: w.notes };
+  if (parts.includes('stats')) out.stats = { origin: w.origin, class: w.class, abilities: w.abilities, followers: w.followers };
+  if (parts.includes('gear')) out.gear = w.inventory;
+  if (parts.includes('knowledge')) out.knowledge = w.knowledge;
+  return out;
+}
+
 export function exportBundle(list: SheetData[]) {
-  return { format: 'materia-mundi-characters', version: FORMAT_VERSION, characters: list.map(writeSheet) };
+  return { format: 'materia-mundi-characters', version: FORMAT_VERSION, characters: list.map((d) => writeParts(d)) };
 }

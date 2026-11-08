@@ -10,7 +10,7 @@ import {
   type EquipmentFileData, type EquipmentItem, type MagicEntry
 } from '../equipment/equipment';
 import { RULESETS, registerRuleset, type RulesetOptions } from '../rules/rules';
-import { writeSheet, type SheetData } from './sheet';
+import { FORMAT_VERSION, PARTS, writeParts, type Part, type SheetData } from './sheet';
 
 export const CAMPAIGN_FORMAT = 'materia-mundi-campaign';
 
@@ -170,10 +170,13 @@ function refsIn(v: unknown, out: Set<string>) {
 
 // A sheet for a file: its custom entries (not from a built-in file) travel with it, so
 // it opens on a device that doesn't have them.
-export function exportSheet(d: SheetData): object {
-  const sheet = writeSheet(d) as Record<string, unknown>;
+// A character as exported, in parts (all four, or only those asked for). Custom equipment the gear
+// uses travels with the gear.
+export function exportSheet(d: SheetData, parts: readonly Part[] = PARTS): object {
+  const sheet = writeParts(d, parts);
+  if (!parts.includes('gear')) return sheet;
   const refs = new Set<string>();
-  refsIn(sheet.inventory, refs);
+  refsIn(sheet.gear, refs);
   const custom: CustomEntry[] = [];
   for (const ref of refs) {
     const file = ref.slice(0, ref.indexOf(':'));
@@ -184,7 +187,7 @@ export function exportSheet(d: SheetData): object {
 }
 
 export function exportSheets(list: SheetData[]) {
-  return { format: 'materia-mundi-characters', version: 3, characters: list.map(exportSheet) };
+  return { format: 'materia-mundi-characters', version: FORMAT_VERSION, characters: list.map((d) => exportSheet(d)) };
 }
 
 // Before reading imported sheets: entries from this device's custom file go back into
