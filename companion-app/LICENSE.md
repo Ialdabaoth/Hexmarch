@@ -7,7 +7,7 @@ The E9 Companion's **code** (everything in this folder that is source, build con
 | Files | Source | Licence |
 | --- | --- | --- |
 | `modules/e9-core/rules.json`, `modules/e9-core/equipment.json` (the E9 module) | E9 System Reference Handbook | CC BY-SA 4.0 (credit and share-alike) |
-| `src/rules/options/mm-options.json`, `src/rules/options/e9mm-options.json`, `src/equipment/mm-equipment.json`, `src/equipment/e9mm-equipment.json`, `src/bestiary/mm-bestiary.json` | The Materia Mundi Compendium, with material derived from the System Reference Document 5.2 by Wizards of the Coast LLC (CC BY 4.0) and E9 material (CC BY-SA 4.0) | The Materia Mundi data is CC BY 4.0; the SRD 5.2 and E9 parts keep CC BY 4.0 and CC BY-SA 4.0 |
+| `modules/mm-core/` (the MM module: `rules.json`, `equipment.json`, `bestiary.json`, and its E9 option `e9/rules.json`, `e9/equipment.json`) | The Materia Mundi Compendium, with material derived from the System Reference Document 5.2 by Wizards of the Coast LLC (CC BY 4.0) and E9 material (CC BY-SA 4.0) | The Materia Mundi data is CC BY 4.0; the SRD 5.2 and E9 parts keep CC BY 4.0 and CC BY-SA 4.0 |
 
 The About screen in Settings carries the SRD 5.2, E9 and hex tile credits. A fork that ships these files must keep those credits.
 

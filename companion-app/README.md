@@ -36,7 +36,7 @@ is documented in [CHARACTER_FORMAT.md](CHARACTER_FORMAT.md).
 
 The app supports these rulesets, each one JSON file:
 
-- `src/rules/options/mm-options.json`: Materia Mundi, with page references to the first-edition Compendium.
+- `modules/mm-core/rules.json` (the MM module, at the repository root): Materia Mundi, with page references to the first-edition Compendium.
 - `modules/e9-core/rules.json` (the E9 module, at the repository root): E9, from the E9 System Reference Handbook (CC BY-SA 4.0).
 
 Each file holds the origin roll tables, origins and classes, plus a `mechanics` block for
@@ -47,7 +47,7 @@ an origin and a random class from that origin's list.
 
 Edit the files to change them (a test checks that every id they mention exists and that each
 roll table covers every face of its die). The engine that reads them is `src/rules/rules.ts`.
-A third file, `e9mm-options.json` ("E9 for Materia Mundi"), uses E9's rules with Materia
+A third file, `modules/mm-core/e9/rules.json` ("E9 for Materia Mundi", the MM module's E9 option, was `e9mm-options.json`), uses E9's rules with Materia
 Mundi's origins as race-as-class. An origin whose class list holds one combined class, like
 `"classes": ["fighter+dweomersmith"]`, always takes all of those classes at once. A combined
 class levels every part together on one XP track. It gets the best hit die bonus, every
@@ -67,7 +67,7 @@ register it in `RULESETS`, instead of editing the old one, so existing character
 ## Equipment data
 
 Armor, weapons, gear, mounts, services and magic live in equipment files in
-`src/equipment/`: `mm-equipment.json` (Compendium, with prices in silver, and its 48
+`src/equipment/` and the MM module: `modules/mm-core/equipment.json` (Compendium, with prices in silver, and its 48
 spells, 56 miracles, 40 glamours and 120 dweomers, each with a one-line summary and
 page number) and the E9 module's `modules/e9-core/equipment.json` (E9 arms and armor, no prices). Each ruleset names
 its files in `"equipment"`; `e9` and `e9mm` use E9's arms and armor with the

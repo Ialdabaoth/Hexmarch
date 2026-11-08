@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { RULESETS } from '../rules/rules';
 import { wikiForCantrip, wikiForClass, wikiForEntry, wikiForMonster, WIKI_BASE } from './wiki';
-import mmBestiary from '../bestiary/mm-bestiary.json';
+import mmBestiary from '../../../modules/mm-core/bestiary.json';
 
 describe('wiki links', () => {
   it('links equipment, magic, classes and creatures', () => {

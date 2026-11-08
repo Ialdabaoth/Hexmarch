@@ -3,7 +3,7 @@
 // point into them with references like "mm:giant-rat", as they do for equipment.
 
 import { roll, type Rng } from '../lib/dice';
-import mmBestiary from './mm-bestiary.json';
+import mmBestiary from '../../../modules/mm-core/bestiary.json';
 
 export type SaveKind = 'doom' | 'hold' | 'blast' | 'trick' | 'curse' | 'fear';
 export type AbilityKey = 'con' | 'str' | 'dex' | 'int' | 'wis' | 'cha';
