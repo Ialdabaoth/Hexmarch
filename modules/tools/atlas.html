@@ -467,7 +467,19 @@ function idb(fn) {
 }
 const idbGet = k => idb((db, ok, no) => { const r = db.transaction('keyval').objectStore('keyval').get(k); r.onsuccess = () => { db.close(); ok(r.result); }; r.onerror = () => { db.close(); no(r.error); }; });
 const idbSet = (k, v) => idb((db, ok, no) => { const t = db.transaction('keyval', 'readwrite'); t.objectStore('keyval').put(v, k); t.oncomplete = () => { db.close(); ok(); }; t.onerror = () => { db.close(); no(t.error); }; });
-async function deviceState() { const set = await idbGet('settings'), c = set && typeof set.campaign === 'string' ? set.campaign : '', raw = await idbGet('state:' + c); return raw ? csRead(raw) : null; }
+// A link may name the campaign (E9 Scribe's "Open in the Atlas", Atlas 0.5.14): ?campaign=<the Companion's link for it>, and ?place=site:<id> puts the party
+// on that place's hex when the campaign has no party yet (a new campaign's start). The settings and the campaigns list hold links; state files go by campaign id.
+const ASK = new URLSearchParams(location.search), ASK_CAMPAIGN = ASK.get('campaign'), ASK_PLACE = ASK.get('place');
+async function campaignIdOf(url) {
+  if (!url) return '';
+  const cs = await idbGet('campaigns'), c = cs && cs[url];
+  if (c && c.campaign && typeof c.campaign.id === 'string') return c.campaign.id;
+  const m = url.match(/^scribe:([a-z0-9-]{1,80})$/); return m ? m[1] : url;  // a campaign saved by Scribe that the Companion hasn't opened yet
+}
+async function deviceState() {
+  const set = await idbGet('settings'), url = ASK_CAMPAIGN !== null ? ASK_CAMPAIGN : set && typeof set.campaign === 'string' ? set.campaign : '';
+  const raw = await idbGet('state:' + await campaignIdOf(url)); return raw ? csRead(raw) : null;
+}
 async function loadState() {
   if (CS_SRC === 'host') return;
   try { const s = await deviceState(); if (s) { CS = s; CS_SRC = 'device'; } } catch (e) {}
@@ -477,6 +489,7 @@ async function loadState() {
     if (p && typeof p.hex === 'string' && CS_ADDR.test(p.hex)) { CS = csBlank(); CS.party = { base: MOD.base, module: MOD.id, map: 'atlas', hex: p.hex, label: p.hex.slice(6), hours: +p.hours || 0 }; CS_SRC = 'local'; store.set(CS_KEY, JSON.stringify(CS)); }
   } catch (e) {}
   fromState();
+  if (CS && CS_SRC === 'device' && !CS.party && ASK_PLACE) { const m = ASK_PLACE.match(/^site:([a-z0-9-]{1,80})$/), p = m && D.pois.find(q => q.id === m[1]); if (p) await setParty(p.hex, 0); }
 }
 function fromState() {  // the marker from the state file: the party shows only on its own module's map
   const p = CS && CS.party, q = p && p.module === MOD.id && parse('#' + p.hex);
