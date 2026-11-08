@@ -1,19 +1,21 @@
 #!/usr/bin/env python3
-"""Write the E9 Scribe app into <site>/scribe/ (Scribe 0.1.0, Heph 2026-11-08: its own app at /scribe/ from day one).
+"""Put the E9 Scribe app into <site>/scribe/ (Heph 2026-11-08: its own app at /scribe/ from day one).
 
-usage: python3 -I scribe/scribe_app.py <site dir>
+usage: (cd scribe && npm ci && npm run build) && python3 -I scribe/scribe_app.py <site dir>
   e.g. python3 -I scribe/scribe_app.py companion-app/dist
 
-Writes index.html (version stamped from scribe/VERSION), its own install manifest and its icons, so Scribe installs
-as a separate app from the Companion and the Atlas (start and scope are its own folder; the app id defaults to the start URL).
+Copies the built app (scribe/dist/, Vite + Svelte since Scribe 0.1.2) and adds its own install manifest and icons,
+so Scribe installs as a separate app from the Companion and the Atlas (start and scope are its own folder; the app
+id defaults to the start URL).
 """
 import json, os, shutil, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__)); REPO = os.path.dirname(HERE)
 site = os.path.abspath(sys.argv[1]); out = os.path.join(site, 'scribe')
 VERSION = open(os.path.join(HERE, 'VERSION')).read().strip()
-os.makedirs(out, exist_ok=True)
-open(os.path.join(out, 'index.html'), 'w').write(open(os.path.join(HERE, 'index.html')).read().replace('{{SCRIBE}}', VERSION))
+DIST = os.path.join(HERE, 'dist')
+if not os.path.isfile(os.path.join(DIST, 'index.html')): sys.exit('scribe/dist/ is missing: run npm ci && npm run build in scribe/ first')
+shutil.copytree(DIST, out, dirs_exist_ok=True)
 ICONS = os.path.join(REPO, 'icons')  # icons/scribe.svg and its PNG renders (icons/README.md)
 shutil.copy(os.path.join(ICONS, 'scribe.svg'), os.path.join(out, 'icon.svg'))
 shutil.copy(os.path.join(ICONS, 'png', 'scribe-180.png'), os.path.join(out, 'apple-touch-icon.png'))
