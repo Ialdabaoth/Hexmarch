@@ -2,10 +2,11 @@
 
 The E9 Atlas app and map tools (`modules/tools/`). The version lives in `ATLAS_VERSION`; every merged PR that touches the tools bumps the patch, each planned sprint bumps the minor. A module's own version is separate (see each module's CHANGELOG.md).
 
-## 0.5.x (in development, now 0.5.9)
+## 0.5.x (in development, now 0.5.10)
 
 Sprint: git and VTT integration (campaign repo, shared state file, referee and player views, VTT polish). See "Queued for 0.5" below.
 
+- 0.5.10: the installed Atlas is named "⬢ Atlas" (short name "Atlas"), matching "⬢ Companion" and "⬢ Scribe" (Heph 2026-11-08).
 - 0.5.9: the Atlas installs as its own app. It has its own install manifest (`atlas/manifest.webmanifest`: E9 Atlas, its icon, start and scope its own folder); before, installing it from the browser found the Companion's manifest, which covers the whole site, and installed the Companion.
 - 0.5.8: the Atlas moved to the apps repository and reads modules from `?site=`, else the data site in `site.json` (2026-11-08); it has its own icon, the map's heavy woods hex in the gold hexagon (`icons/atlas.svg`, C. Martins tiles, CC BY-SA 4.0).
 - 0.5.7: modules publish no map renders (Heph 2026-11-08). The module page at `<site>/modules/<id>/` is now the module's text and reference: places by book (sub-places under their parent), scenes by place, creatures and NPCs, factions, credits and the module's changelog, with a search box and the Language box. Each place has **Show on the map**, which opens it in the Atlas at a new `#site:<slug>` address, and its encounter maps open in the same encounter viewer as in the Atlas. Old map links to the page (`#world`, `#l-…`, `#march-…`, `#atlas-…`, `#p-…`) still forward to the Atlas. The build stops writing `maps/*.svg`; the March and League page tools still run in the work folder for the print PDFs and the manifest's index data. The manifest loses `world.map` and `leagues[].map`. Fixed: factions from several encounter files are now all kept (the last file's list used to replace the others). The tools' leftover CC0 defaults now say CC BY 4.0. This changes build.py, so the first build redraws every module's maps once.
