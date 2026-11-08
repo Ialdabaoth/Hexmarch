@@ -6,6 +6,7 @@ The version lives in `package.json` (see README "Versioning"). Every merged PR b
 
 Sprint: git and VTT integration.
 
+- 0.5.3: the app's code is CC0 1.0, like the E9 Atlas tools (LICENSE.md here and at the repository root); its rules data keeps its sources' licences.
 - 0.5.2: Campaign › Maps is the E9 Atlas itself (its own key, Route and Party tools) instead of the old module viewer; the party's place is kept from the Atlas's Party marker, and a party placed on the old 3-mile grid moves to the centre of its League. Manage › Modules › Open opens the Atlas.
 - 0.5.1: the empty-maps hint names Beyond the Pale as The Isle of Mists, 1422.
 

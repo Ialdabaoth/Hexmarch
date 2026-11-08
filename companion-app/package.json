@@ -1,7 +1,8 @@
 {
   "name": "materia-mundi-companion",
   "private": true,
-  "version": "0.5.2",
+  "version": "0.5.3",
+  "license": "CC0-1.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
