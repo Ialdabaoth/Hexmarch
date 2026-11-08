@@ -110,6 +110,8 @@ Bump `version` in both `package.json` and `package-lock.json` in the PR itself.
 
 ## Licensing
 
+The app's code is CC0 1.0, like the E9 Atlas tools; its rules data files keep their sources' licences. Details in [LICENSE.md](LICENSE.md).
+
 The book includes material derived from the System Reference Document 5.2 by Wizards of the Coast LLC
 (CC BY 4.0); the app's About screen carries that attribution.
 
