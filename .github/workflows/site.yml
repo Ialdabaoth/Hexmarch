@@ -33,7 +33,9 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: companion-app/package-lock.json
+          cache-dependency-path: |
+            companion-app/package-lock.json
+            scribe/package-lock.json
       - name: E9 Companion
         working-directory: companion-app
         run: |
@@ -49,7 +51,13 @@ jobs:
       - name: E9 Atlas
         run: python3 -I modules/tools/atlas_app.py companion-app/dist
       - name: E9 Scribe
-        run: python3 -I scribe/scribe_app.py companion-app/dist
+        working-directory: scribe
+        run: |
+          npm ci
+          npm run check
+          npm test
+          npm run build
+          python3 -I scribe_app.py ../companion-app/dist
       - uses: actions/upload-pages-artifact@v3
         if: github.event_name != 'pull_request'
         with:

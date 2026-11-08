@@ -255,6 +255,9 @@ M = {'format': 'mm-module/1', 'id': MOD['id'], 'title': MOD['title'], 'short': M
      **({'encounters': 'encounters.json', 'bestiary': {r: f'bestiary/{r}.json' for r in BEST}} if ENC else {}),
      **({'encounter_maps': EMAPS} if EMAPS else {}),
      **({'atlas_map': 'atlas/map.json'} if os.path.isdir(out + '/atlas') else {}),  # the E9 Atlas app (<site>/atlas/) lists modules that have one
+     'semver': MOD['version'],  # the plain version (`version` above is the display stamp); E9 Scribe resolves dependencies with it (Atlas 0.5.13)
+     # dependencies and campaign starts, as the module source has them (WORKFLOWS.md "Dependencies", SCRIBE.md "Starts")
+     **{k: MOD[k] for k in ('kind', 'system', 'requires', 'recommends', 'conflicts', 'overrides', 'starts') if k in MOD},
      'credits': MOD.get('credits', []),  # data sources to credit wherever the map is shown [{what, by, license, url}] (Atlas 0.5.0)
      'names': MOD.get('names', {}),  # label translations {name as on the map: {<code>: ...}}; the viewer's Language box uses them
      'languages': LANGS,  # the Language box's choices, drawn language first (Atlas 0.5.3)

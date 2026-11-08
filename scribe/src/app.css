@@ -1,0 +1,29 @@
+:root {
+  --bg: #f4ecdc; --card: #fffaf0; --ink: #2b2118; --muted: #6b5d4d; --line: #d9ccb4; --gold: #b8892e; --accent: #7a3b1d; --bad: #9b2c1c;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #1d1712; --card: #28201a; --ink: #f4ecdc; --muted: #b9a990; --line: #4a3d30; --gold: #e8c77a; --accent: #e8a86b; --bad: #f08a76; color-scheme: dark; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.5 Georgia, 'Times New Roman', serif; }
+main { max-width: 46rem; margin: 0 auto; padding: 16px 16px 64px; }
+header { display: flex; align-items: center; gap: 12px; margin: 8px 0 20px; }
+header img { width: 48px; height: 48px; }
+h1 { margin: 0; font-size: 1.6rem; }
+h2 { font-size: 1.15rem; margin: 0 0 .5rem; }
+.small { font-size: .875rem; }
+.muted { color: var(--muted); }
+section { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; margin: 0 0 14px; }
+label.opt { display: flex; gap: 10px; align-items: flex-start; padding: 8px 0; border-top: 1px solid var(--line); cursor: pointer; }
+label.opt:first-of-type { border-top: 0; }
+label.opt input { margin-top: .3rem; }
+input[type=text], input[type=url], input[type=number], select { font: inherit; color: inherit; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; width: 100%; }
+.row { display: grid; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); gap: 10px; margin-top: 8px; }
+button, a.button { font: inherit; color: var(--bg); background: var(--accent); border: 0; border-radius: 6px; padding: 7px 12px; cursor: pointer; text-decoration: none; display: inline-block; margin: 4px 6px 0 0; }
+button.quiet { background: transparent; color: var(--accent); border: 1px solid var(--line); }
+.bad { color: var(--bad); }
+ul.problems { margin: .3rem 0 0; padding-left: 1.2rem; }
+footer { margin-top: 24px; text-align: center; }
+footer a { color: inherit; margin: 0 .6rem; }
+details summary { cursor: pointer; }
