@@ -353,7 +353,7 @@ function draw() {
   // place ranks (Heph 2026-11-06): 1 shows from the Region view, 2 from March, 3 from League down; then, most important first,
   // a place whose icon (and name) would overlap one already drawn waits for a closer zoom
   const maxRank = { region: 1, march: 2 }[V.lvl] || 3, put = [], bh = isz + (V.lvl === 'region' ? 0 : fs * 1.6);
-  POIS = POIS || D.pois.filter(p => !p.parent || !poiById(p.parent)).sort((a, b) => (a.rank || 3) - (b.rank || 3));  // top-level places; sub-places hang off them
+  POIS = POIS || D.pois.filter(p => shown(p) && (!p.parent || !poiById(p.parent) || !shown(poiById(p.parent)))).sort((a, b) => (a.rank || 3) - (b.rank || 3));  // top-level places; sub-places hang off them
   // PoI hierarchies (Atlas 0.5.1, ATLAS_FORMAT.md "PoI hierarchies"): a place with sub-places (cave mouths, city gates) is drawn as itself
   // while its sub-places would crowd each other on screen, and as its sub-places once they are two icons apart (always at Furlong, where each fills its own hex)
   const apart = ks => V.lvl === 'furlong' || ks.every((a, i) => ks.every((b, j) => { if (j <= i) return true; const [ax, ay] = S(...ft(...a.hex)), [bx, by] = S(...ft(...b.hex)); return Math.hypot(ax - bx, ay - by) >= 2 * isz; }));  // two icons apart, so names fit too
@@ -386,7 +386,7 @@ function draw() {
       ctx.setLineDash([]); ctx.globalAlpha = 1; } }
   if (own) { const [sx, sy] = S(...hexFt(V.i, V.j, own)); hexPath(sx, sy, own * 100 * cam.s / SQ3); if (!EDGES) ctx.setLineDash([9, 5]); ctx.strokeStyle = '#b3261e'; ctx.lineWidth = 2.5; ctx.stroke(); ctx.setLineDash([]); }
   if (V.sel) { const [sx, sy] = S(...ft(...V.sel)); hexPath(sx, sy, 100 * cam.s / SQ3); ctx.strokeStyle = '#b3261e'; ctx.lineWidth = 3; ctx.stroke(); }
-  drawRoute(); drawParty();
+  drawKnown(); drawRoute(); drawParty();
   keepNear();
 }
 
@@ -481,9 +481,69 @@ async function loadState() {
 function fromState() {  // the marker from the state file: the party shows only on its own module's map
   const p = CS && CS.party, q = p && p.module === MOD.id && parse('#' + p.hex);
   PARTY = q && q.sel ? { hex: q.sel, hours: p.hours || 0 } : null; FOUND = new Set(CS && CS.revealed[MOD.id] ? CS.revealed[MOD.id].places : []);
-  partyBox(); redraw();
+  know();  // what everyone knows is part of every creature's view
 }
 let FOUND = new Set();
+
+// ---- character mode (Heph 2026-11-08, WORKFLOWS.md "Knowledge per creature"; Atlas 0.5.12): "what does this one creature know?"
+// The map shown as one creature sees it: only the places it knows, and the 100-ft hexes it knows marked in gold, each with what
+// everyone knows (the state's revealed set). Knowledge lives in the creature's own record (CHARACTER_FORMAT.md "Knowledge"):
+// the sheets the Companion hands over, the Companion's sheets on this device, or a character or creature file loaded here.
+// It is a view, not a lock: anyone at the map can switch back to the referee's view. Showing several creatures at once comes later.
+let WHO = [], WHO_SRC = '', AS = '', KNOW = null;  // WHO: [{id, name, owner, knowledge}]; AS: the id shown as ('' = the referee, everything)
+const WHO_KEY = 'e9-atlas-who';
+function whoRead(r) {  // a sheet as the device keeps it, a whole character or creature file, or one part of one (a knowledge part has no name)
+  if (!r || typeof r !== 'object' || typeof r.id !== 'string' || !r.id) return null;
+  const s = v => typeof v === 'string' ? v.trim() : '', nm = s(r.name) || s(r.flavor && r.flavor.name);
+  const knowledge = (Array.isArray(r.knowledge) ? r.knowledge : []).flatMap(e => e && typeof e === 'object' ? [{ module: s(e.module), hex: s(e.hex), place: s(e.place) }] : []).filter(e => e.hex || e.place);
+  return { id: r.id, name: nm, owner: r.owner === 'referee' ? 'referee' : '', knowledge, has: Array.isArray(r.knowledge) };
+}
+const whoFile = d => (Array.isArray(d) ? d : d && Array.isArray(d.characters) ? d.characters : d && Array.isArray(d.creatures) ? d.creatures : [d]).map(whoRead).filter(Boolean);
+const whoName = w => w.name || 'Unnamed';
+function whoMerge(list, add) { for (const w of add) { const o = list.find(x => x.id === w.id); if (!o) list.push(w); else { if (w.name) o.name = w.name; if (w.has) { o.knowledge = w.knowledge; o.has = true; } } } return list; }
+async function loadWho() {
+  if (WHO_SRC !== 'host') {
+    WHO = []; WHO_SRC = '';
+    try { const raw = await idbGet('sheets'); if (Array.isArray(raw) && raw.length) { WHO = whoFile(raw); WHO_SRC = 'device'; } } catch (e) {}
+    try { const kept = whoFile(JSON.parse(store.get(WHO_KEY) || '[]')); if (kept.length) { whoMerge(WHO, kept); WHO_SRC = WHO_SRC || 'local'; } } catch (e) {}
+  }
+  const q = new URLSearchParams(location.search).get('as'); AS = q !== null ? q : store.get('e9-atlas-as:' + MOD.id) || '';
+  know();
+}
+function know() {
+  const w = AS && WHO.find(x => x.id === AS), mine = e => !e.module || e.module === MOD.id, r = CS && CS.revealed[MOD.id] || { hexes: [], places: [] };
+  KNOW = w ? { who: w, places: new Set([...r.places, ...w.knowledge.filter(e => mine(e) && e.place).map(e => e.place)]),
+    hexes: [...new Set([...r.hexes, ...w.knowledge.filter(e => mine(e) && CS_ADDR.test(e.hex)).map(e => e.hex)])].map(h => parse('#' + h).sel).filter(Boolean) } : null;
+  POIS = null; if (D) { crumbs(); partyBox(); redraw(); }
+}
+function setAs(id, quiet) {
+  AS = id; store.set('e9-atlas-as:' + MOD.id, id); know();
+  if (!quiet && parent !== window) parent.postMessage({ type: 'e9-atlas', event: 'as', module: MOD.id, id }, '*');
+}
+const shown = p => !KNOW || KNOW.places.has(p.id);  // a place drawn and listed in this view
+function asLine() {
+  const opt = (v, t) => `<option value="${esc(v)}"${v === AS ? ' selected' : ''}>${esc(t)}</option>`;
+  const n = KNOW && D.pois.filter(shown).length, h = KNOW && KNOW.hexes.length;
+  return '<hr><small>Show the map as</small> <select data-as aria-label="Show the map as">' + opt('', 'Referee (everything)')
+    + WHO.map(w => opt(w.id, whoName(w) + (w.owner === 'referee' ? ' (NPC)' : ''))).join('') + (AS && !KNOW ? opt(AS, '(not loaded)') : '') + '</select>'
+    + (KNOW ? `<br><small>${esc(whoName(KNOW.who))} knows ${n} place${n === 1 ? '' : 's'} and ${h} hex${h === 1 ? '' : 'es'} here, with what everyone knows</small>` : '')
+    + (WHO_SRC === 'host' ? '' : '<br><button data-p="who">Load character file…</button>');
+}
+function loadWhoFile() {  // a character (whole, or its knowledge part), a file of characters, or a creature record: kept in this browser
+  const inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.json,application/json';
+  inp.onchange = async () => { const f = inp.files && inp.files[0]; if (!f) return;
+    try { const add = whoFile(JSON.parse(await f.text())); if (!add.length) throw new Error("That file holds no character or creature with an id.");
+      let kept = []; try { kept = whoFile(JSON.parse(store.get(WHO_KEY) || '[]')); } catch (e) {}
+      store.set(WHO_KEY, JSON.stringify(whoMerge(kept, add))); whoMerge(WHO, add); WHO_SRC = WHO_SRC || 'local';
+      setAs(add.length === 1 ? add[0].id : AS);
+    } catch (e) { alert(e.message || 'That file could not be read.'); } };
+  inp.click();
+}
+function drawKnown() {  // the 100-ft hexes this creature knows, in gold, never smaller than a dot
+  if (!KNOW) return; const r = Math.max(3, 100 * cam.s / SQ3);
+  ctx.fillStyle = 'rgba(201,154,46,.3)'; ctx.strokeStyle = '#a87b16'; ctx.lineWidth = 1.5;
+  for (const [C, R] of KNOW.hexes) { const [sx, sy] = S(...ft(C, R)); if (sx < -r || sy < -r || sx > W + r || sy > H + r) continue; hexPath(sx, sy, r); ctx.fill(); ctx.stroke(); }
+}
 function csMove(s, party) {  // STATE_FORMAT.md "How it changes": one revision on; travel time passes on the clock; the arrival hex counts as seen
   const n = { ...s, revision: s.revision + 1, updated: new Date().toISOString() };
   if (!party) { n.party = null; return n; }
@@ -531,11 +591,11 @@ function partyBox() {
   const box = document.getElementById('party'); box.hidden = !(PBOX || PLACE); document.getElementById('partybtn').classList.toggle('on', !box.hidden); if (box.hidden) return;
   const P = (D.travel || {}).pace || {}, day = P.hours_per_day || 8;
   if (PLACE) { box.innerHTML = '<b>Party</b> · click a hex to put the party there. <small>Esc cancels.</small><br><button data-p="cancel">Cancel</button>'; return; }
-  if (!PARTY) { box.innerHTML = `<b>Party</b> · not on this map.<br><button data-p="place">Place the party</button><button data-p="close">Close</button><hr>${stateLine()}`; return; }
+  if (!PARTY) { box.innerHTML = `<b>Party</b> · not on this map.<br><button data-p="place">Place the party</button><button data-p="close">Close</button><hr>${stateLine()}${asLine()}`; return; }
   const [C, R] = PARTY.hex, t = T(C, R, 1), h = addr(C, R), lbl = h.slice(7);
   box.innerHTML = `<b>Party</b> · at <a href="${h}">${lbl}</a>${t ? ' · ' + esc(TYPES[t - 1].name.toLowerCase()) : ''}<br><small>Travelled ${hm(PARTY.hours)}${PARTY.hours >= day / 2 ? ` (${(PARTY.hours / day).toFixed(1)} days of ${day} h)` : ''}</small><br>`
     + '<button data-p="go">Go to</button><button data-p="place">Move</button><button data-p="reset" title="Set the travel time back to zero (the campaign clock keeps its time)">Reset time</button><button data-p="remove">Remove</button><button data-p="close">Close</button>'
-    + `<hr>${stateLine()}`;
+    + `<hr>${stateLine()}${asLine()}`;
 }
 function saveFile() {  // the state file as written: plain JSON, as the Companion saves it (Campaign › State)
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(CS, null, 2) + '\n'], { type: 'application/json' })); a.download = 'state.json'; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
@@ -553,16 +613,20 @@ function loadFile() {
 document.getElementById('party').addEventListener('click', e => { const b = e.target.closest('button[data-p]'); if (!b) return; const a = b.dataset.p;
   if (a === 'place') { PLACE = true; hoverHint(); } else if (a === 'cancel') { PLACE = false; hoverHint(); } else if (a === 'close') PBOX = false;
   else if (a === 'go') location.hash = addr(...PARTY.hex); else if (a === 'reset') setParty(PARTY.hex, 0); else if (a === 'remove') setParty(null);
-  else if (a === 'save') { if (CS) saveFile(); return; } else if (a === 'load') { loadFile(); return; }
+  else if (a === 'save') { if (CS) saveFile(); return; } else if (a === 'load') { loadFile(); return; } else if (a === 'who') { loadWhoFile(); return; }
   partyBox(); });
+document.getElementById('party').addEventListener('change', e => { if (e.target.matches('select[data-as]')) setAs(e.target.value); });
 document.getElementById('partybtn').onclick = () => { if (PBOX || PLACE) { PBOX = PLACE = false; hoverHint(); } else { PBOX = true; if (!PARTY && !CS) { PLACE = true; hoverHint(); } } partyBox(); };
 // the Companion's own tab may change the file: read it again when this tab comes back
-document.addEventListener('visibilitychange', () => { if (!document.hidden && MOD && D && CS_SRC === 'device') deviceState().then(s => { if (s && (!CS || s.campaign !== CS.campaign || s.revision !== CS.revision)) { CS = s; fromState(); } }).catch(() => {}); });
+document.addEventListener('visibilitychange', () => { if (!document.hidden && MOD && D && CS_SRC === 'device') deviceState().then(s => { if (s && (!CS || s.campaign !== CS.campaign || s.revision !== CS.revision)) { CS = s; fromState(); } }).catch(() => {}); if (!document.hidden && MOD && D && WHO_SRC !== 'host') loadWho(); });
 // an app that embeds the Atlas may show an address ({type: 'e9-atlas', show: '#world:LLLL:HHHH'}, Atlas 0.5.6)
 addEventListener('message', e => { const d = e.data; if (D && d && d.type === 'e9-atlas' && typeof d.show === 'string' && /^#[\w:-]{0,60}$/.test(d.show)) location.hash = d.show; });
 // an app that embeds the Atlas sends the whole state file ({type: 'e9-atlas', state}, Atlas 0.5.11) on load and after each change; it keeps
 // the file, so the Atlas only tells it of party moves. An older app sends just the party ({party: {hex, hours} | null}); it is not told back
 addEventListener('message', e => { const d = e.data; if (e.source !== parent || parent === window || !D || !MOD || !d || d.type !== 'e9-atlas') return;
+  // and the creatures it keeps, with what each knows ({characters: [{id, name, owner, knowledge}]}), and which one to show the map as ({as: id | ''}), Atlas 0.5.12
+  if ('characters' in d) { WHO = whoFile(Array.isArray(d.characters) ? d.characters : []); WHO_SRC = 'host'; know(); }
+  if (typeof d.as === 'string') setAs(d.as, true);
   if ('state' in d) { try { CS = csRead(d.state); CS_SRC = 'host'; fromState(); } catch (x) {} return; }
   if (!('party' in d)) return;
   if (d.party === null) { setParty(null, 0, true); return; }
@@ -632,7 +696,7 @@ function poiById(id) {
     for (const p of D.pois) if (p.parent && KIDS.by.has(p.parent)) { if (!KIDS.kids.has(p.parent)) KIDS.kids.set(p.parent, []); KIDS.kids.get(p.parent).push(p); } }
   return KIDS.by.get(id);
 }
-function kidsOf(p) { poiById(p.id); return KIDS.kids.get(p.id) || []; }
+function kidsOf(p) { poiById(p.id); return (KIDS.kids.get(p.id) || []).filter(shown); }  // in character mode, only the sub-places it knows
 document.getElementById('key').addEventListener('click', e => {
   const tg = e.target.closest('.tg'); if (tg) { const id = tg.dataset.id; OPEN.has(id) ? OPEN.delete(id) : OPEN.add(id); if (KEYARGS) key(...KEYARGS); return; }
   const em = e.target.closest('.emb'); if (em) { openMaps(D.pois.find(q => q.id === em.dataset.id)); return; }
@@ -643,7 +707,7 @@ document.getElementById('key').addEventListener('click', e => {
 document.getElementById('keybtn').onclick = () => { document.body.classList.toggle('nokey'); redraw(); };
 if (matchMedia('(max-width:700px)').matches) document.body.classList.add('nokey');
 function creaturesHere() {
-  const own = LV[V.lvl].own; if (!own || !CR.length) return [];
+  const own = LV[V.lvl].own; if (!own || !CR.length || KNOW) return [];  // the module's creatures are the referee's: not in a creature's view
   const inHex = (C, R) => { const [i, j] = own === 1200 ? nearest(C, R, 1200) : nearest(C, R, own); return i === V.i && j === V.j; };
   return CR.filter(c => {
     if (c.site) { const p = D.pois.find(q => q.id === c.site); return p ? inHex(...p.hex) : false; }
@@ -684,7 +748,7 @@ function emap(id) {
 }
 function footprints() {
   const out = []; if (V.lvl !== 'furlong' && V.lvl !== 'field') return out;
-  for (const p of D.pois) for (const ptr of p.encounter || []) {
+  for (const p of D.pois.filter(shown)) for (const ptr of p.encounter || []) {
     const e = emap(typeof ptr === 'string' ? ptr : ptr.map); if (!e) continue;
     const m = e.m, a = m.anchor, g = m.grid.ft, [hx, hy] = ft(...(a.hex || p.hex)), o = a.ft || [0, 0], sq = a.square || [m.size[0] / 2, m.size[1] / 2];
     if (out.some(f => f.m === m)) continue;  // one map, drawn once, even with several pointers
@@ -697,7 +761,7 @@ function mapPoiAt(x, y) {
   for (const f of FOOT) {  // anywhere on a drawn map opens it
     const dx = x - f.x, dy = y - f.y, c = Math.cos(-f.rot), s = Math.sin(-f.rot), u = dx * c - dy * s, v = dx * s + dy * c;
     if (u >= f.rect[0] && v >= f.rect[1] && u <= f.rect[0] + f.rect[2] && v <= f.rect[1] + f.rect[3]) return f.p; }
-  return D.pois.find(p => p.encounter && p.hex[0] === C && p.hex[1] === R) || null;  // a place is its whole 100-ft hex
+  return D.pois.find(p => p.encounter && shown(p) && p.hex[0] === C && p.hex[1] === R) || null;  // a place is its whole 100-ft hex
 }
 function goDown(x, y) {  // Heph's rule: anything clicked zooms in one level, centred on it; at Furlong level a place opens its Encounter map
   const N = LV[V.lvl].draw, [i, j] = hexAt(x, y, N);
@@ -722,6 +786,7 @@ function crumbs() {
     if (V.lvl === 'field' || V.lvl === 'furlong') { const [fi, fj] = V.lvl === 'field' ? [V.i, V.j] : nearest(C, R, 25), [fc, fr] = centre(fi, fj, 25); out.push(`<a href="${fieldAddr(fc, fr)}">Field ${addr(fc, fr).slice(12)}</a>`); }
     if (V.lvl === 'furlong') { const [uc, ur] = centre(V.i, V.j, 5); out.push(`<a href="${addr(uc, ur)}">Furlong ${addr(uc, ur).slice(12)}</a>`); }
   }
+  if (KNOW) out.push(`<span title="Character mode: only what this one knows, with what everyone knows (Party › Show the map as)">as <b>${esc(whoName(KNOW.who))}</b></span>`);
   out.push({ region: '1 hex = 1 league (3 miles)', march: '1 hex = 1 league (3 miles)', league: '1 hex = 1 field (½ mile)', field: '1 hex = 1 furlong (500 ft)', furlong: '1 hex = 100 ft' }[V.lvl]);
   document.getElementById('crumbs').innerHTML = out.join(' · ');
 }
@@ -823,6 +888,6 @@ async function loadModules() {
   try { const j = await (await fetch(A + 'creatures.json')).json(); CR = j.creatures || []; SC = j.scenes || {}; } catch (e) { CR = []; }  // a module without creatures has no file
   if (window.E9Map) Object.assign(E9Map, { base: MOD.base, module: MOD.id, creatures: CR, scenes: SC,
     places: D.pois.filter(p => p.encounter).map(p => ({ get name() { return name(p.name); }, pointers: p.encounter, go: () => { location.hash = addr(...p.hex); } })) });  // ways out lead back to the place's 100-ft hex  // encounter maps sit in the module folder
-  await loadState(); smoothRivers(); go();
+  smoothRivers(); await loadState(); await loadWho(); go();
 })();
 </script></body></html>
