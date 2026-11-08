@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { blankState, clockLabel, closeSession, moveParty, openSession, passTime, readState, setStart, withCharacters, writeState } from './state';
+import { blankState, clockLabel, rulesLabel, withRules, closeSession, moveParty, openSession, passTime, readState, setStart, withCharacters, writeState } from './state';
 
 const now = new Date('2026-11-08T12:00:00Z');
 const at = (hex: string, hours = 0) => ({ base: 'https://x/', module: 'isle-of-mists', map: 'atlas', hex, label: hex.slice(6), hours });
@@ -52,6 +52,16 @@ describe('campaign state', () => {
     const thin = readState({ format: 'e9-campaign-state', version: 1, revealed: { 'isle-of-mists': { hexes: ['world:6947:25B2', 'nonsense'] } } }, 'c1');
     expect(thin.revealed['isle-of-mists']).toEqual({ hexes: ['world:6947:25B2'], places: [] });
     expect(thin.clock).toEqual({ start: '3507-05-01', hours: 8 });
+  });
+
+  it('records the rules module', () => {
+    const r = { ruleset: 'e9mm', module: 'mm-core', option: 'e9', version: '0.1.0' };
+    const s = withRules(blankState('', now), r, now);
+    expect(s.rules).toEqual(r);
+    expect(withRules(s, { ...r }, now)).toBe(s);
+    expect(rulesLabel(s.rules)).toBe('e9mm · mm-core › e9 0.1.0');
+    expect(readState(writeState(s), '').rules).toEqual(r);
+    expect(rulesLabel(null)).toBe('not recorded yet');
   });
 
   it('refuses other files', () => {

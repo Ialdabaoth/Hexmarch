@@ -1,6 +1,6 @@
 <script lang="ts">
   import { app } from '../lib/app.svelte';
-  import { clockLabel } from '../lib/state';
+  import { clockLabel, rulesLabel } from '../lib/state';
   import { downloadJson } from '../lib/storage';
 
   // The campaign state file: where the party stands, the clock, what's been found and the session.
@@ -55,6 +55,8 @@
       <button class="small" onclick={() => app.openSession()}>Start session {s.session.number + 1}</button>
     {/if}
   </dd>
+  <dt>Rules</dt>
+  <dd>{rulesLabel(s.rules)}</dd>
   <dt>Found</dt>
   <dd>{found ? `${found} hex${found === 1 ? '' : 'es'} and places` : 'Nothing yet'}</dd>
 </dl>

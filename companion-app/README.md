@@ -34,10 +34,10 @@ is documented in [CHARACTER_FORMAT.md](CHARACTER_FORMAT.md).
 
 ## Rules data
 
-The app supports two rulesets, each one JSON file in `src/rules/options/`:
+The app supports these rulesets, each one JSON file:
 
-- `mm-options.json`: Materia Mundi, with page references to the first-edition Compendium.
-- `e9-options.json`: E9, from the E9 System Reference Handbook (CC BY-SA 4.0).
+- `src/rules/options/mm-options.json`: Materia Mundi, with page references to the first-edition Compendium.
+- `modules/e9-core/rules.json` (the E9 module, at the repository root): E9, from the E9 System Reference Handbook (CC BY-SA 4.0).
 
 Each file holds the origin roll tables, origins and classes, plus a `mechanics` block for
 the rules that differ between the two. In E9 only fighters add their level to attack throws
@@ -69,7 +69,7 @@ register it in `RULESETS`, instead of editing the old one, so existing character
 Armor, weapons, gear, mounts, services and magic live in equipment files in
 `src/equipment/`: `mm-equipment.json` (Compendium, with prices in silver, and its 48
 spells, 56 miracles, 40 glamours and 120 dweomers, each with a one-line summary and
-page number) and `e9-equipment.json` (E9 arms and armor, no prices). Each ruleset names
+page number) and the E9 module's `modules/e9-core/equipment.json` (E9 arms and armor, no prices). Each ruleset names
 its files in `"equipment"`; `e9` and `e9mm` use E9's arms and armor with the
 Compendium's gear and magic (E9 has no spell list of its own).
 Sheets point at entries with references like `"mm:longsword"` and save only what's

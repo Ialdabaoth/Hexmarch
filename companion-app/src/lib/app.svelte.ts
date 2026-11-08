@@ -7,13 +7,14 @@ import {
   unreadableSheets, loadStateFile, saveStateFile, type PartyAt, type Settings
 } from './storage';
 import {
-  StateError, blankState, closeSession, moveParty, openSession, passTime, readState, setStart, withCharacters, writeState, type CampaignState
+  StateError, blankState, closeSession, moveParty, openSession, passTime, readState, setStart, withCharacters, withRules, writeState, type CampaignState, type StateRules
 } from './state';
 import { loadRepo, type SavedModule } from './modules';
 import {
-  absorbCustom, activateCampaign, blankLocal, fetchCampaign, loadCampaigns, loadFallbacks, loadLocal, registerCampaign, saveCampaigns,
+  absorbCustom, activateCampaign, blankLocal, campaignRulesId, fetchCampaign, loadCampaigns, loadFallbacks, loadLocal, registerCampaign, saveCampaigns,
   saveLocal, type CampaignCache
 } from './campaign';
+import { CORE_RULES } from '../rules/core-modules';
 import { hasEquipment, registerEquipment, type EquipmentFileData } from '../equipment/equipment';
 import { preloadDice, showDice } from './dice3d';
 import { portraitFromFile } from './portrait';
@@ -147,11 +148,19 @@ class AppState {
       console.warn('Campaign state unreadable; starting a fresh one', e);
     }
     this.state = s;
+    await this.saveState(withRules(s, this.stateRules()));
     if (this.settings.partyAt) {
       const old = this.settings.partyAt;
       if (!id && !s.party) await this.saveState(moveParty(s, old));
       await this.updateSettings({ partyAt: null });
     }
+  }
+
+  // The rules this campaign plays with: the campaign file's ruleset, or the builder's for This device.
+  stateRules(): StateRules {
+    const ruleset = this.campaign ? campaignRulesId(this.campaign) : this.settings.rules;
+    const core = CORE_RULES[ruleset];
+    return core ? { ruleset, module: core.module, option: core.option, version: core.version } : { ruleset, module: '', option: '', version: '' };
   }
 
   private async saveState(next: CampaignState) {
@@ -182,7 +191,8 @@ class AppState {
 
   // The state file as it would be shared: the party list brought up to date first.
   async exportState(): Promise<CampaignState> {
-    await this.saveState(withCharacters($state.snapshot(this.state) as CampaignState, this.party.map((c) => ({ id: c.id, name: c.name }))));
+    const s = withRules($state.snapshot(this.state) as CampaignState, this.stateRules());
+    await this.saveState(withCharacters(s, this.party.map((c) => ({ id: c.id, name: c.name }))));
     return writeState($state.snapshot(this.state) as CampaignState);
   }
 

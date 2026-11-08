@@ -1,11 +1,11 @@
 // The rules engine shared by Materia Mundi and E9: abilities, talents, throws,
 // attitudes. Each ruleset's origins, classes, origin roll tables and the few
-// mechanics that differ live in JSON under options/ (mm-options.json and
-// e9-options.json). A sheet records which ruleset built it.
+// mechanics that differ live in JSON under options/ (mm-options.json; E9's own
+// rules live in the E9 module, modules/e9-core/rules.json). A sheet records which ruleset built it.
 // Page numbers in comments refer to the Materia Mundi Compendium unless noted.
 
 import mmOptions from './options/mm-options.json';
-import e9Options from './options/e9-options.json';
+import e9Options from '../../../modules/e9-core/rules.json';
 import e9mmOptions from './options/e9mm-options.json';
 import { catalogFor, type Catalog, type MagicSystem } from '../equipment/equipment';
 

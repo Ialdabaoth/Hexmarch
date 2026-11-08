@@ -22,6 +22,16 @@ export interface Revealed {
   places: string[];
 }
 
+// The rules the campaign plays with: a ruleset id and the rules module that provides it.
+export interface StateRules {
+  ruleset: string;
+  // The module's id ("e9-core", "mm-core"), its option ("e9", or '' for the module's own rules) and
+  // version; module '' when the ruleset comes from a file of the referee's own.
+  module: string;
+  option: string;
+  version: string;
+}
+
 export interface CampaignState {
   format: typeof STATE_FORMAT;
   version: typeof STATE_VERSION;
@@ -30,6 +40,7 @@ export interface CampaignState {
   // Goes up by one with every change, so two copies can be told apart.
   revision: number;
   updated: string;
+  rules: StateRules | null;
   clock: {
     // The game's starting day, YYYY-MM-DD in the setting's own years (Materia Mundi: AD + 2085).
     start: string;
@@ -55,7 +66,7 @@ const DATE = /^\d{1,5}-\d{2}-\d{2}$/;
 
 export function blankState(campaign: string, now = new Date()): CampaignState {
   return {
-    format: STATE_FORMAT, version: STATE_VERSION, campaign, revision: 0, updated: now.toISOString(),
+    format: STATE_FORMAT, version: STATE_VERSION, campaign, revision: 0, updated: now.toISOString(), rules: null,
     clock: { start: DEFAULT_START, hours: 8 }, party: null, revealed: {}, session: { number: 0, open: false }, characters: []
   };
 }
@@ -69,6 +80,13 @@ function readParty(p: unknown): PartyAt | null {
   if (typeof o.base !== 'string' || typeof o.module !== 'string' || typeof o.hex !== 'string' || !o.hex) return null;
   const map = typeof o.map === 'string' ? o.map : 'atlas';
   return { base: o.base, module: o.module, map, hex: o.hex, label: typeof o.label === 'string' ? o.label : o.hex.slice(6), hours: hours(o.hours, 0) };
+}
+
+function readRules(r: unknown): StateRules | null {
+  const o = r as Partial<StateRules> | null;
+  if (!o || typeof o !== 'object' || typeof o.ruleset !== 'string' || !o.ruleset) return null;
+  const str = (v: unknown) => (typeof v === 'string' ? v : '');
+  return { ruleset: o.ruleset, module: str(o.module), option: str(o.option), version: str(o.version) };
 }
 
 // Reads a state file (imported, or saved on the device), filling anything missing with defaults.
@@ -90,6 +108,7 @@ export function readState(d: unknown, campaign: string): CampaignState {
     ...base,
     revision: Math.max(0, Math.floor(hours(s.revision, 0))),
     updated: typeof s.updated === 'string' ? s.updated : base.updated,
+    rules: readRules(s.rules),
     clock: {
       start: typeof s.clock?.start === 'string' && DATE.test(s.clock.start) ? s.clock.start : base.clock.start,
       hours: hours(s.clock?.hours, base.clock.hours)
@@ -148,6 +167,19 @@ export function withCharacters(s: CampaignState, list: { id: string; name: strin
   const next = list.map((c) => ({ id: c.id, name: c.name, player: s.characters.find((x) => x.id === c.id)?.player ?? '' }));
   const same = next.length === s.characters.length && next.every((c, i) => c.id === s.characters[i].id && c.name === s.characters[i].name);
   return same ? s : bump(s, { characters: next }, now);
+}
+
+// Records which rules (and which version of their module) the campaign is played with.
+export function withRules(s: CampaignState, rules: StateRules | null, now = new Date()): CampaignState {
+  const a = s.rules, b = rules;
+  if (a === b || (a && b && a.ruleset === b.ruleset && a.module === b.module && a.option === b.option && a.version === b.version)) return s;
+  return bump(s, { rules: b ? { ...b } : null }, now);
+}
+
+export function rulesLabel(r: StateRules | null): string {
+  if (!r) return 'not recorded yet';
+  if (!r.module) return `${r.ruleset} (the campaign's own rules file)`;
+  return `${r.ruleset} · ${r.module}${r.option ? ` › ${r.option}` : ''} ${r.version}`;
 }
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
