@@ -28,7 +28,7 @@ an editable custom file.
 | `local` | This device's custom equipment | Yes |
 | any id  | A custom file named by a campaign URL (see Campaigns) | No, the referee republishes it |
 
-Published files live in `src/equipment/` (`mm-equipment.json`) and in rules modules (`modules/e9-core/equipment.json`).
+Published files live in rules modules: `modules/mm-core/equipment.json` (and `modules/mm-core/e9/equipment.json` for its E9 option) and `modules/e9-core/equipment.json`.
 The weapon and armor catalogs move out of the ruleset files' `gear` block into these.
 The rulesets keep the *mechanics* (what light, medium and heavy mean, two-weapon
 rules, wizard armor limits); the equipment files hold the *things*.
@@ -189,9 +189,9 @@ A dweomer's `effects` is a list; each effect has exactly one of these keys:
   adds its damage when it names `when.attack`. A damage type of plain `physical` is
   the weapon's own kind (Keen Blade).
 
-### E9 for Materia Mundi's magic weapons (`e9mm-equipment.json`)
+### E9 for Materia Mundi's magic weapons (`modules/mm-core/e9/equipment.json`)
 
-e9mm uses `["e9", "e9mm", "mm"]`. `e9mm-equipment.json` holds only magic: the weapon
+e9mm uses `["e9", "e9mm", "mm"]`. `modules/mm-core/e9/equipment.json` (was `e9mm-equipment.json`) holds only magic: the weapon
 dweomers that scaled with rarity (Earthbreaker, Firearm, Flametongue, Flying Blade,
 Frostbrand, Keen Blade, Sparkwhip, Thunderhammer, Venom Scythe, Windbow, Quiver of
 Elemental Bolts), now always uncommon and adding 1d6/2d6/3d6 by weapon size (Heph,

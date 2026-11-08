@@ -3,9 +3,9 @@
 // "mm:longsword". The format is documented in EQUIPMENT_FORMAT.md.
 
 import type { ArmorKind, ArmorType, GearCatalog, WeaponKind, WeaponSize } from '../rules/rules';
-import mmEquipment from './mm-equipment.json';
+import mmEquipment from '../../../modules/mm-core/equipment.json';
 import e9Equipment from '../../../modules/e9-core/equipment.json';
-import e9mmEquipment from './e9mm-equipment.json';
+import e9mmEquipment from '../../../modules/mm-core/e9/equipment.json';
 
 export type ItemKind = 'armor' | 'weapon' | 'gear' | 'mount' | 'service';
 
@@ -304,7 +304,7 @@ export function catalogFor(defaults: string[]): Catalog {
   return c;
 }
 
-// "mm:longsword" -> the Longsword entry in mm-equipment.json.
+// "mm:longsword" -> the Longsword entry in modules/mm-core/equipment.json.
 export function resolve(ref: string): EquipmentItem | MagicEntry | undefined {
   const i = ref.indexOf(':');
   if (i < 0) return undefined;
