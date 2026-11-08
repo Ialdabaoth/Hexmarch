@@ -25,15 +25,18 @@ export interface Settings {
   partyAt: PartyAt | null;
 }
 
-// A hex on a module's maps: the module (its site and id), the map ("world" or an
-// exploration key) and the hex, as in the viewer's links (#world:0706).
+// Where the party stands on a module's E9 Atlas map: the module (its site and id) and the 100-ft
+// hex (map "atlas", hex "world:CCRR:CCRR"). Parties placed before Companion 0.5.2 have map "world"
+// or a League page key and a 3-mile hex "CCRR"; the Atlas moves them to the new grid (lib/atlas.ts).
 export interface PartyAt {
   base: string;
   module: string;
   map: string;
   hex: string;
-  // What the viewer said about the hex, for showing without opening the map.
+  // A short name for the hex, for showing without opening the map.
   label: string;
+  // Travel time the Atlas has added up since the party was placed.
+  hours?: number;
 }
 
 export const DEFAULT_SETTINGS: Settings = { webhookUrl: '', autoPost: false, activeId: '', rules: 'mm', dice3d: !prefersReducedMotion(), diceColor: DEFAULT_DICE_COLOR, diceInk: DEFAULT_DICE_INK, campaign: '', partyAt: null };

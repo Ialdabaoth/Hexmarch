@@ -258,11 +258,29 @@ _ids = {p['name']: p['id'] for p in pois}
 for p in pois:
     if PAR.get(p['name']) in _ids: p['parent'] = _ids[PAR[p['name']]]  # a sub-place whose parent is off the map stands on its own
 
+# old links (ATLAS_FORMAT.md "Old links", Atlas 0.5.6): the module viewer's 3-mile hexes (world:0706), March pages (march-7) and League
+# pages (l-1330) each become the League or March of the new lattice that holds their centre, so links in books, apps and saved
+# campaigns keep working. The Atlas reads them as #legacy:world:0706, #march-7 and #l-1330
+def _league(lat, lon):
+    x, y = face.forward(lat, lon); C, R = hex_round(x, y, 100 / math.sqrt(3)); i, j = (int(v) for v in nearest(C, R, 150))
+    return f'world:{label(i - L0[0])}{label(j - L0[1])}', (C, R)
+legacy = {}
+_G = json.load(open(f'{WORK}/world-grid.json')) if os.path.exists(f'{WORK}/world-grid.json') else {'hexes': []}
+for h in _G['hexes']:
+    if 'lat' in h: legacy[f"world:{h['col'] + 1:02d}{h['row'] + 1:02d}"] = _league(h['lat'], h['lon'])[0]
+if os.path.exists(f'{WORK}/league/league-index.json'):
+    for pg in json.load(open(f'{WORK}/league/league-index.json')): legacy[pg['key']] = _league(pg['lat'], pg['lon'])[0]
+if os.path.exists(f'{WORK}/atlas-index.json') and _G['hexes']:
+    for v in json.load(open(f'{WORK}/atlas-index.json')).values():  # a March page: the old hex at its centre, then the new March there
+        h = min(_G['hexes'], key=lambda q: (q['px'][0] - v['center_px'][0]) ** 2 + (q['px'][1] - v['center_px'][1]) ** 2)
+        C, R = _league(h['lat'], h['lon'])[1]; i, j = (int(q) for q in nearest(C, R, 1200))
+        legacy[f"march-{v['page']}"] = f'march:{label(i - M0[0])}{label(j - M0[1])}'
+
 la, lo = A['centroid'][1:3]
 J = {'format': 'e9-atlas/1', 'id': MOD['id'], 'title': MOD['title'], 'names': MOD.get('names', {}),
      'origin': {'projection': 'dymaxion', 'centroid': {'name': A['centroid'][0], 'lat': la, 'lon': lo}, 'x_ft': 0, 'y_ft': 0},
      'labels': {'march': list(M0), 'league': list(L0)},
      'terrain': {'types': [dict(color=c, id=t, name=n, tile=tl, **({'icon': ic} if ic else {}), travel=tv) for c, t, n, tl, ic, tv in TYPES], 'marches': MJ, 'overrides': {}},
-     'travel': TRAVEL, 'rivers': rivers, 'roads': [], 'crossings': [], 'regions': regions, 'pois': pois}
+     'travel': TRAVEL, 'rivers': rivers, 'roads': [], 'crossings': [], 'regions': regions, 'pois': pois, 'legacy': legacy}
 json.dump(J, open(f'{OUT}/map.json', 'w'), ensure_ascii=False, separators=(',', ':'))
 print(f"E9 Atlas map: {len(MJ)} Marches, {len(rivers)} rivers, {len(regions)} regions, {len(pois)} POIs, map.json {os.path.getsize(OUT + '/map.json') // 1024} KB -> {OUT}")
