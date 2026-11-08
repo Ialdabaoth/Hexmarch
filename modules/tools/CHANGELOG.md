@@ -2,10 +2,11 @@
 
 The E9 Atlas app and map tools (`modules/tools/`). The version lives in `ATLAS_VERSION`; every merged PR that touches the tools bumps the patch, each planned sprint bumps the minor. A module's own version is separate (see each module's CHANGELOG.md).
 
-## 0.5.x (in development, now 0.5.6)
+## 0.5.x (in development, now 0.5.7)
 
 Sprint: git and VTT integration (campaign repo, shared state file, referee and player views, VTT polish). See "Queued for 0.5" below.
 
+- 0.5.7: modules publish no map renders (Heph 2026-11-08). The module page at `<site>/modules/<id>/` is now the module's text and reference: places by book (sub-places under their parent), scenes by place, creatures and NPCs, factions, credits and the module's changelog, with a search box and the Language box. Each place has **Show on the map**, which opens it in the Atlas at a new `#site:<slug>` address, and its encounter maps open in the same encounter viewer as in the Atlas. Old map links to the page (`#world`, `#l-…`, `#march-…`, `#atlas-…`, `#p-…`) still forward to the Atlas. The build stops writing `maps/*.svg`; the March and League page tools still run in the work folder for the print PDFs and the manifest's index data. The manifest loses `world.map` and `leagues[].map`. Fixed: factions from several encounter files are now all kept (the last file's list used to replace the others). The tools' leftover CC0 defaults now say CC BY 4.0. This changes build.py, so the first build redraws every module's maps once.
 - 0.5.6: old links work in the Atlas. map.json gains a `legacy` table (old 3-mile hexes, League pages and March pages to the nearest new address), and `#l-1330`, `#march-7`, `#atlas-7`, `#p-<site>` and `#legacy:world:0706` open the matching place. The old module viewer page forwards to the Atlas when the module has an Atlas map. The Atlas tells an embedding app what it shows (`view` message) and takes `show`; the module name in the header opens the Modules box instead of the old viewer.
 - 0.5.5: the hex grid controls fold into one ⬡ button in the header; clicking it drops down Hex edges, outline colour and opacity (greyed while Hex edges is off). A click outside or Escape closes it.
 - 0.5.4: the larger hex outlines no longer drop out after zooming (they checked the finer map tiles, which load a moment later; now they check the March, which is always loaded). They are white by default, with a colour picker and an opacity slider next to Hex Edges that this device remembers. The hex being looked at stays solid red.

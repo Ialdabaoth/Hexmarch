@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
-"""Build one module: web viewer, E9 Atlas map and app manifest from the same maps (print PDFs only with --pdf).
+"""Build one module: its page, E9 Atlas map and app manifest (print pages and PDFs only with --pdf).
 
 usage: python3 -I modules/tools/build.py <module dir> <out dir> [--pdf]
   e.g. python3 -I modules/tools/build.py modules/isle-of-mists dist/modules/isle-of-mists
 
-Writes <out>/index.html (viewer), <out>/module.json (manifest for the companion app),
-<out>/maps/*.svg, and with --pdf <out>/print/{atlas,leagues}.pdf. See modules/MODULE_FORMAT.md.
+Writes <out>/index.html (the module page: places, scenes, creatures, factions, credits, changelog, each place linked to the Atlas),
+<out>/module.json (manifest for the companion app), <out>/atlas/ and with --pdf <out>/print/{atlas,leagues}.pdf. See modules/MODULE_FORMAT.md.
+No static map renders are published (Heph 2026-11-08, Atlas 0.5.7): the March and League page SVGs stay in the build's work folder,
+where the print pages and the index data (site lists, the Atlas's old-link table) come from.
 Print PDFs are off by default until the print process is settled (Heph 2026-11-07); --pdf still makes them (needs Playwright).
 Creatures (CREATURES_FORMAT.md): every *.json with an "encounters" block merges into <out>/encounters.json,
 bestiary/<ruleset>.json files are copied, and the viewers get a resolved list of who lives at which site.
@@ -15,7 +17,7 @@ import datetime, json, os, re, shutil, subprocess, sys, time, unicodedata, urlli
 TOOLS = os.path.dirname(os.path.abspath(__file__)); ROOT = os.path.dirname(TOOLS)
 mdir, out = os.path.abspath(sys.argv[1]), os.path.abspath(sys.argv[2]); PDF = '--pdf' in sys.argv
 MOD = json.load(open(os.path.join(mdir, 'module.json')))
-work = os.path.join(out, '_work'); os.makedirs(work, exist_ok=True); os.makedirs(out + '/maps', exist_ok=True)
+work = os.path.join(out, '_work'); os.makedirs(work, exist_ok=True); shutil.rmtree(out + '/maps', ignore_errors=True)  # no map renders since 0.5.7
 PY = [sys.executable, '-I']
 MI_KM = 1.524  # the game mile is exactly 5000 feet
 
@@ -151,25 +153,14 @@ else:
     if os.environ.get('BUILD_CACHE', '1') != '0': cache_put()
     print(f"{MOD['id']}: maps built in {time.time() - t0:.0f} s (cache {KEY})")
 
-# 5. web: the same SVGs, one shared icon set, plus the manifest
+# 5. web: the module page and the manifest
 AI = json.load(open(work + '/atlas-index.json')); PI = json.load(open(work + '/league/league-index.json')); G = json.load(open(work + '/world-grid.json'))
-syms = {}
-def web_svg(src, dst, links=None, overlay=''):
-    s = open(src).read()
-    if overlay: s = s[:s.rindex('</svg>')] + overlay + '</svg>'
-    for sym in re.findall(r'<symbol .*?</symbol>', s, flags=re.S): syms[re.search(r'id="([^"]+)"', sym).group(1)] = sym
-    s = re.sub(r'<symbol .*?</symbol>', '', s, flags=re.S)
-    if links:
-        s = re.sub(r'(<g class="site" data-site="([^"]+)".*?</g>)', lambda m: f'<a href="{links[m.group(2)]}">{m.group(1)}</a>' if m.group(2) in links else m.group(1), s, flags=re.S)
-    open(dst, 'w').write(s)
 expl_of = {}
 for p in PI:
     for n in p['members']: expl_of[n] = p
     for s_ in p['sites']: expl_of.setdefault(s_['name'], p)
 page_of = {n: v['page'] for v in AI.values() for n in v['sites']}
 wsite = {s_['name']: s_ for s_ in G['sites']}
-web_svg(work + '/world.svg', out + '/maps/world.svg', {slug(n): f"#{p['key']}--{slug(n)}" for n, p in expl_of.items()})
-for p in PI: web_svg(f"{work}/league/{p['key']}.svg", f"{out}/maps/{p['key']}.svg", overlay=p['overlay'])
 allsrc = {st[0]: st for k in R for st in R[k].get('sites', [])}
 SITES = []
 for n, p in sorted(expl_of.items(), key=lambda kv: kv[0]):
@@ -178,6 +169,14 @@ for n, p in sorted(expl_of.items(), key=lambda kv: kv[0]):
     w = wsite.get(n)
     SITES.append(dict(slug=slug(n), name=n, kind=st[3], book=b['id'], county=b['county'], lat=st[1], lon=st[2], note=st[4] if len(st) > 4 else '',
                       world_hex=w['hex'] if w else None, world_px=w['px'] if w else None, march_page=page_of.get(n), league=p['key'], league_hex=p['hex'], league_page=p['page']))
+# sub-places (Atlas 0.5.1 site_parents) are on no League page: listed under their parent, in the parent's League
+_bys = {s_['name']: s_ for s_ in SITES}
+for n, par in MOD.get('site_parents', {}).items():
+    q = _bys.get(par)
+    if q and n in allsrc and n not in _bys:
+        st = allsrc[n]
+        SITES.append(dict(q, slug=slug(n), name=n, kind=st[3], lat=st[1], lon=st[2], note=st[4] if len(st) > 4 else '', world_hex=None, world_px=None, march_page=None, parent=q['slug']))
+SITES.sort(key=lambda s_: s_['name'])
 # links from before the League pages (version 0.1): #p-<lead site> opens that site's League
 ALIASES = {}
 for s_ in SITES:
@@ -187,11 +186,16 @@ for s_ in SITES:
 def merge(a, b):
     for k, v in b.items(): a[k] = merge(a.get(k, {}), v) if isinstance(v, dict) and isinstance(a.get(k), dict) else v
     return a
+def merge_block(a, b):  # an encounters block: factions is a list of {id, ...}, so each file adds its own (a later one with the same id replaces it)
+    fa = {f['id']: f for f in a.get('factions', []) + b.get('factions', []) if isinstance(f, dict) and 'id' in f}
+    merge(a, {k: v for k, v in b.items() if k != 'factions'})
+    if fa: a['factions'] = list(fa.values())
+    return a
 ENC = {}
 for f in sorted(os.listdir(mdir)):
     if f.endswith('.json') and f != 'module.json':
         j = json.load(open(os.path.join(mdir, f)))
-        if isinstance(j, dict) and 'encounters' in j: merge(ENC, j['encounters'])
+        if isinstance(j, dict) and 'encounters' in j: merge_block(ENC, j['encounters'])
 BEST = {}
 bdir = os.path.join(mdir, 'bestiary')
 for f in sorted(os.listdir(bdir)) if os.path.isdir(bdir) else []:
@@ -238,14 +242,14 @@ _LG = MOD.get('languages')
 if _LG is not None and not (isinstance(_LG, dict) and _LG and all(isinstance(k, str) and isinstance(v, str) and k and v for k, v in _LG.items())):
     sys.exit('module.json languages: {code: label}, e.g. {"de": "Deutsch", "en": "English"}, the drawn language first')
 LANGS = [{'code': k, 'label': v} for k, v in _LG.items()] if _LG else ([{'code': 'ga', 'label': 'Gaeilge'}, {'code': 'en', 'label': 'English'}] if MOD.get('names') else [])
-M = {'format': 'mm-module/1', 'id': MOD['id'], 'title': MOD['title'], 'short': MOD.get('short', MOD['title']), 'version': VER, 'atlas': ATLAS, 'license': MOD.get('license', 'CC0-1.0'),
+M = {'format': 'mm-module/1', 'id': MOD['id'], 'title': MOD['title'], 'short': MOD.get('short', MOD['title']), 'version': VER, 'atlas': ATLAS, 'license': MOD.get('license', 'CC-BY-4.0'),
      'scales': {'mile_ft': 5000, 'region_hex_mi': MOD['atlas']['page_hex_mi'], 'march_hex_mi': HX, 'league_hex_mi': MOD['league']['hex_mi'], 'field_hex_ft': 100, 'encounter_square_ft': 5},
      'books': MOD['books'],
-     'world': {'map': 'maps/world.svg', 'width': round(G['W'], 1), 'height': round(G['H'], 1), 'hex_px': round(G['hex_px'], 3), 'col_px': round(G['w_px'], 3),
+     'world': {'width': round(G['W'], 1), 'height': round(G['H'], 1), 'hex_px': round(G['hex_px'], 3), 'col_px': round(G['w_px'], 3),
                'origin_px': H0['px'], 'grid': 'flat-top, odd columns shifted down, ids CCRR from 0101',
                'hexes': [{'id': f"{h['col']+1:02d}{h['row']+1:02d}", 't': h['t'], 'in': h['inside']} for h in G['hexes']]},
      'marches': [dict(page=v['page'], id=k, center_px=v['center_px'], radius_px=v['radius_px'], neighbors=v['neighbors'], sites=[slug(n) for n in v['sites']]) for k, v in sorted(AI.items(), key=lambda kv: kv[1]['page'])],
-     'leagues': [dict(page=p['page'], key=p['key'], hex=p['hex'], map=f"maps/{p['key']}.svg", title=p['lead'], book=p['book'], county=p['county'], lat=p['lat'], lon=p['lon'], terrain=p['terrain'],
+     'leagues': [dict(page=p['page'], key=p['key'], hex=p['hex'], title=p['lead'], book=p['book'], county=p['county'], lat=p['lat'], lon=p['lon'], terrain=p['terrain'],
                       center_px=p['center_px'], sites=[dict(s_, slug=slug(s_['name'])) for s_ in p['sites']]) for p in PI],
      'sites': SITES, 'aliases': ALIASES,
      **({'encounters': 'encounters.json', 'bestiary': {r: f'bestiary/{r}.json' for r in BEST}} if ENC else {}),
@@ -257,10 +261,38 @@ M = {'format': 'mm-module/1', 'id': MOD['id'], 'title': MOD['title'], 'short': M
      'links': {'world': '#world', 'march': '#march-<page>', 'league': '#l-<march hex>', 'site': '#l-<march hex>--<slug>', 'hex': '#<map>:<hex>'},
      'print': {'atlas': 'print/atlas.pdf', 'leagues': 'print/leagues.pdf'} if PDF else {}}
 json.dump(M, open(out + '/module.json', 'w'), ensure_ascii=False, indent=1)
-tpl = open(TOOLS + '/viewer.html').read()
-lite = {k: v for k, v in M.items() if k != 'world'}; lite['world'] = {k: v for k, v in M['world'].items() if k != 'hexes'}; lite['creatures'] = CREATURES; lite['scenes'] = ENC.get('scenes', {})
+# the module page (Heph 2026-11-08, Atlas 0.5.7): text and reference only, every place linked to the Atlas; the changelog is the module's CHANGELOG.md
+def md_html(t):  # the little Markdown the changelogs use: ## headings, - lists, paragraphs, **bold**, `code`, [links](url)
+    def inl(x):
+        x = x.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+        x = re.sub(r'`([^`]+)`', r'<code>\1</code>', x); x = re.sub(r'\*\*([^*]+)\*\*', r'<b>\1</b>', x)
+        return re.sub(r'\[([^\]]+)\]\(([^)\s]+)\)', lambda m: f'<a href="{m.group(2)}">{m.group(1)}</a>' if re.match(r'https?://', m.group(2)) else m.group(1), x)
+    o, para, lst = [], [], False
+    def flush():
+        nonlocal para, lst
+        if para: o.append('<p>' + inl(' '.join(para)) + '</p>'); para = []
+        if lst: o.append('</ul>'); lst = False
+    for ln in t.splitlines():
+        h = re.match(r'(#{1,4})\s+(.*)', ln)
+        if h: flush(); n = min(len(h.group(1)) + 1, 5); o.append(f'<h{n}>{inl(h.group(2))}</h{n}>'); continue
+        li = re.match(r'\s*[-*]\s+(.*)', ln)
+        if li:
+            if para: o.append('<p>' + inl(' '.join(para)) + '</p>'); para = []
+            if not lst: o.append('<ul>'); lst = True
+            o.append('<li>' + inl(li.group(1)) + '</li>'); continue
+        if not ln.strip(): flush(); continue
+        if lst and ln.startswith(' '): o[-1] = o[-1][:-5] + ' ' + inl(ln.strip()) + '</li>'; continue
+        if lst: o.append('</ul>'); lst = False
+        para.append(ln.strip())
+    flush(); return '\n'.join(o)
+_cl = os.path.join(mdir, 'CHANGELOG.md')
+_ct = open(_cl).read() if os.path.isfile(_cl) else ''
+CHANGES = md_html(_ct[_ct.index('\n## ') + 1:]) if '\n## ' in _ct else ''  # its entries, without the title and the note on versioning
+tpl = open(TOOLS + '/module_page.html').read()
+lite = {k: M[k] for k in ('id', 'title', 'short', 'version', 'atlas', 'license', 'books', 'sites', 'credits', 'names', 'languages', 'aliases') if k in M}
+lite.update(atlas_map=bool(M.get('atlas_map')), creatures=CREATURES, scenes=ENC.get('scenes', {}), factions=ENC.get('factions', []), changelog=CHANGES)
 CARD = open(TOOLS + '/creature_card.html').read() + open(TOOLS + '/encounter_view.html').read() + open(TOOLS + '/vtt_export.html').read() + open(TOOLS + '/vtt_bridge.html').read()  # index card and encounter map viewer
-html = tpl.replace('<!--CARD-->', CARD).replace('/*DATA*/', json.dumps(lite, ensure_ascii=False).replace('</', '<\\/')).replace('<!--SYMBOLS-->', ''.join(syms.values())).replace('{{TITLE}}', MOD['title'])
+html = tpl.replace('<!--CARD-->', CARD).replace('/*DATA*/', json.dumps(lite, ensure_ascii=False).replace('</', '<\\/')).replace('{{TITLE}}', MOD['title'])
 open(out + '/index.html', 'w').write(html)
 # a module that changed its id leaves a page at each old address that forwards to the new one, keeping ?mode and #links
 for old in MOD.get('moved_from', []):
@@ -268,4 +300,4 @@ for old in MOD.get('moved_from', []):
     open(os.path.join(od, 'index.html'), 'w').write(f'<!doctype html><meta charset="utf-8"><title>{MOD["title"]}</title><meta name="robots" content="noindex">'
         f'<script>location.replace("../{MOD["id"]}/" + location.search + location.hash)</script><p>This module moved to <a href="../{MOD["id"]}/">{MOD["title"]}</a>.</p>')
 if os.environ.get('KEEP_WORK') is None: shutil.rmtree(work)
-print(f"Atlas {ATLAS} · {MOD['id']} {VER}: {len(M['marches'])} March pages, {len(M['leagues'])} League pages, {len(SITES)} sites, {len(CREATURES)} creatures -> {out}")
+print(f"Atlas {ATLAS} · {MOD['id']} {VER}: {len(SITES)} sites, {len(CREATURES)} creatures, {len(ENC.get('scenes', {}))} scenes -> {out}")
