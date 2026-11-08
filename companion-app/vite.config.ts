@@ -34,8 +34,9 @@ export default defineConfig({
       // Match each with or without its trailing slash: /Hexmarch/atlas (as typed or bookmarked) used to open the Companion.
       workbox: { navigateFallbackDenylist: [/\/(modules|atlas|scribe)(\/|\?|$)/] },
       manifest: {
-        name: 'E9 Companion',
-        short_name: 'E9',
+        // the hexagon groups the apps on a home screen (Heph 2026-11-08); the icon label uses the plain short name
+        name: '⬢ Companion',
+        short_name: 'Companion',
         description: 'Characters, followers and dice for E9 and its settings, Materia Mundi among them.',
         theme_color: '#2b2118',
         background_color: '#f4ecdc',

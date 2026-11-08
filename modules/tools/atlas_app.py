@@ -31,7 +31,7 @@ if os.path.isdir(ICONS):
 # its own install manifest (Heph 2026-11-08, Atlas 0.5.9): without one, installing from /atlas/ found the Companion's
 # manifest, whose scope covers the whole site, and installed the Companion. Scope and start are the Atlas's folder, so
 # the two install as separate apps (the app id defaults to the start URL)
-json.dump({'name': 'E9 Atlas', 'short_name': 'Atlas', 'description': 'Hex maps for E9 modules, from the whole region down to the 100-ft hex.',
+json.dump({'name': '⬢ Atlas', 'short_name': 'Atlas', 'description': 'Hex maps for E9 modules, from the whole region down to the 100-ft hex.',
            'start_url': './', 'scope': './', 'display': 'standalone', 'theme_color': '#2b2418', 'background_color': '#f4efe1',
            'icons': [{'src': 'icon-192.png', 'sizes': '192x192', 'type': 'image/png'}, {'src': 'icon-512.png', 'sizes': '512x512', 'type': 'image/png'},
                      {'src': 'icon-512.png', 'sizes': '512x512', 'type': 'image/png', 'purpose': 'maskable'}]},
