@@ -6,7 +6,7 @@ One look for every app: a dark rounded square (`#2b2118`) with the gold hexagon 
 | --- | --- | --- |
 | Companion | `companion.svg` | the die (the triangle face) |
 | Atlas | `atlas.svg` | a heavy woods hex (the map's own forest tile) |
-| Scribe | `scribe.svg` | the die with a quill pen over it |
+| Scribe | `scribe.svg` | the die with a quill writing on a scroll |
 
 `png/` holds 512, 192 and 180 px renders (180 is the Apple touch icon). The Companion's copies are in `companion-app/public/`; `modules/tools/atlas_app.py` copies the Atlas's into `<site>/atlas/`. Re-render the PNGs after editing an SVG.
 

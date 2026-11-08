@@ -6,7 +6,7 @@ The version lives in `package.json` (see README "Versioning"). Every merged PR b
 
 Sprint: git and VTT integration.
 
-- 0.5.7: the apps moved to their own repository, and each app has its own icon (Heph 2026-11-08). The Companion's icon is now just the die, without "E9"; the Atlas's is the map's heavy woods hex and Scribe's the die with a quill (`icons/`). The Companion opens the Atlas that ships beside it and passes the module's site, and its home module repository comes from `site.json`.
+- 0.5.7: the apps moved to their own repository, and each app has its own icon (Heph 2026-11-08). The Companion's icon is now just the die, without "E9"; the Atlas's is the map's heavy woods hex and Scribe's the die with a quill on a scroll (`icons/`). The Companion opens the Atlas that ships beside it and passes the module's site, and its home module repository comes from `site.json`.
 - 0.5.6: the campaign state file (`modules/STATE_FORMAT.md`). Campaign › State shows the game clock (+1 hour, +8 hours, +1 day, start date), where the party stands, the session (Start and End), what the party has found and which core rules module the campaign plays with, and saves or loads the file as `state.json`. Each campaign has its own; the party's place moved there from the settings, and Atlas travel time passes on the clock.
 - 0.5.5: E9's rules and arms and armor now come from the E9 module (`modules/e9-core/rules.json`, `modules/e9-core/equipment.json`, module 0.1.0). Nothing changes on screen.
 - 0.5.4: the licence is now CC BY 4.0 for the app code and its Materia Mundi rules data (it was CC0); credit "E9 / Materia Mundi by Heph (Bakagaijin Productions), CC BY 4.0". Third-party data licences are unchanged.
