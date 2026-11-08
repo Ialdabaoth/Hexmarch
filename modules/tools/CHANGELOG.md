@@ -2,10 +2,11 @@
 
 The E9 Atlas app and map tools (`modules/tools/`). The version lives in `ATLAS_VERSION`; every merged PR that touches the tools bumps the patch, each planned sprint bumps the minor. A module's own version is separate (see each module's CHANGELOG.md).
 
-## 0.5.x (in development, now 0.5.10)
+## 0.5.x (in development, now 0.5.11)
 
 Sprint: git and VTT integration (campaign repo, shared state file, referee and player views, VTT polish). See "Queued for 0.5" below.
 
+- 0.5.11: the Atlas reads the campaign state file (STATE_FORMAT.md) instead of keeping the party in its own browser storage. It takes the file from the Companion that embeds it (`{type: "e9-atlas", state}`), else from the Companion on this device (the same site: the file for the campaign in use), else its own copy (a file loaded with **Load state file…**, or a party placed before 0.5.11). Moving the party works as the Companion does: one revision on, travel time passes on the campaign clock, and the arrival hex counts as seen. It is written back to the device's file, or the embedding app hears the party event as before. The Party box shows the campaign, the clock, the session and how many places and hexes have been found, with Load and Save state file. Places the party has found have a ✓ in the key. Hiding unfound places for players comes with the player view.
 - 0.5.10: the installed Atlas is named "⬢ Atlas" (short name "Atlas"), matching "⬢ Companion" and "⬢ Scribe" (Heph 2026-11-08).
 - 0.5.9: the Atlas installs as its own app. It has its own install manifest (`atlas/manifest.webmanifest`: E9 Atlas, its icon, start and scope its own folder); before, installing it from the browser found the Companion's manifest, which covers the whole site, and installed the Companion.
 - 0.5.8: the Atlas moved to the apps repository and reads modules from `?site=`, else the data site in `site.json` (2026-11-08); it has its own icon, the map's heavy woods hex in the gold hexagon (`icons/atlas.svg`, C. Martins tiles, CC BY-SA 4.0).

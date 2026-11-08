@@ -3,6 +3,7 @@
   import { app } from '../lib/app.svelte';
   import { viewerUrl, type SavedModule } from '../lib/modules';
   import { atlasUrl, isAtlasAddress, isAtlasMessage, partyHex } from '../lib/atlas';
+  import { writeState, type CampaignState } from '../lib/state';
 
   // A module's map is the E9 Atlas (<site>/atlas/?module=<id>), embedded whole: its own key,
   // Route and Party tools. The Atlas tells this page where it is (for the full-screen link) and
@@ -31,6 +32,21 @@
 
   function sendParty() {
     if (here && at) post({ party: { hex: partyHex(at), hours: at.hours ?? 0 } });
+  }
+
+  // The whole state file (Atlas 0.5.11): the Atlas shows the clock, the session and what the party has found,
+  // and gets it again after every change. An older Atlas ignores it and goes by the party message.
+  function sendState() {
+    post({ state: writeState($state.snapshot(app.state) as CampaignState) });
+  }
+  $effect(() => {
+    void app.state.revision;
+    untrack(() => frame && sendState());
+  });
+
+  function onLoad() {
+    sendState();
+    sendParty();
   }
 
   async function onMessage(e: MessageEvent) {
@@ -68,7 +84,7 @@
   {#if atlas}
     {#key atlas}
       <div class="frame">
-        <iframe bind:this={frame} src="{atlas}{start}" title="{current.manifest.title}: E9 Atlas" onload={sendParty}></iframe>
+        <iframe bind:this={frame} src="{atlas}{start}" title="{current.manifest.title}: E9 Atlas" onload={onLoad}></iframe>
       </div>
       <div class="strip small muted">
         {#if here && at}Party: hex {at.label} <button class="link" onclick={() => post({ show: `#${partyHex(at!)}` })}>Show</button> ·
