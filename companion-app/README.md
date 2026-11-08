@@ -104,7 +104,7 @@ The version lives in `package.json` and shows under About in Settings.
 - Each sprint (a planned set of features, such as the 0.2 equipment work) bumps the minor
   number and resets the patch: 0.3.0. Saved sheets carry their own format `version`
   (see CHARACTER_FORMAT.md), separate from the app's.
-- 1.0.0 is the first release announced to players.
+- The MVP is released together with the E9 Atlas and E9 Scribe as `1.0.0-alpha` (shown as a1.0.0), then `1.0.0-beta` (b1.0.0), then `1.0.0`, the first release announced to players (WORKFLOWS.md "Versioning").
 
 Bump `version` in both `package.json` and `package-lock.json` in the PR itself.
 
