@@ -4,7 +4,7 @@
 
 import type { ArmorKind, ArmorType, GearCatalog, WeaponKind, WeaponSize } from '../rules/rules';
 import mmEquipment from './mm-equipment.json';
-import e9Equipment from './e9-equipment.json';
+import e9Equipment from '../../../modules/e9-core/equipment.json';
 import e9mmEquipment from './e9mm-equipment.json';
 
 export type ItemKind = 'armor' | 'weapon' | 'gear' | 'mount' | 'service';
