@@ -1,0 +1,210 @@
+<script lang="ts">
+  import { ROOTS, RULES_MANIFESTS, type RootChoice } from './lib/rules';
+  import { loadSite, type SiteModule } from './lib/data';
+  import { buildCampaign, describeProblem, startsOf, type Built, type Choices } from './lib/campaign';
+
+  const VERSION = __SCRIBE_VERSION__;
+  const params = new URLSearchParams(location.search);
+  const DRAFT = 'e9-scribe-draft';
+
+  interface Draft {
+    title: string;
+    root: string; // "<module>/<option>"
+    modules: string[];
+    start: string; // "<module>/<start id>", or "manual"
+    manual: { module: string; site: string; date: string; hour: number };
+  }
+  const blank: Draft = { title: '', root: '', modules: [], start: '', manual: { module: '', site: '', date: '3507-05-01', hour: 8 } };
+  function loadDraft(): Draft {
+    try {
+      const d = JSON.parse(localStorage.getItem(DRAFT) ?? 'null');
+      return d ? { ...blank, ...d, manual: { ...blank.manual, ...(d.manual ?? {}) } } : structuredClone(blank);
+    } catch {
+      return structuredClone(blank);
+    }
+  }
+
+  let draft = $state<Draft>(loadDraft());
+  let siteUrl = $state(params.get('site') || __DATA_URL__);
+  let site = $state<SiteModule[]>([]);
+  let siteError = $state('');
+  let loading = $state(false);
+  let built = $state<Built | null>(null);
+
+  const rootKey = (r: RootChoice) => `${r.module}/${r.option}`;
+  const root = $derived(ROOTS.find((r) => rootKey(r) === draft.root) ?? null);
+  const picked = $derived(site.filter((m) => draft.modules.includes(m.id)));
+  const offers = $derived(picked.flatMap((m) => startsOf(m).map((s) => ({ module: m, start: s }))));
+  const manualModule = $derived(site.find((m) => m.id === (draft.manual.module || picked[0]?.id)) ?? null);
+
+  async function refresh() {
+    if (!siteUrl) return;
+    loading = true;
+    siteError = '';
+    try {
+      site = await loadSite(siteUrl);
+      if (!site.length) siteError = 'That site lists no modules Scribe can read.';
+    } catch (e) {
+      siteError = (e as Error).message;
+      site = [];
+    }
+    loading = false;
+  }
+  refresh();
+
+  $effect(() => {
+    try {
+      localStorage.setItem(DRAFT, JSON.stringify(draft));
+    } catch {
+      // private window: the draft just isn't kept
+    }
+  });
+
+  $effect(() => {
+    const d = $state.snapshot(draft);
+    if (!root || !d.modules.length) {
+      built = null;
+      return;
+    }
+    let start: Choices['start'] = null;
+    if (d.start === 'manual') start = { module: d.manual.module || d.modules[0], site: d.manual.site, date: d.manual.date, hour: Number(d.manual.hour) || 0 };
+    else if (d.start) {
+      const [module, ...rest] = d.start.split('/');
+      start = { module, id: rest.join('/') };
+    }
+    const choices: Choices = { title: d.title, root, modules: d.modules, start };
+    buildCampaign(choices, $state.snapshot(site) as SiteModule[], RULES_MANIFESTS).then((b) => (built = b));
+  });
+
+  function toggle(id: string) {
+    draft.modules = draft.modules.includes(id) ? draft.modules.filter((m) => m !== id) : [...draft.modules, id];
+    if (draft.start && draft.start !== 'manual' && !draft.modules.includes(draft.start.split('/')[0])) draft.start = '';
+  }
+
+  function download(name: string, data: unknown) {
+    const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 1) + '\n'], { type: 'application/json' }));
+    const a = Object.assign(document.createElement('a'), { href: url, download: name });
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  const startSite = $derived.by(() => {
+    if (!built) return null;
+    const s = built.manifest.start as { module: string; id: string } | undefined;
+    const module = s?.module ?? (draft.start === 'manual' ? draft.manual.module || draft.modules[0] : '');
+    const places = (built.state.revealed as Record<string, { places: string[] }>)[module]?.places ?? [];
+    const slugOf = draft.start === 'manual' ? draft.manual.site : places[0];
+    return module ? { module, slug: slugOf ?? '' } : null;
+  });
+  const atlasLink = $derived(
+    startSite ? `../atlas/?site=${encodeURIComponent(siteUrl)}&module=${encodeURIComponent(startSite.module)}${startSite.slug ? `#site:${startSite.slug}` : ''}` : ''
+  );
+</script>
+
+<main>
+  <header>
+    <img src="icon.svg" alt="" />
+    <div>
+      <h1>⬢ Scribe</h1>
+      <div class="small muted">New campaign · E9 Scribe {VERSION}</div>
+    </div>
+  </header>
+
+  <section>
+    <h2>Campaign name</h2>
+    <input type="text" bind:value={draft.title} placeholder="Kells, 1422" />
+  </section>
+
+  <section>
+    <h2>1. Rules</h2>
+    <p class="small muted">A campaign plays one set of core rules (its root). Everything else is added on top.</p>
+    {#each ROOTS as r (rootKey(r))}
+      <label class="opt">
+        <input type="radio" name="root" value={rootKey(r)} bind:group={draft.root} />
+        <span><strong>{r.title}</strong> <span class="small muted">{r.module} {r.version}</span></span>
+      </label>
+    {/each}
+  </section>
+
+  <section>
+    <h2>2. Modules</h2>
+    {#if loading}
+      <p class="muted">Reading the modules…</p>
+    {:else if siteError}
+      <p class="bad">{siteError}</p>
+    {/if}
+    {#each site as m (m.id)}
+      <label class="opt">
+        <input type="checkbox" checked={draft.modules.includes(m.id)} onchange={() => toggle(m.id)} />
+        <span>
+          <strong>{m.title}</strong> <span class="small muted">{m.version}</span>
+          {#if m.books.length}<br /><span class="small muted">{m.books.map((b) => `${b.id} ${b.title}`).join(' · ')}</span>{/if}
+        </span>
+      </label>
+    {/each}
+    <details class="small">
+      <summary class="muted">Modules from another site</summary>
+      <div class="row">
+        <input type="url" bind:value={siteUrl} />
+        <button class="quiet" onclick={refresh}>Read</button>
+      </div>
+    </details>
+  </section>
+
+  <section>
+    <h2>3. Start</h2>
+    {#if !picked.length}
+      <p class="muted">Pick a module first.</p>
+    {:else}
+      {#each offers as o (o.module.id + '/' + o.start.id)}
+        <label class="opt">
+          <input type="radio" name="start" value={`${o.module.id}/${o.start.id}`} bind:group={draft.start} />
+          <span>
+            <strong>{o.start.title ?? o.start.id}</strong> <span class="small muted">{o.module.title}</span>
+            <br /><span class="small muted">
+              {[o.start.site, o.start.date, o.start.levels ? `levels ${o.start.levels[0]}–${o.start.levels[1]}` : '', o.start.uses?.length ? `plays ${o.start.uses.join(', ')}` : '']
+                .filter(Boolean)
+                .join(' · ')}
+            </span>
+          </span>
+        </label>
+      {/each}
+      <label class="opt">
+        <input type="radio" name="start" value="manual" bind:group={draft.start} />
+        <span><strong>Place the party yourself</strong></span>
+      </label>
+      {#if draft.start === 'manual'}
+        <div class="row">
+          <select bind:value={draft.manual.module}>
+            {#each picked as m (m.id)}<option value={m.id}>{m.title}</option>{/each}
+          </select>
+          <select bind:value={draft.manual.site}>
+            <option value="">No place yet</option>
+            {#each manualModule?.sites ?? [] as s (s.slug)}<option value={s.slug}>{s.name}</option>{/each}
+          </select>
+          <input type="text" bind:value={draft.manual.date} placeholder="3507-05-01" />
+          <input type="number" min="0" max="23" bind:value={draft.manual.hour} />
+        </div>
+      {/if}
+    {/if}
+  </section>
+
+  {#if built}
+    <section>
+      <h2>Your campaign</h2>
+      {#if built.problems.length}
+        <p class="bad">Scribe can't settle the modules yet:</p>
+        <ul class="problems">{#each built.problems as p}<li>{describeProblem(p)}</li>{/each}</ul>
+      {:else}
+        <p class="small muted">{built.lock.modules.map((m) => `${m.id} ${m.version}`).join(' · ')}</p>
+      {/if}
+      <button onclick={() => download('module.json', built!.manifest)}>module.json</button>
+      <button onclick={() => download('campaign.lock.json', built!.lock)}>campaign.lock.json</button>
+      <button onclick={() => download('state.json', built!.state)}>state.json</button>
+      {#if atlasLink}<a class="button" href={atlasLink}>Open the start in the Atlas</a>{/if}
+      <p class="small muted">Keep the three files together in the campaign's folder (state.json goes in <code>campaign/</code>). The Companion loads state.json under Campaign › State.</p>
+    </section>
+  {/if}
+
+  <footer class="small muted"><a href="../">Companion</a><a href="../atlas/">Atlas</a></footer>
+</main>
