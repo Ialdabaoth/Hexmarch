@@ -22,4 +22,9 @@ CARD = open(TOOLS + '/creature_card.html').read() + open(TOOLS + '/encounter_vie
 html = open(TOOLS + '/atlas.html').read().replace('{{ATLAS}}', ATLAS).replace('<!--CARD-->', CARD).replace('{{PATREON}}', json.dumps(PATREON)).replace('{{DATA}}', json.dumps(DATA))
 os.makedirs(site + '/atlas', exist_ok=True)
 open(site + '/atlas/index.html', 'w').write(html)
+ICONS = os.path.join(REPO, 'icons')  # the Atlas's app icon (icons/atlas.svg; PNGs rendered from it)
+if os.path.isdir(ICONS):
+    import shutil
+    shutil.copy(os.path.join(ICONS, 'atlas.svg'), site + '/atlas/icon.svg')
+    shutil.copy(os.path.join(ICONS, 'png', 'atlas-180.png'), site + '/atlas/apple-touch-icon.png')
 print(f'E9 Atlas {ATLAS} -> {site}/atlas/index.html')
