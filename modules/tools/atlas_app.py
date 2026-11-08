@@ -27,4 +27,13 @@ if os.path.isdir(ICONS):
     import shutil
     shutil.copy(os.path.join(ICONS, 'atlas.svg'), site + '/atlas/icon.svg')
     shutil.copy(os.path.join(ICONS, 'png', 'atlas-180.png'), site + '/atlas/apple-touch-icon.png')
+    for n in (192, 512): shutil.copy(os.path.join(ICONS, 'png', f'atlas-{n}.png'), f'{site}/atlas/icon-{n}.png')
+# its own install manifest (Heph 2026-11-08, Atlas 0.5.9): without one, installing from /atlas/ found the Companion's
+# manifest, whose scope covers the whole site, and installed the Companion. Scope and start are the Atlas's folder, so
+# the two install as separate apps (the app id defaults to the start URL)
+json.dump({'name': 'E9 Atlas', 'short_name': 'Atlas', 'description': 'Hex maps for E9 modules, from the whole region down to the 100-ft hex.',
+           'start_url': './', 'scope': './', 'display': 'standalone', 'theme_color': '#2b2418', 'background_color': '#f4efe1',
+           'icons': [{'src': 'icon-192.png', 'sizes': '192x192', 'type': 'image/png'}, {'src': 'icon-512.png', 'sizes': '512x512', 'type': 'image/png'},
+                     {'src': 'icon-512.png', 'sizes': '512x512', 'type': 'image/png', 'purpose': 'maskable'}]},
+          open(site + '/atlas/manifest.webmanifest', 'w'), ensure_ascii=False, indent=1)
 print(f'E9 Atlas {ATLAS} -> {site}/atlas/index.html')
