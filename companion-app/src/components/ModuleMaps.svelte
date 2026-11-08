@@ -44,7 +44,23 @@
     untrack(() => frame && sendState());
   });
 
+  // Each character with what it knows (Atlas 0.5.12, character mode: the map shown as one creature sees it).
+  // An older Atlas ignores it.
+  function sendCharacters() {
+    post({
+      characters: app.sheets.map((s) => ({ id: s.id, name: s.name, owner: s.owner, knowledge: $state.snapshot(s.knowledge) }))
+    });
+  }
+  $effect(() => {
+    for (const s of app.sheets) void [s.name, s.owner, JSON.stringify(s.knowledge)];
+    untrack(() => frame && sendCharacters());
+  });
+
+  // The Atlas may still be loading its map when the frame loads, so everything is sent again when it first reports its view.
+  let greeted = false;
   function onLoad() {
+    greeted = false;
+    sendCharacters();
     sendState();
     sendParty();
   }
@@ -53,7 +69,15 @@
     if (!frame || e.source !== frame.contentWindow || !current || !isAtlasMessage(e.data)) return;
     const d = e.data;
     if (d.module !== current.id) return;
-    if (d.event === 'view') showing = d.hash;
+    if (d.event === 'view') {
+      showing = d.hash;
+      if (!greeted) {
+        greeted = true;
+        sendCharacters();
+        sendState();
+        sendParty();
+      }
+    }
     else if (d.hex === null) {
       if (here) await app.setParty(null);
     } else {

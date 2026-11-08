@@ -6,6 +6,7 @@ The version lives in `package.json` (see README "Versioning"). Every merged PR b
 
 Sprint: git and VTT integration.
 
+- 0.5.12: Campaign › Maps sends the Atlas each character's name and `knowledge` entries, on opening and after every change, for the Atlas's character mode (Party › Show the map as). It also sends everything again once the Atlas has finished loading its map, so nothing is lost while it loads.
 - 0.5.11: Campaign › Maps sends the Atlas the whole campaign state file, on opening and after every change, so the Atlas shows the clock, the session and what the party has found. When the Companion's tab comes back into view it reads the state file again if it is newer, which picks up party moves made in a separate Atlas tab.
 - 0.5.10: a character is saved in four parts, stats, gear, knowledge, and flavor (name, portrait, notes), each exported and loaded on its own (CHARACTER_FORMAT.md, sheet version 4; Heph 2026-11-08). The sheet's Manage section has Export one part only and Load a part; a part replaces only that part of the character with the same id. Sheets gain dated `knowledge` entries. Older sheets still import.
 - 0.5.9: the installed app is named "⬢ Companion" (short name "Companion"), matching "⬢ Atlas" and "⬢ Scribe" (Heph 2026-11-08).

@@ -10,7 +10,7 @@ export interface SiteModule {
   sites: { slug: string; name: string }[];
 }
 
-// The built manifest's `version` is a display stamp ("v0.4.11+abc1234 · 2026-11-08"); `semver` (Atlas 0.5.12)
+// The built manifest's `version` is a display stamp ("v0.4.11+abc1234 · 2026-11-08"); `semver` (Atlas 0.5.13)
 // is the plain one. Older builds have only the stamp, so take the version out of it.
 export function plainVersion(m: Record<string, unknown>): string {
   if (typeof m.semver === 'string') return m.semver;
