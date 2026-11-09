@@ -187,7 +187,7 @@
 
   {#snippet status()}
   <section class="card">
-    <div class="grid3 vitals">
+    <div class="grid2 vitals">
       <div>
         <div class="small muted">Hit points</div>
         <div class="row hp">
@@ -201,13 +201,13 @@
         <strong>{gear.defense || '—'}</strong>
         <span class="small">{gear.worn?.name ?? 'None worn'}</span>
       </button>
-      <div>
-        <div class="small muted">Carry</div>
-        <strong class:over={carry.encumbered}>{carry.load} / {carry.capacity}</strong>
-        <div class="small muted">{carry.burdened ? 'burdened' : carry.encumbered ? 'encumbered' : `encumbered past ${carry.threshold}`}</div>
-      </div>
     </div>
   </section>
+  <h3>Carry</h3>
+  <p class="carry">
+    <strong class:over={carry.encumbered}>{carry.load} / {carry.capacity}</strong>
+    <span class="small muted">{carry.burdened ? 'burdened' : carry.encumbered ? 'encumbered' : `encumbered past ${carry.threshold}`}</span>
+  </p>
   <Effects character={c!} />
   {/snippet}
 
@@ -250,8 +250,8 @@
       </button>
     {/each}
   </div>
+  <h3>Ability check <span class="small muted">(d6 + ability)</span></h3>
   <div class="row checks">
-    <span class="small muted">Ability check (d6 + ability):</span>
     {#each ABILITIES as a}
       <button class="mini" use:holdRoll={(d) => rollExpr(`${a.name} check${d === 'normal' ? '' : ` (${d})`}`, `${{ easy: '2d6kh1', normal: 'd6', hard: '2d6kl1' }[d]}${c!.abilities[a.id] ? signed(c!.abilities[a.id]) : ''}`)}>{a.short}</button>
     {/each}
@@ -311,8 +311,8 @@
 
   <!-- Panel order (Heph 2026-11-09). -->
   {@render panel('status', 'Status', status)}
-  {@render panel('abilities', 'Abilities and saves', abilities)}
-  {@render panel('attacks', 'Attacks', attacks)}
+  {@render panel('abilities', 'Abilities and Saves (d20)', abilities)}
+  {@render panel('attacks', 'Attacks (d20)', attacks)}
   {@render panel('talents', 'Talents (d6)', talents)}
   {#if cls.magic}{@render panel('magic', 'Magic', magic, 'magic')}{/if}
   {@render panel('features', 'Class features', features)}
@@ -374,7 +374,11 @@
   .pickbox:disabled { opacity: 0.5; }
   .hands { margin-top: 0.5rem; }
   .over { color: var(--accent); }
-  .checks { margin-top: 0.6rem; gap: 0.3rem; }
+  .checks { gap: 0.3rem; }
+  /* Sub-headings inside a panel (Carry, Effects, Ability check) sit clear of what's above them. */
+  .panel :global(h3) { margin: 0.9rem 0 0.35rem; }
+  .carry { display: flex; align-items: baseline; gap: 0.5rem; margin: 0; }
+  .carry strong { font-size: 1.3rem; font-family: Georgia, serif; }
   .mini { min-height: 36px; padding: 0.2rem 0.55rem; }
   .features { padding-left: 1.1rem; margin: 0; }
   .features li { margin-bottom: 0.35rem; }
