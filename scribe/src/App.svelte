@@ -103,7 +103,7 @@
     startSite ? `../atlas/?site=${encodeURIComponent(siteUrl)}&module=${encodeURIComponent(startSite.module)}${startSite.slug ? `#site:${startSite.slug}` : ''}` : ''
   );
 
-  // Step 7: save the campaign on this device and open it in the Companion or the Atlas (Scribe 0.1.3).
+  // Step 7: save the campaign on this device and open it in the Companion (by link) or the Atlas.
   let saveError = $state('');
   let savedAs = $state('');
   let wroteState = false;
