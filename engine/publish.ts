@@ -16,6 +16,8 @@ export interface Services {
   post: string;
   // The pointer's own address: what invite links name.
   pointer: string;
+  // Where Publish puts the files (adapters.ts); none means the referee uploads them into `folder` by hand.
+  store?: import('./adapters').Store;
 }
 
 export interface Pointer {
@@ -72,7 +74,7 @@ export function pointer(campaign: string, title: string, s: Services, now = new 
     title,
     read: s.read,
     post: s.post,
-    adapters: { store: 'static', mail: s.post ? 'post' : 'manual' },
+    adapters: { store: s.store && s.store.kind !== 'manual' ? s.store.kind : 'static', mail: s.post ? 'post' : 'manual' },
     updated: now.toISOString()
   };
 }
@@ -184,7 +186,10 @@ export async function checkUpload(
     if (res.status === 404) return { status: 'missing' };
     if (!res.ok) return { status: 'unreadable' };
     try {
-      return { status: 'ok', data: await res.json() };
+      const data = await res.json();
+      // the referee's Apps Script answers 200 with {ok: false, error: 'missing'} before the first publish
+      if (data && (data as { ok?: unknown }).ok === false && (data as { error?: unknown }).error === 'missing') return { status: 'missing' };
+      return { status: 'ok', data };
     } catch {
       return { status: 'unreadable' };
     }
