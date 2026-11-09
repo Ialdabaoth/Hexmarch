@@ -3,6 +3,8 @@
 //   campaign.json  the campaign pointer (e9-campaign-pointer/1): where the campaign lives now; invite links name it
 //   snapshot.json  the player snapshot (e9-snapshot/1), at the pointer's read URL: everything a player's app reads
 
+import { canonical } from './hash';
+
 export const POINTER_FORMAT = 'e9-campaign-pointer';
 export const SNAPSHOT_FORMAT = 'e9-snapshot';
 
@@ -153,4 +155,45 @@ export async function publishParts(id: string, get: (key: string) => Promise<unk
     .filter((m) => m && m.box === 'in' && m.answer && m.envelope?.kind === 'join' && m.envelope.campaign === id && typeof m.envelope.id === 'string')
     .map((m) => m.envelope!.id as string);
   return { state, knowledge, receipts };
+}
+
+// Did the upload land? (Heph 2026-11-09: a Test button beside the folder.) Fetches campaign.json and snapshot.json from
+// the folder, bypassing the cache, and compares each with the file the last publish produced. Every app that publishes
+// keeps that pair on the device as "published:<id>" so any of them can test it.
+export type UploadCheck = 'matches' | 'missing' | 'older' | 'different' | 'unreadable';
+
+export interface UploadReport {
+  pointer: UploadCheck;
+  snapshot: UploadCheck;
+  // The revision found in the folder's snapshot, when it could be read.
+  found?: number;
+}
+
+export async function checkUpload(
+  services: Pick<Services, 'pointer' | 'read'>,
+  expected: { pointer: Pointer; snapshot: Snapshot },
+  fetcher: typeof fetch = fetch
+): Promise<UploadReport> {
+  const get = async (url: string): Promise<{ status: 'ok'; data: unknown } | { status: 'missing' | 'unreadable' }> => {
+    let res: Response;
+    try {
+      res = await fetcher(url, { cache: 'no-cache' });
+    } catch {
+      return { status: 'unreadable' }; // offline, or the host doesn't let other sites read it (CORS)
+    }
+    if (res.status === 404) return { status: 'missing' };
+    if (!res.ok) return { status: 'unreadable' };
+    try {
+      return { status: 'ok', data: await res.json() };
+    } catch {
+      return { status: 'unreadable' };
+    }
+  };
+  const same = (a: unknown, b: unknown) => canonical(a) === canonical(b);
+  const [p, s] = await Promise.all([get(services.pointer), get(services.read)]);
+  const pointerCheck: UploadCheck = p.status !== 'ok' ? p.status : same(p.data, expected.pointer) ? 'matches' : 'different';
+  if (s.status !== 'ok') return { pointer: pointerCheck, snapshot: s.status };
+  const found = Number((s.data as { revision?: unknown })?.revision);
+  const snapshotCheck: UploadCheck = same(s.data, expected.snapshot) ? 'matches' : Number.isFinite(found) && found < expected.snapshot.revision ? 'older' : 'different';
+  return { pointer: pointerCheck, snapshot: snapshotCheck, ...(Number.isFinite(found) ? { found } : {}) };
 }

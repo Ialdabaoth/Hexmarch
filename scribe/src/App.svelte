@@ -2,7 +2,8 @@
   import { ROOTS, RULES_MANIFESTS, type RootChoice } from './lib/rules';
   import { loadSite, type SiteModule } from './lib/data';
   import { buildCampaign, describeProblem, startsOf, type Built, type Choices } from './lib/campaign';
-  import { campaignLink, publishOnDevice, saveOnDevice, savedCampaign, type SavedCampaign } from './lib/device';
+  import { campaignLink, publishOnDevice, saveOnDevice, savedCampaign, testUpload, type SavedCampaign } from './lib/device';
+  import type { UploadCheck, UploadReport } from '../../engine';
   import { staticServices } from '../../engine';
 
   const VERSION = __SCRIBE_VERSION__;
@@ -153,6 +154,27 @@
     }
   }
 
+  // Test (Heph 2026-11-09): is the folder serving what the last publish produced?
+  let testing = $state(false);
+  let test = $state<UploadReport | null | 'none' | string>(null);
+  async function runTest() {
+    testing = true;
+    test = null;
+    try {
+      test = (await testUpload(campaignKey, staticServices(folder, postUrl))) ?? 'none';
+    } catch (e) {
+      test = (e as Error).message;
+    }
+    testing = false;
+  }
+  const SAYS: Record<UploadCheck, string> = {
+    matches: 'matches what you published',
+    missing: "isn't there yet (a new upload can take a minute or two to appear)",
+    older: 'is there, but an older one: upload the new file',
+    different: "is there, but isn't the file you published: upload it again",
+    unreadable: "can't be read: it isn't JSON, or the host doesn't let other sites read it"
+  };
+
   async function openIn(app: 'companion' | 'atlas') {
     const link = await save();
     if (!link) return;
@@ -285,6 +307,15 @@
       {:else}
         <p class="small muted">Players need two addresses: one to read the campaign from, one to send their requests to. For now that is a folder on any free web host you can upload to, such as GitHub Pages; your own Apps Script will set this up for you later.</p>
         <label class="field">Folder you upload to <input type="url" bind:value={folder} placeholder="https://you.github.io/kells-1422/" /></label>
+        <button class="quiet" disabled={!folder || !record.published || testing} onclick={runTest}>{testing ? 'Testing…' : 'Test'}</button>
+        {#if test === 'none'}<p class="small muted">Publish first (step 9), then upload the two files and test.</p>
+        {:else if typeof test === 'string'}<p class="bad">{test}</p>
+        {:else if test}
+          <ul class="small test">
+            <li class={test.pointer === 'matches' ? 'ok' : 'bad'}><code>campaign.json</code> {SAYS[test.pointer]}</li>
+            <li class={test.snapshot === 'matches' ? 'ok' : 'bad'}><code>snapshot.json</code> {SAYS[test.snapshot]}{test.found !== undefined && test.snapshot !== 'matches' ? ` (revision ${test.found} there, ${record.published?.revision} published)` : ''}</li>
+          </ul>
+        {/if}
         <label class="field">Where players send requests (optional for now) <input type="url" bind:value={postUrl} placeholder="https://script.google.com/…/exec" /></label>
       {/if}
     </section>

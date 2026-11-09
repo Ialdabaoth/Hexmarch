@@ -9,7 +9,7 @@
 
 import type { Built } from './campaign';
 import type { RootChoice } from './rules';
-import { pointer, publishParts, snapshot, type Pointer, type Services, type Snapshot } from '../../../engine';
+import { checkUpload, pointer, publishParts, snapshot, type UploadReport, type Pointer, type Services, type Snapshot } from '../../../engine';
 
 export const SCRIBE_FORMAT = 'e9-scribe-campaign';
 
@@ -115,5 +115,12 @@ export async function publishOnDevice(id: string, services: Services, now = new 
   const ptr = pointer(id, String(rec.manifest.title ?? id), services, now);
   const record: SavedCampaign = { ...rec, services, published: { revision: snap.revision, at: snap.published } };
   await idbSet(`scribe-campaign:${id}`, record);
+  await idbSet(`published:${id}`, { pointer: ptr, snapshot: snap }); // what the Test button compares the folder with
   return { pointer: ptr, snapshot: snap, record };
+}
+
+// The Test button in step 8: is the folder serving what the last publish (here or in the Companion) produced?
+export async function testUpload(id: string, services: Services): Promise<UploadReport | null> {
+  const last = (await idbGet(`published:${id}`)) as { pointer: Pointer; snapshot: Snapshot } | undefined;
+  return last ? checkUpload(services, last) : null;
 }
