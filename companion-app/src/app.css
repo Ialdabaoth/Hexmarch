@@ -101,3 +101,10 @@ label.check input { width: 1.2rem; height: 1.2rem; min-height: 0; flex: none; }
 details.section { margin-top: 1rem; }
 details.section > summary { cursor: pointer; }
 details.section > summary h2, details.section > summary h3 { display: inline; margin: 0 0 0.5rem; }
+
+/* Sheet layouts (SHEET_LAYOUT.md): data-print="only" and "never". */
+.print-only { display: none !important; }
+@media print {
+  .print-only { display: revert !important; }
+  .screen-only { display: none !important; }
+}

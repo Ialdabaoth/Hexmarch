@@ -20,7 +20,7 @@ describe('resolve', () => {
     const reg = memoryRegistry([e9core, mmcore, btp('0.4.10'), btp('0.4.11')]);
     const r = await resolve(campaign(), reg);
     expect(r.problems).toEqual([]);
-    expect(r.modules.map((m) => `${m.manifest.id}@${m.manifest.version}`)).toEqual(['e9-core@0.1.0', 'mm-core@0.1.0', 'isle-of-mists@0.4.11']);
+    expect(r.modules.map((m) => `${m.manifest.id}@${m.manifest.version}`)).toEqual([`e9-core@${e9core.version}`, 'mm-core@0.1.0', 'isle-of-mists@0.4.11']);
   });
 
   it('keeps the locked version while it still fits', async () => {

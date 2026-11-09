@@ -1,0 +1,132 @@
+<!-- E9 full sheet, US letter. Sections flow onto extra pages as inventories grow;
+     no section is split across a page break unless it is longer than a page. -->
+<div class="pg">
+  <div class="head">
+    <e9-portrait class="portrait"></e9-portrait>
+    <div class="who">
+      <h1 class="name"><e9-value key="d.name"></e9-value></h1>
+      <div class="sub"><e9-value key="d.title"></e9-value> · Hit die <e9-value key="d.hitDie"></e9-value> · XP <e9-value key="d.xp"></e9-value></div>
+    </div>
+    <div class="brand"><e9-value key="d.brand"></e9-value></div>
+  </div>
+
+  <div class="vitals">
+    <div><span>Hit points</span><b><i class="blank"></i> / <e9-value key="d.hpMax"></e9-value></b></div>
+    <div><span>Armor</span><b><e9-value key="d.defense"></e9-value></b><small><e9-value key="d.wornName"></e9-value></small></div>
+    <div><span>Melee</span><b><e9-value key="d.attacks.melee"></e9-value>+</b></div>
+    <div><span>Ranged</span><b><e9-value key="d.attacks.ranged"></e9-value>+</b></div>
+    <div><span>Carry</span><b><e9-value key="d.carry.load"></e9-value> / <e9-value key="d.carry.capacity"></e9-value></b><small>enc. over <e9-value key="d.carry.threshold"></e9-value></small></div>
+  </div>
+
+  <div class="grid-2">
+    <section class="sec">
+      <h2 class="h2">Abilities and saves</h2>
+      <table class="tbl">
+        <tbody>
+          <e9-each list="d.abilities" as="a">
+            <tr><th><e9-value key="a.name"></e9-value></th><td class="num"><e9-value key="a.score"></e9-value></td><td>Save vs. <e9-value key="a.save"></e9-value></td><td class="num"><e9-value key="a.threshold"></e9-value>+</td></tr>
+          </e9-each>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="sec">
+      <h2 class="h2">Talents <small>(d6, * expertise)</small></h2>
+      <table class="tbl">
+        <tbody>
+          <e9-each list="d.talents" as="t">
+            <tr><th><e9-value key="t.label"></e9-value></th><td class="num"><e9-value key="t.threshold"></e9-value>+</td><td class="use"><e9-value key="t.use"></e9-value></td></tr>
+          </e9-each>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="sec">
+      <h2 class="h2">Weapons</h2>
+      <table class="tbl">
+        <tbody>
+          <e9-each list="d.weapons" as="w" min="3">
+            <tr e9-class="empty:w.blank"><th><e9-value key="w.label" empty="&nbsp;"></e9-value></th><td><e9-value key="w.damage"></e9-value></td><td><e9-value key="w.info"></e9-value></td><td class="num"><e9-value key="w.hit"></e9-value></td></tr>
+          </e9-each>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="sec">
+      <h2 class="h2"><e9-value key="d.cls.name"></e9-value> <small><e9-value key="d.cls.book"></e9-value> p. <e9-value key="d.cls.page"></e9-value></small></h2>
+      <ul class="list features">
+        <e9-each list="d.features" as="f"><li><b><e9-value key="f.name"></e9-value>.</b> <e9-value key="f.summary"></e9-value></li></e9-each>
+      </ul>
+      <e9-if key="d.cls.martial"><p class="small"><e9-value key="d.cls.martial"></e9-value>.</p></e9-if>
+    </section>
+
+    <e9-if key="d.magicItems">
+      <section class="sec wide">
+        <h2 class="h2">Magic items</h2>
+        <ul class="list features">
+          <e9-each list="d.magicItems" as="m"><li><b><e9-value key="m.source"></e9-value>:</b> <e9-value key="m.text"></e9-value></li></e9-each>
+        </ul>
+      </section>
+    </e9-if>
+
+    <section class="sec wide">
+      <h2 class="h2">Inventory</h2>
+      <ul class="list items">
+        <e9-each list="d.items" as="i" min="6"><li e9-class="empty:i.blank"><e9-value key="i.label" empty="&nbsp;"></e9-value></li></e9-each>
+      </ul>
+    </section>
+
+    <e9-if key="d.magic.prepared">
+      <section class="sec">
+        <h2 class="h2"><e9-value key="d.magic.prepared"></e9-value></h2>
+        <table class="tbl">
+          <tbody>
+            <e9-each list="d.prepared" as="p" min="3">
+              <tr e9-class="empty:p.blank"><td class="box"><e9-value key="p.box" empty="☐"></e9-value></td><td><e9-value key="p.circle"></e9-value></td><th><e9-value key="p.magic" empty="&nbsp;"></e9-value></th></tr>
+            </e9-each>
+          </tbody>
+        </table>
+      </section>
+      <section class="sec">
+        <h2 class="h2"><e9-value key="d.magic.book"></e9-value></h2>
+        <table class="tbl">
+          <tbody>
+            <e9-each list="d.book" as="b"><tr><td><e9-value key="b.circle"></e9-value></td><th><e9-value key="b.magic"></e9-value></th></tr></e9-each>
+            <e9-if key="d.book" not><tr class="empty"><td></td><th>&nbsp;</th></tr></e9-if>
+          </tbody>
+        </table>
+      </section>
+    </e9-if>
+
+    <e9-if key="d.followers">
+      <section class="sec wide">
+        <h2 class="h2">Retinue</h2>
+        <table class="tbl">
+          <thead><tr><th>Name</th><th>Kind</th><th>HP</th><th>Attitude</th><th>Traits and notes</th></tr></thead>
+          <tbody>
+            <e9-each list="d.followers" as="f">
+              <tr><th><e9-value key="f.name"></e9-value></th><td><e9-value key="f.kind"></e9-value></td><td class="num"><e9-value key="f.hpMax"></e9-value></td><td><e9-value key="f.attitude"></e9-value></td><td class="use"><e9-value key="f.notes"></e9-value></td></tr>
+            </e9-each>
+          </tbody>
+        </table>
+      </section>
+    </e9-if>
+
+    <section class="sec wide">
+      <h2 class="h2">Level history</h2>
+      <table class="tbl">
+        <tbody>
+          <e9-each list="d.levels" as="l">
+            <tr><th>Level <e9-value key="l.level"></e9-value></th><td>+<e9-value key="l.hp"></e9-value> HP</td><td><e9-value key="l.trained"></e9-value></td><td class="use"><e9-value key="l.feat"></e9-value></td></tr>
+          </e9-each>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="sec wide notes">
+      <h2 class="h2">Notes</h2>
+      <p class="notes-text"><e9-value key="flavor.notes"></e9-value></p>
+    </section>
+  </div>
+  <div class="foot">E9 Companion · <e9-value key="d.rulesName"></e9-value> rules</div>
+</div>

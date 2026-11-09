@@ -41,7 +41,7 @@ describe('a new campaign from Beyond the Pale', () => {
       exclude: ['isle-of-mists/book/b3', 'isle-of-mists/book/b5', 'isle-of-mists/book/b4']
     });
     expect(Object.keys(b.manifest.requires as object)[0]).toBe('mm-core'); // the root comes first
-    expect(b.lock.modules.map((m) => `${m.id}@${m.version}`)).toEqual(['e9-core@0.1.0', 'mm-core@0.1.0', 'isle-of-mists@0.4.11']);
+    expect(b.lock.modules.map((m) => `${m.id}@${m.version}`)).toEqual([`e9-core@${e9core.version}`, 'mm-core@0.1.0', 'isle-of-mists@0.4.11']);
     expect(b.state).toMatchObject({
       format: 'e9-campaign-state', version: 1, campaign: 'kells-1422', revision: 1,
       rules: { ruleset: 'e9mm', module: 'mm-core', option: 'e9', version: '0.1.0' },
