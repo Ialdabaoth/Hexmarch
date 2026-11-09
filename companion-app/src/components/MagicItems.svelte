@@ -12,7 +12,7 @@
 </script>
 
 {#if bySource.length}
-  <h2>Magic items</h2>
+  <h3>Magic items</h3>
   <ul class="magic-items">
     {#each bySource as [source, lines]}
       <li><strong>✦ {source}.</strong> {lines.join('. ')}.</li>

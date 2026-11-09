@@ -86,7 +86,6 @@
   }
 </script>
 
-<h2>Magic</h2>
 <p class="small muted">{magic.prepared}s are physical items you carry; they go in the exported inventory.</p>
 
 <h3>{magic.prepared}s</h3>

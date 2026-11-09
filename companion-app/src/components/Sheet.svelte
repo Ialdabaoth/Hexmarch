@@ -124,7 +124,33 @@
     await app.remove(id);
     app.view = { name: 'list' };
   }
+  // Each panel folds away (Heph 2026-11-09). Which ones are folded is remembered on this device.
+  const FOLD_KEY = 'e9-sheet-folded';
+  let folded = $state<string[]>((() => {
+    try {
+      const v = JSON.parse(localStorage.getItem(FOLD_KEY) ?? '[]');
+      return Array.isArray(v) ? v.filter((x) => typeof x === 'string') : [];
+    } catch {
+      return [];
+    }
+  })());
+  function fold(name: string, e: Event) {
+    const open = (e.currentTarget as HTMLDetailsElement).open;
+    folded = open ? folded.filter((x) => x !== name) : folded.includes(name) ? folded : [...folded, name];
+    try {
+      localStorage.setItem(FOLD_KEY, JSON.stringify(folded));
+    } catch {
+      // storage blocked: the panels still fold, just not remembered
+    }
+  }
 </script>
+
+{#snippet panel(name: string, title: string, body: import('svelte').Snippet, id?: string)}
+  <details class="section panel" open={!folded.includes(name)} ontoggle={(e) => fold(name, e)} {id}>
+    <summary><h2>{title}</h2></summary>
+    {@render body()}
+  </details>
+{/snippet}
 
 {#if c && cls}
   {@const atk = attackThresholds(c)}
@@ -159,8 +185,9 @@
   </div>
 
 
+  {#snippet status()}
   <section class="card">
-    <div class="grid3 vitals">
+    <div class="grid2 vitals">
       <div>
         <div class="small muted">Hit points</div>
         <div class="row hp">
@@ -174,16 +201,17 @@
         <strong>{gear.defense || '—'}</strong>
         <span class="small">{gear.worn?.name ?? 'None worn'}</span>
       </button>
-      <div>
-        <div class="small muted">Carry</div>
-        <strong class:over={carry.encumbered}>{carry.load} / {carry.capacity}</strong>
-        <div class="small muted">{carry.burdened ? 'burdened' : carry.encumbered ? 'encumbered' : `encumbered past ${carry.threshold}`}</div>
-      </div>
     </div>
-    <XpPanel character={c} />
   </section>
+  <h3>Carry</h3>
+  <p class="carry">
+    <strong class:over={carry.encumbered}>{carry.load} / {carry.capacity}</strong>
+    <span class="small muted">{carry.burdened ? 'burdened' : carry.encumbered ? 'encumbered' : `encumbered past ${carry.threshold}`}</span>
+  </p>
+  <Effects character={c!} />
+  {/snippet}
 
-  <h2>Attacks</h2>
+  {#snippet attacks()}
   <div class="grid2">
     <button class="stat" use:holdRoll={(d) => check('Melee attack', 20, atk.melee, d, { attack: true })}>
       <span>Melee</span><strong>{atk.melee}+</strong>
@@ -207,8 +235,9 @@
     <span class="small muted">{gear.damageTypes}</span>
     {#if gear.off?.shield}<span class="small muted">Shield: attacks you see coming are harder.</span>{/if}
   </div>
+  {/snippet}
 
-  <h2>Abilities and saves</h2>
+  {#snippet abilities()}
   <div class="grid2">
     {#each ABILITIES as a}
       {@const s = saveThreshold(c, a.id)}
@@ -221,14 +250,15 @@
       </button>
     {/each}
   </div>
+  <h3>Ability check <span class="small muted">(d6 + ability)</span></h3>
   <div class="row checks">
-    <span class="small muted">Ability check (d6 + ability):</span>
     {#each ABILITIES as a}
       <button class="mini" use:holdRoll={(d) => rollExpr(`${a.name} check${d === 'normal' ? '' : ` (${d})`}`, `${{ easy: '2d6kh1', normal: 'd6', hard: '2d6kl1' }[d]}${c!.abilities[a.id] ? signed(c!.abilities[a.id]) : ''}`)}>{a.short}</button>
     {/each}
   </div>
+  {/snippet}
 
-  <h2>Talents <small class="muted">(d6)</small></h2>
+  {#snippet talents()}
   <!-- One column per ability, like the card. -->
   <div class="talents">
     {#each ABILITIES.filter((a) => TALENTS.some((t) => t.ability === a.id)) as a}
@@ -244,8 +274,10 @@
     {/each}
   </div>
   <p class="small muted">* expertise: easy for this class's specialty (see p. {cls.page}). Hold any roll and slide up for Easy or down for Hard.</p>
+  {/snippet}
 
-  <h2>Class features</h2>
+  {#snippet features()}
+  <XpPanel character={c!} />
   <ul class="features">
     {#each cls.features.filter((f) => f.level <= c!.level) as f}
       <li><strong>{f.name}.</strong> {f.summary}</li>
@@ -264,26 +296,33 @@
       </ul>
     </details>
   {/if}
+  {/snippet}
 
-  <MagicItems magic={c.magic} />
+  {#snippet magic()}<Magic character={c!} />{/snippet}
 
-  <Effects character={c} />
+  {#snippet retinue()}<Followers character={c!} />{/snippet}
 
-  {#if cls.magic}
-    <div id="magic"><Magic character={c} /></div>
-  {/if}
-
-  <Followers character={c} />
-
-  <h2 id="inventory">Gear</h2>
-  <GearEditor character={c} />
+  {#snippet gearPanel()}
+  <GearEditor character={c!} />
+  <MagicItems magic={c!.magic} />
   <label for="notes">Notes, feats, spells</label>
-  <textarea id="notes" bind:value={c.data.notes} onchange={save}></textarea>
+  <textarea id="notes" bind:value={c!.data.notes} onchange={save}></textarea>
+  {/snippet}
+
+  <!-- Panel order (Heph 2026-11-09). -->
+  {@render panel('status', 'Status', status)}
+  {@render panel('abilities', 'Abilities and Saves (d20)', abilities)}
+  {@render panel('attacks', 'Attacks (d20)', attacks)}
+  {@render panel('talents', 'Talents (d6)', talents)}
+  {#if cls.magic}{@render panel('magic', 'Magic', magic, 'magic')}{/if}
+  {@render panel('features', 'Class features', features)}
+  {@render panel('gear', 'Gear', gearPanel, 'inventory')}
+  {@render panel('retinue', 'Retinue', retinue)}
 
   <h2>Manage</h2>
   <div class="row">
-    <button class="primary" onclick={() => (app.view = { name: 'render', id: c!.id, mode: 'postcard' })}>Postcard / PDF</button>
-    <button onclick={() => (app.view = { name: 'render', id: c!.id, mode: 'page' })}>Full page</button>
+    <button class="primary" onclick={() => (app.view = { name: 'render', id: c!.id, mode: 'postcard' })}>Print card</button>
+    <button onclick={() => (app.view = { name: 'render', id: c!.id, mode: 'page' })}>Print page</button>
     <button onclick={() => downloadJson(`${slug(c!.name)}.json`, exportSheet(c!.data))}>Export JSON</button>
     <button onclick={() => partInput?.click()}>Load a part</button>
     <input bind:this={partInput} type="file" accept="application/json,.json" hidden onchange={loadPart} />
@@ -335,7 +374,11 @@
   .pickbox:disabled { opacity: 0.5; }
   .hands { margin-top: 0.5rem; }
   .over { color: var(--accent); }
-  .checks { margin-top: 0.6rem; gap: 0.3rem; }
+  .checks { gap: 0.3rem; }
+  /* Sub-headings inside a panel (Carry, Effects, Ability check) sit clear of what's above them. */
+  .panel :global(h3) { margin: 0.9rem 0 0.35rem; }
+  .carry { display: flex; align-items: baseline; gap: 0.5rem; margin: 0; }
+  .carry strong { font-size: 1.3rem; font-family: Georgia, serif; }
   .mini { min-height: 36px; padding: 0.2rem 0.55rem; }
   .features { padding-left: 1.1rem; margin: 0; }
   .features li { margin-bottom: 0.35rem; }
