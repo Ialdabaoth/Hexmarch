@@ -1,7 +1,6 @@
 // The Atlas, embedded in Campaign › Maps (Atlas 0.5.6; modules/ATLAS_FORMAT.md "Party marker").
 // The Atlas is the same app for every module: <site>/atlas/?module=<id>#<address>. It tells the
 // page around it where it is and where the party stands; everything it sends is checked first.
-import type { PartyAt } from './storage';
 
 // A 100-ft hex address: world:<League CCRR>:<hex CCRR>; each label is 00-99, then A0-Z9 without I, O, Q.
 const ADDR = /^world:([0-9A-HJ-NPR-Z][0-9]){2}:([0-9A-HJ-NPR-Z][0-9]){2}$/;
@@ -38,10 +37,3 @@ export function isAtlasMessage(d: unknown): d is AtlasMessage {
   return false;
 }
 
-// Where the party stands, as the Atlas reads it. A party placed before Atlas 0.5.6 sits on the old
-// viewer's grid (map "world" or a League page, hex CCRR): the Atlas reads it as #legacy:… and puts
-// the party at the centre of the League that holds it, then reports the new address back.
-export function partyHex(at: PartyAt): string {
-  if (isAtlasAddress(at.hex)) return at.hex;
-  return at.map === 'world' ? `legacy:world:${at.hex}` : `legacy:${at.map}`;
-}

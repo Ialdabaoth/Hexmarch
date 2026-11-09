@@ -1,1 +1,0 @@
-Update campaign keeps the two files it built on the device (`published:<id>`), as Scribe's Publish does, so Scribe's Test checks the uploaded folder against the latest update rather than an older publish.
