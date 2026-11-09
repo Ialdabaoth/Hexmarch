@@ -19,6 +19,8 @@ import { addMail, answer, joinRequest, loadMail, mailFileName, post, readMailFil
 import { downloadJson } from './storage';
 import { inviteDone, keepInvite, pendingInvite, updateForInvite } from './update';
 import { pointer as campaignPointer, publishParts, snapshot as campaignSnapshot, type Services } from '../../../engine/publish';
+import { envelope as mailEnvelope, messageLink, readMessageHash, type Envelope } from '../../../engine/mail';
+import { readState as readStateFile } from './state';
 import { get as idbGet, set as idbSet } from 'idb-keyval';
 import { addInvitation, bindCharacter, invitationLabel, loadInvitations, readInvite, saveInvitations, withRefereeInvitations, type Invite, type Mode, type Invitation } from './invitations';
 import { hasEquipment, registerEquipment, type EquipmentFileData } from '../equipment/equipment';
@@ -153,6 +155,7 @@ class AppState {
     if (await this.cacheInlinePortraits(this.sheets)) await this.persist();
     if (this.settings.dice3d) preloadDice();
     await this.openAsked();
+    await this.openMessage();
     void this.refreshCampaign();
   }
 
@@ -620,6 +623,69 @@ class AppState {
       inviteDone();
       this.notify(e instanceof NewerAppError ? `${e.message} Close the app and open it again to update.` : (e as Error).message);
     }
+  }
+
+  // A message in the address (WORKFLOWS.md "Apps talk by links"): <companion>#m=<data>, from Scribe, the Atlas or a
+  // player's Share. Applied once: its id is remembered, so opening the same link again changes nothing.
+  private async openMessage() {
+    if (typeof location === 'undefined' || !/[#&]m=/.test(location.hash)) return;
+    const hash = location.hash;
+    history.replaceState(history.state, '', location.pathname + location.search);
+    try {
+      const e = await readMessageHash(hash);
+      if (e) await this.applyMessage(e);
+    } catch (err) {
+      this.notify((err as Error).message);
+    }
+  }
+
+  async applyMessage(e: Envelope) {
+    const applied = ((await idbGet('applied')) as string[] | undefined) ?? [];
+    if (applied.includes(e.id)) return this.notify('Already opened that link');
+    if (e.kind === 'campaign') await this.receiveCampaign(e);
+    else if (e.kind === 'join' || e.kind === 'sent-back') {
+      if (e.campaign !== this.campaignId) {
+        const seat = this.invitations.find((s) => this.campaigns[s.url]?.campaign.id === e.campaign && s.role === (e.kind === 'join' ? 'referee' : 'player'));
+        if (!seat) throw new Error(`That message is for a campaign this device doesn't have (${e.campaign}).`);
+        await this.chooseInvitation(seat.id);
+      }
+      await this.openMail(e);
+      this.view = { name: 'inbox' };
+      this.notify('Added to the Inbox');
+    } else throw new Error("That link is for E9 Scribe, not the Companion.");
+    await idbSet('applied', [...applied, e.id].slice(-500));
+  }
+
+  // Scribe -> Companion: a campaign's definition and the referee's seat. The Companion keeps its own copy of
+  // Scribe's record, so the campaign opens here whichever browser or profile Scribe ran in.
+  private async receiveCampaign(e: Envelope) {
+    const rec = e.body.record as { format?: string; id?: string } | undefined;
+    if (!rec || rec.format !== 'e9-scribe-campaign' || rec.id !== e.campaign) throw new Error("That link doesn't carry a campaign from Scribe.");
+    await idbSet(`scribe-campaign:${rec.id}`, rec);
+    if (e.body.state) {
+      try {
+        const incoming = readStateFile(e.body.state, rec.id);
+        const had = (await idbGet(`state:${rec.id}`)) as { revision?: number } | undefined;
+        if (!had || incoming.revision > (Number(had.revision) || 0)) await idbSet(`state:${rec.id}`, JSON.parse(JSON.stringify(e.body.state)));
+      } catch (err) {
+        console.warn('Campaign state from Scribe not read', err);
+      }
+    }
+    if (this.settings.campaign === `scribe:${rec.id}` && this.mode === 'referee') {
+      await this.checkCampaign();
+      await this.refreshState();
+    } else await this.useCampaign(`scribe:${rec.id}`, 'referee');
+  }
+
+  // Companion -> Scribe: what play changed, for Scribe's Publish (the same parts Update campaign publishes).
+  async scribeLink(): Promise<string> {
+    const id = this.campaignId;
+    if (!id || this.mode !== 'referee') throw new Error('Switch to the referee seat first');
+    await this.exportState();
+    await this.persist();
+    const parts = await publishParts(id, idbGet);
+    const e = mailEnvelope({ campaign: id, kind: 'update', from: { role: 'referee' }, to: 'referee', body: JSON.parse(JSON.stringify(parts)) });
+    return messageLink(new URL('scribe/', location.href.replace(/[?#].*$/, '')).href, e);
   }
 
   // The referee may have changed the campaign's files; pick that up quietly.

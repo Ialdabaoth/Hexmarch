@@ -3,11 +3,13 @@
 // opens, a post URL as the body of one POST. Kinds so far:
 //   join       player -> referee: a seat's character, asking to join (WORKFLOWS.md "Joining")
 //   sent-back  referee -> player: a request returned with a note; the seat stays open
+//   campaign   Scribe -> Companion: a campaign's definition (Scribe's record) and the referee's seat
+//   update     Companion -> Scribe: what play changed (state, each party member's knowledge, receipts)
 // Approval needs no envelope of its own: the request's id appears in the next snapshot's `receipts`, and the
 // character in its state's `characters`.
 
 export const MAIL_FORMAT = 'e9-mail';
-export const MAIL_KINDS = ['join', 'sent-back'] as const;
+export const MAIL_KINDS = ['join', 'sent-back', 'campaign', 'update'] as const;
 export type MailKind = (typeof MAIL_KINDS)[number];
 
 export interface Envelope {
@@ -65,4 +67,53 @@ export function requestStatus(e: Pick<Envelope, 'id' | 'from'>, snapshot: { rece
   if (e.from.character && chars.some((c) => c?.id === e.from.character)) return 'live';
   if (sentBack) return 'sent-back';
   return snapshot?.receipts?.includes(e.id) ? 'received' : 'sent';
+}
+
+// ---- Messages as links (WORKFLOWS.md "The Link adapter" and "Apps talk by links") ---------------------------
+// The envelope rides in the link's fragment, after "#m=": JSON, deflated (CompressionStream "deflate-raw"), in
+// base64url. The fragment never reaches a server. Links between the apps may be long (browsers take about 2 MB);
+// a link sent through email or chat stays under LINK_LIMIT bytes, and anything bigger goes by URL or file.
+
+export const LINK_LIMIT = 4096;
+export const LINK_KEY = 'm';
+
+const toB64url = (bytes: Uint8Array) => {
+  let bin = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+};
+
+const fromB64url = (s: string) => {
+  const bin = atob(s.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - (s.length % 4)) % 4));
+  return Uint8Array.from(bin, (c) => c.charCodeAt(0));
+};
+
+async function pipe(bytes: Uint8Array, stream: CompressionStream | DecompressionStream): Promise<Uint8Array> {
+  const out = new Response(new Blob([bytes as BlobPart]).stream().pipeThrough(stream));
+  return new Uint8Array(await out.arrayBuffer());
+}
+
+export async function encodeMessage(e: Envelope): Promise<string> {
+  return toB64url(await pipe(new TextEncoder().encode(JSON.stringify(e)), new CompressionStream('deflate-raw')));
+}
+
+export async function decodeMessage(data: string): Promise<Envelope> {
+  let text: string;
+  try {
+    text = new TextDecoder().decode(await pipe(fromB64url(data), new DecompressionStream('deflate-raw')));
+  } catch {
+    throw new MailError("That link is cut short or isn't a message from an E9 app.");
+  }
+  return readEnvelope(JSON.parse(text));
+}
+
+// <app>#m=<data>: appUrl is the other app's address ("https://…/Hexmarch/scribe/"); any fragment it had is replaced.
+export async function messageLink(appUrl: string, e: Envelope): Promise<string> {
+  return `${appUrl.replace(/#.*$/, '')}#${LINK_KEY}=${await encodeMessage(e)}`;
+}
+
+// The message in a page's fragment (location.hash), or null when it carries none.
+export async function readMessageHash(hash: string): Promise<Envelope | null> {
+  const data = new URLSearchParams(hash.replace(/^#/, '')).get(LINK_KEY);
+  return data ? decodeMessage(data) : null;
 }
