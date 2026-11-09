@@ -1,1 +1,0 @@
-A locked player's view for the Companion's player mode (Heph 2026-11-09). With `{as: id, lock: true}` from the Companion, or `?as=<id>&lock=1` in the address, the map shows only what that character knows, plus what everyone knows. It has no referee view, no fog brush, and no way to place or move the party. A character the map hasn't been given knows only what everyone knows.
