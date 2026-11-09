@@ -46,15 +46,23 @@
 
   // Each character with what it knows (Atlas 0.5.12, character mode: the map shown as one creature sees it).
   // An older Atlas ignores it.
+  // Player mode (Heph 2026-11-09): the Atlas gets only the player's own character and is locked to it, so the map
+  // shows what that character knows and nothing else; the referee's view, the fog brush and party moves are gone.
+  let player = $derived(app.mode === 'player');
+  let mine = $derived(player ? app.sheets.filter((s) => s.id === app.invitation?.character) : app.sheets);
   function sendCharacters() {
     post({
-      characters: app.sheets.map((s) => ({ id: s.id, name: s.name, owner: s.owner, knowledge: $state.snapshot(s.knowledge) }))
+      characters: mine.map((s) => ({ id: s.id, name: s.name, owner: s.owner, knowledge: $state.snapshot(s.knowledge) })),
+      ...(player ? { as: app.invitation?.character ?? '', lock: true } : {})
     });
   }
   $effect(() => {
-    for (const s of app.sheets) void [s.name, s.owner, JSON.stringify(s.knowledge)];
+    void player;
+    for (const s of mine) void [s.name, s.owner, JSON.stringify(s.knowledge)];
     untrack(() => frame && sendCharacters());
   });
+  // A player's full-screen map stays locked to their character.
+  let lockQuery = $derived(player ? `${atlas.includes('?') ? '&' : '?'}as=${encodeURIComponent(app.invitation?.character ?? '')}&lock=1` : '');
 
   // The Atlas may still be loading its map when the frame loads, so everything is sent again when it first reports its view.
   let greeted = false;
@@ -70,7 +78,7 @@
     const d = e.data;
     if (d.module !== current.id) return;
     if (d.event === 'knowledge') {
-      await app.addKnowledge(d.ids, d.add, d.remove);
+      await app.addKnowledge(player ? d.ids.filter((id) => id === app.invitation?.character) : d.ids, d.add, d.remove);
       return;
     }
     if (d.event === 'view') {
@@ -82,7 +90,9 @@
         sendParty();
       }
     }
-    else if (d.hex === null) {
+    else if (player) {
+      // the party is the referee's to move
+    } else if (d.hex === null) {
       if (here) await app.setParty(null);
     } else {
       await app.setParty({ base: current.base, module: current.id, map: 'atlas', hex: d.hex, label: d.hex.slice(6), hours: d.hours });
@@ -112,12 +122,12 @@
   {#if atlas}
     {#key atlas}
       <div class="frame">
-        <iframe bind:this={frame} src="{atlas}{start}" title="{current.manifest.title}: E9 Atlas" onload={onLoad}></iframe>
+        <iframe bind:this={frame} src="{atlas}{lockQuery}{start}" title="{current.manifest.title}: E9 Atlas" onload={onLoad}></iframe>
       </div>
       <div class="strip small muted">
         {#if here && at}Party: hex {at.label} <button class="link" onclick={() => post({ show: `#${partyHex(at!)}` })}>Show</button> ·
-        {:else}Use the Atlas's Party button to place the party. ·{/if}
-        <a href="{atlas}{showing}" target="_blank" rel="noopener">Full screen</a>
+        {:else if !player}Use the Atlas's Party button to place the party. ·{/if}
+        <a href="{atlas}{lockQuery}{showing}" target="_blank" rel="noopener">Full screen</a>
       </div>
     {/key}
   {:else}

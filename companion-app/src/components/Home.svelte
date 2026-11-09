@@ -43,7 +43,10 @@
     }
   }
 
-  let active = $derived(app.characters.find((c) => c.id === app.settings.activeId) ?? app.party[0]);
+  // Player mode shows only the character this seat plays.
+  let active = $derived(app.mode === 'player' ? app.me : (app.characters.find((c) => c.id === app.settings.activeId) ?? app.party[0]));
+  // Player mode before a character is picked: the ones on this device that could play.
+  let choices = $derived(app.mode === 'player' && !app.me ? app.characters.filter((c) => c.data.owner !== 'referee') : []);
   let view = $derived(active ? sheetView(active.data, active.state) : undefined);
 
   function select(id: string) {
@@ -130,8 +133,23 @@
       {#if app.portraitSrc(c.data.portrait)}<img src={app.portraitSrc(c.data.portrait)} alt="" />{:else}<span>{initials(c.name)}</span>{/if}
     </button>
   {/each}
-  <button class="member add" onclick={() => (app.view = { name: 'build' })} aria-label="New character">+</button>
+  {#if app.mode === 'referee'}<button class="member add" onclick={() => (app.view = { name: 'build' })} aria-label="New character">+</button>{/if}
 </nav>
+
+{#if app.mode === 'player' && !app.me}
+  <div class="card empty">
+    <p>Who do you play in {app.campaign?.campaign.name}?</p>
+    {#if choices.length}
+      <div class="row">
+        {#each choices as c (c.id)}<button onclick={() => app.playAs(c.id)}>{c.name}</button>{/each}
+      </div>
+      <p class="muted small">Or roll up someone new.</p>
+    {:else}
+      <p class="muted small">Roll one up, or import a saved sheet from the Character tab below.</p>
+    {/if}
+    <button class="primary" onclick={() => (app.view = { name: 'build' })}>New character</button>
+  </div>
+{/if}
 
 {#if active && view}
   {#if active.data.owner === 'referee'}<p class="small muted elsewhere-note">{active.name} is an NPC you run. <button class="link" onclick={() => (app.view = { name: 'campaign' })}>Back to Creatures</button></p>{/if}
@@ -148,7 +166,7 @@
       <button class:on={page === i} onclick={() => { page = i; card?.showPage(i); }}>{label}</button>
     {/each}
   </div>
-{:else}
+{:else if app.mode === 'referee'}
   <div class="card empty">
     <p>No characters yet.</p>
     <p class="muted small">Roll one up, or import a saved sheet.</p>

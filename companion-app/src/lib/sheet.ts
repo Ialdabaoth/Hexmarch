@@ -31,6 +31,10 @@ export interface KnowledgeEntry {
   hex?: string;
   place?: string;
   handout?: string;
+  // A creature heard of or met (its id in the campaign: a sheet, a creature or a module creature), and the name the
+  // character knows it by. "rumour": true when only heard of (Companion player mode lists these).
+  creature?: string;
+  name?: string;
   // How it was learned ("scouted alone", "told by the abbot").
   how?: string;
   note?: string;
@@ -142,12 +146,12 @@ export function readKnowledge(v: unknown): KnowledgeEntry[] {
     const o = r as Record<string, unknown>;
     const e: KnowledgeEntry = {};
     if (Number.isInteger(o.session) && (o.session as number) >= 0) e.session = o.session as number;
-    for (const k of ['module', 'hex', 'place', 'handout', 'how', 'note'] as const) {
+    for (const k of ['module', 'hex', 'place', 'handout', 'creature', 'name', 'how', 'note'] as const) {
       if (typeof o[k] === 'string' && (o[k] as string).trim()) e[k] = (o[k] as string).trim();
     }
     if (o.explored === true) e.explored = true;
     if (o.rumour === true) e.rumour = true;
-    return e.hex || e.place || e.handout || e.note ? [e] : [];
+    return e.hex || e.place || e.handout || e.creature || e.note ? [e] : [];
   });
 }
 
@@ -156,11 +160,14 @@ export function readKnowledge(v: unknown): KnowledgeEntry[] {
 export function mergeKnowledge(list: KnowledgeEntry[], add: KnowledgeEntry[], remove: string[] = []): KnowledgeEntry[] {
   const out = list.filter((e) => !(e.hex && remove.includes(e.hex))).map((e) => ({ ...e }));
   for (const a of readKnowledge(add)) {
-    const o = out.find((e) => e.module === a.module && ((a.hex && e.hex === a.hex) || (a.place && e.place === a.place)));
+    const o = out.find((e) => e.module === a.module && ((a.hex && e.hex === a.hex) || (a.place && e.place === a.place) || (a.creature && e.creature === a.creature)));
     if (!o) out.push(a);
     else {
       if (a.explored) o.explored = true;
-      if (!a.rumour && o.rumour) delete o.rumour;
+      if (!a.rumour && o.rumour) {
+        delete o.rumour;
+        if (a.name) o.name = a.name;
+      }
     }
   }
   return out;

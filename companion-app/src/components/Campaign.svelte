@@ -6,6 +6,7 @@
   import Art from './Art.svelte';
   import Creatures from './Creatures.svelte';
   import CampaignState from './CampaignState.svelte';
+  import { knownCreatures } from '../lib/invitations';
 
   // The game being played (the campaign itself is chosen in Settings): its parties, maps, events, history and
   // procedures, and who is in it. Shared campaigns arrive with sign-in; for now
@@ -17,6 +18,12 @@
       return c.classId;
     }
   }
+
+  // Player mode: your party as the referee's state file lists it, and the NPCs your character has heard of or met.
+  let player = $derived(app.mode === 'player');
+  let me = $derived(app.me);
+  let partyNames = $derived(app.state.characters.filter((c) => c.id !== me?.id));
+  let known = $derived(me ? knownCreatures(me.data.knowledge) : []);
 
   function open(id: string) {
     app.updateSettings({ activeId: id });
@@ -32,8 +39,33 @@
 </p>
 
 <details class="section" open>
-  <summary><h2>Parties</h2></summary>
-  {#if app.party.length}
+  <summary><h2>{player ? 'Your party' : 'Parties'}</h2></summary>
+  {#if player}
+    {#if me}
+      <ul class="tree">
+        <li>
+          <button class="link" onclick={() => open(me.id)}>{me.name}</button> <span class="small muted">{className(me)} {me.level} · you</span>
+          {#if me.data.followers.length}
+            <ul>
+              {#each me.data.followers as f (f.id)}<li class="small">{f.name} <span class="muted">· {f.kind === 'beast' ? 'beast' : 'follower'}, level {f.level}</span></li>{/each}
+            </ul>
+          {/if}
+        </li>
+        {#each partyNames as c (c.id)}<li>{c.name}</li>{/each}
+      </ul>
+      {#if !partyNames.length}<p class="small muted">The rest of your party shows here once the referee shares the campaign state.</p>{/if}
+      <h3>People you know of</h3>
+      {#if known.length}
+        <ul class="tree">
+          {#each known as k (k.id)}<li>{k.name} <span class="small muted">· {k.met ? 'met' : 'heard of'}{k.how ? `, ${k.how}` : ''}</span></li>{/each}
+        </ul>
+      {:else}
+        <p class="small muted">No one yet. NPCs {me.name} meets or hears of are listed here.</p>
+      {/if}
+    {:else}
+      <p class="small muted">Pick or make your character in the Party tab.</p>
+    {/if}
+  {:else if app.party.length}
     <ul class="tree">
       <li>
         <strong>Party</strong> <span class="small muted">· active{app.state.party ? ` · hex ${app.state.party.label}` : ''}</span>
@@ -61,18 +93,20 @@
 
 <details class="section" open>
   <summary><h2>State</h2></summary>
-  <CampaignState />
+  <CampaignState readonly={player} />
 </details>
 
-<details class="section" open>
-  <summary><h2>Creatures</h2></summary>
-  <Creatures />
-</details>
+{#if !player}
+  <details class="section" open>
+    <summary><h2>Creatures</h2></summary>
+    <Creatures />
+  </details>
+{/if}
 
 <details class="section" open>
   <summary><h2>Maps</h2></summary>
   <ModuleMaps />
-  <Maps />
+  {#if !player}<Maps />{/if}
 </details>
 
 <details class="section">
@@ -90,6 +124,7 @@
   <p class="small muted">The campaign's chronicle, one entry per session, with the option to undo back to any of them. Nothing recorded yet.</p>
 </details>
 
+{#if !player}
 <details class="section">
   <summary><h2>Art</h2></summary>
   <Art />
@@ -103,6 +138,7 @@
   </section>
   <Modules />
 </details>
+{/if}
 
 <style>
   .tree, .tree ul { list-style: none; margin: 0.25rem 0 0; padding-left: 1rem; }
