@@ -19,12 +19,12 @@ The first time, the bridge saves the map picture in `Data/hexmarch-maps/` and bu
 
 ## What it does in Foundry
 
-| E9 | Foundry |
+| Hexmarch | Foundry |
 |---|---|
 | map picture, 5-ft squares | scene background, square grid of the map's pixels per square, 5 ft |
 | walls, doors (secret, locked) | walls; doors as door walls (secret doors, locked doors) |
 | lights (fires) | ambient lights, dim radius = range, bright = half |
-| creatures | tokens named after the creature, without actors for now (the E9 card is the stat block) |
+| creatures | tokens named after the creature, without actors for now (the Hexmarch card is the stat block) |
 | party | each player's assigned character: its token is moved to the entrance, or made there |
 
 ## Settings

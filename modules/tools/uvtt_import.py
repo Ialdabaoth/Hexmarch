@@ -6,7 +6,7 @@
 Writes encounter-maps/<id>/map.<png|jpg|webp> (the embedded picture, bytes unchanged) and encounter-maps/<id>.json:
 size and pixels per square from "resolution", walls from "line_of_sight" and "objects_line_of_sight", doors from
 "portals", lights and environment as they are. Points are moved by "map_origin" so the map starts at square 0, 0.
-A file that E9 exported carries an "e9" block; its title, grid, areas, links, anchor, spawns, secret and locked doors,
+A file the Hexmarch Atlas exported carries a "hexmarch" block; its title, grid, areas, links, anchor, spawns, secret and locked doors,
 licence and credit come back too. Anything else (areas, links, scenes, the site_encounters pointer) is the module
 author's to add. The licence is left empty for a file from elsewhere: set it before publishing.
 Run encounter_check.py on the module afterwards.
@@ -30,7 +30,7 @@ def main():
     ap.add_argument('file'); ap.add_argument('out', help='the module\'s encounter-maps folder')
     ap.add_argument('--id'); ap.add_argument('--title'); ap.add_argument('--ft', type=float)
     a = ap.parse_args()
-    u = json.load(open(a.file, encoding='utf-8')); e9 = u.get('e9') or {}
+    u = json.load(open(a.file, encoding='utf-8')); e9 = u.get('hexmarch') or {}
     mid = a.id or e9.get('id') or re.sub(r'[^a-z0-9]+', '-', os.path.splitext(os.path.basename(a.file))[0].lower()).strip('-')
     if not re.fullmatch(r'[a-z0-9][a-z0-9-]*', mid): sys.exit(f'map id {mid!r}: use lower-case letters, digits and hyphens')
     res = u['resolution']; ox, oy = res.get('map_origin', {}).get('x', 0), res.get('map_origin', {}).get('y', 0)

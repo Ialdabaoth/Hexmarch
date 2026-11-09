@@ -6,6 +6,6 @@
   "compatibility": { "minimum": "12", "verified": "13" },
   "authors": [{ "name": "Heph (Bakagaijin Productions)" }],
   "esmodules": ["scripts/hexmarch-bridge.js"],
-  "url": "https://github.com/Ialdabaoth/MateriaMundiRPG",
+  "url": "https://github.com/Ialdabaoth/Hexmarch",
   "license": "CC-BY-4.0"
 }

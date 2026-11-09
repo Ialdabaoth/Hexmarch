@@ -33,13 +33,13 @@
 <dialog id="e9map" aria-labelledby="e9map-h"></dialog>
 <script>
 "use strict";
-// E9Map.open(pointers, title): one pointer opens its map at the pointed area; several show a picker first.
-// The page sets E9Map.base (the module folder, ending in /), E9Map.module (its id), E9Map.creatures (as for E9Card) and E9Map.scenes (encounters.scenes).
-// E9Map.load(id) gives a map file with its defaults filled in (the one place export and import code should read maps from).
-// E9Map.place(map, where, tokens, taken) -> one [x, y] per token (ENCOUNTER_FORMAT.md 14.1); where is a spawn id, an area id or [x, y, w, h].
-// E9Map.places: the world's places with maps, [{name, pointers, go()}]; a map lists the ones it leads back out to (section 14.3).
-// E9Map.actions: header buttons for the map on screen, [{label, title, show(map) -> bool, run(map, pointer)}]; VTT export and links plug in here.
-window.E9Map = (() => {
+// HexmarchMap.open(pointers, title): one pointer opens its map at the pointed area; several show a picker first.
+// The page sets HexmarchMap.base (the module folder, ending in /), HexmarchMap.module (its id), HexmarchMap.creatures (as for HexmarchCard) and HexmarchMap.scenes (encounters.scenes).
+// HexmarchMap.load(id) gives a map file with its defaults filled in (the one place export and import code should read maps from).
+// HexmarchMap.place(map, where, tokens, taken) -> one [x, y] per token (ENCOUNTER_FORMAT.md 14.1); where is a spawn id, an area id or [x, y, w, h].
+// HexmarchMap.places: the world's places with maps, [{name, pointers, go()}]; a map lists the ones it leads back out to (section 14.3).
+// HexmarchMap.actions: header buttons for the map on screen, [{label, title, show(map) -> bool, run(map, pointer)}]; VTT export and links plug in here.
+window.HexmarchMap = (() => {
   const dlg = document.getElementById('e9map'), cache = {};
   const e = t => String(t ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
   const api = { base: '', module: '', creatures: [], scenes: {}, actions: [], places: [], open, show, load, place };
@@ -209,7 +209,7 @@ window.E9Map = (() => {
       b.textContent = c ? c.name : w.creature;
       const n = [w.count !== undefined && w.count !== 1 ? '×' + w.count : '', w.chance ? '(' + w.chance + ')' : ''].filter(Boolean).join(' ');
       if (n) b.append(' ', Object.assign(document.createElement('small'), { textContent: n }));
-      if (c && window.E9Card) b.onclick = () => E9Card.show(c); else b.disabled = true;
+      if (c && window.HexmarchCard) b.onclick = () => HexmarchCard.show(c); else b.disabled = true;
       li.append(b); ul.append(li);
     }
     return ul;
