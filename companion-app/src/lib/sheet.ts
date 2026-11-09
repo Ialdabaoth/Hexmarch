@@ -34,7 +34,7 @@ export interface KnowledgeEntry {
   // How it was learned ("scouted alone", "told by the abbot").
   how?: string;
   note?: string;
-  // Fog of war (Atlas 0.5.16): the hex has been searched, which shows its hidden sites; or it is only a rumour.
+  // Fog of war (Atlas 0.5.17): the hex has been searched, which shows its hidden sites; or it is only a rumour.
   explored?: true;
   rumour?: true;
 }

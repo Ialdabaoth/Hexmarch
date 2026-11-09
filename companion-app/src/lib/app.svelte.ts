@@ -170,7 +170,7 @@ class AppState {
     } catch (e) {
       console.warn('Campaign state unreadable', e);
     }
-    // The Atlas on its own (Atlas 0.5.16) writes what the party saw into the sheets on this device: take that knowledge.
+    // The Atlas on its own (Atlas 0.5.17) writes what the party saw into the sheets on this device: take that knowledge.
     try {
       for (const f of await loadSheets()) {
         const s = this.sheets.find((x) => x.id === f.id);

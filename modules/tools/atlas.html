@@ -524,7 +524,7 @@ function idb(fn) {
 }
 const idbGet = k => idb((db, ok, no) => { const r = db.transaction('keyval').objectStore('keyval').get(k); r.onsuccess = () => { db.close(); ok(r.result); }; r.onerror = () => { db.close(); no(r.error); }; });
 const idbSet = (k, v) => idb((db, ok, no) => { const t = db.transaction('keyval', 'readwrite'); t.objectStore('keyval').put(v, k); t.oncomplete = () => { db.close(); ok(); }; t.onerror = () => { db.close(); no(t.error); }; });
-// A link may name the campaign (E9 Scribe's "Open in the Atlas", Atlas 0.5.15): ?campaign=<the Companion's link for it>, and ?place=site:<id> puts the party
+// A link may name the campaign (E9 Scribe's "Open in the Atlas", Atlas 0.5.16): ?campaign=<the Companion's link for it>, and ?place=site:<id> puts the party
 // on that place's hex when the campaign has no party yet (a new campaign's start). The settings and the campaigns list hold links; state files go by campaign id.
 const ASK = new URLSearchParams(location.search), ASK_CAMPAIGN = ASK.get('campaign'), ASK_PLACE = ASK.get('place');
 async function campaignIdOf(url) {
@@ -587,7 +587,7 @@ function know() {
   POIS = null; SHOWN.clear(); if (D) { fogBuild(); crumbs(); partyBox(); redraw(); }
 }
 
-// ---- fog of war (Heph 2026-11-09, Atlas 0.5.16; ATLAS_FORMAT.md "Fog of war"). Each hex of the painted level (the League, or a
+// ---- fog of war (Heph 2026-11-09, Atlas 0.5.17; ATLAS_FORMAT.md "Fog of war"). Each hex of the painted level (the League, or a
 // fantasy world's painted hex) is in one of six states for the creature the map is shown as, or for the party when the referee
 // previews it: in sight and explored, in sight and visited, explored, visited, rumoured, or unknown. Visited means someone has
 // seen it or passed through; explored means it has been searched, which shows its hidden sites. What a creature knows is kept in

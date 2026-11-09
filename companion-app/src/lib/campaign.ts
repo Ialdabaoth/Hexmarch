@@ -118,7 +118,7 @@ export function activateCampaign(c: CampaignCache | null) {
   useCampaignEquipment(c ? campaignFileIds(c) : null);
 }
 
-// Campaigns made in E9 Scribe (data repo modules/SCRIBE.md section 1, step 7; Companion 0.5.14). A campaign
+// Campaigns made in E9 Scribe (data repo modules/SCRIBE.md section 1, step 7; Companion 0.5.15). A campaign
 // is a private module, kept on the device that made it: Scribe saves it here as "scribe-campaign:<id>", and the
 // Companion opens it by the link "scribe:<id>", with nothing to fetch. Its ruleset is its root's; its equipment
 // is that ruleset's own. The state file Scribe wrote first is "state:<id>", as for any campaign.
