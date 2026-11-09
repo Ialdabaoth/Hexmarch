@@ -3,32 +3,63 @@
   import { isWebhookUrl } from '../lib/discord';
   import { DEFAULT_RULES, RULESETS, findRules } from '../rules/rules';
   import { DEFAULT_DICE_COLOR, DEFAULT_DICE_INK, showDice } from '../lib/dice3d';
+  import { inviteLink, readInvite, invitationLabel, type Role } from '../lib/invitations';
 
   const d20 = () => ({ sides: 20, value: 1 + Math.floor(Math.random() * 20), kept: true });
   function tryDice() {
     showDice({ dice: [d20(), d20()] }, app.diceColors);
   }
 
-  // Which campaign this device plays in.
+  // Which campaign this device plays in, and in which seat: one entry per invitation, as referee or as a player.
+  // The seat sets the mode (Heph 2026-11-09).
   let busy = $state(false);
-  async function choose(link: string) {
+  async function run(f: () => Promise<unknown>) {
     busy = true;
     try {
-      if (link) await app.switchCampaign(link);
-      else await app.leaveCampaign();
+      await f();
     } catch (e) {
       app.notify((e as Error).message);
     }
     busy = false;
   }
-  async function refresh() {
-    busy = true;
+  const choose = (id: string) => run(() => (id ? app.chooseInvitation(id) : app.leaveCampaign()));
+  const refresh = () => run(() => app.checkCampaign());
+
+  function label(s: (typeof app.invitations)[number]): string {
+    const name = app.campaigns[s.url]?.campaign.name ?? s.name ?? s.url;
+    return invitationLabel(s, name, s.character ? app.character(s.character)?.name : undefined);
+  }
+  let invitations = $derived(app.invitations.slice().sort((a, b) => label(a).localeCompare(label(b))));
+
+  // Until invitations arrive by sign-in, an invitation is a link, pasted here or opened.
+  let joinUrl = $state('');
+  let joinRole = $state<Role>('player');
+  // A pasted invitation link names its own seat; a plain campaign link takes the one picked here.
+  function invitation(text: string) {
     try {
-      await app.useCampaign(app.settings.campaign);
-    } catch (e) {
-      app.notify((e as Error).message);
+      const u = new URL(text);
+      if (u.searchParams.has('campaign')) return readInvite(u.search);
+    } catch {
+      // not a link with an invitation in it
     }
-    busy = false;
+    return null;
+  }
+  const join = () => run(async () => {
+    const i = invitation(joinUrl.trim());
+    await app.useCampaign(i?.url ?? joinUrl.trim(), i?.role ?? joinRole, i?.character);
+    joinUrl = '';
+  });
+
+  // The referee's invitation link for a player: the campaign and, optionally, the character they play.
+  let inviteFor = $state('');
+  let invite = $derived(app.campaign ? inviteLink(location.origin + location.pathname, { url: app.settings.campaign, role: 'player', ...(inviteFor ? { character: inviteFor } : {}) }) : '');
+  async function copyInvite() {
+    try {
+      await navigator.clipboard.writeText(invite);
+      app.notify('Invitation link copied');
+    } catch {
+      app.notify("Couldn't copy; select the link and copy it instead");
+    }
   }
 
   let url = $state(app.settings.webhookUrl);
@@ -66,19 +97,43 @@
 
 <section class="card" style="margin-top:0.75rem">
   <h3>Campaign</h3>
-  <select aria-label="Campaign" value={app.campaign ? app.settings.campaign : ''} disabled={busy}
+  <select aria-label="Campaign" value={app.invitation ? app.invitation.id : ''} disabled={busy}
     onchange={(e) => choose((e.target as HTMLSelectElement).value)}>
-    <option value="">This device</option>
-    {#each Object.values(app.campaigns) as c (c.url)}<option value={c.url}>{c.campaign.name}</option>{/each}
+    <option value="">This device · referee</option>
+    {#each invitations as s (s.id)}<option value={s.id}>{label(s)}</option>{/each}
   </select>
   {#if app.campaign}
     <p class="small muted">
+      {app.mode === 'player' ? 'Player mode: your character, your party and what your character knows.' : 'Referee mode: everything in the campaign.'}
       Run by {app.campaign.campaign.referee || 'your referee'}. Checked {new Date(app.campaign.fetchedAt).toLocaleDateString()}.
       <button class="link" disabled={busy} onclick={refresh}>Check for changes</button>
+      {#if app.invitation}<button class="link" disabled={busy} onclick={() => app.invitation && run(() => app.forgetInvitation(app.invitation!.id))}>Remove from this device</button>{/if}
     </p>
+    {#if app.mode === 'referee'}
+      <details>
+        <summary class="small">Invite a player</summary>
+        <p class="small muted">Send this link to a player. Opening it adds the campaign to their switcher in player mode.</p>
+        <select aria-label="Character the player plays" bind:value={inviteFor}>
+          <option value="">They pick or make a character</option>
+          {#each app.characters.filter((c) => c.data.owner !== 'referee') as c (c.id)}<option value={c.id}>To play {c.name}</option>{/each}
+        </select>
+        <input readonly value={invite} aria-label="Invitation link" onfocus={(e) => (e.target as HTMLInputElement).select()} />
+        <button onclick={copyInvite}>Copy link</button>
+      </details>
+    {/if}
   {:else}
-    <p class="small muted">Your characters, maps and notes on this phone. Joining a referee's campaign arrives with sign-in.</p>
+    <p class="small muted">Your characters, maps and notes on this phone, in referee mode.</p>
   {/if}
+  <details>
+    <summary class="small">Add a campaign</summary>
+    <label for="join">Campaign or invitation link</label>
+    <input id="join" bind:value={joinUrl} placeholder="https://…/campaign.json" autocapitalize="off" autocomplete="off" />
+    <div class="row" style="margin-top:0.5rem">
+      <label class="check small"><input type="radio" bind:group={joinRole} value="player" /> As a player</label>
+      <label class="check small"><input type="radio" bind:group={joinRole} value="referee" /> As the referee</label>
+      <button class="primary" disabled={busy || !joinUrl.trim()} onclick={join}>Add</button>
+    </div>
+  </details>
 </section>
 
 <section class="card" style="margin-top:0.75rem">

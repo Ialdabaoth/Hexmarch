@@ -240,6 +240,17 @@
   }
 </script>
 
+<!-- What the party knows of this creature: an entry on each party member's sheet, which their player's Companion lists
+     (player mode, Campaign › Your party). -->
+{#snippet known(id: string, name: string)}
+  {#if app.party.length}
+    <div class="row small">
+      <button class="ghost" onclick={() => app.partyKnows(id, name, false)}>The party met them</button>
+      <button class="ghost" onclick={() => app.partyKnows(id, name, true)}>The party heard of them</button>
+    </div>
+  {/if}
+{/snippet}
+
 <p class="small muted">Monsters, NPCs and beasts you run, for {app.campaign ? app.campaign.campaign.name : 'this device'} ({rules.name}). Each is a copy of its bestiary entry, so changing it here never changes the book.</p>
 
 <div class="row add">
@@ -297,6 +308,7 @@
       <button class="ghost" onclick={() => joinParty(c, 'party')}>Join the party</button>
       <button class="ghost failure" onclick={() => remove(c)}>Remove</button>
     </div>
+    {@render known(c.id, sheet?.name ?? c.name)}
   </div>
   {:else}
   <div class="card creature">
@@ -385,6 +397,7 @@
           {#if c.hp.length > 1}<button class="ghost" onclick={() => removeMember(c, c.hp.length - 1)}>One fewer</button>{/if}
           <button class="ghost failure" onclick={() => remove(c)}>Remove {c.name}</button>
         </div>
+        {@render known(c.id, c.name)}
       </div>
     {/if}
   </div>

@@ -475,7 +475,7 @@ function routeBox() {
   let h = `<b>Route</b> · ${STOPS.length} stop${STOPS.length === 1 ? '' : 's'} · ${r.mi.toFixed(r.mi < 10 ? 1 : 0)} mi`;
   if (STOPS.length > 1) h += r.blocked ? ` · <b>crosses ${esc(TYPES.find(t => t.id === r.blocked).name.toLowerCase())}</b>: no way on foot`
     : ` · ${hm(r.hours)}${r.days >= .5 ? ` · ${r.days.toFixed(1)} days of ${P.hours_per_day || 8} h` : ''}`;
-  h += `<br><small>Terrain read from ${unit}${unknown > .05 ? `; ${unknown.toFixed(1)} mi unmapped, at normal pace` : ''}${onRoad > .05 ? `; ${onRoad.toFixed(onRoad < 10 ? 1 : 0)} mi on roads` : ''}.</small><br>${STOPS.length > 1 && !r.blocked ? `<button data-r="move" title="Put the party at the last stop and add the travel time">Move party here</button>` : ''}<button data-r="undo">Undo</button><button data-r="clear">Clear</button><button data-r="done">Done</button>`;
+  h += `<br><small>Terrain read from ${unit}${unknown > .05 ? `; ${unknown.toFixed(1)} mi unmapped, at normal pace` : ''}${onRoad > .05 ? `; ${onRoad.toFixed(onRoad < 10 ? 1 : 0)} mi on roads` : ''}.</small><br>${STOPS.length > 1 && !r.blocked && !LOCK ? `<button data-r="move" title="Put the party at the last stop and add the travel time">Move party here</button>` : ''}<button data-r="undo">Undo</button><button data-r="clear">Clear</button><button data-r="done">Done</button>`;
   box.innerHTML = h;
 }
 document.getElementById('route').addEventListener('click', e => { const b = e.target.closest('button[data-r]'); if (!b) return;
@@ -546,7 +546,7 @@ async function loadState() {
     if (p && typeof p.hex === 'string' && CS_ADDR.test(p.hex)) { CS = csBlank(); CS.party = { base: MOD.base, module: MOD.id, map: 'atlas', hex: p.hex, label: p.hex.slice(6), hours: +p.hours || 0 }; CS_SRC = 'local'; store.set(CS_KEY, JSON.stringify(CS)); }
   } catch (e) {}
   fromState();
-  if (CS && CS_SRC === 'device' && !CS.party && ASK_PLACE) { const m = ASK_PLACE.match(/^site:([a-z0-9-]{1,80})$/), p = m && D.pois.find(q => q.id === m[1]); if (p) await setParty(p.hex, 0); }
+  if (CS && CS_SRC === 'device' && !CS.party && ASK_PLACE && !LOCK) { const m = ASK_PLACE.match(/^site:([a-z0-9-]{1,80})$/), p = m && D.pois.find(q => q.id === m[1]); if (p) await setParty(p.hex, 0); }
 }
 function fromState() {  // the marker from the state file: the party shows only on its own module's map
   const p = CS && CS.party, q = p && p.module === MOD.id && parse('#' + p.hex);
@@ -561,6 +561,9 @@ let FOUND = new Set();
 // the sheets the Companion hands over, the Companion's sheets on this device, or a character or creature file loaded here.
 // It is a view, not a lock: anyone at the map can switch back to the referee's view. Showing several creatures at once comes later.
 let WHO = [], WHO_SRC = '', AS = '', KNOW = null;  // WHO: [{id, name, owner, knowledge}]; AS: the id shown as ('' = the referee, everything)
+// A player's view (the Companion's player mode, Heph 2026-11-09): locked to one character, with no referee view, no fog brush and no
+// party moves. The Companion asks for it ({as: id, lock: true}); a full-screen link carries ?as=<id>&lock=1.
+let LOCK = new URLSearchParams(location.search).get('lock') === '1';
 const WHO_KEY = 'e9-atlas-who';
 function whoRead(r) {  // a sheet as the device keeps it, a whole character or creature file, or one part of one (a knowledge part has no name)
   if (!r || typeof r !== 'object' || typeof r.id !== 'string' || !r.id) return null;
@@ -577,11 +580,12 @@ async function loadWho() {
     try { const raw = await idbGet('sheets'); if (Array.isArray(raw) && raw.length) { WHO = whoFile(raw); WHO_SRC = 'device'; } } catch (e) {}
     try { const kept = whoFile(JSON.parse(store.get(WHO_KEY) || '[]')); if (kept.length) { whoMerge(WHO, kept); WHO_SRC = WHO_SRC || 'local'; } } catch (e) {}
   }
-  const q = new URLSearchParams(location.search).get('as'); AS = q !== null ? q : store.get('e9-atlas-as:' + MOD.id) || '';
+  const q = new URLSearchParams(location.search).get('as'); AS = q !== null ? q : LOCK ? AS : store.get('e9-atlas-as:' + MOD.id) || '';
   know();
 }
 function know() {
-  const w = AS && WHO.find(x => x.id === AS), mine = e => !e.module || e.module === MOD.id, r = CS && CS.revealed[MOD.id] || { hexes: [], places: [] };
+  // locked to a character this map hasn't been given yet: it knows only what everyone knows, never the referee's whole map
+  const w = AS && (WHO.find(x => x.id === AS) || (LOCK ? { id: AS, name: '', owner: '', knowledge: [] } : null)), mine = e => !e.module || e.module === MOD.id, r = CS && CS.revealed[MOD.id] || { hexes: [], places: [] };
   KNOW = w ? { who: w, places: new Set([...r.places, ...w.knowledge.filter(e => mine(e) && e.place && !e.rumour).map(e => e.place)]),
     hexes: [...new Set([...r.hexes, ...w.knowledge.filter(e => mine(e) && !e.rumour && CS_ADDR.test(e.hex)).map(e => e.hex)])].map(h => parse('#' + h).sel).filter(Boolean) } : null;
   POIS = null; SHOWN.clear(); if (D) { fogBuild(); crumbs(); partyBox(); redraw(); }
@@ -674,6 +678,7 @@ async function brushAt(x, y) {  // the referee's brush: paints one painted-level
   else await addKnowledge(ids, seenEntries([k], BRUSH === 'explored' ? { how: 'explored', explored: true } : BRUSH === 'rumour' ? { how: 'rumour', rumour: true } : { how: 'referee' }), BRUSH === 'rumour' ? [] : [...old].filter(h => h !== addr(C0, R0).slice(1)));
 }
 function setAs(id, quiet) {
+  if (LOCK && !quiet) return;
   AS = id; store.set('e9-atlas-as:' + MOD.id, id); know();
   if (!quiet && parent !== window) parent.postMessage({ type: 'e9-atlas', event: 'as', module: MOD.id, id }, '*');
 }
@@ -682,11 +687,13 @@ function shown(p) {  // a place drawn and listed in this view: in character mode
   v = (KNOW && KNOW.places.has(p.id)) || (!!FOG && fogPlace(p)); SHOWN.set(p.id, v); return v;
 }
 function fogLine() {  // the referee's fog controls: preview the party's view, and the brush
+  if (LOCK) return '';
   const b = (v, t) => `<button data-fb="${v}"${BRUSH === v ? ' class="on"' : ''}>${t}</button>`;
   return `<hr><label><input type="checkbox" data-fog${PREVIEW || KNOW ? ' checked' : ''}${KNOW ? ' disabled title="Character mode always shows that one\'s fog"' : ''}> <small>Fog of war ${KNOW ? '(' + esc(whoName(KNOW.who)) + ')' : '(the party’s view)'}</small></label>`
     + (FOG ? `<br><small>Brush${BRUSH ? ': click hexes' : ''}</small> ${b('visited', 'Visited')}${b('explored', 'Explored')}${b('rumour', 'Rumoured')}${b('hide', 'Hide')}${BRUSH ? b('', 'Done') : ''}` : '');
 }
 function asLine() {
+  if (LOCK) return `<hr><small>The map as ${esc(KNOW ? whoName(KNOW.who) : 'your character')} knows it</small>`;
   const opt = (v, t) => `<option value="${esc(v)}"${v === AS ? ' selected' : ''}>${esc(t)}</option>`;
   const n = KNOW && D.pois.filter(shown).length, h = KNOW && KNOW.hexes.length;
   return '<hr><small>Show the map as</small> <select data-as aria-label="Show the map as">' + opt('', 'Referee (everything)')
@@ -765,10 +772,12 @@ function partyBox() {
   const box = document.getElementById('party'); box.hidden = !(PBOX || PLACE); document.getElementById('partybtn').classList.toggle('on', !box.hidden); if (box.hidden) return;
   const P = (D.travel || {}).pace || {}, day = P.hours_per_day || 8;
   if (PLACE) { box.innerHTML = '<b>Party</b> · click a hex to put the party there. <small>Esc cancels.</small><br><button data-p="cancel">Cancel</button>'; return; }
+  if (!PARTY && LOCK) { box.innerHTML = `<b>Party</b> · not on this map.<br><button data-p="close">Close</button><hr>${stateLine()}${asLine()}`; return; }
   if (!PARTY) { box.innerHTML = `<b>Party</b> · not on this map.<br><button data-p="place">Place the party</button><button data-p="close">Close</button><hr>${stateLine()}${asLine()}${fogLine()}`; return; }
   const [C, R] = PARTY.hex, t = T(C, R, 1), h = addr(C, R), lbl = h.slice(7);
   box.innerHTML = `<b>Party</b> · at <a href="${h}">${lbl}</a>${t ? ' · ' + esc(TYPES[t - 1].name.toLowerCase()) : ''}<br><small>Travelled ${hm(PARTY.hours)}${PARTY.hours >= day / 2 ? ` (${(PARTY.hours / day).toFixed(1)} days of ${day} h)` : ''}</small><br>`
-    + '<button data-p="go">Go to</button><button data-p="place">Move</button><button data-p="reset" title="Set the travel time back to zero (the campaign clock keeps its time)">Reset time</button><button data-p="remove">Remove</button><button data-p="close">Close</button>'
+    + (LOCK ? '<button data-p="go">Go to</button><button data-p="close">Close</button>'
+      : '<button data-p="go">Go to</button><button data-p="place">Move</button><button data-p="reset" title="Set the travel time back to zero (the campaign clock keeps its time)">Reset time</button><button data-p="remove">Remove</button><button data-p="close">Close</button>')
     + `<hr>${stateLine()}${asLine()}${fogLine()}`;
 }
 function saveFile() {  // the state file as written: plain JSON, as the Companion saves it (Campaign › State)
@@ -785,7 +794,7 @@ function loadFile() {
   inp.click();
 }
 document.getElementById('party').addEventListener('click', e => { const b = e.target.closest('button[data-p]'); if (!b) return; const a = b.dataset.p;
-  if (a === 'place') { PLACE = true; hoverHint(); } else if (a === 'cancel') { PLACE = false; hoverHint(); } else if (a === 'close') PBOX = false;
+  if (a === 'place' && !LOCK) { PLACE = true; hoverHint(); } else if (a === 'cancel') { PLACE = false; hoverHint(); } else if (a === 'close') PBOX = false;
   else if (a === 'go') location.hash = addr(...PARTY.hex); else if (a === 'reset') setParty(PARTY.hex, 0); else if (a === 'remove') setParty(null);
   else if (a === 'save') { if (CS) saveFile(); return; } else if (a === 'load') { loadFile(); return; } else if (a === 'who') { loadWhoFile(); return; }
   partyBox(); });
@@ -793,7 +802,7 @@ document.getElementById('party').addEventListener('change', e => { if (e.target.
   else if (e.target.matches('input[data-fog]')) { PREVIEW = e.target.checked; if (!PREVIEW && !KNOW) BRUSH = ''; know(); } });
 document.getElementById('party').addEventListener('click', e => { const b = e.target.closest('button[data-fb]'); if (!b) return; BRUSH = BRUSH === b.dataset.fb ? '' : b.dataset.fb; PLACE = false;
   document.getElementById('hover').textContent = BRUSH ? `Brush: click a hex to mark it ${BRUSH === 'hide' ? 'unknown' : BRUSH}.` : 'Click a hex to zoom in.'; partyBox(); });
-document.getElementById('partybtn').onclick = () => { if (PBOX || PLACE) { PBOX = PLACE = false; hoverHint(); } else { PBOX = true; if (!PARTY && !CS) { PLACE = true; hoverHint(); } } partyBox(); };
+document.getElementById('partybtn').onclick = () => { if (PBOX || PLACE) { PBOX = PLACE = false; hoverHint(); } else { PBOX = true; if (!PARTY && !CS && !LOCK) { PLACE = true; hoverHint(); } } partyBox(); };
 // the Companion's own tab may change the file: read it again when this tab comes back
 document.addEventListener('visibilitychange', () => { if (!document.hidden && MOD && D && CS_SRC === 'device') deviceState().then(s => { if (s && (!CS || s.campaign !== CS.campaign || s.revision !== CS.revision)) { CS = s; fromState(); } }).catch(() => {}); if (!document.hidden && MOD && D && WHO_SRC !== 'host') loadWho(); });
 // an app that embeds the Atlas may show an address ({type: 'e9-atlas', show: '#world:LLLL:HHHH'}, Atlas 0.5.6)
@@ -803,6 +812,7 @@ addEventListener('message', e => { const d = e.data; if (D && d && d.type === 'e
 addEventListener('message', e => { const d = e.data; if (e.source !== parent || parent === window || !D || !MOD || !d || d.type !== 'e9-atlas') return;
   // and the creatures it keeps, with what each knows ({characters: [{id, name, owner, knowledge}]}), and which one to show the map as ({as: id | ''}), Atlas 0.5.12
   if ('characters' in d) { WHO = whoFile(Array.isArray(d.characters) ? d.characters : []); WHO_SRC = 'host'; know(); }
+  if (d.lock === true) LOCK = true;
   if (typeof d.as === 'string') setAs(d.as, true);
   if ('state' in d) { try { CS = csRead(d.state); CS_SRC = 'host'; fromState(); } catch (x) {} return; }
   if (!('party' in d)) return;

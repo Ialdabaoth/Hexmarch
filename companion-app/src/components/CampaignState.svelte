@@ -5,6 +5,8 @@
 
   // The campaign state file: where the party stands, the clock, what's been found and the session.
   // It lives on this device for now; with sign-in, Update campaign commits it as campaign/state.json.
+  // A player (player mode) reads it and can load the file the referee shares, but changes nothing.
+  let { readonly = false }: { readonly?: boolean } = $props();
   let s = $derived(app.state);
   let found = $derived(Object.values(s.revealed).reduce((n, r) => n + r.hexes.length + r.places.length, 0));
   let start = $state('');
@@ -38,20 +40,20 @@
   <dt>Clock</dt>
   <dd>
     {clockLabel(s)}
-    <span class="row">
+    {#if !readonly}<span class="row">
       <button class="small" onclick={() => app.passTime(1)}>+1 hour</button>
       <button class="small" onclick={() => app.passTime(8)}>+8 hours</button>
       <button class="small" onclick={() => app.passTime(24)}>+1 day</button>
-    </span>
+    </span>{/if}
   </dd>
   <dt>Party</dt>
-  <dd>{s.party ? `hex ${s.party.label} · ${s.party.module}` : 'not on a map yet (place them with the Atlas’s Party button below)'}</dd>
+  <dd>{s.party ? `hex ${s.party.label} · ${s.party.module}` : readonly ? 'not on a map yet' : 'not on a map yet (place them with the Atlas’s Party button below)'}</dd>
   <dt>Session</dt>
   <dd>
     {s.session.number ? `Session ${s.session.number}, ${s.session.open ? 'in play' : 'closed'}` : 'None played yet'}
-    {#if s.session.open}
+    {#if !readonly && s.session.open}
       <button class="small" onclick={() => app.closeSession()}>End session</button>
-    {:else}
+    {:else if !readonly}
       <button class="small" onclick={() => app.openSession()}>Start session {s.session.number + 1}</button>
     {/if}
   </dd>
@@ -61,6 +63,7 @@
   <dd>{found ? `${found} hex${found === 1 ? '' : 'es'} and places` : 'Nothing yet'}</dd>
 </dl>
 
+{#if !readonly}
 <details>
   <summary class="small">Start date</summary>
   <div class="row">
@@ -70,8 +73,10 @@
   <p class="small muted">Year, month and day in the setting's own years (Materia Mundi: AD + 2085, so 1422 is 3507).</p>
 </details>
 
+{/if}
+
 <div class="row" style="margin-top:0.5rem">
-  <button onclick={save}>Save state file</button>
+  {#if !readonly}<button onclick={save}>Save state file</button>{/if}
   <button onclick={() => fileInput?.click()}>Load state file</button>
   <input bind:this={fileInput} type="file" accept="application/json,.json" hidden onchange={load} />
 </div>

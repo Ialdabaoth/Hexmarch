@@ -95,9 +95,11 @@ Every file starts with the same header (`format`, `version`, `id`, `rules`, and 
 
 ## Knowledge
 
-What one character knows is kept on their own sheet, as dated entries, not on the map (modules/WORKFLOWS.md in the data repo, "Knowledge per creature"). Each entry has the `session` it was learned in and the `module` it belongs to, and points at one thing: a 100-ft `hex` address, a `place` slug, a `handout`, or a free-text `note`. `how` says how it was learned. Entries that point at nothing are dropped. What everyone knows stays in the campaign state's `revealed` set (STATE_FORMAT.md).
+What one character knows is kept on their own sheet, as dated entries, not on the map (modules/WORKFLOWS.md in the data repo, "Knowledge per creature"). Each entry has the `session` it was learned in and the `module` it belongs to, and points at one thing: a 100-ft `hex` address, a `place` slug, a `handout`, a `creature` (an NPC or creature's id in the campaign, with the `name` the character knows it by), or a free-text `note`. `how` says how it was learned. Entries that point at nothing are dropped. What everyone knows stays in the campaign state's `revealed` set (STATE_FORMAT.md).
 
 For the Atlas's fog of war (Atlas 0.5.17, ATLAS_FORMAT.md "Fog of war"), a `hex` entry means the character knows the whole 3-mile hex (League) that holds it: they have seen it or passed through (**visited**). `"explored": true` means it has been searched, which shows its hidden sites. `"rumour": true` means they have only heard of the hex or `place`; seeing it replaces the rumour. When the party moves in the Atlas, each character in the party gets an entry (`"how": "seen"`) for every 3-mile hex in sight along the way, and the referee's fog brush adds or removes entries the same way. The Companion keeps them as they arrive.
+
+A `creature` entry is how a player's Companion knows which NPCs to list (player mode, Campaign › Parties): `"rumour": true` when the character has only heard of them, without it once they have met. The referee's Creatures list has **The party met them** and **The party heard of them**, which give every character in the party an entry.
 
 ## Changes are tallies
 

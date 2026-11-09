@@ -15,6 +15,7 @@ import {
   saveLocal, type CampaignCache
 } from './campaign';
 import { CORE_RULES } from '../rules/core-modules';
+import { addInvitation, bindCharacter, loadInvitations, readInvite, saveInvitations, withRefereeInvitations, type Invite, type Mode, type Invitation } from './invitations';
 import { hasEquipment, registerEquipment, type EquipmentFileData } from '../equipment/equipment';
 import { preloadDice, showDice } from './dice3d';
 import { portraitFromFile } from './portrait';
@@ -40,8 +41,13 @@ class AppState {
   sheets = $state<SheetData[]>([]);
   live = $state<Record<string, LiveState>>({});
   characters: Character[] = $derived(this.sheets.map((s) => new Character(s, this.live[s.id] ?? freshState())));
-  // The players' characters: everyone but the referee's full-sheet NPCs.
-  party: Character[] = $derived(this.characters.filter((c) => c.data.owner !== 'referee'));
+  // Where this device sits in each campaign it knows: one seat per invitation (lib/invitations.ts).
+  invitations = $state<Invitation[]>([]);
+  // The characters on the home screen. Referee mode: everyone but the referee's full-sheet NPCs. Player mode:
+  // your own character only (its followers are on its card).
+  party: Character[] = $derived(
+    this.mode === 'player' ? this.characters.filter((c) => c.id === this.invitation?.character) : this.characters.filter((c) => c.data.owner !== 'referee')
+  );
   log = $state<LogEntry[]>([]);
   settings = $state<Settings>({ ...DEFAULT_SETTINGS });
   view = $state<View>({ name: 'list' });
@@ -65,6 +71,22 @@ class AppState {
 
   get campaign(): CampaignCache | null {
     return this.campaigns[this.settings.campaign] ?? null;
+  }
+
+  // The seat in use; null for "This device", which is the referee's own table.
+  get invitation(): Invitation | null {
+    return (this.campaign && this.invitations.find((s) => s.id === this.settings.invitation && s.url === this.settings.campaign)) || null;
+  }
+
+  // Player mode or referee mode, set by the seat picked in the campaign switcher (Heph 2026-11-09).
+  get mode(): Mode {
+    return this.invitation?.role === 'player' ? 'player' : 'referee';
+  }
+
+  // Player mode: the character this seat plays, once picked.
+  get me(): Character | undefined {
+    const id = this.mode === 'player' ? this.invitation?.character : undefined;
+    return id ? this.character(id) : undefined;
   }
 
   // The active campaign's id; '' for "This device".
@@ -135,6 +157,18 @@ class AppState {
           console.warn(e);
         }
       }
+    }
+    // Campaigns opened before invitations existed were opened as their referee.
+    try {
+      const loaded = await loadInvitations();
+      this.invitations = withRefereeInvitations(loaded, Object.keys(this.campaigns));
+      if (this.invitations.length !== loaded.length) await saveInvitations(this.invitations);
+    } catch (e) {
+      console.warn('Invitations unavailable', e);
+    }
+    if (this.settings.campaign && !this.invitation) {
+      const s = this.invitations.find((x) => x.url === this.settings.campaign && x.role === 'referee') ?? this.invitations.find((x) => x.url === this.settings.campaign);
+      if (s) this.settings = { ...this.settings, invitation: s.id };
     }
     activateCampaign(this.campaign);
   }
@@ -260,31 +294,80 @@ class AppState {
     return modules;
   }
 
-  // Opens a campaign by its link. Throws with a message for the player.
-  async useCampaign(url: string) {
+  // Opens a campaign by an invitation (its link, as referee unless it says player) and takes that seat. Throws
+  // with a message for the player.
+  async useCampaign(url: string, role: Invite['role'] = 'referee', character?: string) {
     const c = await openCampaignLink(url.trim());
-    await this.adoptCampaign(c);
-    this.notify(`Playing in ${c.campaign.name}`);
+    const seat = await this.takeInvitation({ url: c.url, role, ...(character ? { character } : {}) });
+    await this.adoptCampaign(c, seat.id);
+    if (seat.role === 'player' && seat.character) await this.claim(seat.character);
+    this.notify(`${role === 'player' ? 'Playing in' : 'Running'} ${c.campaign.name}`);
   }
 
-  // Switches to a campaign opened before, fetching it again when possible.
-  async switchCampaign(url: string) {
+  private async takeInvitation(i: Invite): Promise<Invitation> {
+    const { invitations, invitation: seat } = addInvitation($state.snapshot(this.invitations) as Invitation[], i);
+    if (invitations !== this.invitations) {
+      this.invitations = invitations;
+      await saveInvitations(invitations);
+    }
+    return seat;
+  }
+
+  // Switches to a seat taken before (the campaign switcher), fetching its campaign again when possible.
+  async chooseInvitation(id: string) {
+    const seat = this.invitations.find((s) => s.id === id);
+    if (!seat) return this.leaveCampaign();
     try {
-      await this.adoptCampaign(await openCampaignLink(url));
+      await this.adoptCampaign(await openCampaignLink(seat.url), seat.id);
     } catch (e) {
-      const c = this.campaigns[url];
+      const c = this.campaigns[seat.url];
       if (!c) throw e;
-      await this.updateSettings({ campaign: url });
+      await this.updateSettings({ campaign: seat.url, invitation: seat.id });
       activateCampaign(c);
       this.equipmentChanged();
       this.notify(`Using the saved copy of ${c.campaign.name}`);
     }
   }
 
+  // Fetches the campaign in use again (Settings › Check for changes), keeping the seat.
+  async checkCampaign() {
+    if (!this.campaign) return;
+    await this.adoptCampaign(await openCampaignLink(this.settings.campaign), this.settings.invitation);
+    this.notify(`${this.campaign.campaign.name} is up to date`);
+  }
+
   async leaveCampaign() {
-    await this.updateSettings({ campaign: '' });
+    await this.updateSettings({ campaign: '', invitation: '' });
     activateCampaign(null);
     this.equipmentChanged();
+  }
+
+  // Player mode: the character this seat plays (picked on the home screen, or the first one made there).
+  async playAs(id: string) {
+    const seat = this.invitation;
+    if (!seat || seat.role !== 'player') return;
+    this.invitations = bindCharacter($state.snapshot(this.invitations) as Invitation[], seat.id, id);
+    await saveInvitations(this.invitations);
+    await this.updateSettings({ activeId: id });
+    await this.claim(id);
+  }
+
+  // A character played in a campaign belongs to it (its sheet's campaign), so it reads that campaign's equipment.
+  private async claim(id: string) {
+    const s = this.sheets.find((x) => x.id === id);
+    if (!s || (s.campaign ?? '') === this.campaignId) return;
+    s.campaign = this.campaignId || undefined;
+    await this.persist();
+  }
+
+  // Drops one seat; the campaign goes too once no seat uses it.
+  async forgetInvitation(id: string) {
+    const seat = this.invitations.find((s) => s.id === id);
+    if (!seat) return;
+    if (this.settings.invitation === id) await this.leaveCampaign();
+    this.invitations = this.invitations.filter((s) => s.id !== id);
+    await saveInvitations(this.invitations);
+    if (!this.invitations.some((s) => s.url === seat.url)) await this.forgetCampaign(seat.url);
   }
 
   async forgetCampaign(url: string) {
@@ -294,11 +377,18 @@ class AppState {
     await saveCampaigns(this.campaigns);
   }
 
-  private async adoptCampaign(c: CampaignCache) {
+  // Referee mode: every character in the party has met (or heard of) a creature, as a knowledge entry on each sheet.
+  async partyKnows(creature: string, name: string, rumour: boolean) {
+    const entry = { creature, name, ...(this.state.session.number ? { session: this.state.session.number } : {}), ...(rumour ? { rumour: true } : {}) };
+    await this.addKnowledge(this.party.map((c) => c.id), [entry], []);
+    this.notify(`${rumour ? 'The party has heard of' : 'The party has met'} ${name}`);
+  }
+
+  private async adoptCampaign(c: CampaignCache, seat: string) {
     registerCampaign(c);
     this.campaigns = { ...this.campaigns, [c.url]: c };
     await saveCampaigns(this.campaigns);
-    await this.updateSettings({ campaign: c.url });
+    await this.updateSettings({ campaign: c.url, invitation: seat });
     activateCampaign(c);
     await this.rereadSheets();
     this.equipmentChanged();
@@ -308,16 +398,21 @@ class AppState {
     if (site && !this.modules.some((m) => m.base === site)) void this.addModuleRepo(site).catch((e) => console.warn('Campaign modules not read', e));
   }
 
-  // A link may name the campaign to open (E9 Scribe's "Open in the Companion": ?campaign=scribe:<id>).
-  // The address is cleared afterwards, so reloading doesn't switch campaigns again.
+  // A link may be an invitation: the campaign to open, and the seat (E9 Scribe's "Open in the Companion":
+  // ?campaign=scribe:<id>; a player's: ?campaign=<link>&as=player&character=<id>). The address is cleared
+  // afterwards, so reloading doesn't switch campaigns again.
   private async openAsked() {
     if (typeof location === 'undefined') return;
-    const q = new URLSearchParams(location.search), url = q.get('campaign');
-    if (url === null) return;
-    q.delete('campaign');
+    const invite = readInvite(location.search);
+    const q = new URLSearchParams(location.search);
+    if (!q.has('campaign')) return;
+    for (const k of ['campaign', 'as', 'character']) q.delete(k);
     history.replaceState(history.state, '', location.pathname + (q.size ? `?${q}` : '') + location.hash);
+    if (!invite) return;
     try {
-      if (url !== this.settings.campaign || !this.campaign) await this.useCampaign(url);
+      const here = this.invitation;
+      const same = here && here.url === invite.url && here.role === invite.role && (invite.role === 'referee' || !invite.character || here.character === invite.character);
+      if (!same || !this.campaign) await this.useCampaign(invite.url, invite.role, invite.character);
     } catch (e) {
       this.notify((e as Error).message);
     }
@@ -329,7 +424,7 @@ class AppState {
     if (!url || (!navigator.onLine && !isScribeLink(url))) return;
     try {
       const c = await openCampaignLink(url);
-      if (this.settings.campaign === url) await this.adoptCampaign(c);
+      if (this.settings.campaign === url) await this.adoptCampaign(c, this.settings.invitation);
     } catch (e) {
       console.warn('Campaign not refreshed', e);
     }
@@ -380,6 +475,8 @@ class AppState {
     this.sheets.unshift(sheet);
     this.live[sheet.id] = freshState();
     await this.persist();
+    // A player seat with no character yet plays the first one made in it.
+    if (this.mode === 'player' && !this.invitation?.character && sheet.owner !== 'referee') await this.playAs(sheet.id);
   }
 
   // Imported sheets replace any sheet with the same id.

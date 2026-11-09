@@ -21,6 +21,8 @@ export interface Settings {
   diceInk: string;
   // The campaign file's link, or '' for "This device".
   campaign: string;
+  // The invitation in use in that campaign (lib/invitations.ts): the referee's or a player's; '' for "This device".
+  invitation: string;
   // Where the party stood before Companion 0.5.5. It now lives in the campaign state file
   // (lib/state.ts); a value left here is moved into This device's state on load and cleared.
   partyAt: PartyAt | null;
@@ -40,7 +42,7 @@ export interface PartyAt {
   hours?: number;
 }
 
-export const DEFAULT_SETTINGS: Settings = { webhookUrl: '', autoPost: false, activeId: '', rules: 'mm', dice3d: !prefersReducedMotion(), diceColor: DEFAULT_DICE_COLOR, diceInk: DEFAULT_DICE_INK, campaign: '', partyAt: null };
+export const DEFAULT_SETTINGS: Settings = { webhookUrl: '', autoPost: false, activeId: '', rules: 'mm', dice3d: !prefersReducedMotion(), diceColor: DEFAULT_DICE_COLOR, diceInk: DEFAULT_DICE_INK, campaign: '', invitation: '', partyAt: null };
 
 // Saved sheets go through the same checks as imported files, so a sheet the
 // app can't read is skipped instead of breaking the whole list. Skipped sheets
