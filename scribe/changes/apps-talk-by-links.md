@@ -1,1 +1,0 @@
-Apps talk by links: "Save and open in the Companion" hands the campaign over in a `#m=` link (with the state to start from when Scribe just wrote it), and Scribe takes play the Companion sends back by link ("Update in Scribe") for Publish.

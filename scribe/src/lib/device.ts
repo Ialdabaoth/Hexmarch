@@ -1,10 +1,10 @@
-// Saving a campaign on this device for the Companion and the Atlas (SCRIBE.md section 1, step 7; Scribe 0.1.3).
-// The three apps share one site, so they share its IndexedDB: the Companion keeps its files in idb-keyval's
-// "keyval-store" database, and so does this. Scribe writes three keys there:
-//   scribe-campaign:<id>  the campaign module and lockfile (format e9-scribe-campaign/1), which the Companion opens
-//                         by the link "scribe:<id>" (Companion 0.5.15)
+// Saving a campaign on this device (SCRIBE.md section 1, step 7). The apps hand each other the campaign and play by
+// links (below); this device's IndexedDB is only a cache, shared by the three apps because they share one site
+// (idb-keyval's "keyval-store" database, as the Companion uses it). Scribe writes:
+//   scribe-campaign:<id>  its record of the campaign: module, lockfile, services, published (e9-scribe-campaign/1)
 //   state:<id>            the first state file, the one every app reads and writes for that campaign (STATE_FORMAT.md)
 //   invitations           the creator's Referee invitation is added to the Companion's list (below)
+//   play:<id>             play the Companion sent back by link, for Publish
 // A state file already there has been played with, so it is replaced only when the referee says so.
 
 import type { Built } from './campaign';
