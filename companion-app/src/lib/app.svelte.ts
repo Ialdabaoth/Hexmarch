@@ -11,12 +11,13 @@ import {
 } from './state';
 import { loadRepo, type SavedModule } from './modules';
 import {
-  absorbCustom, activateCampaign, blankLocal, campaignRulesId, exportSheet, isScribeLink, openCampaignLink, loadCampaigns, loadFallbacks, loadLocal, registerCampaign, saveCampaigns,
+  NewerAppError, absorbCustom, activateCampaign, blankLocal, campaignRulesId, exportSheet, isScribeLink, openCampaignLink, loadCampaigns, loadFallbacks, loadLocal, registerCampaign, saveCampaigns,
   saveLocal, type CampaignCache
 } from './campaign';
 import { CORE_RULES } from '../rules/core-modules';
 import { addMail, answer, joinRequest, loadMail, mailFileName, post, readMailFile, saveMail, sendBack, type MailItem } from './mail';
 import { downloadJson } from './storage';
+import { inviteDone, keepInvite, pendingInvite, updateForInvite } from './update';
 import { pointer as campaignPointer, publishParts, snapshot as campaignSnapshot, type Services } from '../../../engine/publish';
 import { get as idbGet, set as idbSet } from 'idb-keyval';
 import { addInvitation, bindCharacter, invitationLabel, loadInvitations, readInvite, saveInvitations, withRefereeInvitations, type Invite, type Mode, type Invitation } from './invitations';
@@ -560,18 +561,28 @@ class AppState {
   // afterwards, so reloading doesn't switch campaigns again.
   private async openAsked() {
     if (typeof location === 'undefined') return;
-    const invite = readInvite(location.search);
     const q = new URLSearchParams(location.search);
-    if (!q.has('campaign')) return;
-    for (const k of ['campaign', 'as', 'character']) q.delete(k);
-    history.replaceState(history.state, '', location.pathname + (q.size ? `?${q}` : '') + location.hash);
-    if (!invite) return;
+    // the invitation in the address, or one kept across a reload into a newer app (lib/update.ts)
+    const search = q.has('campaign') ? location.search : pendingInvite();
+    if (q.has('campaign')) {
+      keepInvite(location.search);
+      for (const k of ['campaign', 'as', 'character']) q.delete(k);
+      history.replaceState(history.state, '', location.pathname + (q.size ? `?${q}` : '') + location.hash);
+    }
+    const invite = search ? readInvite(search) : null;
+    if (!invite) return inviteDone();
     try {
       const here = this.invitation;
       const same = here && here.url === invite.url && here.role === invite.role && (invite.role === 'referee' || !invite.character || here.character === invite.character);
       if (!same || !this.campaign) await this.useCampaign(invite.url, invite.role, invite.character);
+      inviteDone();
     } catch (e) {
-      this.notify((e as Error).message);
+      if (e instanceof NewerAppError && (await updateForInvite())) {
+        this.notify('This campaign needs a newer Companion. Updating…');
+        return;
+      }
+      inviteDone();
+      this.notify(e instanceof NewerAppError ? `${e.message} Close the app and open it again to update.` : (e as Error).message);
     }
   }
 

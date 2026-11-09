@@ -44,6 +44,8 @@ export interface CampaignCache {
 }
 
 export class CampaignError extends Error {}
+// A campaign file in a format this build doesn't know: a newer app made it.
+export class NewerAppError extends CampaignError {}
 
 // Anything with a slash or ending in .json is a link, relative to the campaign file.
 export const isLink = (s: string) => /[/]|\.json$/i.test(s);
@@ -74,7 +76,9 @@ async function fetchJson(url: string): Promise<unknown> {
 
 export async function fetchCampaign(url: string): Promise<CampaignCache> {
   const campaign = await fetchJson(url);
-  if ((campaign as { format?: unknown } | null)?.format === POINTER_FORMAT) return publishedCampaign(url, campaign);
+  const format = (campaign as { format?: unknown } | null)?.format;
+  if (format === POINTER_FORMAT) return publishedCampaign(url, campaign);
+  if (typeof format === 'string' && /^e9-/.test(format)) throw new NewerAppError('This campaign needs a newer Companion.');
   checkCampaign(campaign);
   const at = (link: string) => new URL(link, url).href;
   let rules: RulesetOptions | undefined;
@@ -180,7 +184,8 @@ export async function publishedCampaign(url: string, data: unknown): Promise<Cam
     });
     return { ...c, published: { pointer: url, read: p.read, post: p.post, revision: snap.revision, snapshot: { state: snap.state, private: snap.private, receipts: snap.receipts } } };
   } catch (e) {
-    throw e instanceof PublishError ? new CampaignError(e.message) : e;
+    if (e instanceof PublishError) throw /newer app/.test(e.message) ? new NewerAppError(e.message) : new CampaignError(e.message);
+    throw e;
   }
 }
 
