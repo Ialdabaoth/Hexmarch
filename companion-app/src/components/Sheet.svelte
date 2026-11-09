@@ -25,7 +25,10 @@
 
   // Opened at a section, e.g. from the card's Carry box: jump straight to it.
   $effect(() => {
-    if (section) document.getElementById(section)?.scrollIntoView({ block: 'start' });
+    if (!section) return;
+    const el = document.getElementById(section);
+    if (el instanceof HTMLDetailsElement) el.open = true;
+    el?.scrollIntoView({ block: 'start' });
   });
 
   // c is computed from c.sheet; edits go to the sheet and c follows.
@@ -124,11 +127,11 @@
     await app.remove(id);
     app.view = { name: 'list' };
   }
-  // Each panel folds away (Heph 2026-11-09). Which ones are folded is remembered on this device.
-  const FOLD_KEY = 'e9-sheet-folded';
-  let folded = $state<string[]>((() => {
+  // Each panel folds away and starts folded (Heph 2026-11-09). The ones opened are remembered on this device.
+  const OPEN_KEY = 'e9-sheet-open';
+  let opened = $state<string[]>((() => {
     try {
-      const v = JSON.parse(localStorage.getItem(FOLD_KEY) ?? '[]');
+      const v = JSON.parse(localStorage.getItem(OPEN_KEY) ?? '[]');
       return Array.isArray(v) ? v.filter((x) => typeof x === 'string') : [];
     } catch {
       return [];
@@ -136,9 +139,10 @@
   })());
   function fold(name: string, e: Event) {
     const open = (e.currentTarget as HTMLDetailsElement).open;
-    folded = open ? folded.filter((x) => x !== name) : folded.includes(name) ? folded : [...folded, name];
+    if (open === opened.includes(name)) return;
+    opened = open ? [...opened, name] : opened.filter((x) => x !== name);
     try {
-      localStorage.setItem(FOLD_KEY, JSON.stringify(folded));
+      localStorage.setItem(OPEN_KEY, JSON.stringify(opened));
     } catch {
       // storage blocked: the panels still fold, just not remembered
     }
@@ -146,7 +150,7 @@
 </script>
 
 {#snippet panel(name: string, title: string, body: import('svelte').Snippet, id?: string)}
-  <details class="section panel" open={!folded.includes(name)} ontoggle={(e) => fold(name, e)} {id}>
+  <details class="section panel" open={opened.includes(name)} ontoggle={(e) => fold(name, e)} {id}>
     <summary><h2>{title}</h2></summary>
     {@render body()}
   </details>
@@ -204,10 +208,10 @@
     </div>
   </section>
   <h3>Carry</h3>
-  <section class="card carry">
-    <strong class:over={carry.encumbered}>{carry.load} / {carry.capacity}</strong>
-    <span class="small muted">{carry.burdened ? 'burdened' : carry.encumbered ? 'encumbered' : `encumbered past ${carry.threshold}`}</span>
-  </section>
+  <div class="carry">
+    <strong class="card" class:over={carry.encumbered}>{carry.load} / {carry.capacity}</strong>
+    <span class="small muted">({carry.burdened ? 'burdened' : carry.encumbered ? 'encumbered' : `encumbered past ${carry.threshold}`})</span>
+  </div>
   <Effects character={c!} />
   {/snippet}
 
@@ -378,7 +382,7 @@
   /* Sub-headings inside a panel (Carry, Effects, Ability check) sit clear of what's above them. */
   .panel :global(h3) { margin: 0.9rem 0 0.35rem; }
   .carry { display: flex; align-items: baseline; gap: 0.5rem; }
-  .carry strong { font-size: 1.3rem; font-family: Georgia, serif; }
+  .carry strong { font-size: 1.3rem; font-family: Georgia, serif; margin: 0; padding: 0.4rem 0.9rem; }
   .mini { min-height: 36px; padding: 0.2rem 0.55rem; }
   .features { padding-left: 1.1rem; margin: 0; }
   .features li { margin-bottom: 0.35rem; }
