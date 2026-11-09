@@ -1,4 +1,4 @@
-"""E9 Atlas: draw Encounter maps (ENCOUNTER_FORMAT.md) from a small plan file.
+"""Hexmarch Atlas: draw Encounter maps (ENCOUNTER_FORMAT.md) from a small plan file.
 
     python3 -I encounter_draw.py modules/<module>/encounter-maps [map-id ...]
 
