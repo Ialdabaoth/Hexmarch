@@ -188,7 +188,7 @@
     <div class="backup">
       {#if active}
         <div class="row actions">
-          <button class="primary grow" onclick={() => (app.view = { name: 'sheet', id: active.id })}>Full sheet</button>
+          <button class="primary grow" onclick={() => (app.view = { name: 'sheet', id: active.id })}>Edit</button>
           <button onclick={() => (app.view = { name: 'render', id: active.id, mode: 'postcard' })}>PDF</button>
         </div>
       {/if}

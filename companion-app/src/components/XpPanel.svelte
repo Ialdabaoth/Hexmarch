@@ -4,7 +4,7 @@
   import { levelUp } from '../lib/sheet';
   import { TALENTS, hasKind, scheduledTraining, type TalentId } from '../rules/rules';
 
-  // XP tally and the level-up steps, shared by the full sheet and the postcard's XP editor.
+  // XP tally and the level-up steps, shared by the Edit view and the postcard's XP editor.
   let { character: c, onleveled }: { character: Character; onleveled?: () => void } = $props();
 
   let cls = $derived(c.rules.getClass(c.classId));
