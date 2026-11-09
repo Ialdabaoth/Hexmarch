@@ -2,9 +2,9 @@
   import { ROOTS, RULES_MANIFESTS, type RootChoice } from './lib/rules';
   import { loadSite, type SiteModule } from './lib/data';
   import { buildCampaign, describeProblem, startsOf, type Built, type Choices } from './lib/campaign';
-  import { campaignLink, publishOnDevice, saveOnDevice, savedCampaign, testUpload, type SavedCampaign } from './lib/device';
+  import { applyUpdate, campaignLink, campaignMessage, publishOnDevice, saveOnDevice, savedCampaign, testUpload, type SavedCampaign, type UpdateResult } from './lib/device';
   import type { UploadCheck, UploadReport } from '../../engine';
-  import { staticServices } from '../../engine';
+  import { messageLink, readMessageHash, staticServices } from '../../engine';
 
   const VERSION = __SCRIBE_VERSION__;
   const params = new URLSearchParams(location.search);
@@ -106,14 +106,17 @@
   // Step 7: save the campaign on this device and open it in the Companion or the Atlas (Scribe 0.1.3).
   let saveError = $state('');
   let savedAs = $state('');
+  let wroteState = false;
   async function save(): Promise<string | null> {
     if (!built || !root || built.problems.length) return null;
     saveError = '';
     const title = String(built.manifest.title);
     try {
-      savedAs = await saveOnDevice($state.snapshot(built) as Built, root, siteUrl, (rev) =>
+      const saved = await saveOnDevice($state.snapshot(built) as Built, root, siteUrl, (rev) =>
         confirm(`This device already has play for “${title}” (state revision ${rev}): where the party is, the clock and what it has found. Start it again from this campaign's start?\n\nOK starts again; Cancel keeps the play and saves only the campaign.`)
       );
+      wroteState = saved.wroteState;
+      savedAs = saved.link;
       return savedAs;
     } catch (e) {
       saveError = `Scribe couldn't save on this device: ${(e as Error).message || e}. A private window may not allow it; download the files instead.`;
@@ -175,11 +178,29 @@
     unreadable: "can't be read: it isn't JSON, or the host doesn't let other sites read it"
   };
 
+  // Update in Scribe (Companion -> Scribe, a link to scribe/#m=...): play to publish from.
+  let received = $state<UpdateResult | null>(null);
+  let receiveError = $state('');
+  (async () => {
+    try {
+      const e = await readMessageHash(location.hash);
+      if (!e) return;
+      received = await applyUpdate(e);
+      history.replaceState(null, '', location.pathname + location.search);
+    } catch (e) {
+      receiveError = `Scribe couldn't read that link: ${(e as Error).message || e}`;
+    }
+  })();
+
   async function openIn(app: 'companion' | 'atlas') {
     const link = await save();
     if (!link) return;
     const c = encodeURIComponent(link);
-    if (app === 'companion') location.href = `../?campaign=${c}`;
+    if (app === 'companion') {
+      // Apps talk by links: the Companion gets the campaign, and the state to start from when Scribe just wrote it
+      const rec = await savedCampaign(String(built!.manifest.id));
+      if (rec) location.href = await messageLink(new URL('../', location.href).href, campaignMessage(rec, wroteState ? $state.snapshot(built!.state) : undefined));
+    }
     else if (startSite) location.href = `../atlas/?site=${encodeURIComponent(siteUrl)}&module=${encodeURIComponent(startSite.module)}&campaign=${c}${startSite.slug ? `&place=site:${startSite.slug}#site:${startSite.slug}` : ''}`;
   }
 </script>
@@ -189,9 +210,19 @@
     <img src="icon.svg" alt="" />
     <div>
       <h1>⬢ Scribe</h1>
-      <div class="small muted">New campaign · E9 Scribe {VERSION}</div>
+      <div class="small muted">New campaign · {__SITE_NAME__} Scribe {VERSION}</div>
     </div>
   </header>
+
+  {#if received}
+    <section class="small">
+      {#if received.status === 'applied'}Received play for “{received.title ?? received.campaign}” from the Companion (state revision {received.revision}). Publish again to share it.
+      {:else if received.status === 'older'}That link holds older play for “{received.title ?? received.campaign}” (revision {received.revision}) than Scribe already has, so Scribe kept what it has.
+      {:else}Scribe already has the play in that link.{/if}
+      {#if !received.title} Scribe hasn't saved this campaign on this device; open it in Scribe to publish.{/if}
+    </section>
+  {/if}
+  {#if receiveError}<p class="bad">{receiveError}</p>{/if}
 
   <section>
     <h2>Campaign name</h2>

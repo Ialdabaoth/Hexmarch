@@ -38,14 +38,14 @@ export function campaignId(title: string): string {
 // "^0.4.11": this version or any later one that the version rules say is compatible.
 const caret = (v: string) => `^${v}`;
 
-export function startsOf(m: SiteModule): Start[] {
-  return Array.isArray(m.raw.starts) ? (m.raw.starts as Start[]) : [];
+export function startsOf(m: SiteModule | undefined): Start[] {
+  return m && Array.isArray(m.raw.starts) ? (m.raw.starts as Start[]) : [];
 }
 
 export async function buildCampaign(c: Choices, site: SiteModule[], rules: unknown[], now = new Date()): Promise<Built> {
   const id = campaignId(c.title);
   const picked = c.modules.map((m) => site.find((s) => s.id === m)).filter((m): m is SiteModule => !!m);
-  const start = c.start && 'id' in c.start ? startsOf(site.find((s) => s.id === c.start!.module)!).find((s) => s.id === (c.start as StartChoice).id) : undefined;
+  const start = c.start && 'id' in c.start ? startsOf(site.find((s) => s.id === c.start!.module)).find((s) => s.id === (c.start as StartChoice).id) : undefined;
   const startModule = c.start?.module ?? picked[0]?.id ?? '';
 
   // a start that plays only some parts of its module leaves the rest out (SCRIBE.md section 2, "uses")
