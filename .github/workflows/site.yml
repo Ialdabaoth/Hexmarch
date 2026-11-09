@@ -21,6 +21,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # the whole history: change notes are numbered in the order they reached main
+      - name: No hand-numbered versions
+        if: github.event_name == 'pull_request'
+        run: python3 -I scripts/changes.py check HEAD^1
+      - name: Version numbers from the change notes (scripts/changes.py; never committed)
+        run: python3 -I scripts/changes.py stamp
       - id: data
         run: echo "repo=$(jq -r .data.repo site.json)" >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@v4

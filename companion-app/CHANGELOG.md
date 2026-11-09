@@ -1,11 +1,12 @@
 # E9 Companion: changelog
 
-The version lives in `package.json` (see README "Versioning"). Every merged PR bumps the patch; each sprint bumps the minor.
+The released version lives in `package.json` (see README "Versioning"). Every merged PR is one patch; each sprint bumps the minor. New entries are not written here by hand: each PR adds a change note in `changes/`, and the site build numbers the notes in the order they merged and lists them here (CONTRIBUTING.md "Versions and change notes").
 
 ## 0.5.0 (in development)
 
 Sprint: git and VTT integration.
 
+<!-- changes.py: new entries go below this line -->
 - 0.5.16: knowledge entries may say `"explored": true` or `"rumour": true` (the Atlas's fog of war, Atlas 0.5.17). Campaign › Maps keeps what the Atlas reports (each hex in sight along a party move, and the referee's fog brush) on the named characters' sheets, and when the app comes back into view it takes knowledge the Atlas wrote on this device while open on its own.
 - 0.5.15: opens a campaign made in E9 Scribe. Scribe saves the campaign on this device, and its "Open in the Companion" link (`?campaign=scribe:<id>`) makes it the campaign in use: its name, the ruleset its root provides, that ruleset's own equipment, the first state file Scribe wrote (clock, start, places known), and the modules' site added to Modules for Campaign › Maps. Nothing is fetched for the campaign itself. It shows under Settings › Campaign with the others. (0.5.14 is the Atlas fog PR, #15.)
 - 0.5.13: the index card and the full page are drawn from the ruleset's module layout (SHEET_LAYOUT.md in the data repo; e9-core 0.1.1 ships today's card and page, so nothing changes on screen). The Companion keeps the surfaces (the 5×3 card's two faces, the letter page), the dice, the editors and print; a layout is checked on load against a whitelist of elements and CSS, and can only place values, roll buttons and taps. Engine: `src/lib/layout/` (parser, CSS scoping, named values, the sheet's d.* values) and `components/layout/LayoutNodes.svelte`.

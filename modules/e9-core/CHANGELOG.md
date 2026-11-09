@@ -1,6 +1,8 @@
 # E9 core rules module (e9-core): changelog
 
-The E9 rules as data, from the E9 System Reference Handbook (CC BY-SA 4.0). The version lives in `module.json`. Every merged PR bumps the patch; each sprint bumps the minor.
+The E9 rules as data, from the E9 System Reference Handbook (CC BY-SA 4.0). The released version lives in `module.json`. Every merged PR is one patch; each sprint bumps the minor. New entries are not written here by hand: each PR adds a change note in `changes/`, and the site build numbers the notes in the order they merged and lists them here (CONTRIBUTING.md "Versions and change notes"). Here a note is the body under its version heading, usually a list.
+
+<!-- changes.py: new entries go below this line -->
 
 ## 0.1.1
 

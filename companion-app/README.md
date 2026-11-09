@@ -98,7 +98,7 @@ for GitHub Pages.
 
 ## Versioning
 
-The version lives in `package.json` and shows under About in Settings.
+The released version lives in `package.json`; the version the site shows (under About in Settings) is that plus one patch per change note in `changes/`, worked out by `scripts/changes.py` when the site builds.
 
 - Every merged PR bumps the patch number: 0.2.0, 0.2.1, 0.2.2, …
 - Each sprint (a planned set of features, such as the 0.2 equipment work) bumps the minor
@@ -106,7 +106,7 @@ The version lives in `package.json` and shows under About in Settings.
   (see CHARACTER_FORMAT.md), separate from the app's.
 - The MVP is released together with the E9 Atlas and E9 Scribe as `1.0.0-alpha` (shown as a1.0.0), then `1.0.0-beta` (b1.0.0), then `1.0.0`, the first release announced to players (WORKFLOWS.md "Versioning").
 
-Bump `version` in both `package.json` and `package-lock.json` in the PR itself.
+Don't bump `version` in a PR: add a change note in `changes/` instead (CONTRIBUTING.md "Versions and change notes").
 
 ## Licensing
 
