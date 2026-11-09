@@ -1,4 +1,4 @@
-name: Site (E9 apps)
+name: Site (Hexmarch apps)
 
 on:
   push:
@@ -43,7 +43,7 @@ jobs:
           cache-dependency-path: |
             companion-app/package-lock.json
             scribe/package-lock.json
-      - name: E9 Companion
+      - name: Companion
         working-directory: companion-app
         run: |
           npm ci
@@ -55,9 +55,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: E9 Atlas
+      - name: Atlas
         run: python3 -I modules/tools/atlas_app.py companion-app/dist
-      - name: E9 Scribe
+      - name: Scribe
         working-directory: scribe
         run: |
           npm ci

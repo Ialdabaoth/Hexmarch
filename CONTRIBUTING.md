@@ -1,6 +1,6 @@
 # Contributing to E9 and Materia Mundi
 
-E9 is an old-school (B/X-family) fantasy RPG system, and Materia Mundi is its flagship setting. The project ships three things together: books, apps (E9 Companion and E9 Atlas, with a third, Scribe, planned) and modules (adventures and hexcrawls that run in both apps). Heph (GitHub `Ialdabaoth`) owns the game, writes the books and has the final say on canon and prose.
+E9 is an old-school (B/X-family) fantasy RPG system, and Materia Mundi is its flagship setting. The project ships three things together: books, apps (Hexmarch Companion, Hexmarch Atlas and Hexmarch Scribe, which run any OSR hexcrawl core rules) and modules (adventures and hexcrawls that run in the apps). Heph (GitHub `Ialdabaoth`) owns the game, writes the books and has the final say on canon and prose.
 
 ## How work is organised
 
@@ -20,9 +20,9 @@ Every piece of work has one home thread, named by what it is and which version i
 
 ## Apps and modules
 
-- **E9 Companion** (`companion-app/`): the player and referee PWA. Changelog: `companion-app/CHANGELOG.md`, new entries in `companion-app/changes/`.
-- **E9 Atlas** (`modules/tools/`): the map builder and viewer, live at https://ialdabaoth.github.io/MateriaMundiRPG/atlas/. Changelog: `modules/tools/CHANGELOG.md`, new entries in `modules/tools/changes/`.
-- **Scribe** (planned): a WYSIWYG module creator.
+- **Hexmarch Companion** (`companion-app/`): the player and referee PWA. Changelog: `companion-app/CHANGELOG.md`, new entries in `companion-app/changes/`.
+- **Hexmarch Atlas** (`modules/tools/`): the map builder and viewer, live at https://ialdabaoth.github.io/MateriaMundiRPG/atlas/. Changelog: `modules/tools/CHANGELOG.md`, new entries in `modules/tools/changes/`.
+- **Hexmarch Scribe** (`scribe/`): the module and campaign editor, published at `/scribe/`.
 - **Modules** (`modules/<id>/`): Beyond the Pale: The Isle of Mists, 1422 (`isle-of-mists`), Hansa (`hansa`), and the E9, MM and MM-for-E9 core modules.
 
 The data formats are specified next to the code: `modules/MODULE_FORMAT.md`, `ATLAS_FORMAT.md`, `CREATURES_FORMAT.md`, `ENCOUNTER_FORMAT.md`, `EVENTS_FORMAT.md`, `WORKFLOWS.md`, `BUILDING_A_MODULE.md`, and `companion-app/*_FORMAT.md`. Ideas that aren't agreed yet go in `modules/PROPOSALS.md`, not in the specs.

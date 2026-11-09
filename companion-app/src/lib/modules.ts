@@ -33,7 +33,7 @@ export interface ModuleManifest {
   version: string;
   license: string;
   books?: ModuleBook[];
-  atlas_map?: string; // set when the module has an E9 Atlas map: open it in <base>atlas/?module=<id>
+  atlas_map?: string; // set when the module has an Atlas map: open it in <base>atlas/?module=<id>
   [key: string]: unknown;
 }
 

@@ -20,7 +20,9 @@ export default defineConfig({
   server: { fs: { allow: ['.', '../modules', '../engine'] } },
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
-    // ../links.json is shared with the E9 Atlas; an empty link is hidden
+    // the suite's name (../site.json "name"): the Companion is "<name> Companion"
+    __SUITE_NAME__: JSON.stringify(site.name ?? 'Hexmarch'),
+    // ../links.json is shared with the Atlas; an empty link is hidden
     __PATREON_URL__: JSON.stringify(links.patreon ?? ''),
     __DATA_URL__: JSON.stringify(site.data?.url ?? '')
   },
@@ -29,7 +31,7 @@ export default defineConfig({
     pwa && VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['icon.svg', 'apple-touch-icon.png'],
-      // The E9 Atlas is published beside the app (<base>atlas/); module pages live on the data site.
+      // The Atlas is published beside the app (<base>atlas/); module pages live on the data site.
       // The app's offline shell must not answer for those pages, or a map opens as another copy of the app.
       // Match each with or without its trailing slash: /Hexmarch/atlas (as typed or bookmarked) used to open the Companion.
       workbox: { navigateFallbackDenylist: [/\/(modules|atlas|scribe)(\/|\?|$)/] },
@@ -52,7 +54,7 @@ export default defineConfig({
     })
   ],
   test: {
-    // ../engine is the shared editing engine (E9 Scribe); its tests run here too
+    // ../engine is the shared editing engine (Scribe); its tests run here too
     include: ['src/**/*.test.ts', '../engine/**/*.test.ts'],
     // Module layouts read their layout.css as text (lib/layout/layouts.ts).
     css: { include: [/layout\/layout\.css/] }

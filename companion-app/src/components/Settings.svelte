@@ -76,7 +76,7 @@
     await app.post({
       id: crypto.randomUUID(),
       at: new Date().toISOString(),
-      who: 'Materia Mundi',
+      who: `${__SUITE_NAME__} Companion`,
       label: 'Test roll',
       detail: 'The companion app is connected.',
       total: 20,
@@ -195,12 +195,12 @@
 
 <section class="card" style="margin-top:0.75rem">
   <h3>About</h3>
-  <p class="small muted">Version {__APP_VERSION__}</p>
+  <p class="small muted">{__SUITE_NAME__} Companion, version {__APP_VERSION__}</p>
   {#if __PATREON_URL__}
     <p class="small">Enjoying E9? <a href={__PATREON_URL__} target="_blank" rel="noopener">Support it on Patreon</a> for new modules every month.</p>
   {/if}
   <p class="small">
-    A companion for E9 and its settings. Characters can use the Materia Mundi Compendium (first edition, a setting
+    A companion for OSR hexcrawl games: E9 and its settings so far. Characters can use the Materia Mundi Compendium (first edition, a setting
     within E9) or the E9 System Reference Handbook; page numbers point to whichever book the character uses.
   </p>
   <p class="small muted">

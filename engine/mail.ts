@@ -39,7 +39,7 @@ export function envelope(e: Omit<Envelope, 'format' | 'version' | 'id' | 'sent'>
 
 export function readEnvelope(d: unknown): Envelope {
   const e = d as Partial<Envelope> | null;
-  if (!e || typeof e !== 'object' || e.format !== MAIL_FORMAT) throw new MailError("That isn't a message from an E9 app.");
+  if (!e || typeof e !== 'object' || e.format !== MAIL_FORMAT) throw new MailError("That isn't a message from a Hexmarch app.");
   if (typeof e.version !== 'number' || e.version > 1) throw new MailError('That message was sent by a newer app. Update the app to read it.');
   if (!MAIL_KINDS.includes(e.kind as MailKind)) throw new MailError(`This app can't read a "${String(e.kind)}" message yet.`);
   if (typeof e.id !== 'string' || !e.id || typeof e.campaign !== 'string' || !e.campaign) throw new MailError('That message has no id or campaign.');
@@ -102,7 +102,7 @@ export async function decodeMessage(data: string): Promise<Envelope> {
   try {
     text = new TextDecoder().decode(await pipe(fromB64url(data), new DecompressionStream('deflate-raw')));
   } catch {
-    throw new MailError("That link is cut short or isn't a message from an E9 app.");
+    throw new MailError("That link is cut short or isn't a message from a Hexmarch app.");
   }
   return readEnvelope(JSON.parse(text));
 }

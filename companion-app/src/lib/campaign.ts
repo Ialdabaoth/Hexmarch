@@ -36,7 +36,7 @@ export interface CampaignCache {
   rules?: RulesetOptions;
   files: EquipmentFileData[];
   fetchedAt: string;
-  // A campaign made in E9 Scribe: where its modules are published.
+  // A campaign made in Scribe: where its modules are published.
   scribe?: { site: string };
   // A campaign its referee has published (data repo modules/SCRIBE.md section 5): the pointer invitations name,
   // where players read the snapshot and send requests, and, on a player's device, the snapshot as last read.
@@ -52,7 +52,7 @@ export const isLink = (s: string) => /[/]|\.json$/i.test(s);
 
 export function checkCampaign(d: unknown): asserts d is CampaignData {
   const c = d as Partial<CampaignData> | null;
-  if (!c || typeof c !== 'object' || c.format !== CAMPAIGN_FORMAT) throw new CampaignError("That link isn't a Materia Mundi campaign file");
+  if (!c || typeof c !== 'object' || c.format !== CAMPAIGN_FORMAT) throw new CampaignError("That link isn't a campaign file");
   if (typeof c.name !== 'string' || !c.name.trim()) throw new CampaignError('The campaign file needs a "name"');
   if (typeof c.rules !== 'string' || !c.rules) throw new CampaignError('The campaign file needs "rules": a ruleset id like "mm", or a link');
   if (!Array.isArray(c.equipment) || !c.equipment.every((e) => typeof e === 'string')) throw new CampaignError('The campaign file needs an "equipment" list');
@@ -127,7 +127,7 @@ export function activateCampaign(c: CampaignCache | null) {
   useCampaignEquipment(c ? campaignFileIds(c) : null);
 }
 
-// Campaigns made in E9 Scribe (data repo modules/SCRIBE.md section 1, step 7; Companion 0.5.15). A campaign
+// Campaigns made in Scribe (data repo modules/SCRIBE.md section 1, step 7; Companion 0.5.15). A campaign
 // is a private module, kept on the device that made it: Scribe saves it here as "scribe-campaign:<id>", and the
 // Companion opens it by the link "scribe:<id>", with nothing to fetch. Its ruleset is its root's; its equipment
 // is that ruleset's own. The state file Scribe wrote first is "state:<id>", as for any campaign.
@@ -150,7 +150,7 @@ export interface ScribeCampaign {
 
 export function fromScribe(url: string, d: unknown): CampaignCache {
   const r = d as Partial<ScribeCampaign> | null;
-  if (!r || typeof r !== 'object' || r.format !== 'e9-scribe-campaign') throw new CampaignError("That isn't a campaign saved by E9 Scribe");
+  if (!r || typeof r !== 'object' || r.format !== 'e9-scribe-campaign') throw new CampaignError("That isn't a campaign saved by Scribe");
   if (typeof r.version !== 'number' || r.version > 1) throw new CampaignError('That campaign was saved by a newer Scribe. Update the app to open it.');
   if (typeof r.id !== 'string' || !/^[a-z0-9-]{1,80}$/.test(r.id)) throw new CampaignError('The campaign saved by Scribe has no id');
   const rules = RULESETS.find((x) => x.id === r.ruleset);

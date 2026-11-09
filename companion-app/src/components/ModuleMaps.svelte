@@ -5,7 +5,7 @@
   import { atlasUrl, isAtlasAddress, isAtlasMessage, partyHex } from '../lib/atlas';
   import { writeState, type CampaignState } from '../lib/state';
 
-  // A module's map is the E9 Atlas (<site>/atlas/?module=<id>), embedded whole: its own key,
+  // A module's map is the Atlas (<site>/atlas/?module=<id>), embedded whole: its own key,
   // Route and Party tools. The Atlas tells this page where it is (for the full-screen link) and
   // where the party stands, which is kept in the campaign state file and handed back each time the map opens.
   const HOME_MODULES = __DATA_URL__; // site.json "data.url": the Materia Mundi module site
@@ -17,8 +17,14 @@
   let problem = $state('');
 
   const keyOf = (m: SavedModule) => `${m.base}${m.id}`;
-  let current = $derived(app.modules.find((m) => keyOf(m) === chosen) ?? app.modules[0]);
   let at = $derived(app.state.party);
+  // until one is picked: the module the party is in, else the first with an Atlas map
+  let current = $derived(
+    app.modules.find((m) => keyOf(m) === chosen) ??
+      app.modules.find((m) => at && m.base === at.base && m.id === at.module && m.manifest.atlas_map) ??
+      app.modules.find((m) => m.manifest.atlas_map) ??
+      app.modules[0]
+  );
   let here = $derived(!!current && !!at && at.base === current.base && at.module === current.id);
   let atlas = $derived(current?.manifest.atlas_map ? atlasUrl(current.base, current.id) : '');
   // The first view: the party's hex if it is on the new grid, or the whole region. Later moves
@@ -115,14 +121,14 @@
 
 {#if current}
   {#if app.modules.length > 1}
-    <select bind:value={chosen} aria-label="Module" style="margin-bottom:0.5rem">
+    <select value={keyOf(current)} onchange={(e) => (chosen = (e.target as HTMLSelectElement).value)} aria-label="Module" style="margin-bottom:0.5rem">
       {#each app.modules as m (keyOf(m))}<option value={keyOf(m)}>{m.manifest.title}</option>{/each}
     </select>
   {/if}
   {#if atlas}
     {#key atlas}
       <div class="frame">
-        <iframe bind:this={frame} src="{atlas}{lockQuery}{start}" title="{current.manifest.title}: E9 Atlas" onload={onLoad}></iframe>
+        <iframe bind:this={frame} src="{atlas}{lockQuery}{start}" title="{current.manifest.title}: Atlas" onload={onLoad}></iframe>
       </div>
       <div class="strip small muted">
         {#if here && at}Party: hex {at.label} <button class="link" onclick={() => post({ show: `#${partyHex(at!)}` })}>Show</button> ·
@@ -132,7 +138,7 @@
     {/key}
   {:else}
     <section class="card">
-      <p class="small muted" style="margin-top:0">{current.manifest.title} has no E9 Atlas map. Its own pages may still have maps.</p>
+      <p class="small muted" style="margin-top:0">{current.manifest.title} has no Atlas map. Its own pages may still have maps.</p>
       <a class="link" href={viewerUrl(current.base, current.path ?? `${current.id}/`)} target="_blank" rel="noopener">Open its pages</a>
     </section>
   {/if}

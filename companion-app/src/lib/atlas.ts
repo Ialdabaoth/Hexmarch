@@ -1,4 +1,4 @@
-// The E9 Atlas, embedded in Campaign › Maps (Atlas 0.5.6; modules/ATLAS_FORMAT.md "Party marker").
+// The Atlas, embedded in Campaign › Maps (Atlas 0.5.6; modules/ATLAS_FORMAT.md "Party marker").
 // The Atlas is the same app for every module: <site>/atlas/?module=<id>#<address>. It tells the
 // page around it where it is and where the party stands; everything it sends is checked first.
 import type { PartyAt } from './storage';

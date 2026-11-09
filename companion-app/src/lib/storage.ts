@@ -28,7 +28,7 @@ export interface Settings {
   partyAt: PartyAt | null;
 }
 
-// Where the party stands on a module's E9 Atlas map: the module (its site and id) and the 100-ft
+// Where the party stands on a module's Atlas map: the module (its site and id) and the 100-ft
 // hex (map "atlas", hex "world:CCRR:CCRR"). Parties placed before Companion 0.5.2 have map "world"
 // or a League page key and a 3-mile hex "CCRR"; the Atlas moves them to the new grid (lib/atlas.ts).
 export interface PartyAt {
