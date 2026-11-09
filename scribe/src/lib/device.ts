@@ -2,7 +2,7 @@
 // The three apps share one site, so they share its IndexedDB: the Companion keeps its files in idb-keyval's
 // "keyval-store" database, and so does this. Scribe writes two keys there:
 //   scribe-campaign:<id>  the campaign module and lockfile (format e9-scribe-campaign/1), which the Companion opens
-//                         by the link "scribe:<id>" (Companion 0.5.14)
+//                         by the link "scribe:<id>" (Companion 0.5.15)
 //   state:<id>            the first state file, the one every app reads and writes for that campaign (STATE_FORMAT.md)
 // A state file already there has been played with, so it is replaced only when the referee says so.
 
