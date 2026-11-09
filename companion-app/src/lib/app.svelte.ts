@@ -512,6 +512,8 @@ class AppState {
     const snap = campaignSnapshot({ campaign: id, ruleset: rec.ruleset, site: rec.site, module: rec.manifest, lock: rec.lock, state: parts.state, knowledge: parts.knowledge }, rec.published, parts.receipts);
     const ptr = campaignPointer(id, String(rec.manifest.title ?? c.campaign.name), rec.services);
     await idbSet(`scribe-campaign:${id}`, { ...rec, published: { revision: snap.revision, at: snap.published } });
+    // the pair as built, which Scribe's Test compares the uploaded folder against (engine checkUpload, #29)
+    await idbSet(`published:${id}`, JSON.parse(JSON.stringify({ pointer: ptr, snapshot: snap })));
     this.campaigns = { ...this.campaigns, [c.url]: { ...c, published: { ...c.published, revision: snap.revision } } };
     await saveCampaigns(this.campaigns);
     downloadJson('campaign.json', ptr);
