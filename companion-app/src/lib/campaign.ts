@@ -35,6 +35,8 @@ export interface CampaignCache {
   rules?: RulesetOptions;
   files: EquipmentFileData[];
   fetchedAt: string;
+  // A campaign made in E9 Scribe: where its modules are published.
+  scribe?: { site: string };
 }
 
 export class CampaignError extends Error {}
@@ -114,6 +116,58 @@ export function registerCampaign(c: CampaignCache) {
 
 export function activateCampaign(c: CampaignCache | null) {
   useCampaignEquipment(c ? campaignFileIds(c) : null);
+}
+
+// Campaigns made in E9 Scribe (data repo modules/SCRIBE.md section 1, step 7; Companion 0.5.15). A campaign
+// is a private module, kept on the device that made it: Scribe saves it here as "scribe-campaign:<id>", and the
+// Companion opens it by the link "scribe:<id>", with nothing to fetch. Its ruleset is its root's; its equipment
+// is that ruleset's own. The state file Scribe wrote first is "state:<id>", as for any campaign.
+export const SCRIBE_LINK = 'scribe:';
+export const isScribeLink = (url: string) => url.startsWith(SCRIBE_LINK);
+
+export interface ScribeCampaign {
+  format: 'e9-scribe-campaign';
+  version: number;
+  id: string;
+  // The data site the campaign's modules came from (its mm.json), ending in "/".
+  site: string;
+  // The ruleset id its root provides (state.rules.ruleset).
+  ruleset: string;
+  // The campaign module.json and campaign.lock.json as Scribe wrote them.
+  manifest: { title?: string; requires?: Record<string, string> } & Record<string, unknown>;
+  lock: unknown;
+  saved: string;
+}
+
+export function fromScribe(url: string, d: unknown): CampaignCache {
+  const r = d as Partial<ScribeCampaign> | null;
+  if (!r || typeof r !== 'object' || r.format !== 'e9-scribe-campaign') throw new CampaignError("That isn't a campaign saved by E9 Scribe");
+  if (typeof r.version !== 'number' || r.version > 1) throw new CampaignError('That campaign was saved by a newer Scribe. Update the app to open it.');
+  if (typeof r.id !== 'string' || !/^[a-z0-9-]{1,80}$/.test(r.id)) throw new CampaignError('The campaign saved by Scribe has no id');
+  const rules = RULESETS.find((x) => x.id === r.ruleset);
+  if (!rules) throw new CampaignError(`This app doesn't have the ruleset "${r.ruleset}" the campaign plays with`);
+  const own = rules.options.equipment;
+  const campaign: CampaignData = {
+    format: CAMPAIGN_FORMAT,
+    version: 1,
+    id: r.id,
+    name: (typeof r.manifest?.title === 'string' && r.manifest.title.trim()) || r.id,
+    rules: rules.id,
+    equipment: (Array.isArray(own) ? own : [own]).filter((e) => isBuiltIn(e))
+  };
+  return { url, campaign, files: [], fetchedAt: typeof r.saved === 'string' ? r.saved : new Date().toISOString(), scribe: { site: typeof r.site === 'string' ? r.site : '' } };
+}
+
+export async function scribeCampaign(url: string): Promise<CampaignCache> {
+  const id = url.slice(SCRIBE_LINK.length);
+  const d = /^[a-z0-9-]{1,80}$/.test(id) ? await get(`scribe-campaign:${id}`) : undefined;
+  if (!d) throw new CampaignError(`There's no campaign "${id}" saved by Scribe on this device. Scribe keeps campaigns on the device that made them.`);
+  return fromScribe(url, d);
+}
+
+// A campaign by its link: fetched from the web, or read from Scribe's copy on this device.
+export function openCampaignLink(url: string): Promise<CampaignCache> {
+  return isScribeLink(url) ? scribeCampaign(url) : fetchCampaign(url);
 }
 
 export async function loadCampaigns(): Promise<Record<string, CampaignCache>> {

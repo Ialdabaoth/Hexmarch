@@ -11,7 +11,7 @@ import {
 } from './state';
 import { loadRepo, type SavedModule } from './modules';
 import {
-  absorbCustom, activateCampaign, blankLocal, campaignRulesId, fetchCampaign, loadCampaigns, loadFallbacks, loadLocal, registerCampaign, saveCampaigns,
+  absorbCustom, activateCampaign, blankLocal, campaignRulesId, isScribeLink, openCampaignLink, loadCampaigns, loadFallbacks, loadLocal, registerCampaign, saveCampaigns,
   saveLocal, type CampaignCache
 } from './campaign';
 import { CORE_RULES } from '../rules/core-modules';
@@ -107,6 +107,7 @@ class AppState {
     if (typeof document !== 'undefined') document.addEventListener('visibilitychange', () => { if (!document.hidden) void this.refreshState(); });
     if (await this.cacheInlinePortraits(this.sheets)) await this.persist();
     if (this.settings.dice3d) preloadDice();
+    await this.openAsked();
     void this.refreshCampaign();
   }
 
@@ -241,7 +242,7 @@ class AppState {
 
   // Opens a campaign by its link. Throws with a message for the player.
   async useCampaign(url: string) {
-    const c = await fetchCampaign(url.trim());
+    const c = await openCampaignLink(url.trim());
     await this.adoptCampaign(c);
     this.notify(`Playing in ${c.campaign.name}`);
   }
@@ -249,7 +250,7 @@ class AppState {
   // Switches to a campaign opened before, fetching it again when possible.
   async switchCampaign(url: string) {
     try {
-      await this.adoptCampaign(await fetchCampaign(url));
+      await this.adoptCampaign(await openCampaignLink(url));
     } catch (e) {
       const c = this.campaigns[url];
       if (!c) throw e;
@@ -282,14 +283,32 @@ class AppState {
     await this.rereadSheets();
     this.equipmentChanged();
     void this.syncArt().catch((e) => console.warn('Campaign art not read', e));
+    // a campaign made in Scribe brings its modules' site, for Campaign › Maps and Modules
+    const site = c.scribe?.site;
+    if (site && !this.modules.some((m) => m.base === site)) void this.addModuleRepo(site).catch((e) => console.warn('Campaign modules not read', e));
+  }
+
+  // A link may name the campaign to open (E9 Scribe's "Open in the Companion": ?campaign=scribe:<id>).
+  // The address is cleared afterwards, so reloading doesn't switch campaigns again.
+  private async openAsked() {
+    if (typeof location === 'undefined') return;
+    const q = new URLSearchParams(location.search), url = q.get('campaign');
+    if (url === null) return;
+    q.delete('campaign');
+    history.replaceState(history.state, '', location.pathname + (q.size ? `?${q}` : '') + location.hash);
+    try {
+      if (url !== this.settings.campaign || !this.campaign) await this.useCampaign(url);
+    } catch (e) {
+      this.notify((e as Error).message);
+    }
   }
 
   // The referee may have changed the campaign's files; pick that up quietly.
   private async refreshCampaign() {
     const url = this.settings.campaign;
-    if (!url || !navigator.onLine) return;
+    if (!url || (!navigator.onLine && !isScribeLink(url))) return;
     try {
-      const c = await fetchCampaign(url);
+      const c = await openCampaignLink(url);
       if (this.settings.campaign === url) await this.adoptCampaign(c);
     } catch (e) {
       console.warn('Campaign not refreshed', e);
@@ -438,7 +457,7 @@ class AppState {
   // Quietly does nothing when there's no campaign or it has no art file yet.
   async syncArt(): Promise<number> {
     const c = this.campaign;
-    if (!c || !this.missingArt.length) return 0;
+    if (!c || isScribeLink(c.url) || !this.missingArt.length) return 0;  // a campaign from Scribe has no art file yet
     const res = await fetch(artUrl(c.url, c.campaign.art), { cache: 'no-cache' });
     if (!res.ok) return 0;
     return this.addArt(await res.json());

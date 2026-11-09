@@ -2,6 +2,7 @@
   import { ROOTS, RULES_MANIFESTS, type RootChoice } from './lib/rules';
   import { loadSite, type SiteModule } from './lib/data';
   import { buildCampaign, describeProblem, startsOf, type Built, type Choices } from './lib/campaign';
+  import { campaignLink, saveOnDevice } from './lib/device';
 
   const VERSION = __SCRIBE_VERSION__;
   const params = new URLSearchParams(location.search);
@@ -99,6 +100,31 @@
   const atlasLink = $derived(
     startSite ? `../atlas/?site=${encodeURIComponent(siteUrl)}&module=${encodeURIComponent(startSite.module)}${startSite.slug ? `#site:${startSite.slug}` : ''}` : ''
   );
+
+  // Step 7: save the campaign on this device and open it in the Companion or the Atlas (Scribe 0.1.3).
+  let saveError = $state('');
+  let savedAs = $state('');
+  async function save(): Promise<string | null> {
+    if (!built || !root || built.problems.length) return null;
+    saveError = '';
+    const title = String(built.manifest.title);
+    try {
+      savedAs = await saveOnDevice($state.snapshot(built) as Built, root, siteUrl, (rev) =>
+        confirm(`This device already has play for “${title}” (state revision ${rev}): where the party is, the clock and what it has found. Start it again from this campaign's start?\n\nOK starts again; Cancel keeps the play and saves only the campaign.`)
+      );
+      return savedAs;
+    } catch (e) {
+      saveError = `Scribe couldn't save on this device: ${(e as Error).message || e}. A private window may not allow it; download the files instead.`;
+      return null;
+    }
+  }
+  async function openIn(app: 'companion' | 'atlas') {
+    const link = await save();
+    if (!link) return;
+    const c = encodeURIComponent(link);
+    if (app === 'companion') location.href = `../?campaign=${c}`;
+    else if (startSite) location.href = `../atlas/?site=${encodeURIComponent(siteUrl)}&module=${encodeURIComponent(startSite.module)}&campaign=${c}${startSite.slug ? `&place=site:${startSite.slug}#site:${startSite.slug}` : ''}`;
+  }
 </script>
 
 <main>
@@ -198,10 +224,20 @@
       {:else}
         <p class="small muted">{built.lock.modules.map((m) => `${m.id} ${m.version}`).join(' · ')}</p>
       {/if}
-      <button onclick={() => download('module.json', built!.manifest)}>module.json</button>
-      <button onclick={() => download('campaign.lock.json', built!.lock)}>campaign.lock.json</button>
-      <button onclick={() => download('state.json', built!.state)}>state.json</button>
-      {#if atlasLink}<a class="button" href={atlasLink}>Open the start in the Atlas</a>{/if}
+      <h3>Play it</h3>
+      <div class="row">
+        <button disabled={!!built.problems.length} onclick={() => openIn('companion')}>Save and open in the Companion</button>
+        {#if startSite}<button disabled={!!built.problems.length} onclick={() => openIn('atlas')}>Save and open the start in the Atlas</button>{/if}
+        <button class="quiet" disabled={!!built.problems.length} onclick={save}>Save on this device</button>
+      </div>
+      {#if saveError}<p class="bad">{saveError}</p>{/if}
+      {#if savedAs}<p class="small muted">Saved on this device. The Companion lists it under Settings › Campaign; its link is <code>{savedAs}</code>{#if savedAs !== campaignLink(String(built.manifest.id))} (renamed since: save again){/if}.</p>{/if}
+      <p class="small muted">The campaign stays on this device: the Companion, the Atlas and Scribe share it here. The Atlas puts the party at the start the first time it opens.</p>
+      <h3>Or keep the files</h3>
+      <button class="quiet" onclick={() => download('module.json', built!.manifest)}>module.json</button>
+      <button class="quiet" onclick={() => download('campaign.lock.json', built!.lock)}>campaign.lock.json</button>
+      <button class="quiet" onclick={() => download('state.json', built!.state)}>state.json</button>
+      {#if atlasLink}<a class="button quiet" href={atlasLink}>Look at the start in the Atlas</a>{/if}
       <p class="small muted">Keep the three files together in the campaign's folder (state.json goes in <code>campaign/</code>). The Companion loads state.json under Campaign › State.</p>
     </section>
   {/if}

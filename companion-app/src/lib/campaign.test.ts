@@ -7,7 +7,7 @@ vi.mock('idb-keyval', () => ({
 }));
 
 import {
-  absorbCustom, activateCampaign, blankLocal, campaignFileIds, checkCampaign, exportSheet, fetchCampaign, publishCampaign,
+  CampaignError, absorbCustom, activateCampaign, campaignRulesId, fromScribe, isScribeLink, scribeCampaign, blankLocal, campaignFileIds, checkCampaign, exportSheet, fetchCampaign, publishCampaign,
   registerCampaign, type CampaignData
 } from './campaign';
 import { catalogFor, registerEquipment, resolve, type EquipmentFileData } from '../equipment/equipment';
@@ -120,5 +120,37 @@ describe('campaigns', () => {
     const s = createSheet({ name: 'Ada', campaign: 'pale', origin: 'human', classId: 'warrior', abilities, talentBase: defaultTalents(abilities) });
     expect(readSheet(JSON.parse(JSON.stringify(s))).campaign).toBe('pale');
     expect(() => readSheet({ ...s, rules: 'norse-rules', campaign: 'norse' })).toThrow(/campaign "norse"/);
+  });
+});
+
+describe('campaigns made in E9 Scribe', () => {
+  const saved = {
+    format: 'e9-scribe-campaign', version: 1, id: 'kells-1422', site: 'https://example.org/data/', ruleset: 'e9mm',
+    manifest: { id: 'kells-1422', title: 'Kells 1422', kind: 'campaign', requires: { 'mm-core': '^0.1.0' } }, lock: {}, saved: '2026-11-08T23:00:00.000Z'
+  };
+
+  it('opens as a campaign with its root ruleset and that ruleset\'s own equipment', () => {
+    const c = fromScribe('scribe:kells-1422', saved);
+    expect(c.url).toBe('scribe:kells-1422');
+    expect(c.campaign.id).toBe('kells-1422');
+    expect(c.campaign.name).toBe('Kells 1422');
+    expect(campaignRulesId(c)).toBe('e9mm');
+    expect(c.campaign.equipment.length).toBeGreaterThan(0);
+    expect(c.scribe?.site).toBe('https://example.org/data/');
+    expect(isScribeLink(c.url)).toBe(true);
+  });
+
+  it('refuses what it cannot read', () => {
+    expect(() => fromScribe('scribe:x', { ...saved, format: 'nope' })).toThrow(CampaignError);
+    expect(() => fromScribe('scribe:x', { ...saved, version: 2 })).toThrow(/newer Scribe/);
+    expect(() => fromScribe('scribe:x', { ...saved, ruleset: 'acks' })).toThrow(/ruleset "acks"/);
+  });
+});
+
+describe('opening a Scribe campaign by its link', () => {
+  it('reads the copy Scribe saved on this device', async () => {
+    store.set('scribe-campaign:kells-1422', { format: 'e9-scribe-campaign', version: 1, id: 'kells-1422', site: '', ruleset: 'mm', manifest: { title: 'Kells' }, lock: {}, saved: '' });
+    expect((await scribeCampaign('scribe:kells-1422')).campaign.name).toBe('Kells');
+    await expect(scribeCampaign('scribe:elsewhere')).rejects.toThrow(/saved by Scribe on this device/);
   });
 });

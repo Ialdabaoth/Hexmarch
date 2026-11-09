@@ -21,9 +21,11 @@ label.opt input { margin-top: .3rem; }
 input[type=text], input[type=url], input[type=number], select { font: inherit; color: inherit; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; width: 100%; }
 .row { display: grid; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); gap: 10px; margin-top: 8px; }
 button, a.button { font: inherit; color: var(--bg); background: var(--accent); border: 0; border-radius: 6px; padding: 7px 12px; cursor: pointer; text-decoration: none; display: inline-block; margin: 4px 6px 0 0; }
-button.quiet { background: transparent; color: var(--accent); border: 1px solid var(--line); }
+button.quiet, a.button.quiet { background: transparent; color: var(--accent); border: 1px solid var(--line); }
 .bad { color: var(--bad); }
 ul.problems { margin: .3rem 0 0; padding-left: 1.2rem; }
 footer { margin-top: 24px; text-align: center; }
 footer a { color: inherit; margin: 0 .6rem; }
 details summary { cursor: pointer; }
+h3 { font-size: 1rem; margin: 14px 0 4px; }
+button:disabled { opacity: .5; cursor: default; }
