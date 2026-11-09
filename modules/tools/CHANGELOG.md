@@ -1,6 +1,6 @@
-# E9 Atlas: changelog
+# Hexmarch Atlas: changelog
 
-The E9 Atlas app and map tools (`modules/tools/`). The released version lives in `ATLAS_VERSION`; every merged PR that touches the tools is one patch, each planned sprint bumps the minor. New entries are not written here by hand: each PR adds a change note in `changes/`, and the site build numbers the notes in the order they merged and lists them here (CONTRIBUTING.md "Versions and change notes"). A module's own version is separate (see each module's CHANGELOG.md).
+The Hexmarch Atlas app and map tools (`modules/tools/`). The released version lives in `ATLAS_VERSION`; every merged PR that touches the tools is one patch, each planned sprint bumps the minor. New entries are not written here by hand: each PR adds a change note in `changes/`, and the site build numbers the notes in the order they merged and lists them here (CONTRIBUTING.md "Versions and change notes"). A module's own version is separate (see each module's CHANGELOG.md).
 
 ## 0.5.x (in development)
 

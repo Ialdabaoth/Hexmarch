@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>E9 Atlas</title>
+<title>{{APP}} Atlas</title>
 <link rel="icon" href="icon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="manifest" href="manifest.webmanifest"><meta name="theme-color" content="#2b2418">
 <style>
@@ -50,7 +50,7 @@ footer a{color:var(--red)}
 <label class="gr">Opacity <input type="range" id="grida" min="10" max="100" value="80"></label></div></div>
 <button id="out" title="Zoom out">−</button><button id="in" title="Zoom in">+</button><button id="fit">Fit</button><button id="routebtn" title="Plot a route and estimate the travel time">Route</button><button id="partybtn" title="Show, place or move the party">Party</button><button id="keybtn">Key</button><button id="modbtn" title="Load a different module">Modules</button></div></header>
 <div id="main"><div id="map"><canvas id="cv"></canvas><div id="route" hidden aria-live="polite"></div><div id="party" hidden aria-live="polite"></div></div><aside id="key"></aside></div>
-<footer><span id="hover">Click a hex to zoom in.</span><span><span id="support"></span>E9 Atlas {{ATLAS}}<span id="modver"></span> · <a href="#" id="creditbtn">Credits</a></span></footer>
+<footer><span id="hover">Click a hex to zoom in.</span><span><span id="support"></span>{{APP}} Atlas {{ATLAS}}<span id="modver"></span> · <a href="#" id="creditbtn">Credits</a></span></footer>
 <dialog id="modules"><h2>Load a module</h2><ul id="modlist"></ul><button id="modfile" title="A map file made by atlas_flat.py, such as a private module's. It stays in this browser and is never uploaded">Open a map file…</button> <button id="modclose">Close</button></dialog>
 <dialog id="credits"><h2>Credits</h2><ul id="creditlist"></ul><button id="creditclose">Close</button></dialog>
 <!--CARD-->
@@ -496,7 +496,7 @@ function drawRoute() {
 }
 
 // ---- the campaign state (STATE_FORMAT.md, e9-campaign-state/1; Atlas 0.5.11): where the party stands, the clock, what the party has found.
-// The Atlas reads it from, in order: the app around it (the E9 Companion sends {type: 'e9-atlas', state}), the Companion on this device
+// The Atlas reads it from, in order: the app around it (the Hexmarch Companion sends {type: 'e9-atlas', state}), the Companion on this device
 // (same site, its saved file for the campaign in use), or its own copy (a file loaded here, or a party placed before 0.5.11).
 // The party marker (Heph 2026-11-07, Atlas 0.4.17; ATLAS_FORMAT.md "Party marker") is always one 100-ft hex, drawn at every zoom.
 // Moving it along a route adds the travel time, which also passes on the campaign clock.
@@ -524,7 +524,7 @@ function idb(fn) {
 }
 const idbGet = k => idb((db, ok, no) => { const r = db.transaction('keyval').objectStore('keyval').get(k); r.onsuccess = () => { db.close(); ok(r.result); }; r.onerror = () => { db.close(); no(r.error); }; });
 const idbSet = (k, v) => idb((db, ok, no) => { const t = db.transaction('keyval', 'readwrite'); t.objectStore('keyval').put(v, k); t.oncomplete = () => { db.close(); ok(); }; t.onerror = () => { db.close(); no(t.error); }; });
-// A link may name the campaign (E9 Scribe's "Open in the Atlas", Atlas 0.5.16): ?campaign=<the Companion's link for it>, and ?place=site:<id> puts the party
+// A link may name the campaign (Hexmarch Scribe's "Open in the Atlas", Atlas 0.5.16): ?campaign=<the Companion's link for it>, and ?place=site:<id> puts the party
 // on that place's hex when the campaign has no party yet (a new campaign's start). The settings and the campaigns list hold links; state files go by campaign id.
 const ASK = new URLSearchParams(location.search), ASK_CAMPAIGN = ASK.get('campaign'), ASK_PLACE = ASK.get('place');
 async function campaignIdOf(url) {
@@ -847,6 +847,7 @@ window.E9Atlas = { travel(legs) {
 
 // the map key (Heph 2026-11-05: "get the map keys back"): terrain in view, then the places in view; a place zooms in like a click
 let KEYHTML = '';
+const APP = {{APPJSON}};  // the apps' name, from site.json "name" at build time (Heph 2026-11-09: Hexmarch Companion, Atlas and Scribe)
 const PATREON = {{PATREON}};  // from links.json at build time; empty hides the link. In the footer (Heph 2026-11-07), no longer in the key
 if (PATREON) document.getElementById('support').innerHTML = `<a href="${String(PATREON).replace(/[&<>"]/g, '')}" target="_blank" rel="noopener">Support E9 on Patreon</a> · `;
 const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
@@ -991,7 +992,7 @@ function crumbs() {
 }
 function go() {
   V = parse(location.hash); fit(); crumbs(); redraw();
-  // an app that embeds the Atlas (the E9 Companion) hears where it is, for its own links ({type: 'e9-atlas', event: 'view', hash})
+  // an app that embeds the Atlas (the Hexmarch Companion) hears where it is, for its own links ({type: 'e9-atlas', event: 'view', hash})
   if (parent !== window) parent.postMessage({ type: 'e9-atlas', event: 'view', module: MOD.id, hash: location.hash || '#world' }, '*');
 }
 
@@ -1074,7 +1075,7 @@ function openFile() {
   const inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.json,application/json';
   inp.onchange = async () => { const f = inp.files && inp.files[0]; if (!f) return;
     try { const b = JSON.parse(await f.text());
-      if (!b || b.format !== 'e9-atlas-file' || !b.module || !/^[a-z0-9-]{1,80}$/.test(b.module.id || '') || !b.map || !b.map.paint) throw new Error("That isn't an E9 Atlas map file.");
+      if (!b || b.format !== 'e9-atlas-file' || !b.module || !/^[a-z0-9-]{1,80}$/.test(b.module.id || '') || !b.map || !b.map.paint) throw new Error("That isn't a ${APP} Atlas map file.");
       if (b.version > 1) throw new Error('That map file was made by a newer Atlas.');
       await idbSet(FILE_KEY + b.module.id, b); const list = ((await idbGet(FILES_KEY)) || []).filter(x => x.id !== b.module.id);
       list.push({ id: b.module.id, title: b.module.title, version: b.module.version, credits: b.module.credits, languages: b.module.languages }); await idbSet(FILES_KEY, list);
@@ -1103,7 +1104,7 @@ async function loadModules() {
   try { await loadModules(); } catch (e) {}
   if (!MOD) { document.getElementById('crumbs').textContent = 'No module with an atlas map was found. Modules › Open a map file… opens one from this device.'; if (MODS.length) { modList(); document.getElementById('modules').showModal(); } return; }
   A = MOD.base + 'atlas/'; store.set('e9-atlas-module', MOD.id);
-  document.title = MOD.title + ' · E9 Atlas'; document.getElementById('modver').textContent = ' · ' + MOD.title + (MOD.version ? ' v' + plainVer(MOD.version).split(' ')[0] : '');
+  document.title = MOD.title + ' · ' + APP + ' Atlas'; document.getElementById('modver').textContent = ' · ' + MOD.title + (MOD.version ? ' v' + plainVer(MOD.version).split(' ')[0] : '');
   if (MOD.local) { const b = await idbGet(FILE_KEY + MOD.id).catch(() => null); if (!b) { document.getElementById('crumbs').textContent = 'That map file is no longer in this browser. Open it again from Modules.'; return; } D = b.map; TILES = b.tiles || {}; A = ''; }
   else D = await (await fetch(A + 'map.json', { cache: 'no-cache' })).json();  // always the current map.json: an old one has no tile cache
   TYPES = D.terrain.types; LBL = D.labels; D.names = D.names || {}; FLAT = !!D.flat; ladder(); langs();

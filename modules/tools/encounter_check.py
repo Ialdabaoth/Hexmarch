@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""E9 Atlas: check a module's Encounter maps (ENCOUNTER_FORMAT.md) before they are published.
+"""Hexmarch Atlas: check a module's Encounter maps (ENCOUNTER_FORMAT.md) before they are published.
 
     python3 -I modules/tools/encounter_check.py modules/<module>
 

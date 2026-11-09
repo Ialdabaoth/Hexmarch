@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""E9 Atlas: import a Universal VTT file (.uvtt / .dd2vtt / .df2vtt) as an Encounter map (ENCOUNTER_FORMAT.md section 7).
+"""Hexmarch Atlas: import a Universal VTT file (.uvtt / .dd2vtt / .df2vtt) as an Encounter map (ENCOUNTER_FORMAT.md section 7).
 
     python3 -I modules/tools/uvtt_import.py <file.uvtt> modules/<module>/encounter-maps [--id <map-id>] [--title "..."] [--ft 5]
 
