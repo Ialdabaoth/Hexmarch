@@ -142,6 +142,8 @@ class AppState {
     } catch (e) {
       console.warn('Modules unavailable', e);
     }
+    // saved manifests are a cache: read each site again, keeping the saved copy when it can't be read
+    void this.refreshModules();
     try {
       this.portraits = await loadPortraits();
     } catch (e) {
@@ -326,6 +328,19 @@ class AppState {
     return modules;
   }
 
+  // Reads every saved module site again (and `also`, the campaign's own site), so a module list saved by an older
+  // install (before the module had an Atlas map, say) doesn't last. A site that can't be read keeps its saved copy.
+  async refreshModules(also: string[] = []) {
+    const bases = [...new Set([...also.filter(Boolean), ...this.modules.map((m) => m.base)])];
+    for (const base of bases) {
+      try {
+        await this.addModuleRepo(base);
+      } catch (e) {
+        console.warn('Modules not refreshed', base, e);
+      }
+    }
+  }
+
   // Opens a campaign by an invitation (its link, as referee unless it says player) and takes that seat. Throws
   // with a message for the player.
   async useCampaign(url: string, role: Invite['role'] = 'referee', character?: string) {
@@ -430,8 +445,9 @@ class AppState {
     this.equipmentChanged();
     void this.syncArt().catch((e) => console.warn('Campaign art not read', e));
     // a campaign made in Scribe brings its modules' site, for Campaign › Maps and Modules
+    // (read again even when it is already saved, so the player's copy is the one the campaign was published with)
     const site = c.scribe?.site;
-    if (site && !this.modules.some((m) => m.base === site)) void this.addModuleRepo(site).catch((e) => console.warn('Campaign modules not read', e));
+    if (site) void this.addModuleRepo(site).catch((e) => console.warn('Campaign modules not read', e));
   }
 
   private async keepMail(list: MailItem[]) {

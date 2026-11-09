@@ -17,8 +17,14 @@
   let problem = $state('');
 
   const keyOf = (m: SavedModule) => `${m.base}${m.id}`;
-  let current = $derived(app.modules.find((m) => keyOf(m) === chosen) ?? app.modules[0]);
   let at = $derived(app.state.party);
+  // until one is picked: the module the party is in, else the first with an Atlas map
+  let current = $derived(
+    app.modules.find((m) => keyOf(m) === chosen) ??
+      app.modules.find((m) => at && m.base === at.base && m.id === at.module && m.manifest.atlas_map) ??
+      app.modules.find((m) => m.manifest.atlas_map) ??
+      app.modules[0]
+  );
   let here = $derived(!!current && !!at && at.base === current.base && at.module === current.id);
   let atlas = $derived(current?.manifest.atlas_map ? atlasUrl(current.base, current.id) : '');
   // The first view: the party's hex if it is on the new grid, or the whole region. Later moves
@@ -115,7 +121,7 @@
 
 {#if current}
   {#if app.modules.length > 1}
-    <select bind:value={chosen} aria-label="Module" style="margin-bottom:0.5rem">
+    <select value={keyOf(current)} onchange={(e) => (chosen = (e.target as HTMLSelectElement).value)} aria-label="Module" style="margin-bottom:0.5rem">
       {#each app.modules as m (keyOf(m))}<option value={keyOf(m)}>{m.manifest.title}</option>{/each}
     </select>
   {/if}
