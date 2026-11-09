@@ -53,7 +53,7 @@
 
   // The referee's invitation link for a player: the campaign and, optionally, the character they play.
   let inviteFor = $state('');
-  let invite = $derived(app.campaign ? inviteLink(location.origin + location.pathname, { url: app.settings.campaign, role: 'player', ...(inviteFor ? { character: inviteFor } : {}) }) : '');
+  let invite = $derived(app.campaign ? inviteLink(location.origin + location.pathname, { url: app.campaign.published?.pointer ?? app.settings.campaign, role: 'player', ...(inviteFor ? { character: inviteFor } : {}) }) : '');
   async function copyInvite() {
     try {
       await navigator.clipboard.writeText(invite);
@@ -113,7 +113,7 @@
     {#if app.mode === 'referee'}
       <details>
         <summary class="small">Invite a player</summary>
-        {#if isScribeLink(app.settings.campaign)}
+        {#if isScribeLink(app.settings.campaign) && !app.campaign.published}
           <p class="small muted">This campaign is kept only on this device, where Scribe saved it, so a player can't open it yet. Invitations open once the campaign is published.</p>
         {:else}
         <p class="small muted">Send this link to a player. Opening it adds the campaign to their switcher in player mode.</p>

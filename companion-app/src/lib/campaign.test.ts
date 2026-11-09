@@ -15,6 +15,7 @@ import { rulesFor } from '../rules/rules';
 import { createSheet, readSheet } from './sheet';
 import { defaultTalents } from './character';
 import { newWeapon } from './gear';
+import { pointer, snapshot } from '../../../engine/publish';
 
 const abilities = { con: 0, str: 1, dex: 0, int: 0, wis: 0, cha: 0 };
 const fighter = () =>
@@ -152,5 +153,49 @@ describe('opening a Scribe campaign by its link', () => {
     store.set('scribe-campaign:kells-1422', { format: 'e9-scribe-campaign', version: 1, id: 'kells-1422', site: '', ruleset: 'mm', manifest: { title: 'Kells' }, lock: {}, saved: '' });
     expect((await scribeCampaign('scribe:kells-1422')).campaign.name).toBe('Kells');
     await expect(scribeCampaign('scribe:elsewhere')).rejects.toThrow(/saved by Scribe on this device/);
+  });
+});
+
+describe('published campaigns', () => {
+  const services = { folder: 'https://example.org/kells/', read: 'https://example.org/kells/snapshot.json', post: '', pointer: 'https://example.org/kells/campaign.json' };
+  const record = { format: 'e9-scribe-campaign', version: 1, id: 'kells-1422', site: 'https://example.org/data/', ruleset: 'e9mm', manifest: { title: 'Kells 1422' }, lock: {}, saved: '2026-11-09T00:00:00Z' };
+  const state = { format: 'e9-campaign-state', version: 1, campaign: 'kells-1422', revision: 7, characters: [{ id: 'holly', name: 'Holly', player: 'Ann', hp: 3 }], private: { secret: 1 } };
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('lets the referee invite once Scribe has published, naming the pointer', () => {
+    expect(fromScribe('scribe:kells-1422', record).published).toBeUndefined();
+    const c = fromScribe('scribe:kells-1422', { ...record, services, published: { revision: 2, at: '2026-11-09T01:00:00Z' } });
+    expect(c.published).toEqual({ pointer: services.pointer, read: services.read, post: '', revision: 2 });
+  });
+
+  it('opens an invitation by its pointer, then the snapshot it names', async () => {
+    const snap = snapshot({ campaign: 'kells-1422', ruleset: 'e9mm', site: record.site, module: record.manifest, lock: {}, state, knowledge: { holly: [{ hex: 'world:0101:0101' }] } });
+    const files: Record<string, unknown> = { [services.pointer]: pointer('kells-1422', 'Kells 1422', services), [services.read]: snap };
+    const fetched: string[] = [];
+    vi.stubGlobal('fetch', async (url: string) => {
+      fetched.push(url);
+      return { ok: true, json: async () => JSON.parse(JSON.stringify(files[url])) };
+    });
+    const c = await fetchCampaign(services.pointer);
+    expect(fetched).toEqual([services.pointer, services.read]);
+    expect(c.url).toBe(services.pointer);
+    expect(c.campaign.id).toBe('kells-1422');
+    expect(c.campaign.name).toBe('Kells 1422');
+    expect(campaignRulesId(c)).toBe('e9mm');
+    expect(c.scribe?.site).toBe(record.site);
+    expect(c.published?.revision).toBe(1);
+    expect(c.published?.snapshot?.state.characters).toEqual([{ id: 'holly', name: 'Holly', player: 'Ann' }]);
+    expect(c.published?.snapshot?.state.private).toBeUndefined();
+    expect(c.published?.snapshot?.private).toEqual({ holly: { characters: { holly: { knowledge: [{ hex: 'world:0101:0101' }] } } } });
+  });
+
+  it("says so when the snapshot isn't the pointer's campaign", async () => {
+    const files: Record<string, unknown> = {
+      [services.pointer]: pointer('kells-1422', 'Kells 1422', services),
+      [services.read]: snapshot({ campaign: 'other', ruleset: 'e9mm', site: '', module: {}, lock: {}, state: {} })
+    };
+    vi.stubGlobal('fetch', async (url: string) => ({ ok: true, json: async () => files[url] }));
+    await expect(fetchCampaign(services.pointer)).rejects.toThrow(CampaignError);
+    await expect(fetchCampaign(services.pointer)).rejects.toThrow(/another campaign/);
   });
 });
