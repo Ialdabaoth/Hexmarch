@@ -398,12 +398,28 @@ class AppState {
     await saveCampaigns(this.campaigns);
     await this.updateSettings({ campaign: c.url, invitation: seat });
     activateCampaign(c);
+    await this.takeSnapshotState(c);
     await this.rereadSheets();
     this.equipmentChanged();
     void this.syncArt().catch((e) => console.warn('Campaign art not read', e));
     // a campaign made in Scribe brings its modules' site, for Campaign › Maps and Modules
     const site = c.scribe?.site;
     if (site && !this.modules.some((m) => m.base === site)) void this.addModuleRepo(site).catch((e) => console.warn('Campaign modules not read', e));
+  }
+
+  // A published campaign read from its snapshot (a player's device): the shared state there (clock, party, what
+  // everyone knows) replaces this device's copy when the referee's is newer.
+  private async takeSnapshotState(c: CampaignCache) {
+    const shared = c.published?.snapshot?.state;
+    if (!shared || this.campaignId !== c.campaign.id) return;
+    try {
+      const s = readState(shared, c.campaign.id);
+      if (s.revision <= this.state.revision) return;
+      this.state = s;
+      await saveStateFile(s.campaign, writeState(s));
+    } catch (e) {
+      console.warn('Shared campaign state unreadable', e);
+    }
   }
 
   // A link may be an invitation: the campaign to open, and the seat (E9 Scribe's "Open in the Companion":

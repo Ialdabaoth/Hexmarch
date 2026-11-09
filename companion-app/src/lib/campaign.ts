@@ -11,6 +11,7 @@ import {
 } from '../equipment/equipment';
 import { RULESETS, registerRuleset, type RulesetOptions } from '../rules/rules';
 import { FORMAT_VERSION, PARTS, writeParts, type Part, type SheetData } from './sheet';
+import { POINTER_FORMAT, PublishError, readPointer, readSnapshot, type Snapshot } from '../../../engine/publish';
 
 export const CAMPAIGN_FORMAT = 'materia-mundi-campaign';
 
@@ -37,6 +38,9 @@ export interface CampaignCache {
   fetchedAt: string;
   // A campaign made in E9 Scribe: where its modules are published.
   scribe?: { site: string };
+  // A campaign its referee has published (data repo modules/SCRIBE.md section 5): the pointer invitations name,
+  // where players read the snapshot and send requests, and, on a player's device, the snapshot as last read.
+  published?: { pointer: string; read: string; post: string; revision: number; snapshot?: Pick<Snapshot, 'state' | 'private'> };
 }
 
 export class CampaignError extends Error {}
@@ -70,6 +74,7 @@ async function fetchJson(url: string): Promise<unknown> {
 
 export async function fetchCampaign(url: string): Promise<CampaignCache> {
   const campaign = await fetchJson(url);
+  if ((campaign as { format?: unknown } | null)?.format === POINTER_FORMAT) return publishedCampaign(url, campaign);
   checkCampaign(campaign);
   const at = (link: string) => new URL(link, url).href;
   let rules: RulesetOptions | undefined;
@@ -155,7 +160,28 @@ export function fromScribe(url: string, d: unknown): CampaignCache {
     rules: rules.id,
     equipment: (Array.isArray(own) ? own : [own]).filter((e) => isBuiltIn(e))
   };
-  return { url, campaign, files: [], fetchedAt: typeof r.saved === 'string' ? r.saved : new Date().toISOString(), scribe: { site: typeof r.site === 'string' ? r.site : '' } };
+  const out: CampaignCache = { url, campaign, files: [], fetchedAt: typeof r.saved === 'string' ? r.saved : new Date().toISOString(), scribe: { site: typeof r.site === 'string' ? r.site : '' } };
+  // Scribe's Publish step (Hexmarch #21) records where it published: the referee's invitations name that pointer.
+  const { services, published } = r as { services?: { pointer?: unknown; read?: unknown; post?: unknown }; published?: { revision?: unknown } };
+  if (published && typeof services?.pointer === 'string' && services.pointer)
+    out.published = { pointer: services.pointer, read: String(services.read ?? ''), post: String(services.post ?? ''), revision: Number(published.revision) || 0 };
+  return out;
+}
+
+// A published campaign, as a player opens it (WORKFLOWS.md "Invitations"): the invitation names the pointer, the
+// pointer names the snapshot, and the snapshot holds the campaign as Scribe would have saved it, plus the shared state.
+export async function publishedCampaign(url: string, data: unknown): Promise<CampaignCache> {
+  try {
+    const p = readPointer(data);
+    const snap = readSnapshot(await fetchJson(p.read), p.campaign);
+    const c = fromScribe(url, {
+      format: 'e9-scribe-campaign', version: 1, id: p.campaign, site: snap.site, ruleset: snap.ruleset,
+      manifest: { ...snap.module, title: p.title }, lock: snap.lock, saved: snap.published
+    });
+    return { ...c, published: { pointer: url, read: p.read, post: p.post, revision: snap.revision, snapshot: { state: snap.state, private: snap.private } } };
+  } catch (e) {
+    throw e instanceof PublishError ? new CampaignError(e.message) : e;
+  }
 }
 
 export async function scribeCampaign(url: string): Promise<CampaignCache> {
