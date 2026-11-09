@@ -2,7 +2,8 @@
   import { ROOTS, RULES_MANIFESTS, type RootChoice } from './lib/rules';
   import { loadSite, type SiteModule } from './lib/data';
   import { buildCampaign, describeProblem, startsOf, type Built, type Choices } from './lib/campaign';
-  import { campaignLink, saveOnDevice } from './lib/device';
+  import { campaignLink, publishOnDevice, saveOnDevice, savedCampaign, type SavedCampaign } from './lib/device';
+  import { staticServices } from '../../engine';
 
   const VERSION = __SCRIBE_VERSION__;
   const params = new URLSearchParams(location.search);
@@ -118,6 +119,40 @@
       return null;
     }
   }
+  // Steps 8 and 9: Services and Publish (SCRIBE.md section 5).
+  let record = $state<SavedCampaign | null>(null);
+  let folder = $state('');
+  let postUrl = $state('');
+  let publishError = $state('');
+  let justPublished = $state(false);
+  const campaignKey = $derived(built ? String(built.manifest.id) : '');
+  $effect(() => {
+    const id = campaignKey;
+    void savedAs; // read the record again after every save
+    if (!id) return;
+    savedCampaign(id).then((r) => {
+      record = r;
+      if (r?.services && !folder) {
+        folder = r.services.folder;
+        postUrl = r.services.post;
+      }
+    }).catch(() => (record = null));
+  });
+  async function publish() {
+    publishError = '';
+    justPublished = false;
+    try {
+      const services = staticServices(folder, postUrl);
+      const out = await publishOnDevice(campaignKey, services);
+      record = out.record;
+      download('campaign.json', out.pointer);
+      download('snapshot.json', out.snapshot);
+      justPublished = true;
+    } catch (e) {
+      publishError = (e as Error).message;
+    }
+  }
+
   async function openIn(app: 'companion' | 'atlas') {
     const link = await save();
     if (!link) return;
@@ -240,6 +275,32 @@
       {#if atlasLink}<a class="button quiet" href={atlasLink}>Look at the start in the Atlas</a>{/if}
       <p class="small muted">Keep the three files together in the campaign's folder (state.json goes in <code>campaign/</code>). The Companion loads state.json under Campaign › State.</p>
     </section>
+  {/if}
+
+  {#if built && !built.problems.length}
+    <section>
+      <h2>8. Where players find it</h2>
+      {#if !record}
+        <p class="small muted">Save the campaign on this device first (above). Players can't join until it is published.</p>
+      {:else}
+        <p class="small muted">Players need two addresses: one to read the campaign from, one to send their requests to. For now that is a folder on any free web host you can upload to, such as GitHub Pages; your own Apps Script will set this up for you later.</p>
+        <label class="field">Folder you upload to <input type="url" bind:value={folder} placeholder="https://you.github.io/kells-1422/" /></label>
+        <label class="field">Where players send requests (optional for now) <input type="url" bind:value={postUrl} placeholder="https://script.google.com/…/exec" /></label>
+      {/if}
+    </section>
+    {#if record}
+      <section>
+        <h2>9. Publish</h2>
+        <p class="small muted">Publishing writes what players may see: the campaign, its modules and the shared state (clock, party, what everyone knows), as it stands on this device now. Nothing only you should see goes in. Invite a player opens in the Companion once it is published.</p>
+        <button disabled={!folder} onclick={publish}>{record.published ? 'Publish again' : 'Publish'}</button>
+        {#if publishError}<p class="bad">{publishError}</p>{/if}
+        {#if record.published}
+          <p class="small muted">Published (revision {record.published.revision}, {new Date(record.published.at).toLocaleString()}).
+            {#if justPublished}Upload <code>campaign.json</code> and <code>snapshot.json</code> into <code>{record.services?.folder}</code>, replacing the old ones.{/if}
+            Players' invitations name <code>{record.services?.pointer}</code>.</p>
+        {/if}
+      </section>
+    {/if}
   {/if}
 
   <footer class="small muted"><a href="../">Companion</a><a href="../atlas/">Atlas</a></footer>
