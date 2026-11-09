@@ -1,1 +1,0 @@
-The window title follows the campaign in use, as the switcher names it: "Kells 1422 · Playing Holly", "Kells 1422 · Referee", or "My Characters" outside a campaign (it read "E9 Companion"; Heph 2026-11-09).

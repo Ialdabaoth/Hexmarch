@@ -1,1 +1,0 @@
-Saved modules are read again from their sites each time the app opens, and a campaign always brings its own modules' site, so a module list saved by an older install no longer hides a module's Atlas map ("has no Atlas map"). A site that can't be read keeps its saved copy. Campaign › Maps opens on the party's module, or else the first module with a map.
