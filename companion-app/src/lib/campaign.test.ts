@@ -165,7 +165,7 @@ describe('published campaigns', () => {
   it('lets the referee invite once Scribe has published, naming the pointer', () => {
     expect(fromScribe('scribe:kells-1422', record).published).toBeUndefined();
     const c = fromScribe('scribe:kells-1422', { ...record, services, published: { revision: 2, at: '2026-11-09T01:00:00Z' } });
-    expect(c.published).toEqual({ pointer: services.pointer, read: services.read, post: '', revision: 2 });
+    expect(c.published).toEqual({ pointer: services.pointer, read: services.read, post: '', revision: 2, at: '2026-11-09T01:00:00Z' });
   });
 
   it('opens an invitation by its pointer, then the snapshot it names', async () => {

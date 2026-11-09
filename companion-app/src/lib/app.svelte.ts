@@ -515,12 +515,19 @@ class AppState {
     await idbSet(`scribe-campaign:${id}`, { ...rec, published: { revision: snap.revision, at: snap.published } });
     // the pair as built, which Scribe's Test compares the uploaded folder against (engine checkUpload, #29)
     await idbSet(`published:${id}`, JSON.parse(JSON.stringify({ pointer: ptr, snapshot: snap })));
-    this.campaigns = { ...this.campaigns, [c.url]: { ...c, published: { ...c.published, revision: snap.revision } } };
+    this.campaigns = { ...this.campaigns, [c.url]: { ...c, published: { ...c.published, revision: snap.revision, at: snap.published } } };
     await saveCampaigns(this.campaigns);
     downloadJson('campaign.json', ptr);
     await new Promise((r) => setTimeout(r, 400));
     downloadJson('snapshot.json', snap);
     this.notify(`Update ${snap.revision} saved. Upload campaign.json and snapshot.json to ${rec.services.folder}`);
+  }
+
+  // Referee mode: answers (approved or sent back) made since the campaign was last published, which players
+  // learn of only at the next Update campaign.
+  get unpublished(): number {
+    const since = this.campaign?.published?.at ?? '';
+    return this.requests.filter((m) => m.box === 'in' && m.answer && m.envelope.kind === 'join' && m.answer.at > since).length;
   }
 
   // The requests this device has answered, for the next snapshot's receipts.

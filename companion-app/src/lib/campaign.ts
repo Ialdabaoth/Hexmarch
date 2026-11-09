@@ -40,7 +40,7 @@ export interface CampaignCache {
   scribe?: { site: string };
   // A campaign its referee has published (data repo modules/SCRIBE.md section 5): the pointer invitations name,
   // where players read the snapshot and send requests, and, on a player's device, the snapshot as last read.
-  published?: { pointer: string; read: string; post: string; revision: number; snapshot?: Pick<Snapshot, 'state' | 'private' | 'receipts'> };
+  published?: { pointer: string; read: string; post: string; revision: number; at?: string; snapshot?: Pick<Snapshot, 'state' | 'private' | 'receipts'> };
 }
 
 export class CampaignError extends Error {}
@@ -166,9 +166,12 @@ export function fromScribe(url: string, d: unknown): CampaignCache {
   };
   const out: CampaignCache = { url, campaign, files: [], fetchedAt: typeof r.saved === 'string' ? r.saved : new Date().toISOString(), scribe: { site: typeof r.site === 'string' ? r.site : '' } };
   // Scribe's Publish step (Hexmarch #21) records where it published: the referee's invitations name that pointer.
-  const { services, published } = r as { services?: { pointer?: unknown; read?: unknown; post?: unknown }; published?: { revision?: unknown } };
+  const { services, published } = r as { services?: { pointer?: unknown; read?: unknown; post?: unknown }; published?: { revision?: unknown; at?: unknown } };
   if (published && typeof services?.pointer === 'string' && services.pointer)
-    out.published = { pointer: services.pointer, read: String(services.read ?? ''), post: String(services.post ?? ''), revision: Number(published.revision) || 0 };
+    out.published = {
+      pointer: services.pointer, read: String(services.read ?? ''), post: String(services.post ?? ''), revision: Number(published.revision) || 0,
+      ...(typeof published.at === 'string' ? { at: published.at } : {})
+    };
   return out;
 }
 
