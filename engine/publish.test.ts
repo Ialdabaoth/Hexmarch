@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { PublishError, pointer, privateParts, publicState, publishParts, readPointer, readSnapshot, snapshot, staticServices } from './publish';
+import { PublishError, checkUpload, pointer, privateParts, publicState, publishParts, readPointer, readSnapshot, snapshot, staticServices } from './publish';
 
 const now = new Date('2026-11-09T13:00:00Z');
 const kells = {
@@ -77,5 +77,29 @@ describe("the parts a snapshot reads from the referee's device", () => {
   });
   it('works on a device with nothing played yet', async () => {
     expect(await publishParts('x', async () => undefined)).toEqual({ state: {}, knowledge: {}, receipts: [] });
+  });
+});
+
+describe('testing the upload', () => {
+  const s = staticServices('https://me.github.io/kells/');
+  const expected = { pointer: pointer('kells-1422', 'Kells, 1422', s, now), snapshot: snapshot(kells, { revision: 2 }, [], now) };
+  const host = (files: Record<string, unknown | number>): typeof fetch =>
+    (async (url: string) => {
+      const f = files[url];
+      if (f === undefined) return new Response('nope', { status: 404 });
+      if (typeof f === 'number') return new Response('', { status: f });
+      return new Response(typeof f === 'string' ? f : JSON.stringify(f), { status: 200 });
+    }) as unknown as typeof fetch;
+
+  it('says both match, whatever the key order', async () => {
+    const reordered = JSON.parse(JSON.stringify(expected.snapshot, Object.keys(expected.snapshot).reverse()));
+    expect(await checkUpload(s, expected, host({ [s.pointer]: expected.pointer, [s.read]: { ...reordered, ...expected.snapshot } }))).toEqual({ pointer: 'matches', snapshot: 'matches', found: 3 });
+  });
+  it('tells missing, older, different and unreadable apart', async () => {
+    expect(await checkUpload(s, expected, host({}))).toEqual({ pointer: 'missing', snapshot: 'missing' });
+    expect(await checkUpload(s, expected, host({ [s.pointer]: { ...expected.pointer, read: 'x' }, [s.read]: { ...expected.snapshot, revision: 2 } }))).toEqual({ pointer: 'different', snapshot: 'older', found: 2 });
+    expect(await checkUpload(s, expected, host({ [s.pointer]: '<html>', [s.read]: 500 }))).toEqual({ pointer: 'unreadable', snapshot: 'unreadable' });
+    const blocked = (async () => { throw new TypeError('Failed to fetch'); }) as unknown as typeof fetch;
+    expect(await checkUpload(s, expected, blocked)).toEqual({ pointer: 'unreadable', snapshot: 'unreadable' });
   });
 });
