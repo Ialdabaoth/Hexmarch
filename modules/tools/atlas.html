@@ -195,15 +195,6 @@ const leagueAddr = (i, j) => FLAT ? `#world:${i}.${j}` : '#world:' + lab(i - LBL
 const marchAddr = (i, j) => FLAT ? `#march:${i}.${j}` : '#march:' + lab(i - LBL.march[0]) + lab(j - LBL.march[1]);
 function parse(h) {
   h = decodeURIComponent(h).replace(/^#/, ''); let m;
-  // old links (the module viewer's #l-1330, #l-1330--site, #march-7, #atlas-7, #p-site, and #legacy:world:0706, whose world:CCRR would read as
-  // a League today; Atlas 0.5.6, ATLAS_FORMAT.md "Old links"): a place named in the link opens its 100-ft hex, anything else the
-  // League or March that map.json "legacy" gives for the old page or hex
-  const old = h.startsWith('legacy:') ? h.slice(7) : /^(l-|march-|atlas-|p-)/.test(h) ? h : null;
-  if (old !== null) {
-    if ((m = old.match(/--([a-z0-9-]+)$/) || old.match(/^p-([a-z0-9-]+)$/))) { const p = D.pois.find(q => q.id === m[1]); if (p) return parse(addr(...p.hex)); }
-    const k = old.replace(/^atlas-/, 'march-').replace(/--.*$/, '').replace(/^(\w+-\w+):\d{4}$/, '$1');  // a hex inside an old League page: that page
-    return D.legacy && D.legacy[k] ? parse('#' + D.legacy[k]) : { lvl: 'region' };
-  }
   // a place by its id (the module page's "Show on the map", Atlas 0.5.7): its 100-ft hex
   if ((m = h.match(/^site:([a-z0-9-]+)$/))) { const p = D.pois.find(q => q.id === m[1]); return p ? parse(addr(...p.hex)) : { lvl: 'region' }; }
   h = h.toUpperCase();
@@ -497,7 +488,7 @@ function drawRoute() {
 
 // ---- the campaign state (STATE_FORMAT.md, hexmarch-campaign-state/1; Atlas 0.5.11): where the party stands, the clock, what the party has found.
 // The Atlas reads it from, in order: the app around it (the Hexmarch Companion sends {type: 'hexmarch-atlas', state}), the Companion on this device
-// (same site, its saved file for the campaign in use), or its own copy (a file loaded here).
+// (same site, its saved file for the campaign in use), or its own copy (a file loaded here, or a party placed before 0.5.11).
 // The party marker (Heph 2026-11-07, Atlas 0.4.17; ATLAS_FORMAT.md "Party marker") is always one 100-ft hex, drawn at every zoom.
 // Moving it along a route adds the travel time, which also passes on the campaign clock.
 let PARTY = null, PLACE = false, PBOX = false;  // PARTY: {hex: [C, R], hours}; PLACE: the next click puts the party there; PBOX: its box is open
@@ -541,6 +532,10 @@ async function loadState() {
   if (CS_SRC === 'host') return;
   try { const s = await deviceState(); if (s) { CS = s; CS_SRC = 'device'; } } catch (e) {}
   if (!CS) try { const s = JSON.parse(store.get(CS_KEY) || 'null'); if (s) { CS = csRead(s); CS_SRC = 'local'; } } catch (e) {}
+  if (!CS) try {  // a party placed in this browser before 0.5.11 ('hexmarch-atlas-party:<module>') starts the Atlas's own copy
+    const p = JSON.parse(store.get('hexmarch-atlas-party:' + MOD.id) || 'null');
+    if (p && typeof p.hex === 'string' && CS_ADDR.test(p.hex)) { CS = csBlank(); CS.party = { base: MOD.base, module: MOD.id, map: 'atlas', hex: p.hex, label: p.hex.slice(6), hours: +p.hours || 0 }; CS_SRC = 'local'; store.set(CS_KEY, JSON.stringify(CS)); }
+  } catch (e) {}
   fromState();
   if (CS && CS_SRC === 'device' && !CS.party && ASK_PLACE && !LOCK) { const m = ASK_PLACE.match(/^site:([a-z0-9-]{1,80})$/), p = m && D.pois.find(q => q.id === m[1]); if (p) await setParty(p.hex, 0); }
 }
@@ -804,7 +799,7 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden && MO
 // an app that embeds the Atlas may show an address ({type: 'hexmarch-atlas', show: '#world:LLLL:HHHH'}, Atlas 0.5.6)
 addEventListener('message', e => { const d = e.data; if (D && d && d.type === 'hexmarch-atlas' && typeof d.show === 'string' && /^#[\w:-]{0,60}$/.test(d.show)) location.hash = d.show; });
 // an app that embeds the Atlas sends the whole state file ({type: 'hexmarch-atlas', state}, Atlas 0.5.11) on load and after each change; it keeps
-// the file, so the Atlas only tells it of party moves. An older app sends just the party ({party: {hex, hours} | null}); it is not told back
+// the file, so the Atlas only tells it of party moves. Without a state file it sends just the party ({party: {hex, hours} | null}); it is not told back
 addEventListener('message', e => { const d = e.data; if (e.source !== parent || parent === window || !D || !MOD || !d || d.type !== 'hexmarch-atlas') return;
   // and the creatures it keeps, with what each knows ({characters: [{id, name, owner, knowledge}]}), and which one to show the map as ({as: id | ''}), Atlas 0.5.12
   if ('characters' in d) { WHO = whoFile(Array.isArray(d.characters) ? d.characters : []); WHO_SRC = 'host'; know(); }
@@ -815,7 +810,6 @@ addEventListener('message', e => { const d = e.data; if (e.source !== parent || 
   if (d.party === null) { setParty(null, 0, true); return; }
   const q = d.party && typeof d.party.hex === 'string' && parse('#' + d.party.hex); if (!q) return;
   if (q.sel) setParty(q.sel, +d.party.hours || 0, true);
-  else if (q.lvl === 'league') setParty(centre(q.i, q.j, NL), +d.party.hours || 0);  // an old 3-mile hex: the centre of its League, told back in the new form
 });
 function drawParty() {  // a red pennant planted on the party's hex centre, over everything; the hex itself shaded once it is big enough to see
   if (!PARTY) return; const [sx, sy] = S(...ft(...PARTY.hex)), F = 100 * cam.s;

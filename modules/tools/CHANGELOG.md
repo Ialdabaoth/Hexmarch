@@ -2,11 +2,32 @@
 
 The Hexmarch Atlas app and map tools (`modules/tools/`). The released version lives in `ATLAS_VERSION`; every merged PR that touches the tools is one patch, each planned sprint bumps the minor. New entries are not written here by hand: each PR adds a change note in `changes/`, and the site build numbers the notes in the order they merged and lists them here (CONTRIBUTING.md "Versions and change notes"). A module's own version is separate (see each module's CHANGELOG.md).
 
-## 0.5.x (in development)
+## 0.6.x (in development)
 
-Sprint: git and VTT integration (campaign repo, shared state file, referee and player views, VTT polish). See "Queued for 0.5" below.
+Sprint: set by the ⬢ Atlas 0.6.X thread. The `hexmarch-` protocol rename (data repo WORKFLOWS.md "Versioning > Protocol names") lands in 0.6.x, made by the ⬢ Companion 0.6.X thread for all apps; the Atlas thread reviews its Atlas parts. See "Queued for 0.6" below.
 
 <!-- changes.py: new entries go below this line -->
+- 0.6.0: 0.5.x closed (Heph 2026-11-09, after the alpha walkthrough worked end to end). Housekeeping: old links are gone (`#l-1330`, `#march-7`, `#atlas-7`, `#p-<site>`, `#legacy:…`, from 0.5.6), and so is the module page's redirect for them; map files no longer carry an empty `legacy` table; the Atlas no longer converts a party on an old 3-mile hex sent by the Companion. Until 0.8.x the only users are Heph and us, so formats change without compatibility shims (Heph 2026-11-09).
+
+### Queued for 0.6
+
+Carried forward from 0.5 (done in 0.5: the state file, player and character views, referee reveal controls):
+- The `hexmarch-` protocol rename (the ⬢ Companion 0.6.X thread owns it, in both repos): formats `e9-atlas/1`, `e9-atlas-cache/1`, `e9-encounter-map/1`, `e9-vtt/1`, `e9-vtt-links/1`, the postMessage type `e9-atlas`, the `e9-atlas-*` storage keys, `.e9atlas.json` to `.hexmarch-atlas.json`, and `mm.json` to `hexmarch.json`. A clean rename with no shims (it is just us until 0.8).
+- "E9 Atlas" in the comments of `build.py` and the map tools it hashes (`hexmap.py`, `atlas_convert.py`, `atlas_cache.py`, `atlas_roads.py`, `realmap.py`, `dymaxion.py`), the redirect page `build.py` writes at `modules/<id>/atlas/`, and the `legacy` table `atlas_convert.py` still writes. Each edit there redraws every map, so do them together with the next change that redraws anyway.
+- Run the `sight-range` procedure once the Atlas runs procedures; the terrain table is a stand-in. A "charted" fog state (a map reveals coarse terrain only).
+- Site finder: search places by name in any of the module's languages.
+- PoI hierarchies, next steps: Route and party arrive at the nearest sub-place (gate); parent footprint shaded on the Field view; player view shows only found sub-places.
+- Module pinning: load the exact module versions the campaign's lockfile names.
+- VTT: test the E9 Bridge in a live Foundry v12/v13 world; Owlbear Rodeo extension on `e9-vtt/1`; per-campaign "Open in Foundry/Roll20/Owlbear" scene links (ENCOUNTER_FORMAT.md section 13).
+- Party pennants with their own icons and colours.
+- Rights check on encounter maps traced from PDFs before any public play.
+
+## 0.5.19 (2026-11-09), 0.5.x closed
+
+0.5.x was the git and campaign sprint. The Atlas moved to the apps repository (Hexmarch) as an installable app of its own, became the **Hexmarch Atlas**, and stopped drawing maps into module pages. It reads the campaign state file (party, clock, revealed places) from the Companion, from this device, or from a Scribe campaign link. Each creature now has its own map: character mode, a locked player's view and fog of war, with six hex states, travel that reveals what each character sees, and a referee brush. Fantasy worlds with their own scale ladder and private map files (Mystara) work beside the real-world modules, and module pages link places into the Atlas.
+
+- 0.5.19: The app is now the **Hexmarch Atlas** (Heph 2026-11-09: Hexmarch Companion, Hexmarch Atlas and Hexmarch Scribe, because they run any OSR hexcrawl core rules, not only E9). The page title, footer and install description take the name from `site.json` "name", so a rename needs no code change. Module pages say "the Atlas". Format and message ids (`e9-atlas`, `e9-atlas-file`, storage keys) are unchanged, so saved maps, parties and links keep working.
+- 0.5.18: A locked player's view for the Companion's player mode (Heph 2026-11-09). With `{as: id, lock: true}` from the Companion, or `?as=<id>&lock=1` in the address, the map shows only what that character knows, plus what everyone knows. It has no referee view, no fog brush, and no way to place or move the party. A character the map hasn't been given knows only what everyone knows.
 - 0.5.17: fog of war (Heph 2026-11-09, ATLAS_FORMAT.md "Fog of war"). Each 3-mile hex (or a fantasy world's painted hex) is in one of six states: **in sight and explored** (full colour, gold rim), **in sight and visited** (full colour), **explored** (sepia), **visited** (faded sepia), **rumoured** (parchment, dotted outline) or **unknown** (blank parchment). Visited means someone has seen it or passed through; explored means it has been searched, which shows its hidden sites. The sepia is the terrain's own light and shade in brown ink, over tiles, icons, rivers and roads alike. Places show when known, all of them in an explored hex, and the plain ones (rank 1–2) in a hex visited or in sight; a rumoured place is a faded icon with "Name ?". Character mode always shows that one's fog; the referee's view has none unless **Party › Fog of war** is ticked, which shows the party's view. Moving the party reveals every hex in sight along the route to each character in the party, as knowledge entries on their sheets (sent to the Companion that embeds the Atlas, else written to the Companion's sheets on this device, else to characters loaded here). The referee's **brush** marks hexes visited, explored, rumoured or unknown. How far one sees is a Procedure (`sight-range`, Heph 2026-11-09); until the Atlas runs procedures, a stand-in table by terrain gives the miles (grass 3, forest ½, hills 6, mountains 12…).
 - 0.5.16: opening a campaign from E9 Scribe. A link can name the campaign whose state file the Atlas uses (`?campaign=<the Companion's link for it>`; a campaign Scribe saved on this device is `scribe:<id>`) instead of the one the Companion is using, and `?place=site:<place id>` puts the party on that place's hex when the campaign has no party yet, so a new campaign's start appears on the map with the party there (one revision on, the hex counts as seen). Fixed: the Atlas looked for a linked campaign's state file under the campaign's link, but the Companion saves it under the campaign's id, so only This device's file was ever found.
 - 0.5.14: fantasy worlds and private map files (ATLAS_FORMAT.md "Fantasy worlds"; first for Mystara). A module can bring its own five-level ladder (`scales`), such as 64 mi, 8 mi, 1 mi, 660 ft and 60 ft on a 5280-ft mile, and paint only one level: one picture with a pixel per hex. The level above is the most common terrain under each hex; the levels below are worked out as you zoom, with borders that wander by seeded noise (the same every time), so nothing finer is stored. Its addresses are plain numbers, `#world:<col>.<row>` for a painted hex (the painter's own grid) and `#world:<col>.<row>:<C>.<R>` for a bottom hex. The header, hover line and Route box name each level by the module's own names, and route miles use its mile. New tool `atlas_flat.py` builds such a module folder into one self-contained map file (map, credits and tile art). **Modules › Open a map file…** opens it; it stays in this browser, is listed as "on this device" with a Remove button, and is never uploaded, which is how private modules are played.
@@ -34,18 +55,6 @@ Sprint: git and VTT integration (campaign repo, shared state file, referee and p
   - Diagonal doors (`"dir": "d"` or `"a"`).
   - New marks: statue, pillar, trapdoor (with `"up"` for one in the ceiling), portcullis and curtain.
   - Existing maps come out unchanged.
-
-### Queued for 0.5
-
-From `strategy/mvp-checklist.md` (project files) and ENCOUNTER_FORMAT.md sections 13–14:
-- Read and write the campaign state file (party hex and hours, revealed hexes and sites) instead of localStorage; referee moves write back.
-- `view=player`: party marker plus revealed hexes and places only; referee layers, keyed text, monsters and unrevealed sites hidden.
-- Referee reveal controls (by hand, and automatically for hexes the party enters).
-- Site finder: search places by name in Irish or English.
-- PoI hierarchies, next steps: Route and party arrive at the nearest sub-place (gate); parent footprint shaded on the Field view; player view shows only found sub-places.
-- Module pinning: the campaign file names the module and exact version every device loads.
-- VTT: test the E9 Bridge (0.1.0) in a live Foundry v12/v13 world; Owlbear Rodeo extension on the `e9-vtt/1` protocol; per-campaign "Open in Foundry/Roll20/Owlbear" scene links (section 13); `.e9vtt` file drop for VTTs that can't host a page.
-- Rights check on encounter maps traced from PDFs before any public play.
 
 ## 0.4.18 (2026-11-07), 0.4.x closed
 

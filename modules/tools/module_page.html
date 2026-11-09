@@ -72,9 +72,6 @@ details.card > summary b { font-size: 16px } details.card > div { display: grid;
 "use strict";
 const D = JSON.parse(document.getElementById('module-data').textContent);
 const ATLAS = '../../atlas/?module=' + encodeURIComponent(D.id);
-// links into the old map pages (#world, #l-1330--site, #march-7, #atlas-7, #p-site) open that place in the Atlas, which reads them (Atlas 0.5.6)
-{ const h = location.hash.replace(/^#/, '');
-  if (D.atlas_map && /^(world(:\d{4})?$|l-|march-|atlas-|p-)/.test(h)) location.replace(ATLAS + (h === 'world' ? '#world' : /^world:\d{4}$/.test(h) ? '#legacy:' + h : '#' + h)); }
 const $ = id => document.getElementById(id);
 const esc = v => String(v ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html !== undefined) e.innerHTML = html; return e; };
