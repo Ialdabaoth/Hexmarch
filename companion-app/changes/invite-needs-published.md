@@ -1,0 +1,1 @@
+Settings › Invite a player waits until the campaign is published: a campaign Scribe saved on this device can't be opened by anyone else, so it says so instead of offering a link (data repo WORKFLOWS.md "Invitations, modes and who writes what", Heph 2026-11-09).

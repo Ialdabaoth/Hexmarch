@@ -4,6 +4,7 @@
   import { DEFAULT_RULES, RULESETS, findRules } from '../rules/rules';
   import { DEFAULT_DICE_COLOR, DEFAULT_DICE_INK, showDice } from '../lib/dice3d';
   import { inviteLink, readInvite, invitationLabel, type Role } from '../lib/invitations';
+  import { isScribeLink } from '../lib/campaign';
 
   const d20 = () => ({ sides: 20, value: 1 + Math.floor(Math.random() * 20), kept: true });
   function tryDice() {
@@ -112,6 +113,9 @@
     {#if app.mode === 'referee'}
       <details>
         <summary class="small">Invite a player</summary>
+        {#if isScribeLink(app.settings.campaign)}
+          <p class="small muted">This campaign is kept only on this device, where Scribe saved it, so a player can't open it yet. Invitations open once the campaign is published.</p>
+        {:else}
         <p class="small muted">Send this link to a player. Opening it adds the campaign to their switcher in player mode.</p>
         <select aria-label="Character the player plays" bind:value={inviteFor}>
           <option value="">They pick or make a character</option>
@@ -119,6 +123,7 @@
         </select>
         <input readonly value={invite} aria-label="Invitation link" onfocus={(e) => (e.target as HTMLInputElement).select()} />
         <button onclick={copyInvite}>Copy link</button>
+        {/if}
       </details>
     {/if}
   {:else}
