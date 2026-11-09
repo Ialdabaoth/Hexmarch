@@ -291,7 +291,7 @@
     {#if record}
       <section>
         <h2>9. Publish</h2>
-        <p class="small muted">Publishing writes what players may see: the campaign, its modules and the shared state (clock, party, what everyone knows), as it stands on this device now. Nothing only you should see goes in. Invite a player opens in the Companion once it is published.</p>
+        <p class="small muted">Publishing writes what players may see: the campaign, its modules and the shared state (clock, party, what everyone knows), as it stands on this device now, plus each character's knowledge for their player alone and which requests you have answered. It is the same as Update campaign in the Companion, so either one can publish. Nothing only you should see goes in. Invite a player opens in the Companion once it is published.</p>
         <button disabled={!folder} onclick={publish}>{record.published ? 'Publish again' : 'Publish'}</button>
         {#if publishError}<p class="bad">{publishError}</p>{/if}
         {#if record.published}

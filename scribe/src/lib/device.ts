@@ -9,7 +9,7 @@
 
 import type { Built } from './campaign';
 import type { RootChoice } from './rules';
-import { pointer, snapshot, type Pointer, type Services, type Snapshot } from '../../../engine';
+import { pointer, publishParts, snapshot, type Pointer, type Services, type Snapshot } from '../../../engine';
 
 export const SCRIBE_FORMAT = 'e9-scribe-campaign';
 
@@ -88,6 +88,7 @@ export async function saveOnDevice(built: Built, root: RootChoice, site: string,
 
 // Steps 8 and 9, Services and Publish (SCRIBE.md section 5). The campaign must be saved on this device first.
 // Publish reads the play state as it is now (the Companion and the Atlas may have moved it on since Scribe wrote it),
+// with each party member's knowledge and the answered join requests, exactly as the Companion's Update campaign does,
 // counts the revision on from the last publish, and records both on Scribe's record, which unlocks Invite in the
 // Companion. Until an adapter can upload, the referee uploads the two files into the folder themselves.
 export interface SavedCampaign extends ReturnType<typeof scribeRecord> {
@@ -103,11 +104,12 @@ export async function savedCampaign(id: string): Promise<SavedCampaign | null> {
 export async function publishOnDevice(id: string, services: Services, now = new Date()): Promise<{ pointer: Pointer; snapshot: Snapshot; record: SavedCampaign }> {
   const rec = await savedCampaign(id);
   if (!rec) throw new Error('Save the campaign on this device first (step 7).');
-  const state = ((await idbGet(`state:${id}`)) ?? {}) as Record<string, unknown>;
+  // the same parts the Companion's Update campaign publishes: state, each party member's knowledge, receipts
+  const { state, knowledge, receipts } = await publishParts(id, idbGet);
   const snap = snapshot(
-    { campaign: id, ruleset: rec.ruleset, site: rec.site, module: rec.manifest as Record<string, unknown>, lock: rec.lock, state },
+    { campaign: id, ruleset: rec.ruleset, site: rec.site, module: rec.manifest as Record<string, unknown>, lock: rec.lock, state, knowledge },
     rec.published ?? null,
-    [],
+    receipts,
     now
   );
   const ptr = pointer(id, String(rec.manifest.title ?? id), services, now);

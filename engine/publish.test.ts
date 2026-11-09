@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { PublishError, pointer, privateParts, publicState, readPointer, readSnapshot, snapshot, staticServices } from './publish';
+import { PublishError, pointer, privateParts, publicState, publishParts, readPointer, readSnapshot, snapshot, staticServices } from './publish';
 
 const now = new Date('2026-11-09T13:00:00Z');
 const kells = {
@@ -53,5 +53,29 @@ describe('what players see of the party', () => {
   it("puts each character's knowledge in its player's private part", () => {
     expect(privateParts({ holly: { format: 'k' } })).toEqual({ holly: { characters: { holly: { knowledge: { format: 'k' } } } } });
     expect(snapshot({ ...kells, knowledge: { holly: [] } }, null, [], now).private).toEqual({ holly: { characters: { holly: { knowledge: [] } } } });
+  });
+});
+
+describe("the parts a snapshot reads from the referee's device", () => {
+  it('takes the state, each party member\'s knowledge and the answered join requests', async () => {
+    const store: Record<string, unknown> = {
+      'state:kells-1422': { ...kells.state, characters: [{ id: 'holly', name: 'Holly', player: 'dana' }] },
+      sheets: [{ id: 'holly', knowledge: [{ place: 'baile-atha-troim' }] }, { id: 'npc-not-in-party', knowledge: [{ x: 1 }] }],
+      mail: [
+        { box: 'in', answer: { kind: 'approved' }, envelope: { id: 'e1', kind: 'join', campaign: 'kells-1422' } },
+        { box: 'in', envelope: { id: 'e2', kind: 'join', campaign: 'kells-1422' } },
+        { box: 'in', answer: { kind: 'sent-back' }, envelope: { id: 'e3', kind: 'join', campaign: 'other' } },
+        { box: 'out', answer: { kind: 'approved' }, envelope: { id: 'e4', kind: 'join', campaign: 'kells-1422' } }
+      ]
+    };
+    const parts = await publishParts('kells-1422', async (k) => store[k]);
+    expect(parts.knowledge).toEqual({ holly: [{ place: 'baile-atha-troim' }] });
+    expect(parts.receipts).toEqual(['e1']);
+    const snap = snapshot({ ...kells, ...parts }, { revision: 3 }, parts.receipts, now);
+    expect(snap.private).toEqual({ holly: { characters: { holly: { knowledge: [{ place: 'baile-atha-troim' }] } } } });
+    expect(snap.receipts).toEqual(['e1']);
+  });
+  it('works on a device with nothing played yet', async () => {
+    expect(await publishParts('x', async () => undefined)).toEqual({ state: {}, knowledge: {}, receipts: [] });
   });
 });

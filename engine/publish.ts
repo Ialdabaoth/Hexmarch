@@ -135,3 +135,22 @@ export function readSnapshot(d: unknown, campaign: string): Snapshot {
   if (!s.module || typeof s.module !== 'object' || !s.state || typeof s.state !== 'object') throw new PublishError('That snapshot has no campaign in it.');
   return { ...(s as Snapshot), revision: Number(s.revision) || 0, receipts: Array.isArray(s.receipts) ? s.receipts : [], private: s.private && typeof s.private === 'object' ? s.private : {} };
 }
+
+// What a snapshot needs from the referee's device, read the same way by every app that publishes (Scribe's Publish,
+// the Companion's Update campaign), so publishing from either never drops a part. The apps share one site and so
+// one IndexedDB (idb-keyval's store); `get` reads a key from it.
+//   state:<id>  the campaign state file as it stands now
+//   sheets      the Companion's character sheets: each party member's `knowledge` goes to their player alone
+//   mail        the Companion's requests: the join requests the referee has answered become the receipts
+export async function publishParts(id: string, get: (key: string) => Promise<unknown>): Promise<{ state: Record<string, unknown>; knowledge: Record<string, unknown>; receipts: string[] }> {
+  const state = ((await get(`state:${id}`)) ?? {}) as Record<string, unknown>;
+  const party = Array.isArray(state.characters) ? (state.characters as { id?: unknown }[]).map((c) => c?.id).filter((x): x is string => typeof x === 'string') : [];
+  const sheets = (await get('sheets')) as { id?: unknown; knowledge?: unknown }[] | undefined;
+  const knowledge: Record<string, unknown> = {};
+  for (const s of Array.isArray(sheets) ? sheets : []) if (s && typeof s.id === 'string' && party.includes(s.id)) knowledge[s.id] = Array.isArray(s.knowledge) ? s.knowledge : [];
+  const mail = (await get('mail')) as { box?: string; answer?: unknown; envelope?: { id?: unknown; kind?: string; campaign?: string } }[] | undefined;
+  const receipts = (Array.isArray(mail) ? mail : [])
+    .filter((m) => m && m.box === 'in' && m.answer && m.envelope?.kind === 'join' && m.envelope.campaign === id && typeof m.envelope.id === 'string')
+    .map((m) => m.envelope!.id as string);
+  return { state, knowledge, receipts };
+}
