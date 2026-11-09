@@ -231,7 +231,7 @@
         <button class="quiet" disabled={!!built.problems.length} onclick={save}>Save on this device</button>
       </div>
       {#if saveError}<p class="bad">{saveError}</p>{/if}
-      {#if savedAs}<p class="small muted">Saved on this device. The Companion lists it under Settings › Campaign; its link is <code>{savedAs}</code>{#if savedAs !== campaignLink(String(built.manifest.id))} (renamed since: save again){/if}.</p>{/if}
+      {#if savedAs}<p class="small muted">Saved on this device, with your Referee invitation: the Companion lists it in its campaigns. Its link is <code>{savedAs}</code>{#if savedAs !== campaignLink(String(built.manifest.id))} (renamed since: save again){/if}.</p>{/if}
       <p class="small muted">The campaign stays on this device: the Companion, the Atlas and Scribe share it here. The Atlas puts the party at the start the first time it opens.</p>
       <h3>Or keep the files</h3>
       <button class="quiet" onclick={() => download('module.json', built!.manifest)}>module.json</button>
