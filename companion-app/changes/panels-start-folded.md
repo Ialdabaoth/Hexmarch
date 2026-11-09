@@ -1,0 +1,1 @@
+Edit view panels start folded, and the ones you open stay open next time on this device. Opening the Edit view at a section, such as from the card's Carry box, opens that panel. Only the Carry load sits in the box now, with the encumbrance note in parentheses beside it.
