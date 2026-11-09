@@ -70,7 +70,7 @@ export function bindCharacter(list: Invitation[], invitationId: string, characte
 }
 
 export function invitationLabel(s: Invitation, campaign: string, character?: string): string {
-  return s.role === 'referee' ? `${campaign} · referee` : `${campaign} · ${character ? `playing ${character}` : 'player'}`;
+  return s.role === 'referee' ? `${campaign} · Referee` : `${campaign} · ${character ? `Playing ${character}` : '(Roll a character)'}`;
 }
 
 // The NPCs and creatures a character has heard of or met: its knowledge entries that name a creature, one per
