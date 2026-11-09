@@ -97,6 +97,8 @@ Every file starts with the same header (`format`, `version`, `id`, `rules`, and 
 
 What one character knows is kept on their own sheet, as dated entries, not on the map (modules/WORKFLOWS.md in the data repo, "Knowledge per creature"). Each entry has the `session` it was learned in and the `module` it belongs to, and points at one thing: a 100-ft `hex` address, a `place` slug, a `handout`, or a free-text `note`. `how` says how it was learned. Entries that point at nothing are dropped. What everyone knows stays in the campaign state's `revealed` set (STATE_FORMAT.md).
 
+For the Atlas's fog of war (Atlas 0.5.17, ATLAS_FORMAT.md "Fog of war"), a `hex` entry means the character knows the whole 3-mile hex (League) that holds it: they have seen it or passed through (**visited**). `"explored": true` means it has been searched, which shows its hidden sites. `"rumour": true` means they have only heard of the hex or `place`; seeing it replaces the rumour. When the party moves in the Atlas, each character in the party gets an entry (`"how": "seen"`) for every 3-mile hex in sight along the way, and the referee's fog brush adds or removes entries the same way. The Companion keeps them as they arrive.
+
 ## Changes are tallies
 
 Anything that changes a talent or hit points is written as a number keyed by its

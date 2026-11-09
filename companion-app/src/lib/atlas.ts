@@ -10,7 +10,9 @@ const VIEW = /^#((world|march|field)(:[0-9A-Za-z]{4}){0,2})?$/;
 
 export interface AtlasView { type: 'e9-atlas'; event: 'view'; module: string; hash: string }
 export interface AtlasParty { type: 'e9-atlas'; event: 'party'; module: string; hex: string | null; hours: number }
-export type AtlasMessage = AtlasView | AtlasParty;
+// Knowledge to add to (or hexes to remove from) some characters: party travel and the referee's fog brush (Atlas 0.5.15).
+export interface AtlasKnowledge { type: 'e9-atlas'; event: 'knowledge'; module: string; ids: string[]; add: unknown[]; remove: string[] }
+export type AtlasMessage = AtlasView | AtlasParty | AtlasKnowledge;
 
 // The Atlas ships with the app (<app>/atlas/) and loads the module from its own site (?site=<base>).
 export function atlasUrl(base: string, id: string, app: string = appAtlas()): string {
@@ -28,6 +30,10 @@ export function isAtlasMessage(d: unknown): d is AtlasMessage {
   const m = d as Record<string, unknown> | null;
   if (!m || typeof m !== 'object' || m.type !== 'e9-atlas' || typeof m.module !== 'string' || !/^[a-z0-9-]{1,80}$/.test(m.module)) return false;
   if (m.event === 'view') return typeof m.hash === 'string' && VIEW.test(m.hash);
+  if (m.event === 'knowledge') {
+    const strs = (v: unknown, n: number) => Array.isArray(v) && v.length <= n && v.every((x) => typeof x === 'string' && x.length <= 200);
+    return strs(m.ids, 200) && Array.isArray(m.add) && m.add.length <= 5000 && strs(m.remove, 5000);
+  }
   if (m.event === 'party') return (m.hex === null || isAtlasAddress(m.hex)) && typeof m.hours === 'number' && Number.isFinite(m.hours) && m.hours >= 0;
   return false;
 }

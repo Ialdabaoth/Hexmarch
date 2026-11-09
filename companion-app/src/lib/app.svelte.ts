@@ -1,5 +1,5 @@
 import { Character, freshState, type LiveState } from './character';
-import { importFile, type SheetData } from './sheet';
+import { importFile, mergeKnowledge, type KnowledgeEntry, type SheetData } from './sheet';
 import type { LogEntry } from './checks';
 import { postToDiscord, isWebhookUrl } from './discord';
 import {
@@ -170,6 +170,26 @@ class AppState {
     } catch (e) {
       console.warn('Campaign state unreadable', e);
     }
+    // The Atlas on its own (Atlas 0.5.17) writes what the party saw into the sheets on this device: take that knowledge.
+    try {
+      for (const f of await loadSheets()) {
+        const s = this.sheets.find((x) => x.id === f.id);
+        if (s && JSON.stringify(f.knowledge) !== JSON.stringify(s.knowledge)) s.knowledge = f.knowledge;
+      }
+    } catch (e) {
+      console.warn('Character sheets unreadable', e);
+    }
+  }
+
+  // Knowledge from the Atlas (party travel, the referee's fog brush): added to each named character's sheet.
+  async addKnowledge(ids: string[], add: unknown[], remove: string[]) {
+    let changed = false;
+    for (const s of this.sheets) {
+      if (!ids.includes(s.id)) continue;
+      s.knowledge = mergeKnowledge($state.snapshot(s.knowledge) as KnowledgeEntry[], add as KnowledgeEntry[], remove);
+      changed = true;
+    }
+    if (changed) await this.persist();
   }
 
   // The rules this campaign plays with: the campaign file's ruleset, or the builder's for This device.

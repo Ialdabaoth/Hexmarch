@@ -69,6 +69,10 @@
     if (!frame || e.source !== frame.contentWindow || !current || !isAtlasMessage(e.data)) return;
     const d = e.data;
     if (d.module !== current.id) return;
+    if (d.event === 'knowledge') {
+      await app.addKnowledge(d.ids, d.add, d.remove);
+      return;
+    }
     if (d.event === 'view') {
       showing = d.hash;
       if (!greeted) {

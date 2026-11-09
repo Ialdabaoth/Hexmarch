@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { defaultTalents } from './character';
-import { createSheet, importFile, isInParts, partsIn, readSheet, writeParts, writeSheet, type SheetData } from './sheet';
+import { createSheet, importFile, isInParts, mergeKnowledge, partsIn, readSheet, writeParts, writeSheet, type SheetData } from './sheet';
 
 const abilities = { con: -1, str: 0, dex: 2, int: 0, wis: -1, cha: 1 };
 const holly = () => {
@@ -53,5 +53,26 @@ describe('character parts', () => {
   it('keeps only knowledge that points somewhere', () => {
     const s = readSheet({ ...json(writeSheet(holly())), knowledge: [{ session: 1 }, { note: ' a rumour ' }, 'x'] });
     expect(s.knowledge).toEqual([{ note: 'a rumour' }]);
+  });
+});
+
+describe('mergeKnowledge (Atlas fog of war)', () => {
+  it('adds new hexes, marks explored, drops rumours once seen, and forgets removed hexes', () => {
+    const have = [
+      { module: 'm', hex: 'world:0101:A075', how: 'seen' },
+      { module: 'm', place: 'keep', rumour: true as const },
+      { module: 'm', hex: 'world:0102:A075' }
+    ];
+    const out = mergeKnowledge(have, [
+      { module: 'm', hex: 'world:0101:A075', explored: true },
+      { module: 'm', place: 'keep', how: 'seen' },
+      { module: 'm', hex: 'world:0103:A075', how: 'seen' },
+      { nothing: 1 } as never
+    ], ['world:0102:A075']);
+    expect(out).toEqual([
+      { module: 'm', hex: 'world:0101:A075', how: 'seen', explored: true },
+      { module: 'm', place: 'keep' },
+      { module: 'm', hex: 'world:0103:A075', how: 'seen' }
+    ]);
   });
 });
