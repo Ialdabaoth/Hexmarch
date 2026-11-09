@@ -25,3 +25,20 @@ describe('e9-mail envelopes', () => {
     expect(requestStatus(e, { receipts: ['r1'], state: { characters: [{ id: 'holly' }] } }, true)).toBe('live');
   });
 });
+
+describe('messages as links', () => {
+  it('reads back a link it wrote, and keeps it short', async () => {
+    const { messageLink, readMessageHash, LINK_LIMIT } = await import('./mail');
+    const e = envelope({ campaign: 'kells-1422', kind: 'update', from: { role: 'referee' }, to: 'referee', body: { receipts: ['r1'], knowledge: { holly: [{ creature: 'abbot', name: 'Abbot Fintan' }] } } }, NOW);
+    const link = await messageLink('https://x.test/Hexmarch/scribe/#old', e);
+    expect(link.startsWith('https://x.test/Hexmarch/scribe/#m=')).toBe(true);
+    expect(link.length).toBeLessThan(LINK_LIMIT);
+    expect(await readMessageHash(new URL(link).hash)).toEqual(e);
+    expect(await readMessageHash('#place=site:x')).toBeNull();
+  });
+
+  it('refuses a damaged link', async () => {
+    const { decodeMessage } = await import('./mail');
+    await expect(decodeMessage('not-a-message')).rejects.toThrow(MailError);
+  });
+});
