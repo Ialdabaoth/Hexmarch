@@ -204,10 +204,10 @@
     </div>
   </section>
   <h3>Carry</h3>
-  <p class="carry">
+  <section class="card carry">
     <strong class:over={carry.encumbered}>{carry.load} / {carry.capacity}</strong>
     <span class="small muted">{carry.burdened ? 'burdened' : carry.encumbered ? 'encumbered' : `encumbered past ${carry.threshold}`}</span>
-  </p>
+  </section>
   <Effects character={c!} />
   {/snippet}
 
@@ -377,7 +377,7 @@
   .checks { gap: 0.3rem; }
   /* Sub-headings inside a panel (Carry, Effects, Ability check) sit clear of what's above them. */
   .panel :global(h3) { margin: 0.9rem 0 0.35rem; }
-  .carry { display: flex; align-items: baseline; gap: 0.5rem; margin: 0; }
+  .carry { display: flex; align-items: baseline; gap: 0.5rem; }
   .carry strong { font-size: 1.3rem; font-family: Georgia, serif; }
   .mini { min-height: 36px; padding: 0.2rem 0.55rem; }
   .features { padding-left: 1.1rem; margin: 0; }
