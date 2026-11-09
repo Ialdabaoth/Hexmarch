@@ -210,7 +210,7 @@
     <img src="icon.svg" alt="" />
     <div>
       <h1>⬢ Scribe</h1>
-      <div class="small muted">New campaign · E9 Scribe {VERSION}</div>
+      <div class="small muted">New campaign · {__SITE_NAME__} Scribe {VERSION}</div>
     </div>
   </header>
 
