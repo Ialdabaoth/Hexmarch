@@ -116,6 +116,12 @@
         saves the campaign as players will see it now (the clock, the party, what each character knows, and the requests you answered) as two files to upload in place of the old ones.
       </p>
     {/if}
+    {#if app.mode === 'referee' && isScribeLink(app.settings.campaign)}
+      <p class="small muted">
+        <button class="link" disabled={busy} onclick={() => run(async () => { location.href = await app.scribeLink(); })}>Send play to Scribe</button>
+        opens Scribe with the clock, the party, what each character knows and the requests you answered, so its Publish includes them.
+      </p>
+    {/if}
     {#if app.mode === 'referee'}
       <details>
         <summary class="small">Invite a player</summary>

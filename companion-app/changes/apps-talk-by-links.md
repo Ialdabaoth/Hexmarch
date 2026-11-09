@@ -1,0 +1,1 @@
+Scribe and the Companion talk by links: Scribe's "Open in the Companion" link opens the campaign in referee mode on any device or browser, and "Send play to Scribe" in Settings opens Scribe with the clock, the party, what each character knows and the requests you answered. Opening the same link twice changes nothing.
