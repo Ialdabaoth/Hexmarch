@@ -1,0 +1,1 @@
+Update campaign builds its snapshot the same way Scribe's Publish does (engine publishParts, #27): state, each party member's knowledge and the answered requests are read from storage after saving, so publishing from either app gives the same snapshot.

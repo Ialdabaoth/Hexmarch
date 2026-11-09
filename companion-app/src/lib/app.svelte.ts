@@ -17,7 +17,7 @@ import {
 import { CORE_RULES } from '../rules/core-modules';
 import { addMail, answer, joinRequest, loadMail, mailFileName, post, readMailFile, saveMail, sendBack, type MailItem } from './mail';
 import { downloadJson } from './storage';
-import { pointer as campaignPointer, snapshot as campaignSnapshot, type Services } from '../../../engine/publish';
+import { pointer as campaignPointer, publishParts, snapshot as campaignSnapshot, type Services } from '../../../engine/publish';
 import { get as idbGet, set as idbSet } from 'idb-keyval';
 import { addInvitation, bindCharacter, invitationLabel, loadInvitations, readInvite, saveInvitations, withRefereeInvitations, type Invite, type Mode, type Invitation } from './invitations';
 import { hasEquipment, registerEquipment, type EquipmentFileData } from '../equipment/equipment';
@@ -504,14 +504,12 @@ class AppState {
     type Rec = { site: string; ruleset: string; manifest: Record<string, unknown>; lock: unknown; services?: Services; published?: { revision: number; at: string } };
     const rec = (await idbGet(`scribe-campaign:${id}`)) as Rec | undefined;
     if (!rec?.services || !rec.published) throw new Error('Publish the campaign in Scribe first');
-    const state = await this.exportState();
-    const knowledge = Object.fromEntries(
-      state.characters.flatMap((x) => {
-        const s = this.sheets.find((y) => y.id === x.id);
-        return s ? [[x.id, $state.snapshot(s.knowledge)]] : [];
-      })
-    );
-    const snap = campaignSnapshot({ campaign: id, ruleset: rec.ruleset, site: rec.site, module: rec.manifest, lock: rec.lock, state: state as unknown as Record<string, unknown>, knowledge }, rec.published, this.receipts);
+    // the state file (party list brought up to date) and the sheets saved first: the parts are read from storage,
+    // by the same rule Scribe's Publish uses (engine publishParts), so the two can't drift
+    await this.exportState();
+    await this.persist();
+    const parts = await publishParts(id, idbGet);
+    const snap = campaignSnapshot({ campaign: id, ruleset: rec.ruleset, site: rec.site, module: rec.manifest, lock: rec.lock, state: parts.state, knowledge: parts.knowledge }, rec.published, parts.receipts);
     const ptr = campaignPointer(id, String(rec.manifest.title ?? c.campaign.name), rec.services);
     await idbSet(`scribe-campaign:${id}`, { ...rec, published: { revision: snap.revision, at: snap.published } });
     this.campaigns = { ...this.campaigns, [c.url]: { ...c, published: { ...c.published, revision: snap.revision } } };
