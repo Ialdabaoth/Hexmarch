@@ -6,3 +6,4 @@ export * from './manifest';
 export * from './resolve';
 export * from './content';
 export * from './sites';
+export * from './publish';

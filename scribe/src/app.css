@@ -29,3 +29,4 @@ footer a { color: inherit; margin: 0 .6rem; }
 details summary { cursor: pointer; }
 h3 { font-size: 1rem; margin: 14px 0 4px; }
 button:disabled { opacity: .5; cursor: default; }
+label.field { display: block; margin: 8px 0; }
