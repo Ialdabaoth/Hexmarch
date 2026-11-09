@@ -1,0 +1,1 @@
+Renamed to the Hexmarch Companion, since the apps run any OSR hexcrawl core rules. The name comes from the site's name, so it shows in Settings › About, as the Discord poster when a roll has no name, and in the sheet's footer.

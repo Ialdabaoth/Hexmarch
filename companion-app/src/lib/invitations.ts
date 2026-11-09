@@ -4,7 +4,7 @@
 // everything, as the Companion always has; player mode shows your character and their followers, your party, the NPCs
 // your character knows, and the map as your character knows it.
 //
-// Kept in the app's IndexedDB (idb-keyval's default store) under "invitations": an array of Invitation. E9 Scribe
+// Kept in the app's IndexedDB (idb-keyval's default store) under "invitations": an array of Invitation. Scribe
 // writes the creator's Referee invitation there when it saves a campaign (url "scribe:<id>").
 import { get, set } from 'idb-keyval';
 import type { KnowledgeEntry } from './sheet';

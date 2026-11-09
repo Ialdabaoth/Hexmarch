@@ -4,7 +4,7 @@
   import { atlasUrl } from '../lib/atlas';
 
   // Module repositories added on this device. Their maps open in Campaign › Maps, and Open
-  // shows a module's E9 Atlas map in its own page (or the module's own pages if it has no map).
+  // shows a module's Atlas map in its own page (or the module's own pages if it has no map).
   let address = $state('');
   let busy = $state(false);
   let problem = $state('');

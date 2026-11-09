@@ -1,6 +1,6 @@
-# E9 Companion
+# Hexmarch Companion
 
-A small installable web app (PWA) for players of E9 and its settings, Materia Mundi among them: roll up and keep characters,
+A small installable web app (PWA) for players of OSR hexcrawl games (E9 and its settings, Materia Mundi among them, so far): roll up and keep characters,
 manage a retinue of followers and beast companions, tap any stat to roll it, and send rolls to Discord.
 
 Everything is stored on the device. There are no accounts and no server.
@@ -104,13 +104,13 @@ The released version lives in `package.json`; the version the site shows (under 
 - Each sprint (a planned set of features, such as the 0.2 equipment work) bumps the minor
   number and resets the patch: 0.3.0. Saved sheets carry their own format `version`
   (see CHARACTER_FORMAT.md), separate from the app's.
-- The MVP is released together with the E9 Atlas and E9 Scribe as `1.0.0-alpha` (shown as a1.0.0), then `1.0.0-beta` (b1.0.0), then `1.0.0`, the first release announced to players (WORKFLOWS.md "Versioning").
+- The MVP is released together with the Atlas and Scribe as `1.0.0-alpha` (shown as a1.0.0), then `1.0.0-beta` (b1.0.0), then `1.0.0`, the first release announced to players (WORKFLOWS.md "Versioning").
 
 Don't bump `version` in a PR: add a change note in `changes/` instead (CONTRIBUTING.md "Versions and change notes").
 
 ## Licensing
 
-The app's code is CC BY 4.0, like the E9 Atlas tools; its rules data files keep their sources' licences. Details in [LICENSE.md](LICENSE.md).
+The app's code is CC BY 4.0, like the Atlas tools; its rules data files keep their sources' licences. Details in [LICENSE.md](LICENSE.md).
 
 The book includes material derived from the System Reference Document 5.2 by Wizards of the Coast LLC
 (CC BY 4.0); the app's About screen carries that attribution.

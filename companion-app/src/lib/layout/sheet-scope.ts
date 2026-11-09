@@ -44,6 +44,7 @@ export function sheetScope(v: SheetView, frame: FrameFlags): Scope {
     title: v.title,
     brand: rules.id === 'mm' ? 'Materia Mundi' : rules.name,
     rulesName: rules.name,
+    appName: `${__SUITE_NAME__} Companion`,
     xp: v.xp,
     hp: v.c.hp,
     hpMax: v.c.hpMax,

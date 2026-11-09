@@ -1,6 +1,6 @@
-# E9 editing engine
+# Hexmarch editing engine
 
-One library behind **E9 Scribe**, and behind the small in-play edits in the E9 Companion and the E9 Atlas (PROPOSALS.md P3, "One editing engine"). The spec is `modules/SCRIBE.md` in the data repo. Plain TypeScript with no dependencies.
+One library behind **Hexmarch Scribe**, and behind the small in-play edits in the Hexmarch Companion and the Hexmarch Atlas (PROPOSALS.md P3, "One editing engine"). The spec is `modules/SCRIBE.md` in the data repo. Plain TypeScript with no dependencies.
 
 | File | What it does |
 | --- | --- |

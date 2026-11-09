@@ -1,13 +1,13 @@
 # Licences
 
-Everything made for the E9 app suite and its modules (code, specs, rules data, module text and maps, and the art drawn for them) is licensed by Heph under **Creative Commons Attribution 4.0 International (CC BY 4.0)** (https://creativecommons.org/licenses/by/4.0/). Use it, change it, fork it, self-host it and ship it, commercially or not, as long as you give credit, link the licence and say what you changed.
+Everything made for the Hexmarch app suite and its modules (code, specs, rules data, module text and maps, and the art drawn for them) is licensed by Heph under **Creative Commons Attribution 4.0 International (CC BY 4.0)** (https://creativecommons.org/licenses/by/4.0/). Use it, change it, fork it, self-host it and ship it, commercially or not, as long as you give credit, link the licence and say what you changed.
 
 Suggested credit: "E9 / Materia Mundi by Heph (Bakagaijin Productions), CC BY 4.0".
 
 | Part | Where | Licence |
 | --- | --- | --- |
-| E9 Companion app code | `companion-app/` (see [its LICENSE.md](companion-app/LICENSE.md) for the data files it carries) | CC BY 4.0 |
-| E9 Atlas app and map tools | `modules/tools/` ([LICENSE.md](modules/tools/LICENSE.md)) | CC BY 4.0 |
+| Hexmarch Companion app code | `companion-app/` (see [its LICENSE.md](companion-app/LICENSE.md) for the data files it carries) | CC BY 4.0 |
+| Hexmarch Atlas app and map tools | `modules/tools/` ([LICENSE.md](modules/tools/LICENSE.md)) | CC BY 4.0 |
 | E9 Bridge for Foundry VTT | `vtt/foundry/e9-bridge/` | CC BY 4.0 |
 | Build workflow and repo scripts | `.github/`, `mm.json`, `links.json` | CC BY 4.0 |
 | Format specs | `modules/*.md`, `companion-app/*_FORMAT.md` | CC BY 4.0, so anyone can implement them |

@@ -124,7 +124,7 @@ describe('campaigns', () => {
   });
 });
 
-describe('campaigns made in E9 Scribe', () => {
+describe('campaigns made in Scribe', () => {
   const saved = {
     format: 'e9-scribe-campaign', version: 1, id: 'kells-1422', site: 'https://example.org/data/', ruleset: 'e9mm',
     manifest: { id: 'kells-1422', title: 'Kells 1422', kind: 'campaign', requires: { 'mm-core': '^0.1.0' } }, lock: {}, saved: '2026-11-08T23:00:00.000Z'

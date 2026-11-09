@@ -150,7 +150,7 @@ class AppState {
     await this.loadState();
     await this.checkCanUpdate();
     this.loaded = true;
-    // The E9 Atlas in another tab of this site saves party moves into the same file (Atlas 0.5.11): read it again on coming back.
+    // The Atlas in another tab of this site saves party moves into the same file (Atlas 0.5.11): read it again on coming back.
     if (typeof document !== 'undefined') document.addEventListener('visibilitychange', () => { if (!document.hidden) void this.refreshState(); });
     if (await this.cacheInlinePortraits(this.sheets)) await this.persist();
     if (this.settings.dice3d) preloadDice();
@@ -595,7 +595,7 @@ class AppState {
     }
   }
 
-  // A link may be an invitation: the campaign to open, and the seat (E9 Scribe's "Open in the Companion":
+  // A link may be an invitation: the campaign to open, and the seat (Scribe's "Open in the Companion":
   // ?campaign=scribe:<id>; a player's: ?campaign=<link>&as=player&character=<id>). The address is cleared
   // afterwards, so reloading doesn't switch campaigns again.
   private async openAsked() {
@@ -652,7 +652,7 @@ class AppState {
       await this.openMail(e);
       this.view = { name: 'inbox' };
       this.notify('Added to the Inbox');
-    } else throw new Error("That link is for E9 Scribe, not the Companion.");
+    } else throw new Error("That link is for Scribe, not the Companion.");
     await idbSet('applied', [...applied, e.id].slice(-500));
   }
 

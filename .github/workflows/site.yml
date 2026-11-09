@@ -1,4 +1,4 @@
-name: Site (E9 apps)
+name: Site (Hexmarch apps)
 
 on:
   push:
@@ -43,7 +43,7 @@ jobs:
           cache-dependency-path: |
             companion-app/package-lock.json
             scribe/package-lock.json
-      - name: E9 Companion
+      - name: Companion
         working-directory: companion-app
         run: |
           npm ci

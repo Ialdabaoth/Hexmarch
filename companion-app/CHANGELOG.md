@@ -1,4 +1,4 @@
-# E9 Companion: changelog
+# Hexmarch Companion: changelog
 
 The released version lives in `package.json` (see README "Versioning"). Every merged PR is one patch; each sprint bumps the minor. New entries are not written here by hand: each PR adds a change note in `changes/`, and the site build numbers the notes in the order they merged and lists them here (CONTRIBUTING.md "Versions and change notes").
 

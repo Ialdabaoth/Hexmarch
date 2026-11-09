@@ -1,6 +1,6 @@
-# E9 Companion: licence
+# Hexmarch Companion: licence
 
-The E9 Companion's **code** (everything in this folder that is source, build configuration or a script: `src/**/*.ts`, `src/**/*.svelte`, `src/**/*.css`, `scripts/`, `index.html`, `public/`, `src/rules/wiki-links.json`, and the config files) is licensed by Heph under **CC BY 4.0** (https://creativecommons.org/licenses/by/4.0/), the same as the E9 Atlas tools. Use it, change it, fork it and self-host it, as long as you credit it: "E9 / Materia Mundi by Heph (Bakagaijin Productions), CC BY 4.0". See the repository's [LICENSE.md](../LICENSE.md) for the whole suite.
+The Hexmarch Companion's **code** (everything in this folder that is source, build configuration or a script: `src/**/*.ts`, `src/**/*.svelte`, `src/**/*.css`, `scripts/`, `index.html`, `public/`, `src/rules/wiki-links.json`, and the config files) is licensed by Heph under **CC BY 4.0** (https://creativecommons.org/licenses/by/4.0/), the same as the Atlas tools. Use it, change it, fork it and self-host it, as long as you credit it: "E9 / Materia Mundi by Heph (Bakagaijin Productions), CC BY 4.0". See the repository's [LICENSE.md](../LICENSE.md) for the whole suite.
 
 **The rules data the app carries is CC BY 4.0 too**, except the third-party material in it, which keeps its source's licence:
 
