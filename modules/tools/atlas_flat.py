@@ -117,7 +117,7 @@ bundle = {
             'scales': {'unit_ft': UNIT, 'mile_ft': MILE, 'levels': levels, 'paint': SC['paint']},
             'terrain': {'types': types}, 'paint': {'w': w, 'h': h, 'data': base64.b64encode(bytes(grid)).decode()},
             'travel': {'pace': {'mi_per_hour': 3, 'hours_per_day': 8, **tv.get('pace', {})}, 'roads': {'roman': 0.5, 'local': 0.75, 'trail': 1, **tv.get('roads', {})}},
-            'pois': pois, 'rivers': [], 'roads': [], 'crossings': [], 'regions': [], 'names': MOD.get('names', {}), 'legacy': {}},
+            'pois': pois, 'rivers': [], 'roads': [], 'crossings': [], 'regions': [], 'names': MOD.get('names', {})},
     'tiles': tiles,
 }
 json.dump(bundle, open(out, 'w'), ensure_ascii=False, separators=(',', ':'))
