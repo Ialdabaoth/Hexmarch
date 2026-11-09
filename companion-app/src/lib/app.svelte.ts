@@ -15,7 +15,7 @@ import {
   saveLocal, type CampaignCache
 } from './campaign';
 import { CORE_RULES } from '../rules/core-modules';
-import { addInvitation, bindCharacter, loadInvitations, readInvite, saveInvitations, withRefereeInvitations, type Invite, type Mode, type Invitation } from './invitations';
+import { addInvitation, bindCharacter, invitationLabel, loadInvitations, readInvite, saveInvitations, withRefereeInvitations, type Invite, type Mode, type Invitation } from './invitations';
 import { hasEquipment, registerEquipment, type EquipmentFileData } from '../equipment/equipment';
 import { preloadDice, showDice } from './dice3d';
 import { portraitFromFile } from './portrait';
@@ -81,6 +81,14 @@ class AppState {
   // Player mode or referee mode, set by the seat picked in the campaign switcher (Heph 2026-11-09).
   get mode(): Mode {
     return this.invitation?.role === 'player' ? 'player' : 'referee';
+  }
+
+  // The window's title (Heph 2026-11-09): the invitation in use as the switcher names it, or "My Characters"
+  // outside a campaign. The installed app shows it after its own name: "⬢ Companion - Kells 1422 · Playing Holly".
+  get title(): string {
+    const inv = this.invitation, c = this.campaign;
+    if (!inv || !c) return c ? c.campaign.name : 'My Characters';
+    return invitationLabel(inv, c.campaign.name, inv.character ? this.character(inv.character)?.name : undefined);
   }
 
   // Player mode: the character this seat plays, once picked.

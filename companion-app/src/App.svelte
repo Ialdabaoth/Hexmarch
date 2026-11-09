@@ -29,6 +29,11 @@
     { name: 'settings', label: '⚙️', aria: 'Settings' }
   ] as const);
 
+  // The window's title follows the campaign in use; a printout sets its own while it is open.
+  $effect(() => {
+    if (app.loaded && app.view.name !== 'render') document.title = app.title;
+  });
+
   let active = $derived(['build', 'sheet', 'render'].includes(app.view.name) ? 'list' : app.view.name === 'equipment' ? 'rules' : app.view.name);
   let diceOpen = $state(false);
 </script>
