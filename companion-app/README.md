@@ -3,7 +3,7 @@
 A small installable web app (PWA) for players of OSR hexcrawl games (E9 and its settings, Materia Mundi among them, so far): roll up and keep characters,
 manage a retinue of followers and beast companions, tap any stat to roll it, and send rolls to Discord.
 
-Everything is stored on the device. There are no accounts and no server.
+Everything is stored on the device. There are no accounts and no server: a campaign is published as two static files (`campaign.json` and `snapshot.json`) on any host the referee picks.
 
 ## What it does
 
@@ -22,6 +22,12 @@ Everything is stored on the device. There are no accounts and no server.
   live numbers without touching the sheet.
 - **Portraits**: pick a photo; it is shrunk to 256×256 and saved in the sheet.
 - **Backup**: export and import character sheets as JSON.
+- **Campaigns and seats**: Settings › Campaign lists one entry per invitation. **Referee mode** sees everything in the campaign; **player mode** sees the player's own character and followers, the party, and the map as that character knows it.
+- **Invitations**: the referee copies an invitation link (optionally for a given character); opening it adds the campaign in player mode.
+- **Inbox**: a player sends their character to the referee as a join request (one POST to the campaign's post URL, or a file to pass on); the referee approves it or sends it back with a note, and the player follows where it stands.
+- **Update campaign**: the referee saves the campaign as players will see it (the clock, the party, what each character knows, and the requests answered) as `campaign.json` and `snapshot.json` to upload; players get it with Check for changes.
+- **Links between the apps**: Scribe's "Open in the Companion" link brings the campaign here in referee mode, and Settings › Send play to Scribe sends play back (`#m=` links, `engine/mail.ts`).
+- **Maps**: Campaign › Maps embeds the Hexmarch Atlas for the campaign's modules, with the party marker, the clock and fog of war; in player mode it shows only what the character knows.
 
 ## Sheets and characters
 
@@ -104,7 +110,7 @@ The released version lives in `package.json`; the version the site shows (under 
 - Each sprint (a planned set of features, such as the 0.2 equipment work) bumps the minor
   number and resets the patch: 0.3.0. Saved sheets carry their own format `version`
   (see CHARACTER_FORMAT.md), separate from the app's.
-- The MVP is released together with the Atlas and Scribe as `1.0.0-alpha` (shown as a1.0.0), then `1.0.0-beta` (b1.0.0), then `1.0.0`, the first release announced to players (WORKFLOWS.md "Versioning").
+- The apps move together: 0.6.X integration, 0.7.X UX, 0.8.X private alpha, 0.9.0 format lock, 0.9.X public beta, then 1.0.0 (WORKFLOWS.md "Versioning"). Until 0.8.X the only users are the developers, so formats change without compatibility shims.
 
 Don't bump `version` in a PR: add a change note in `changes/` instead (CONTRIBUTING.md "Versions and change notes").
 
@@ -117,6 +123,4 @@ The book includes material derived from the System Reference Document 5.2 by Wiz
 
 ## Later
 
-- 3D dice: when you roll, WebGL dice tumble onto the card and land showing the result
-  the app rolled (for example with three.js and a small physics engine, loaded only
-  when the feature is switched on so the app stays small).
+Open work is tracked in the Companion 0.6.X development thread and the data repo's WORKFLOWS.md: the Link adapter (messages as share links), the `hexmarch-` protocol names, seats and join codes, and opening shared links and files straight into the app (`share_target`, `launch_handler`).

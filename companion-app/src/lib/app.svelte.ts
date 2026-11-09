@@ -206,8 +206,7 @@ class AppState {
     activateCampaign(this.campaign);
   }
 
-  // The state file of the campaign now in use. A party placed before 0.5.5 was kept in the
-  // settings, for every campaign at once; it moves into This device's state.
+  // The state file of the campaign now in use.
   private async loadState() {
     const id = this.campaignId;
     let s = blankState(id);
@@ -219,11 +218,6 @@ class AppState {
     }
     this.state = s;
     await this.saveState(withRules(s, this.stateRules()));
-    if (this.settings.partyAt) {
-      const old = this.settings.partyAt;
-      if (!id && !s.party) await this.saveState(moveParty(s, old));
-      await this.updateSettings({ partyAt: null });
-    }
   }
 
   // Takes the saved state file when it is newer than the one in memory (another tab, such as the Atlas, changed it).

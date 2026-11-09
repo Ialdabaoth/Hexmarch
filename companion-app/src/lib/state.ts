@@ -77,9 +77,9 @@ const hours = (v: unknown, fallback: number) => (typeof v === 'number' && Number
 function readParty(p: unknown): PartyAt | null {
   const o = p as Partial<PartyAt> | null;
   if (!o || typeof o !== 'object') return null;
-  if (typeof o.base !== 'string' || typeof o.module !== 'string' || typeof o.hex !== 'string' || !o.hex) return null;
+  if (typeof o.base !== 'string' || typeof o.module !== 'string' || !isAtlasAddress(o.hex)) return null;
   const map = typeof o.map === 'string' ? o.map : 'atlas';
-  return { base: o.base, module: o.module, map, hex: o.hex, label: typeof o.label === 'string' ? o.label : o.hex.slice(6), hours: hours(o.hours, 0) };
+  return { base: o.base, module: o.module, map, hex: o.hex as string, label: typeof o.label === 'string' ? o.label : (o.hex as string).slice(6), hours: hours(o.hours, 0) };
 }
 
 function readRules(r: unknown): StateRules | null {

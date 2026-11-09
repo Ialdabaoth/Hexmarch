@@ -1,1 +1,0 @@
-A player's invitation to a published campaign opens: the Companion reads the campaign pointer (campaign.json) the link names, then the snapshot it points to, and takes the shared state (clock, party, what everyone knows) from it. The referee's Invite a player opens once Scribe has published the campaign, and the link names the pointer.

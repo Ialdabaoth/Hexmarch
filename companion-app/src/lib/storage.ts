@@ -23,14 +23,10 @@ export interface Settings {
   campaign: string;
   // The invitation in use in that campaign (lib/invitations.ts): the referee's or a player's; '' for "This device".
   invitation: string;
-  // Where the party stood before Companion 0.5.5. It now lives in the campaign state file
-  // (lib/state.ts); a value left here is moved into This device's state on load and cleared.
-  partyAt: PartyAt | null;
 }
 
 // Where the party stands on a module's Atlas map: the module (its site and id) and the 100-ft
-// hex (map "atlas", hex "world:CCRR:CCRR"). Parties placed before Companion 0.5.2 have map "world"
-// or a League page key and a 3-mile hex "CCRR"; the Atlas moves them to the new grid (lib/atlas.ts).
+// hex (map "atlas", hex "world:CCRR:CCRR").
 export interface PartyAt {
   base: string;
   module: string;
@@ -42,7 +38,7 @@ export interface PartyAt {
   hours?: number;
 }
 
-export const DEFAULT_SETTINGS: Settings = { webhookUrl: '', autoPost: false, activeId: '', rules: 'mm', dice3d: !prefersReducedMotion(), diceColor: DEFAULT_DICE_COLOR, diceInk: DEFAULT_DICE_INK, campaign: '', invitation: '', partyAt: null };
+export const DEFAULT_SETTINGS: Settings = { webhookUrl: '', autoPost: false, activeId: '', rules: 'mm', dice3d: !prefersReducedMotion(), diceColor: DEFAULT_DICE_COLOR, diceInk: DEFAULT_DICE_INK, campaign: '', invitation: '' };
 
 // Saved sheets go through the same checks as imported files, so a sheet the
 // app can't read is skipped instead of breaking the whole list. Skipped sheets

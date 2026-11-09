@@ -1,1 +1,0 @@
-The campaign switcher names a new player invitation "Kells 1422 · (Roll a character)" until the player picks or makes one, then "Kells 1422 · Playing Holly"; a referee invitation reads "Kells 1422 · Referee" (Heph 2026-11-09).

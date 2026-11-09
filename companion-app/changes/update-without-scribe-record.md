@@ -1,1 +1,0 @@
-Update campaign also works on a device that doesn't hold Scribe's record of the campaign (Scribe ran in another browser or profile): opened as referee by its published link, the campaign rebuilds the record from its pointer and last snapshot. The Inbox says which campaign id it looked for when it can't offer Update campaign.

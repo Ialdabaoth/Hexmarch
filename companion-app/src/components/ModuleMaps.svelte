@@ -2,7 +2,7 @@
   import { untrack } from 'svelte';
   import { app } from '../lib/app.svelte';
   import { viewerUrl, type SavedModule } from '../lib/modules';
-  import { atlasUrl, isAtlasAddress, isAtlasMessage, partyHex } from '../lib/atlas';
+  import { atlasUrl, isAtlasAddress, isAtlasMessage, } from '../lib/atlas';
   import { writeState, type CampaignState } from '../lib/state';
 
   // A module's map is the Atlas (<site>/atlas/?module=<id>), embedded whole: its own key,
@@ -37,7 +37,7 @@
   const post = (msg: object) => frame?.contentWindow?.postMessage({ type: 'hexmarch-atlas', ...msg }, '*');
 
   function sendParty() {
-    if (here && at) post({ party: { hex: partyHex(at), hours: at.hours ?? 0 } });
+    if (here && at) post({ party: { hex: at.hex, hours: at.hours ?? 0 } });
   }
 
   // The whole state file (Atlas 0.5.11): the Atlas shows the clock, the session and what the party has found,
@@ -131,7 +131,7 @@
         <iframe bind:this={frame} src="{atlas}{lockQuery}{start}" title="{current.manifest.title}: Atlas" onload={onLoad}></iframe>
       </div>
       <div class="strip small muted">
-        {#if here && at}Party: hex {at.label} <button class="link" onclick={() => post({ show: `#${partyHex(at!)}` })}>Show</button> ·
+        {#if here && at}Party: hex {at.label} <button class="link" onclick={() => post({ show: `#${at!.hex}` })}>Show</button> ·
         {:else if !player}Use the Atlas's Party button to place the party. ·{/if}
         <a href="{atlas}{lockQuery}{showing}" target="_blank" rel="noopener">Full screen</a>
       </div>
