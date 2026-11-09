@@ -1,0 +1,1 @@
+Update campaign is offered whenever this device holds Scribe's published record of the campaign in use, whichever seat or link opened it; a referee opening their own campaign by its published link runs it from Scribe's copy.

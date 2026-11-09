@@ -56,6 +56,8 @@ class AppState {
   log = $state<LogEntry[]>([]);
   // Requests sent and received on this device, every campaign (lib/mail.ts).
   mail = $state<MailItem[]>([]);
+  // Whether this device holds Scribe's record of the campaign in use, published: Update campaign needs it.
+  canUpdate = $state(false);
   settings = $state<Settings>({ ...DEFAULT_SETTINGS });
   view = $state<View>({ name: 'list' });
   toast = $state('');
@@ -144,6 +146,7 @@ class AppState {
       console.warn('Portraits unavailable', e);
     }
     await this.loadState();
+    await this.checkCanUpdate();
     this.loaded = true;
     // The E9 Atlas in another tab of this site saves party moves into the same file (Atlas 0.5.11): read it again on coming back.
     if (typeof document !== 'undefined') document.addEventListener('visibilitychange', () => { if (!document.hidden) void this.refreshState(); });
@@ -221,6 +224,7 @@ class AppState {
   // Takes the saved state file when it is newer than the one in memory (another tab, such as the Atlas, changed it).
   async refreshState() {
     const id = this.campaignId;
+    void this.checkCanUpdate();
     try {
       const saved = await loadStateFile(id);
       if (!saved) return;
@@ -322,7 +326,9 @@ class AppState {
   // Opens a campaign by an invitation (its link, as referee unless it says player) and takes that seat. Throws
   // with a message for the player.
   async useCampaign(url: string, role: Invite['role'] = 'referee', character?: string) {
-    const c = await openCampaignLink(url.trim());
+    let c = await openCampaignLink(url.trim());
+    // the referee opening their own published campaign by its pointer: run it from Scribe's copy on this device
+    if (role === 'referee' && !isScribeLink(c.url) && (await idbGet(`scribe-campaign:${c.campaign.id}`))) c = await openCampaignLink(`scribe:${c.campaign.id}`);
     const seat = await this.takeInvitation({ url: c.url, role, ...(character ? { character } : {}) });
     await this.adoptCampaign(c, seat.id);
     if (seat.role === 'player' && seat.character) await this.claim(seat.character);
@@ -415,6 +421,7 @@ class AppState {
     await saveCampaigns(this.campaigns);
     await this.updateSettings({ campaign: c.url, invitation: seat });
     activateCampaign(c);
+    await this.checkCanUpdate();
     await this.takeSnapshotState(c);
     await this.rereadSheets();
     this.equipmentChanged();
@@ -495,12 +502,22 @@ class AppState {
     this.notify('Saved the reply. Send that file to the player.');
   }
 
+  private async checkCanUpdate() {
+    const id = this.campaignId;
+    try {
+      const rec = id ? ((await idbGet(`scribe-campaign:${id}`)) as { services?: unknown; published?: unknown } | undefined) : undefined;
+      this.canUpdate = !!(rec?.services && rec.published);
+    } catch {
+      this.canUpdate = false;
+    }
+  }
+
   // Referee mode, a campaign Scribe published: writes the pointer and a new snapshot (WORKFLOWS.md "Invitations"),
   // with the state as it is now, each party member's knowledge for their player alone, and the requests answered.
   // Until an adapter can upload, the referee uploads the two files into the campaign's folder, replacing the old.
   async updateCampaign() {
     const c = this.campaign;
-    if (!c?.published || !isScribeLink(c.url) || this.mode !== 'referee') throw new Error('Publish the campaign in Scribe first');
+    if (!c || this.mode !== 'referee') throw new Error('Switch to the referee seat first');
     const id = c.campaign.id;
     type Rec = { site: string; ruleset: string; manifest: Record<string, unknown>; lock: unknown; services?: Services; published?: { revision: number; at: string } };
     const rec = (await idbGet(`scribe-campaign:${id}`)) as Rec | undefined;
@@ -515,7 +532,8 @@ class AppState {
     await idbSet(`scribe-campaign:${id}`, { ...rec, published: { revision: snap.revision, at: snap.published } });
     // the pair as built, which Scribe's Test compares the uploaded folder against (engine checkUpload, #29)
     await idbSet(`published:${id}`, JSON.parse(JSON.stringify({ pointer: ptr, snapshot: snap })));
-    this.campaigns = { ...this.campaigns, [c.url]: { ...c, published: { ...c.published, revision: snap.revision, at: snap.published } } };
+    const was = c.published ?? { pointer: rec.services.pointer, read: rec.services.read, post: rec.services.post, revision: 0 };
+    this.campaigns = { ...this.campaigns, [c.url]: { ...c, published: { ...was, revision: snap.revision, at: snap.published } } };
     await saveCampaigns(this.campaigns);
     downloadJson('campaign.json', ptr);
     await new Promise((r) => setTimeout(r, 400));

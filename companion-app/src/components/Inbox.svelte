@@ -3,7 +3,6 @@
   // request arrives as a file: open it here.
   import { app } from '../lib/app.svelte';
   import { requestStatus } from '../../../engine/mail';
-  import { isScribeLink } from '../lib/campaign';
 
   let fileInput = $state<HTMLInputElement>();
   let notes = $state<Record<string, string>>({});
@@ -59,7 +58,7 @@
     {#if app.unpublished}
       <section class="card publish">
         <p>{app.unpublished === 1 ? '1 answer' : `${app.unpublished} answers`} not yet sent to players.</p>
-        {#if app.campaign.published && isScribeLink(app.settings.campaign)}
+        {#if app.canUpdate}
           <button class="primary" disabled={busy} onclick={() => run(() => app.updateCampaign())}>Update campaign</button>
           <p class="small muted">Saves campaign.json and snapshot.json to upload to your campaign's folder, replacing the old ones.</p>
         {:else}
