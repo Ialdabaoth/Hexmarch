@@ -34,6 +34,9 @@ export interface KnowledgeEntry {
   // How it was learned ("scouted alone", "told by the abbot").
   how?: string;
   note?: string;
+  // Fog of war (Atlas 0.5.15): the hex has been searched, which shows its hidden sites; or it is only a rumour.
+  explored?: true;
+  rumour?: true;
 }
 
 // Changes are tallies keyed by what they change: "agility": 1 improves Agility one
@@ -142,8 +145,25 @@ export function readKnowledge(v: unknown): KnowledgeEntry[] {
     for (const k of ['module', 'hex', 'place', 'handout', 'how', 'note'] as const) {
       if (typeof o[k] === 'string' && (o[k] as string).trim()) e[k] = (o[k] as string).trim();
     }
+    if (o.explored === true) e.explored = true;
+    if (o.rumour === true) e.rumour = true;
     return e.hex || e.place || e.handout || e.note ? [e] : [];
   });
+}
+
+// Knowledge the Atlas adds (party travel, the referee's fog brush): new entries are appended, an entry for the same
+// module and hex or place is updated (explored sticks; a rumour gives way to the real thing), and hexes in `remove` are forgotten.
+export function mergeKnowledge(list: KnowledgeEntry[], add: KnowledgeEntry[], remove: string[] = []): KnowledgeEntry[] {
+  const out = list.filter((e) => !(e.hex && remove.includes(e.hex))).map((e) => ({ ...e }));
+  for (const a of readKnowledge(add)) {
+    const o = out.find((e) => e.module === a.module && ((a.hex && e.hex === a.hex) || (a.place && e.place === a.place)));
+    if (!o) out.push(a);
+    else {
+      if (a.explored) o.explored = true;
+      if (!a.rumour && o.rumour) delete o.rumour;
+    }
+  }
+  return out;
 }
 
 export const TALENT_ABILITIES = ['dex', 'int', 'wis', 'cha'] as const;
