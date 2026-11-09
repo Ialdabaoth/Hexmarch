@@ -2,9 +2,9 @@
   import { ROOTS, RULES_MANIFESTS, type RootChoice } from './lib/rules';
   import { loadSite, type SiteModule } from './lib/data';
   import { buildCampaign, describeProblem, startsOf, type Built, type Choices } from './lib/campaign';
-  import { applyUpdate, campaignLink, campaignMessage, publishOnDevice, saveOnDevice, savedCampaign, testUpload, type SavedCampaign, type UpdateResult } from './lib/device';
+  import { applyUpdate, campaignLink, campaignMessage, publishOnDevice, publishSecret, saveOnDevice, savePublishSecret, savedCampaign, testUpload, type SavedCampaign, type UpdateResult } from './lib/device';
   import type { UploadCheck, UploadReport } from '../../engine';
-  import { messageLink, readMessageHash, staticServices } from '../../engine';
+  import { appsScriptCode, appsScriptStore, githubStore, messageLink, newKey, readMessageHash, servicesFor, staticServices, upload, type Services, type StoreKind } from '../../engine';
 
   const VERSION = __SCRIBE_VERSION__;
   const params = new URLSearchParams(location.search);
@@ -127,6 +127,30 @@
   let record = $state<SavedCampaign | null>(null);
   let folder = $state('');
   let postUrl = $state('');
+  // Where Publish puts the files (Scribe 0.6: adapters). Google Drive through the referee's own Apps Script,
+  // their own GitHub repo, or by hand as before.
+  let storeKind = $state<StoreKind>('apps-script');
+  let scriptUrl = $state('');
+  let ghRepo = $state('');
+  let ghDir = $state('');
+  let ghBranch = $state('main');
+  let secret = $state('');
+  let scriptKey = $state(newKey()); // only for a script not set up yet
+  let copied = $state(false);
+  function services(): Services {
+    if (storeKind === 'manual') return staticServices(folder, postUrl);
+    return servicesFor(storeKind === 'github' ? githubStore(ghRepo, ghDir, ghBranch) : appsScriptStore(scriptUrl), postUrl);
+  }
+  const storeReady = $derived(storeKind === 'manual' ? !!folder : storeKind === 'github' ? !!ghRepo && !!secret : !!scriptUrl && !!secret);
+  async function copyScript() {
+    try {
+      await navigator.clipboard.writeText(appsScriptCode(scriptKey));
+      secret = scriptKey;
+      copied = true;
+    } catch {
+      copied = false;
+    }
+  }
   let publishError = $state('');
   let justPublished = $state(false);
   const campaignKey = $derived(built ? String(built.manifest.id) : '');
@@ -139,23 +163,41 @@
       if (r?.services && !folder) {
         folder = r.services.folder;
         postUrl = r.services.post;
+        const st = r.services.store;
+        storeKind = st?.kind ?? 'manual';
+        if (st?.kind === 'apps-script') scriptUrl = st.url;
+        if (st?.kind === 'github') {
+          ghRepo = `${st.owner}/${st.repo}`;
+          ghDir = st.dir;
+          ghBranch = st.branch;
+        }
       }
+      if (r) publishSecret(id).then((v) => v && (secret = v));
     }).catch(() => (record = null));
   });
   async function publish() {
     publishError = '';
     justPublished = false;
     try {
-      const services = staticServices(folder, postUrl);
-      const out = await publishOnDevice(campaignKey, services);
+      const sv = services();
+      if (sv.store && sv.store.kind !== 'manual') await savePublishSecret(campaignKey, secret);
+      publishing = true;
+      const out = await publishOnDevice(campaignKey, sv, new Date(), (f) =>
+        upload(sv.store ?? { kind: 'manual', folder: sv.folder }, secret, { 'campaign.json': f.pointer, 'snapshot.json': f.snapshot }, `Publish ${String(record?.manifest.title ?? campaignKey)}, revision ${f.snapshot.revision}`)
+      );
       record = out.record;
-      download('campaign.json', out.pointer);
-      download('snapshot.json', out.snapshot);
+      folder = sv.folder;
+      if (!sv.store || sv.store.kind === 'manual') {
+        download('campaign.json', out.pointer);
+        download('snapshot.json', out.snapshot);
+      }
       justPublished = true;
     } catch (e) {
       publishError = (e as Error).message;
     }
+    publishing = false;
   }
+  let publishing = $state(false);
 
   // Test (Heph 2026-11-09): is the folder serving what the last publish produced?
   let testing = $state(false);
@@ -164,7 +206,7 @@
     testing = true;
     test = null;
     try {
-      test = (await testUpload(campaignKey, staticServices(folder, postUrl))) ?? 'none';
+      test = (await testUpload(campaignKey, services())) ?? 'none';
     } catch (e) {
       test = (e as Error).message;
     }
@@ -172,7 +214,7 @@
   }
   const SAYS: Record<UploadCheck, string> = {
     matches: 'matches what you published',
-    missing: "isn't there yet (a new upload can take a minute or two to appear)",
+    missing: "isn't there yet (a new upload can take a few minutes to appear)",
     older: 'is there, but an older one: upload the new file',
     different: "is there, but isn't the file you published: upload it again",
     unreadable: "can't be read: it isn't JSON, or the host doesn't let other sites read it"
@@ -336,10 +378,41 @@
       {#if !record}
         <p class="small muted">Save the campaign on this device first (above). Players can't join until it is published.</p>
       {:else}
-        <p class="small muted">Players need two addresses: one to read the campaign from, one to send their requests to. For now that is a folder on any free web host you can upload to, such as GitHub Pages; your own Apps Script will set this up for you later.</p>
-        <label class="field">Folder you upload to <input type="url" bind:value={folder} placeholder="https://you.github.io/kells-1422/" /></label>
-        <button class="quiet" disabled={!folder || !record.published || testing} onclick={runTest}>{testing ? 'Testing…' : 'Test'}</button>
-        {#if test === 'none'}<p class="small muted">Publish first (step 9), then upload the two files and test.</p>
+        <p class="small muted">Players read the campaign from a web address you choose. Publish puts the files there for you, free, on an account of yours.</p>
+        <label class="opt"><input type="radio" name="store" value="apps-script" bind:group={storeKind} /><span><strong>Google Drive</strong> <span class="small muted">through your own Apps Script, set up once</span></span></label>
+        <label class="opt"><input type="radio" name="store" value="github" bind:group={storeKind} /><span><strong>GitHub</strong> <span class="small muted">a public repository of yours</span></span></label>
+        <label class="opt"><input type="radio" name="store" value="manual" bind:group={storeKind} /><span><strong>Upload by hand</strong> <span class="small muted">to any web folder; Publish hands you the two files</span></span></label>
+        {#if storeKind === 'apps-script'}
+          <details class="small" open={!scriptUrl}>
+            <summary>Set up your script (once, about two minutes)</summary>
+            <ol>
+              <li>Open <a href="https://script.new" target="_blank" rel="noopener">script.new</a> signed in to Google, and name the project “Hexmarch publisher”.</li>
+              <li><button class="quiet" onclick={copyScript}>Copy the script</button>{#if copied} Copied, with your key already in it.{/if} Replace everything in <code>Code.gs</code> with it, and save.</li>
+              <li>Deploy › New deployment › type <strong>Web app</strong>. Execute as <strong>Me</strong>, Who has access <strong>Anyone</strong>. Deploy, and allow it to use your Drive (Google warns because the script is your own and unverified: Advanced › Go to Hexmarch publisher).</li>
+              <li>Paste the Web app URL below. Your files go to the Drive folder “Hexmarch campaigns”.</li>
+            </ol>
+          </details>
+          <label class="field">Web app URL <input type="url" bind:value={scriptUrl} placeholder="https://script.google.com/macros/s/…/exec" /></label>
+          <label class="field">Key (the KEY line in your script) <input type="password" bind:value={secret} autocomplete="off" /></label>
+        {:else if storeKind === 'github'}
+          <details class="small" open={!ghRepo}>
+            <summary>Set up GitHub (once)</summary>
+            <ol>
+              <li>Make a <strong>public</strong> repository for your campaigns (players read the files from it, so keep secrets out of it).</li>
+              <li>Make a <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">fine-grained token</a>: Only select repositories › that one; Permissions › Contents › Read and write. Paste it below. It stays on this device.</li>
+            </ol>
+          </details>
+          <div class="row">
+            <label class="field">Repository <input type="text" bind:value={ghRepo} placeholder="you/kells-1422" autocapitalize="off" /></label>
+            <label class="field">Folder (optional) <input type="text" bind:value={ghDir} placeholder="kells" autocapitalize="off" /></label>
+            <label class="field">Branch <input type="text" bind:value={ghBranch} autocapitalize="off" /></label>
+          </div>
+          <label class="field">Token <input type="password" bind:value={secret} autocomplete="off" /></label>
+        {:else}
+          <label class="field">Folder you upload to <input type="url" bind:value={folder} placeholder="https://you.github.io/kells-1422/" /></label>
+        {/if}
+        <button class="quiet" disabled={!storeReady || !record.published || testing} onclick={runTest}>{testing ? 'Testing…' : 'Test'}</button>
+        {#if test === 'none'}<p class="small muted">Publish first (step 9), then test.</p>
         {:else if typeof test === 'string'}<p class="bad">{test}</p>
         {:else if test}
           <ul class="small test">
@@ -354,11 +427,11 @@
       <section>
         <h2>9. Publish</h2>
         <p class="small muted">Publishing writes what players may see: the campaign, its modules and the shared state (clock, party, what everyone knows), as it stands on this device now, plus each character's knowledge for their player alone and which requests you have answered. It is the same as Update campaign in the Companion, so either one can publish. Nothing only you should see goes in. Invite a player opens in the Companion once it is published.</p>
-        <button disabled={!folder} onclick={publish}>{record.published ? 'Publish again' : 'Publish'}</button>
+        <button disabled={!storeReady || publishing} onclick={publish}>{publishing ? 'Publishing…' : record.published ? 'Publish again' : 'Publish'}</button>
         {#if publishError}<p class="bad">{publishError}</p>{/if}
         {#if record.published}
           <p class="small muted">Published (revision {record.published.revision}, {new Date(record.published.at).toLocaleString()}).
-            {#if justPublished}Upload <code>campaign.json</code> and <code>snapshot.json</code> into <code>{record.services?.folder}</code>, replacing the old ones.{/if}
+            {#if justPublished}{#if record.services?.store && record.services.store.kind !== 'manual'}Both files are up; players see them within a few minutes.{:else}Upload <code>campaign.json</code> and <code>snapshot.json</code> into <code>{record.services?.folder}</code>, replacing the old ones.{/if}{/if}
             Players' invitations name <code>{record.services?.pointer}</code>.</p>
         {/if}
       </section>

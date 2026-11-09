@@ -8,3 +8,4 @@ export * from './content';
 export * from './sites';
 export * from './publish';
 export * from './mail';
+export * from './adapters';
