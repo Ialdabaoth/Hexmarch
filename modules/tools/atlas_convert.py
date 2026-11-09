@@ -52,6 +52,10 @@ def nearest(C, R, N):
     return best[1], best[2]
 
 def centre(i, j, N): return N * i, N * j + (N // 2) * (i & 1)
+def groups(i, j):
+    """np.unique(np.stack([i, j], 1), axis=0, return_inverse=True), same order, on one packed int64 key: over ten times faster."""
+    k, inv = np.unique((i.astype(np.int64) + (1 << 30)) << 32 | (j.astype(np.int64) + (1 << 30)), return_inverse=True)
+    return np.stack([(k >> 32) - (1 << 30), (k & 0xFFFFFFFF) - (1 << 30)], 1), inv.ravel()
 def ft(C, R): return C * CW, (R + 0.5 * (C & 1)) * 100
 
 face = Face(*A['centroid'][1:3])
@@ -157,23 +161,29 @@ def master(path):
     out = np.zeros(key.shape, np.uint8)
     for k, t in enumerate(TYPES): out[key == int(t[0][1:], 16)] = k + 1
     return out
+def master_png(i, j): return f"{MDIR}/atlas/terrain/{label(i - M0[0]) + label(j - M0[1])}.png"
+# the counts below only feed the summaries of generated Marches, so a painted March counts only when a generated one is
+# next to it (a League or Field near the border straddles both); a module painted all over skips them entirely
+GEN = [(i, j) for (i, j) in marches if not os.path.exists(master_png(i, j))]
 for (i, j) in marches:  # pass 1: each March's own hexes, and terrain counts per League and Field (which can straddle Marches)
+    mp = master_png(i, j); counts = any(abs(i - a) <= 1 and abs(j - b) <= 1 for a, b in GEN)
+    if os.path.exists(mp):  # the module's own painted map wins over anything generated
+        img = master(mp); MASTER.add((i, j)); IMG[i, j] = img
+        if not counts: continue
     Cm, Rm = centre(i, j, 1200); C = Cm - 800 + xs; R = Rm - 600 + ys
     ni, nj = nearest(C, R, 1200); own = (ni == i) & (nj == j)
-    mp = f"{MDIR}/atlas/terrain/{label(i - M0[0]) + label(j - M0[1])}.png"
-    if os.path.exists(mp): img = master(mp); MASTER.add((i, j))  # the module's own painted map wins over anything generated
-    else: img = np.zeros((1200, 1600), np.uint8); img[own] = terrain(C[own], R[own])
+    if (i, j) not in MASTER: img = np.zeros((1200, 1600), np.uint8); img[own] = terrain(C[own], R[own])
     IMG[i, j], OWN[i, j] = img, own
     for N in CNT:
         ui, uj = nearest(C[own], R[own], N); t = img[own].astype(np.int64)
-        keys, inv = np.unique(np.stack([ui, uj], 1), axis=0, return_inverse=True)
-        cnt = np.bincount(inv.ravel() * 256 + t, minlength=len(keys) * 256).reshape(-1, 256)
+        keys, inv = groups(ui, uj)
+        cnt = np.bincount(inv * 256 + t, minlength=len(keys) * 256).reshape(-1, 256)
         for k, c in zip(map(tuple, keys.tolist()), cnt): CNT[N][k] = CNT[N].get(k, 0) + c
 def top(c):  # most common terrain, not counting "none"
     c = c.copy(); c[0] = 0; return int(c.argmax()) if c.any() else 0
 MJ = []
 for (i, j) in marches:  # pass 2: summaries in the dead corners, then save
-    Cm, Rm = centre(i, j, 1200); img, own = IMG[i, j], OWN[i, j]
+    Cm, Rm = centre(i, j, 1200); img, own = IMG[i, j], OWN.get((i, j))
     for N, (bx, by, bw, bh, du, dv) in ((150, (2, 2, 11, 9, 5, 4)), (25, (1533, 1149, 65, 49, 32, 24))):
         if (i, j) in MASTER: break  # a master keeps its own (perhaps hand-painted) summaries
         img[0, 0] = top(np.bincount(img[own], minlength=256))

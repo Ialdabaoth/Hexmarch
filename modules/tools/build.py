@@ -43,54 +43,78 @@ for b in MOD['books']:
         if st[0] in seen or st[0] in MOD.get('site_parents', {}): continue  # a sub-place (Atlas 0.5.1) shows only in the Atlas; the print and overview maps show its parent
         seen.add(st[0]); sites.append(st); home[st[0]] = b
 
-# build cache (Heph 2026-11-07: fast small deploys): steps 1-4 are most of a site build, and most changes to a module
-# (encounters, bestiary, encounter maps) never touch them. Their results (_work, <out>/atlas, <out>/print) are kept in
-# modules/.cache/build/<module id>/<key>, where <key> hashes every file those steps read: module.json, the module's
-# atlas/ folder, its admin file, the shared geo data and tile art, the map tools and requirements.txt. A changed file
-# changes the key, and a missing or partial entry is a miss, so a miss always rebuilds. BUILD_CACHE=0 turns it off.
-# The maps carry no version stamp, so a cached one never shows a stale version.
-import hashlib
-MAP_TOOLS = ['build.py', 'hexmap.py', 'atlas_pages.py', 'league_pages.py', 'atlas_convert.py', 'atlas_cache.py', 'atlas_roads.py',
-             'realmap.py', 'dymaxion.py', 'pdf.js', 'ATLAS_VERSION']  # a tool a map step starts to read belongs here (local imports are found below)
-def map_key():
-    tools = set(MAP_TOOLS)
-    for t in list(tools):  # and any tools/*.py a listed script imports
+# build cache (Heph 2026-11-07: fast small deploys; staged Heph 2026-11-09: "only redraw a single march or league"). The map steps
+# are most of a site build and most changes never touch them, so each stage's results are kept in modules/.cache/build/<module id>/
+# and reused while the stage's own inputs are unchanged. A missing or partial entry is a miss, and a miss always rebuilds.
+#   region   hexmap.py, the print pages and PDFs: keyed on what they are given (world.json, island.json, their settings), the
+#            module.json fields they read, the admin file, geo/, assets/, requirements.txt and their code
+#   convert  atlas_convert.py: the region key, the rest of module.json, the module's atlas/ folder (the painted Marches) and its code
+#   cut      atlas_cache.py, with a state folder that survives between builds: only the Marches whose PNG changed, and the League
+#            tiles they share with their neighbours, are cut again
+# Code counts by what it does, not how it is written: a Python tool is hashed as its syntax tree without docstrings, so
+# comments, docstrings and layout never redraw a map. build.py itself is not in any key: what it passes to the tools is.
+# The page and manifest (step 5) always run and never redraw. BUILD_CACHE=0 turns the cache off.
+import ast, hashlib
+CACHE = os.environ.get('BUILD_CACHE', '1') != '0'
+CBASE = os.path.join(ROOT, '.cache', 'build', MOD['id'])
+STEP5_ONLY = ('version', 'languages', 'credits', 'requires', 'recommends', 'conflicts', 'overrides', 'starts', 'system', 'kind', 'moved_from', 'license')
+def code(path):  # what a tool does: its syntax tree without docstrings (no comments, no line numbers); other files byte for byte
+    src = open(path, 'rb').read()
+    if not path.endswith('.py'): return src
+    tree = ast.parse(src)
+    for n in ast.walk(tree):
+        if isinstance(n, (ast.Module, ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)) and n.body and isinstance(n.body[0], ast.Expr) \
+                and isinstance(n.body[0].value, ast.Constant) and isinstance(n.body[0].value.value, str):
+            n.body = n.body[1:] or [ast.Pass()]
+    return ast.dump(tree).encode()
+def tools(names):  # the listed tools and any tools/*.py they import
+    ts, todo = set(), list(names)
+    while todo:
+        t = todo.pop()
+        if t in ts or not os.path.isfile(os.path.join(TOOLS, t)): continue
+        ts.add(t)
         if t.endswith('.py'):
-            for m in re.findall(r'^\s*(?:from|import)\s+(\w+)', open(os.path.join(TOOLS, t)).read(), flags=re.M):
-                if os.path.isfile(os.path.join(TOOLS, m + '.py')): tools.add(m + '.py')
-    if not PDF: tools.discard('ATLAS_VERSION')
-    paths = [os.path.join(mdir, 'module.json'), os.path.join(mdir, 'atlas'), os.path.normpath(os.path.join(mdir, MOD['admin'])),
-             os.path.join(ROOT, 'geo'), os.path.join(ROOT, 'assets'), os.path.join(ROOT, 'requirements.txt')] + [os.path.join(TOOLS, t) for t in sorted(tools)]
-    h = hashlib.sha256(f'pdf={PDF}'.encode())
-    # module.json counts without its version: a version bump alone must not redraw every map. The maps never print the
-    # version (only index.html and the manifest do, and step 5 always writes those); the print PDFs do, so with --pdf it counts
-    # (Heph 2026-11-07, Atlas 0.5.3) nor do the manifest-only fields (languages, credits) or the Atlas version, which only the print pages show
-    mj = json.load(open(paths[0]))
-    if not PDF:
-        for k in ('version', 'languages', 'credits'): mj.pop(k, None)
-    h.update(json.dumps(mj, sort_keys=True, ensure_ascii=False).encode()); paths = paths[1:]
-    for p in paths:
-        fs = [p] if os.path.isfile(p) else sorted(os.path.join(dp, f) for dp, dn, fn in os.walk(p) for f in fn if '__pycache__' not in dp)
-        if not fs: h.update(b'\0none ' + p.encode())
-        for f in fs: h.update(b'\0' + os.path.relpath(f, ROOT).encode() + b'\0' + hashlib.sha256(open(f, 'rb').read()).digest())
+            todo += [m + '.py' for m in re.findall(r'^\s*(?:from|import)\s+(\w+)', open(os.path.join(TOOLS, t)).read(), flags=re.M)]
+    return sorted(ts)
+def key(*parts):  # parts: (label, value) pairs, a value being bytes, a dict, or a file or folder path
+    h = hashlib.sha256()
+    for lab, v in parts:
+        h.update(b'\0' + lab.encode() + b'\0')
+        if isinstance(v, bytes): h.update(v); continue
+        if not isinstance(v, str): h.update(json.dumps(v, sort_keys=True, ensure_ascii=False).encode()); continue
+        fs = [v] if os.path.isfile(v) else sorted(os.path.join(dp, f) for dp, dn, fn in os.walk(v) for f in fn if '__pycache__' not in dp)
+        if not fs: h.update(b'none')
+        for f in fs: h.update((os.path.basename(f) if f == v else os.path.relpath(f, v)).encode() + b'\0' + hashlib.sha256(code(f) if f.startswith(TOOLS + os.sep) else open(f, 'rb').read()).digest())  # names, not where the build runs
     return h.hexdigest()[:24]
-CBASE = os.path.join(ROOT, '.cache', 'build', MOD['id']); KEY = map_key(); CDIR = os.path.join(CBASE, KEY)
-PARTS = (('work', work), ('atlas', out + '/atlas'), ('print', out + '/print'))
-HIT = os.environ.get('BUILD_CACHE', '1') != '0' and os.path.isfile(os.path.join(CDIR, 'complete'))
-def cache_get():
-    for n, dst in PARTS:
-        if os.path.isdir(os.path.join(CDIR, n)): shutil.rmtree(dst, ignore_errors=True); shutil.copytree(os.path.join(CDIR, n), dst)
-def cache_put():
-    tmp = CDIR + '.tmp'; shutil.rmtree(tmp, ignore_errors=True)
-    for n, src in PARTS:
-        if os.path.isdir(src): shutil.copytree(src, os.path.join(tmp, n), ignore=shutil.ignore_patterns('creatures.json', '*.html' if n == 'work' else 'creatures.json'))  # step 5 reads no _work page
-    open(os.path.join(tmp, 'complete'), 'w').write(KEY)  # written last: an entry without it is never used
-    for old in os.listdir(CBASE) if os.path.isdir(CBASE) else []:  # one entry per module, so the cache does not grow without end
-        if old != KEY + '.tmp': shutil.rmtree(os.path.join(CBASE, old), ignore_errors=True)
-    os.replace(tmp, CDIR)
+def cached(stage, k, parts):  # restore a stage's results ((name, path) pairs); True on a hit
+    d = os.path.join(CBASE, f'{stage}-{k}')
+    if not (CACHE and os.path.isfile(os.path.join(d, 'complete'))): return False
+    for n, dst in parts:
+        if os.path.isdir(os.path.join(d, n)): shutil.rmtree(dst, ignore_errors=True); shutil.copytree(os.path.join(d, n), dst, dirs_exist_ok=True)
+    return True
+def store(stage, k, parts, ignore=()):  # keep a stage's results; one entry per stage, so the cache does not grow without end
+    if not CACHE: return
+    d = os.path.join(CBASE, f'{stage}-{k}'); tmp = d + '.tmp'; shutil.rmtree(tmp, ignore_errors=True)
+    for n, src in parts:
+        if os.path.isdir(src): shutil.copytree(src, os.path.join(tmp, n), ignore=shutil.ignore_patterns(*ignore))
+    open(os.path.join(tmp, 'complete'), 'w').write(k)  # written last: an entry without it is never used
+    for old in os.listdir(CBASE) if os.path.isdir(CBASE) else []:
+        if old.startswith(stage + '-') and old != f'{stage}-{k}.tmp': shutil.rmtree(os.path.join(CBASE, old), ignore_errors=True)
+    os.replace(tmp, d)
 
-def map_stages():  # steps 1-4: everything drawn from the terrain (most of a site build)
-    global world
+world = dict(MOD['world'], hex_mi=HX, px=round(96 / (HX * MI_KM), 4), master=True, title=MOD['title'], subtitle='', sites=sites)
+json.dump({'world': world}, open(work + '/world.json', 'w'), ensure_ascii=False)
+ISLAND = MOD['atlas'].get('land') == 'island'
+if ISLAND: json.dump({'island': dict(world, counties='*', sites=[])}, open(work + '/island.json', 'w'), ensure_ascii=False)
+MJ = {k: v for k, v in MOD.items() if k not in (STEP5_ONLY if PDF else STEP5_ONLY + ('version',))}  # a version bump alone never redraws (the PDFs print it)
+if PDF: MJ['version'] = MOD['version']
+MJR = dict({k: v for k, v in MJ.items() if k not in ('names', 'site_encounters', 'site_ranks')}, atlas={k: v for k, v in MOD['atlas'].items() if k not in ('roads', 'travel')})  # what the region tools never read
+SET = {k: ENV[k] for k in ('HEXDEM', 'HEXSITEICONS', 'HEXDUMP', 'MODTITLE') + (('MODVER', 'MODATLAS') if PDF else ())}
+RKEY = key(('pdf', str(PDF).encode()), ('settings', SET), ('module', MJR), ('world', work + '/world.json'), ('island', work + '/island.json' if ISLAND else b'-'),
+           ('admin', ENV['HEXADMIN']), ('geo', os.path.join(ROOT, 'geo')), ('assets', os.path.join(ROOT, 'assets')), ('req', os.path.join(ROOT, 'requirements.txt')),
+           *[('tool', os.path.join(TOOLS, t)) for t in tools(['hexmap.py', 'atlas_pages.py', 'league_pages.py'] + (['pdf.js', 'ATLAS_VERSION'] if PDF else []))])
+
+def region():  # steps 1-4 from the terrain: the world map, print pages and PDFs (the work folder holds what step 5 and the Atlas read)
     # terrain data: SRTM tiles are fetched once into modules/.cache/geo (only when the maps are drawn)
     la0, la1, lo0, lo1 = MOD['dem']
     for la in range(la0, la1 + 1):
@@ -99,59 +123,67 @@ def map_stages():  # steps 1-4: everything drawn from the terrain (most of a sit
             f = os.path.join(geo, t + '.hgt.gz')
             if not os.path.exists(f):
                 print('fetching', t); urllib.request.urlretrieve(f'https://s3.amazonaws.com/elevation-tiles-prod/skadi/{t[:3]}/{t}.hgt.gz', f)
-    world = dict(MOD['world'], hex_mi=HX, px=round(96 / (HX * MI_KM), 4), master=True, title=MOD['title'], subtitle='', sites=sites)
-    json.dump({'world': world}, open(work + '/world.json', 'w'), ensure_ascii=False)
     run(*PY, TOOLS + '/hexmap.py', geo, work, work + '/world.json')
     # atlas.land = "island": the Hexmarch Atlas covers every county on the island (Heph 2026-11-06, all of Ireland), while the print maps
     # stay on the books' counties; this second, unprinted run only gives atlas_convert.py its Marches and the island's rivers
-    if MOD['atlas'].get('land') == 'island':
-        json.dump({'island': dict(world, counties='*', sites=[])}, open(work + '/island.json', 'w'), ensure_ascii=False)
-        run(*PY, TOOLS + '/hexmap.py', geo, work, work + '/island.json')
+    if ISLAND: run(*PY, TOOLS + '/hexmap.py', geo, work, work + '/island.json')
     # 2. March pages (the print atlas: one 24-mile hex per page), 3. League pages (one 3-mile hex per page)
     run(*PY, TOOLS + '/atlas_pages.py', work + '/world.svg', work + '/world-grid.json', work + '/atlas.html')
     run(*PY, TOOLS + '/league_pages.py', os.path.join(mdir, 'module.json'), work + '/atlas-index.json', work + '/world-grid.json', work + '/league')
-    # Hexmarch Atlas format (ATLAS_FORMAT.md): the same terrain as one map JSON + one PNG per March, for the dynamic renderer
-    if 'centroid' in MOD['atlas']:
-        run(*PY, TOOLS + '/atlas_convert.py', os.path.join(mdir, 'module.json'), work, out + '/atlas')
-        run(*PY, TOOLS + '/atlas_cache.py', out + '/atlas')  # the pieces the Atlas loads around the view (rebuilt when a March PNG changes)
-        run(*PY, TOOLS + '/atlas_roads.py', os.path.join(mdir, 'module.json'), out + '/atlas')  # module.json atlas.roads, laid over the Field terrain in the cache
-        # the dynamic renderer (preview): atlas/index.html draws every level from map.json + the March PNGs, with the shared tiles
-        AJ = json.load(open(out + '/atlas/map.json')); os.makedirs(out + '/atlas/tiles', exist_ok=True)
-        TD = os.path.join(ROOT, 'assets', 'tiles', 'icons')
-        want = {t['icon'] for t in AJ['terrain']['types'] if t.get('icon')} | {p['icon'] for p in AJ['pois'] if p.get('icon')}
-        want |= {t['tile'] for t in AJ['terrain']['types']}
-        for n in sorted(want | {n + '-x' for n in want if n.startswith('bg-')}):  # full RGBA, as drawn
-            if os.path.exists(f'{TD}/{n}.png'): shutil.copy(f'{TD}/{n}.png', f'{out}/atlas/tiles/{n}.png')
-        # blends: not the 96 bleed tiles (4 MB) but Heph's edge and corner masks, rotated, as 8-bit greyscale (Heph 2026-11-05);
-        # the renderer multiplies each into the colour's own tile on the phone, exactly as tiles_blend.py does
-        from PIL import Image
-        MD = os.path.join(ROOT, 'assets', 'tiles', 'masks')
-        for kind, f in (('e', 'edge.png'), ('c', 'corner.png')):
-            m = Image.open(os.path.join(MD, f)).getchannel('A')
-            for k in range(6):
-                r = m.rotate(-60 * k, resample=Image.BICUBIC, center=(m.width / 2, m.height / 2))
-                r.save(f'{out}/atlas/tiles/mask-{kind}{k}.png', optimize=True)
-                x = Image.new('L', (r.width + 8, r.height + 8)); x.paste(r, (4, 4))  # the -x twins' 4 px margin, edge pixels repeated
-                for p_ in range(4):
-                    x.paste(r.crop((0, 0, r.width, 1)), (4, p_)); x.paste(r.crop((0, r.height - 1, r.width, r.height)), (4, r.height + 4 + p_))
-                for p_ in range(4):
-                    x.paste(x.crop((4, 0, 5, x.height)), (p_, 0)); x.paste(x.crop((r.width + 3, 0, r.width + 4, x.height)), (r.width + 4 + p_, 0))
-                x.save(f'{out}/atlas/tiles/mask-{kind}{k}-x.png', optimize=True)
-        # the app itself lives once at <site>/atlas/ (atlas_app.py, Atlas 0.3.0); this old address forwards there, keeping the #link
-        open(out + '/atlas/index.html', 'w').write(f'<!doctype html><meta charset="utf-8"><title>{MOD["title"]} · Hexmarch Atlas</title><meta name="robots" content="noindex">'
-            f'<script>location.replace("../../../atlas/?module={MOD["id"]}" + location.hash)</script><p>The Hexmarch Atlas moved to <a href="../../../atlas/?module={MOD["id"]}">its own page</a>.</p>')
     # 4. PDFs
     if PDF:
         os.makedirs(out + '/print', exist_ok=True)
         for src, dst in ((work + '/atlas.html', 'atlas.pdf'), (work + '/league/leagues.html', 'leagues.pdf')):
             run('node', TOOLS + '/pdf.js', src, 'none'); shutil.move(src.replace('.html', '.pdf'), out + '/print/' + dst)
 
-if HIT:
-    cache_get(); print(f"{MOD['id']}: maps unchanged (cache {KEY}), steps 1-4 skipped")
-else:
-    t0 = time.time(); map_stages()
-    if os.environ.get('BUILD_CACHE', '1') != '0': cache_put()
-    print(f"{MOD['id']}: maps built in {time.time() - t0:.0f} s (cache {KEY})")
+t0 = time.time(); RP = (('work', work), ('print', out + '/print'))
+if cached('region', RKEY, RP): print(f"{MOD['id']}: region maps unchanged (cache region-{RKEY})")
+else: region(); store('region', RKEY, RP, ignore=('*.html',)); print(f"{MOD['id']}: region maps drawn in {time.time() - t0:.0f} s")  # step 5 reads no _work page
+# the Hexmarch Atlas format (ATLAS_FORMAT.md): the same terrain as one map JSON + one PNG per March, for the dynamic renderer
+if 'centroid' in MOD['atlas']:
+    t0 = time.time(); AP = (('atlas', out + '/atlas'),)
+    CKEY = key(('region', RKEY.encode()), ('module', MJ), ('masters', os.path.join(mdir, 'atlas')), *[('tool', os.path.join(TOOLS, t)) for t in tools(['atlas_convert.py', 'realmap.py'])])
+    if cached('convert', CKEY, AP): print(f"{MOD['id']}: Atlas Marches unchanged (cache convert-{CKEY})")
+    else:
+        shutil.rmtree(out + '/atlas', ignore_errors=True); run(*PY, TOOLS + '/atlas_convert.py', os.path.join(mdir, 'module.json'), work, out + '/atlas')
+        store('convert', CKEY, AP); print(f"{MOD['id']}: Atlas Marches made in {time.time() - t0:.0f} s")
+    # the pieces the Atlas loads around the view: only changed Marches are cut again (the state folder outlives the build)
+    t0 = time.time(); ST = os.path.join(CBASE, 'cut-' + key(*[('tool', os.path.join(TOOLS, t)) for t in tools(['atlas_cache.py'])]))
+    if CACHE:
+        for old in os.listdir(CBASE) if os.path.isdir(CBASE) else []:
+            if old.startswith('cut-') and os.path.join(CBASE, old) != ST: shutil.rmtree(os.path.join(CBASE, old), ignore_errors=True)
+    run(*PY, TOOLS + '/atlas_cache.py', out + '/atlas', *(['--state', ST] if CACHE else []))
+    print(f"{MOD['id']}: Atlas tiles cut in {time.time() - t0:.0f} s"); t0 = time.time()
+    run(*PY, TOOLS + '/atlas_roads.py', os.path.join(mdir, 'module.json'), out + '/atlas')  # module.json atlas.roads, laid over the Field terrain in the cache
+    print(f"{MOD['id']}: Atlas roads laid in {time.time() - t0:.0f} s")
+    # the dynamic renderer: atlas/index.html draws every level from map.json + the March PNGs, with the shared tiles
+    AJ = json.load(open(out + '/atlas/map.json')); os.makedirs(out + '/atlas/tiles', exist_ok=True)
+    TD = os.path.join(ROOT, 'assets', 'tiles', 'icons')
+    want = {t['icon'] for t in AJ['terrain']['types'] if t.get('icon')} | {p['icon'] for p in AJ['pois'] if p.get('icon')}
+    want |= {t['tile'] for t in AJ['terrain']['types']}
+    for n in sorted(want | {n + '-x' for n in want if n.startswith('bg-')}):  # full RGBA, as drawn
+        if os.path.exists(f'{TD}/{n}.png'): shutil.copy(f'{TD}/{n}.png', f'{out}/atlas/tiles/{n}.png')
+    # blends: not the 96 bleed tiles (4 MB) but Heph's edge and corner masks, rotated, as 8-bit greyscale (Heph 2026-11-05);
+    # the renderer multiplies each into the colour's own tile on the phone, exactly as tiles_blend.py does
+    from PIL import Image
+    MD = os.path.join(ROOT, 'assets', 'tiles', 'masks')
+    for kind, f in (('e', 'edge.png'), ('c', 'corner.png')):
+        m = Image.open(os.path.join(MD, f)).getchannel('A')
+        for k in range(6):
+            r = m.rotate(-60 * k, resample=Image.BICUBIC, center=(m.width / 2, m.height / 2))
+            r.save(f'{out}/atlas/tiles/mask-{kind}{k}.png', optimize=True)
+            x = Image.new('L', (r.width + 8, r.height + 8)); x.paste(r, (4, 4))  # the -x twins' 4 px margin, edge pixels repeated
+            for p_ in range(4):
+                x.paste(r.crop((0, 0, r.width, 1)), (4, p_)); x.paste(r.crop((0, r.height - 1, r.width, r.height)), (4, r.height + 4 + p_))
+            for p_ in range(4):
+                x.paste(x.crop((4, 0, 5, x.height)), (p_, 0)); x.paste(x.crop((r.width + 3, 0, r.width + 4, x.height)), (r.width + 4 + p_, 0))
+            x.save(f'{out}/atlas/tiles/mask-{kind}{k}-x.png', optimize=True)
+    # the app itself lives once at <site>/atlas/ (atlas_app.py, Atlas 0.3.0); this old address forwards there, keeping the #link
+    open(out + '/atlas/index.html', 'w').write(f'<!doctype html><meta charset="utf-8"><title>{MOD["title"]} · Hexmarch Atlas</title><meta name="robots" content="noindex">'
+        f'<script>location.replace("../../../atlas/?module={MOD["id"]}" + location.hash)</script><p>The Hexmarch Atlas moved to <a href="../../../atlas/?module={MOD["id"]}">its own page</a>.</p>')
+if CACHE and os.path.isdir(CBASE):  # entries from before the stages (one folder per key) go
+    for old in os.listdir(CBASE):
+        if not re.match(r'(region|convert|cut)-', old): shutil.rmtree(os.path.join(CBASE, old), ignore_errors=True)
 
 # 5. web: the module page and the manifest
 AI = json.load(open(work + '/atlas-index.json')); PI = json.load(open(work + '/league/league-index.json')); G = json.load(open(work + '/world-grid.json'))
