@@ -1,0 +1,29 @@
+name: Merge order
+
+# Sets the "merge order" status on pull requests (scripts/merge_order.py): a PR waits while a PR it names in
+# "Merge after #N" is unmerged, or while an older open PR changes the same app. Heph 2026-11-09.
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize, ready_for_review, converted_to_draft, closed]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+  statuses: write
+
+concurrency:
+  group: merge-order
+  cancel-in-progress: false
+
+jobs:
+  order:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # one PR when it changes; every open PR when main moves or a PR closes, so a waiting PR turns green
+      - run: python3 -I scripts/merge_order.py ${{ github.event_name == 'pull_request' && github.event.action != 'closed' && github.event.pull_request.number || '' }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
