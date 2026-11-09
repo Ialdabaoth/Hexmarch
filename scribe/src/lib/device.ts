@@ -9,7 +9,7 @@
 
 import type { Built } from './campaign';
 import type { RootChoice } from './rules';
-import { checkUpload, pointer, publishParts, snapshot, type UploadReport, type Pointer, type Services, type Snapshot } from '../../../engine';
+import { checkUpload, envelope, pointer, publishParts, snapshot, type Envelope, type UploadReport, type Pointer, type Services, type Snapshot } from '../../../engine';
 
 export const SCRIBE_FORMAT = 'e9-scribe-campaign';
 
@@ -75,15 +75,64 @@ export function withRefereeInvitation(list: unknown, url: string, name: string, 
 }
 
 // Saves the campaign and the creator's Referee invitation; asks before replacing a state file that is already
-// on this device. Returns the campaign's link.
-export async function saveOnDevice(built: Built, root: RootChoice, site: string, replaceState: (revision: number) => boolean): Promise<string> {
+// on this device. Returns the campaign's link, and the state file when Scribe wrote one (the Companion starts from it).
+export interface Saved {
+  link: string;
+  wroteState: boolean;
+}
+export async function saveOnDevice(built: Built, root: RootChoice, site: string, replaceState: (revision: number) => boolean): Promise<Saved> {
   const rec = scribeRecord(built, root, site);
   const link = campaignLink(rec.id);
-  await idbSet(`scribe-campaign:${rec.id}`, rec);
+  const kept = await savedCampaign(rec.id); // keep services and published from an earlier save
+  await idbSet(`scribe-campaign:${rec.id}`, kept ? { ...kept, ...rec } : rec);
   const had = (await idbGet(`state:${rec.id}`)) as { revision?: number } | undefined;
-  if (!had || replaceState(Number(had.revision) || 0)) await idbSet(`state:${rec.id}`, built.state);
+  const wroteState = !had || replaceState(Number(had.revision) || 0);
+  if (wroteState) await idbSet(`state:${rec.id}`, built.state);
   await idbSet('invitations', withRefereeInvitation(await idbGet('invitations'), link, String(built.manifest.title ?? rec.id)));
-  return link;
+  return { link, wroteState };
+}
+
+// Apps talk by links (WORKFLOWS.md, Heph 2026-11-09): the apps hand each other data in e9-mail/1 envelopes after
+// "#m=" in a link; this device's storage is only a cache.
+//   campaign  Scribe -> Companion: {record, state?}, the saved record (with services and published once it has
+//             them) and, when Scribe has just written it, the state file to start play from
+//   update    Companion -> Scribe: {state, knowledge, receipts}, the parts Publish needs, as the Companion has them
+export function campaignMessage(record: SavedCampaign, state?: unknown, now = new Date()): Envelope {
+  return envelope({ campaign: record.id, kind: 'campaign', from: { role: 'referee' }, to: 'referee', body: { record, ...(state ? { state } : {}) } }, now);
+}
+
+export interface Play {
+  state: Record<string, unknown>;
+  knowledge: Record<string, unknown>;
+  receipts: string[];
+  at: string;
+}
+const revisionOf = (s: unknown) => Number((s as { revision?: number } | null)?.revision) || 0;
+
+// Applies an "update" envelope: keeps it as play:<id> unless play already there is newer. Each envelope is applied
+// once (the ids go under "applied", shared with the Companion). Returns what happened, for the page to say.
+export type UpdateResult = { status: 'applied' | 'older' | 'repeat'; campaign: string; revision: number; title?: string };
+export async function applyUpdate(e: Envelope): Promise<UpdateResult> {
+  if (e.kind !== 'update') throw new Error(`Scribe can't use a "${e.kind}" message.`);
+  const b = e.body as Partial<Play>;
+  if (!b.state || typeof b.state !== 'object') throw new Error('That update has no play state in it.');
+  const rec = await savedCampaign(e.campaign);
+  const base = { campaign: e.campaign, revision: revisionOf(b.state), ...(rec ? { title: String(rec.manifest.title ?? e.campaign) } : {}) };
+  const applied = ((await idbGet('applied')) as string[] | undefined) ?? [];
+  if (applied.includes(e.id)) return { ...base, status: 'repeat' };
+  const had = (await idbGet(`play:${e.campaign}`)) as Play | undefined;
+  const newer = !had || revisionOf(b.state) >= revisionOf(had.state);
+  if (newer) await idbSet(`play:${e.campaign}`, { state: b.state, knowledge: b.knowledge ?? {}, receipts: Array.isArray(b.receipts) ? b.receipts : [], at: e.sent });
+  await idbSet('applied', [...applied, e.id].slice(-200));
+  return { ...base, status: newer ? 'applied' : 'older' };
+}
+
+// What Publish publishes: the play the Companion last sent by link, or what this device's storage holds when that
+// is newer (the three apps still share one site's storage in alpha).
+export async function playFor(id: string, get = idbGet): Promise<Omit<Play, 'at'>> {
+  const sent = (await get(`play:${id}`)) as Play | undefined;
+  const here = await publishParts(id, get);
+  return sent && revisionOf(sent.state) >= revisionOf(here.state) ? { state: sent.state, knowledge: sent.knowledge, receipts: sent.receipts } : here;
 }
 
 // Steps 8 and 9, Services and Publish (SCRIBE.md section 5). The campaign must be saved on this device first.
@@ -105,7 +154,7 @@ export async function publishOnDevice(id: string, services: Services, now = new 
   const rec = await savedCampaign(id);
   if (!rec) throw new Error('Save the campaign on this device first (step 7).');
   // the same parts the Companion's Update campaign publishes: state, each party member's knowledge, receipts
-  const { state, knowledge, receipts } = await publishParts(id, idbGet);
+  const { state, knowledge, receipts } = await playFor(id);
   const snap = snapshot(
     { campaign: id, ruleset: rec.ruleset, site: rec.site, module: rec.manifest as Record<string, unknown>, lock: rec.lock, state, knowledge },
     rec.published ?? null,

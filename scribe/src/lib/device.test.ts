@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { campaignLink, scribeRecord, withRefereeInvitation } from './device';
+import { campaignLink, campaignMessage, playFor, scribeRecord, withRefereeInvitation, type SavedCampaign } from './device';
 import type { Built } from './campaign';
 
 describe('saving on this device', () => {
@@ -22,5 +22,23 @@ describe("the creator's Referee invitation", () => {
   });
   it('starts a list when there is none', () => {
     expect(withRefereeInvitation(undefined, 'scribe:x', 'X', now, () => 'r')).toHaveLength(1);
+  });
+});
+
+describe('apps talk by links', () => {
+  const now = new Date('2026-11-09T16:30:00Z');
+  it('hands the Companion the record, and the state only when Scribe wrote it', () => {
+    const rec = { id: 'kells-1422', manifest: { title: 'Kells 1422' } } as unknown as SavedCampaign;
+    const m = campaignMessage(rec, { revision: 1 }, now);
+    expect(m).toMatchObject({ format: 'e9-mail', kind: 'campaign', campaign: 'kells-1422', from: { role: 'referee' }, to: 'referee', body: { record: rec, state: { revision: 1 } } });
+    expect(campaignMessage(rec, undefined, now).body).toEqual({ record: rec });
+  });
+  it('publishes the play the Companion sent, unless this device holds newer', async () => {
+    const sent = { state: { revision: 5, characters: [] }, knowledge: { holly: [] }, receipts: ['j1'], at: '' };
+    const keys = (here: number): Record<string, unknown> => ({ 'play:k': sent, 'state:k': { revision: here, characters: [] } });
+    const get = (k: Record<string, unknown>) => async (key: string) => k[key];
+    expect(await playFor('k', get(keys(4)))).toEqual({ state: sent.state, knowledge: sent.knowledge, receipts: ['j1'] });
+    expect((await playFor('k', get(keys(6)))).state).toEqual({ revision: 6, characters: [] });
+    expect((await playFor('k', get({ 'state:k': { revision: 2 } }))).state).toEqual({ revision: 2 });
   });
 });
