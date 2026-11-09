@@ -62,7 +62,7 @@
           <button class="primary" disabled={busy} onclick={() => run(() => app.updateCampaign())}>Update campaign</button>
           <p class="small muted">Saves campaign.json and snapshot.json to upload to your campaign's folder, replacing the old ones.</p>
         {:else}
-          <p class="small muted">Publish the campaign in Scribe first; then Update campaign appears here.</p>
+          <p class="small muted">This device has no published copy of “{app.campaignId}”. Publish it in Scribe in this same browser, or open the campaign's published link (its campaign.json) in Settings › Add a campaign; then Update campaign appears here.</p>
         {/if}
       </section>
     {/if}
