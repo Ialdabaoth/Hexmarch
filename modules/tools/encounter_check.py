@@ -10,7 +10,7 @@ that a VTT export or a PoI click would trip over. build.py runs it.
 """
 import json, os, sys
 
-FORMAT = 'e9-encounter-map/1'
+FORMAT = 'hexmarch-encounter-map/1'
 
 
 def main(mdir):

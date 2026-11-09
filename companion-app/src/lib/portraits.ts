@@ -3,7 +3,7 @@
 // the browser loads them from the web each time.
 import { createStore, del, entries, set } from 'idb-keyval';
 
-const store = createStore('materia-mundi-portraits', 'portraits');
+const store = createStore('hexmarch-portraits', 'portraits');
 
 export const CACHE_PREFIX = 'cache:';
 

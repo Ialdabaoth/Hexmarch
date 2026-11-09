@@ -5,7 +5,7 @@ import { EQUIPMENT, equipmentFile, magicLevel, magicLevels, resolve } from './eq
 // Guards hand edits to the files in this folder.
 describe.each(EQUIPMENT.map((f) => [`${f.id}-equipment.json`, f] as const))('%s', (_, file) => {
   it('has a header and unique kebab-case ids', () => {
-    expect(file.data.format).toBe('materia-mundi-equipment');
+    expect(file.data.format).toBe('hexmarch-equipment');
     expect(file.data.version).toBe(1);
     const ids = [...file.items, ...file.magic].map((e) => e.id);
     expect(new Set(ids).size).toBe(ids.length);

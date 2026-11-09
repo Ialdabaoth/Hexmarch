@@ -5,9 +5,9 @@ import type { Built } from './campaign';
 describe('saving on this device', () => {
   it('writes the record the Companion opens by scribe:<id>', () => {
     (globalThis as { location?: unknown }).location ??= { href: 'https://example.org/Hexmarch/scribe/' };
-    const built = { manifest: { id: 'kells-1422', title: 'Kells 1422' }, lock: { format: 'e9-lock/1', modules: [] }, state: {}, problems: [] } as unknown as Built;
+    const built = { manifest: { id: 'kells-1422', title: 'Kells 1422' }, lock: { format: 'hexmarch-lock/1', modules: [] }, state: {}, problems: [] } as unknown as Built;
     const r = scribeRecord(built, { module: 'mm-core', option: 'e9', ruleset: 'e9mm', title: '', version: '0.1.0' }, 'https://example.org/data', new Date('2026-11-08T23:00:00Z'));
-    expect(r).toMatchObject({ format: 'e9-scribe-campaign', version: 1, id: 'kells-1422', site: 'https://example.org/data/', ruleset: 'e9mm', saved: '2026-11-08T23:00:00.000Z' });
+    expect(r).toMatchObject({ format: 'hexmarch-scribe-campaign', version: 1, id: 'kells-1422', site: 'https://example.org/data/', ruleset: 'e9mm', saved: '2026-11-08T23:00:00.000Z' });
     expect(campaignLink(r.id)).toBe('scribe:kells-1422');
   });
 });
@@ -30,7 +30,7 @@ describe('apps talk by links', () => {
   it('hands the Companion the record, and the state only when Scribe wrote it', () => {
     const rec = { id: 'kells-1422', manifest: { title: 'Kells 1422' } } as unknown as SavedCampaign;
     const m = campaignMessage(rec, { revision: 1 }, now);
-    expect(m).toMatchObject({ format: 'e9-mail', kind: 'campaign', campaign: 'kells-1422', from: { role: 'referee' }, to: 'referee', body: { record: rec, state: { revision: 1 } } });
+    expect(m).toMatchObject({ format: 'hexmarch-mail', kind: 'campaign', campaign: 'kells-1422', from: { role: 'referee' }, to: 'referee', body: { record: rec, state: { revision: 1 } } });
     expect(campaignMessage(rec, undefined, now).body).toEqual({ record: rec });
   });
   it('publishes the play the Companion sent, unless this device holds newer', async () => {

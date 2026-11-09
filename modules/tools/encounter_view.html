@@ -43,7 +43,7 @@ window.E9Map = (() => {
   const dlg = document.getElementById('e9map'), cache = {};
   const e = t => String(t ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
   const api = { base: '', module: '', creatures: [], scenes: {}, actions: [], places: [], open, show, load, place };
-  const pref = { get(k) { try { return localStorage.getItem('e9map-' + k); } catch (x) { return null; } }, set(k, v) { try { localStorage.setItem('e9map-' + k, v); } catch (x) {} } };
+  const pref = { get(k) { try { return localStorage.getItem('hexmarch-map-' + k); } catch (x) { return null; } }, set(k, v) { try { localStorage.setItem('hexmarch-map-' + k, v); } catch (x) {} } };
   let st = null, back = [];  // st: the map on screen; back: where Back returns to
   dlg.addEventListener('click', ev => { if (ev.target === dlg) dlg.close(); });
   dlg.addEventListener('close', () => { st = null; back = []; });

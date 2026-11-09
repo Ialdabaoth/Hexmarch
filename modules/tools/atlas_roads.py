@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""E9 Atlas roads (ATLAS_FORMAT.md "Roads", Atlas 0.4.18): lay a module's roads over its built map.
+"""Hexmarch Atlas roads (ATLAS_FORMAT.md "Roads", Atlas 0.4.18): lay a module's roads over its built map.
 
     python3 -I modules/tools/atlas_roads.py <module.json> <out>/atlas
 

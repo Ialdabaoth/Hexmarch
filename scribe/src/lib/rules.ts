@@ -1,4 +1,4 @@
-// The root rules modules Scribe offers in step 1, from modules/*-core/module.json (e9-rules/1), the same
+// The root rules modules Scribe offers in step 1, from modules/*-core/module.json (hexmarch-rules/1), the same
 // manifests the Companion is built with. Each module, and each option inside one, is a choice.
 
 export interface RootChoice {

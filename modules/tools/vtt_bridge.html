@@ -1,4 +1,4 @@
-<!-- VTT bridge (ENCOUNTER_FORMAT.md sections 14.2 and 14.4, Atlas 0.4.6): the E9 app's side of the e9-vtt/1 adapter protocol.
+<!-- VTT bridge (ENCOUNTER_FORMAT.md sections 14.2 and 14.4, Atlas 0.4.6): the E9 app's side of the hexmarch-vtt/1 adapter protocol.
      Active only when a VTT adapter opened this page with ?vtt=<app>&pair=<code>; build.py and atlas_app.py inline it after vtt_export.html -->
 <style>
 #e9bridge{position:fixed;left:50%;bottom:10px;transform:translateX(-50%);z-index:50;background:#2b2418;color:#f4efe1;font:13px Georgia,serif;padding:5px 12px;border-radius:14px;box-shadow:0 2px 10px #0006;white-space:nowrap}
@@ -22,18 +22,18 @@ window.E9Bridge = (() => {
   let origin = null, seq = 0, info = null; const wait = {};
   // replies only from the window that opened us; its origin is learned from the first reply and checked from then on
   addEventListener('message', ev => {
-    if (ev.source !== peer || !ev.data || ev.data.protocol !== 'e9-vtt/1' || ev.data.pair !== pair) return;
+    if (ev.source !== peer || !ev.data || ev.data.protocol !== 'hexmarch-vtt/1' || ev.data.pair !== pair) return;
     if (origin && ev.origin !== origin) return; origin = origin || ev.origin;
     const w = wait[ev.data.id]; if (!w) return; delete wait[ev.data.id];
     ev.data.ok ? w.ok(ev.data.result) : w.no(new Error(ev.data.error || 'the VTT refused'));
   });
   function send(cmd, args) {
     const id = ++seq;
-    return new Promise((ok, no) => { wait[id] = { ok, no }; peer.postMessage({ protocol: 'e9-vtt/1', pair, id, cmd, args }, origin || '*');
+    return new Promise((ok, no) => { wait[id] = { ok, no }; peer.postMessage({ protocol: 'hexmarch-vtt/1', pair, id, cmd, args }, origin || '*');
       setTimeout(() => { if (wait[id]) { delete wait[id]; no(new Error(NAME + ' did not answer')); } }, cmd === 'scene.open' ? 120e3 : 20e3); });
   }
   const bar = document.createElement('div'); bar.id = 'e9bridge'; bar.textContent = `Connecting to ${NAME}…`; document.body.append(bar);
-  send('hello', { protocol: 'e9-vtt/1', app: 'atlas', module: window.E9Map && E9Map.module }).then(r => { info = r;
+  send('hello', { protocol: 'hexmarch-vtt/1', app: 'atlas', module: window.E9Map && E9Map.module }).then(r => { info = r;
     bar.innerHTML = `Linked to ${e(NAME)} · code <b>${e(pair)}</b> <small>(check it matches ${e(NAME)})</small>`; })
     .catch(err => { bar.textContent = `Not linked to ${NAME}: ${err.message}`; });
   // dice in a scene's "who" count: 3, d6, 2d6, d6+1, d6÷2 (CREATURES_FORMAT.md); a troupe word counts as 1 until the bestiary is wired in

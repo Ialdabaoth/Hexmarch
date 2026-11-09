@@ -78,7 +78,7 @@ export async function buildCampaign(c: Choices, site: SiteModule[], rules: unkno
   const sitePlace = start?.site ? slug(start.site) : manual?.site ?? '';
   const places = [...new Set([...(start?.revealed?.places ?? []).map(slug), ...(sitePlace ? [sitePlace] : [])])];
   const state = {
-    format: 'e9-campaign-state',
+    format: 'hexmarch-campaign-state',
     version: 1,
     campaign: id,
     revision: 1,

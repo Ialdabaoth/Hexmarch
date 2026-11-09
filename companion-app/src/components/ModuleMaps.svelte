@@ -34,7 +34,7 @@
     return untrack(() => (here && at && isAtlasAddress(at.hex) ? `#${at.hex}` : '#world'));
   });
 
-  const post = (msg: object) => frame?.contentWindow?.postMessage({ type: 'e9-atlas', ...msg }, '*');
+  const post = (msg: object) => frame?.contentWindow?.postMessage({ type: 'hexmarch-atlas', ...msg }, '*');
 
   function sendParty() {
     if (here && at) post({ party: { hex: partyHex(at), hours: at.hours ?? 0 } });

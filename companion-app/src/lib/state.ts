@@ -1,11 +1,11 @@
-// The campaign state file (e9-campaign-state/1, modules/STATE_FORMAT.md): one small versioned file
+// The campaign state file (hexmarch-campaign-state/1, modules/STATE_FORMAT.md): one small versioned file
 // holding where the party stands, the game clock, what the party has found, the current session and
 // who is playing. The Companion keeps one per campaign on the device ("" is This device); later the
 // referee's Update campaign commits it to the campaign repo as campaign/state.json and players read it.
 import { isAtlasAddress } from './atlas';
 import type { PartyAt } from './storage';
 
-export const STATE_FORMAT = 'e9-campaign-state';
+export const STATE_FORMAT = 'hexmarch-campaign-state';
 export const STATE_VERSION = 1;
 
 export interface StateCharacter {
@@ -92,7 +92,7 @@ function readRules(r: unknown): StateRules | null {
 // Reads a state file (imported, or saved on the device), filling anything missing with defaults.
 export function readState(d: unknown, campaign: string): CampaignState {
   const s = d as Partial<CampaignState> | null;
-  if (!s || typeof s !== 'object' || s.format !== STATE_FORMAT) throw new StateError("That isn't an E9 campaign state file");
+  if (!s || typeof s !== 'object' || s.format !== STATE_FORMAT) throw new StateError("That isn't a campaign state file");
   if (typeof s.version !== 'number' || s.version > STATE_VERSION) throw new StateError('That state file was written by a newer app. Update the app to read it.');
   if (typeof s.campaign === 'string' && s.campaign !== campaign) {
     throw new StateError(`That state file belongs to another campaign (${s.campaign || 'This device'})`);

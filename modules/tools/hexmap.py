@@ -325,7 +325,7 @@ def make(key, R):
             if main.get(p) != ch[-2]: break  # joined a bigger river
         chains.append(ch)
     chains.sort(key=lambda ch: -max(acc[c] for c in ch[:-1]))  # big rivers first, so tributaries can join their smoothed line
-    if os.environ.get("HEXDUMP"):  # raw geometry for the E9 Atlas converter (atlas_convert.py): grid, terrain, river cells, sites
+    if os.environ.get("HEXDUMP"):  # raw geometry for the Hexmarch Atlas converter (atlas_convert.py): grid, terrain, river cells, sites
         def ll(i):
             r, c = divmod(int(i), SNC); return [round(LON_LEFT + (c0 + c + .5) * cell, 6), round(LAT_TOP - (r0 + r + .5) * cell, 6)]
         json.dump(dict(key=key, hex_mi=HEX_MI, X0=X0, Y0=Y0, s=s, w=w, h=h, kx=kx, ky=ky, ncol=ncol, nrow=nrow, anchor=R.get("anchor"),

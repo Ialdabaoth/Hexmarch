@@ -4,7 +4,7 @@
 
 Each map has a plan at encounter-maps/<id>/plan.json, written by hand in squares (5 ft unless the plan
 says otherwise). The tool draws the picture in the E9 ink style to encounter-maps/<id>/map.jpg and writes
-the map file encounter-maps/<id>.json (format e9-encounter-map/1) with that picture as its one layer and the
+the map file encounter-maps/<id>.json (format hexmarch-encounter-map/1) with that picture as its one layer and the
 plan's areas, links and notes. Drawings are original and CC BY 4.0 like the rest of the tools: no hex tiles and
 no traced art (Heph 2026-11-05: Encounter maps are feel-alikes with their own identity).
 
@@ -606,7 +606,7 @@ def build(root, mid, draw=True):
             sp = dict(plan, _surface=True, marks=[k for k in plan.get('marks', []) if k['t'] not in ('num', 'letter', 'label', 'secret')])
             sim, _ = render(sp, random.Random(plan.get('seed', mid)))
             sim.resize((plan['size'][0] * SURFACE_PX, plan['size'][1] * SURFACE_PX), Image.LANCZOS).save(os.path.join(pdir, 'surface.png'), optimize=True)
-    m = {'format': 'e9-encounter-map/1', 'id': mid, 'title': plan['title'], 'size': plan['size'],
+    m = {'format': 'hexmarch-encounter-map/1', 'id': mid, 'title': plan['title'], 'size': plan['size'],
          'grid': {'ft': plan.get('ft', 5), 'show': True},
          'layers': [{'src': f'{mid}/map.jpg', 'at': [0, 0], 'px': P}],
          'ground': 'none'}
@@ -615,7 +615,7 @@ def build(root, mid, draw=True):
         if plan.get(k): m[k] = plan[k]
     if surface: m['surface'] = surface
     m.update({'walls': walls, 'doors': doors, 'lights': lights, 'environment': {},
-              'licence': plan.get('licence', 'CC BY 4.0'), 'credit': plan.get('credit', 'Drawn for Beyond the Pale with the E9 Atlas encounter tool')})
+              'licence': plan.get('licence', 'CC BY 4.0'), 'credit': plan.get('credit', 'Drawn for Beyond the Pale with the Hexmarch Atlas encounter tool')})
     txt = json.dumps(m, ensure_ascii=False, indent=1)
     txt = re.sub(r'\[\s+(-?[\d.]+),\s+(-?[\d.]+)\s+\]', r'[\1, \2]', txt)  # one [x, y] point per line, not three
     open(os.path.join(root, mid + '.json'), 'w').write(txt)

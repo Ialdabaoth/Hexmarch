@@ -49,7 +49,7 @@ place is fine.
 
 ```json
 {
-  "format": "materia-mundi-equipment",
+  "format": "hexmarch-equipment",
   "version": 1,
   "id": "mm",
   "name": "Materia Mundi Compendium (1st ed.)",
@@ -271,7 +271,7 @@ and their app uses that campaign. With no URL set, the app uses
 
 ```json
 {
-  "format": "materia-mundi-campaign",
+  "format": "hexmarch-campaign",
   "version": 1,
   "id": "hansa",
   "name": "The Hansa Campaign",
@@ -292,7 +292,7 @@ and their app uses that campaign. With no URL set, the app uses
   of them, the first winning on a name. Put the rules' own file first.
 - `art` (optional, since 0.4.0): link to the campaign's art file, relative to the
   campaign file; `art.json` beside it when left out. An art file is
-  `{"format": "materia-mundi-art", "version": 1, "pictures": {"<id>": "data:image/jpeg;base64,…"}}`,
+  `{"format": "hexmarch-art", "version": 1, "pictures": {"<id>": "data:image/jpeg;base64,…"}}`,
   keyed by the ids in sheets' `cache:<id>` portraits. Players' apps fill in any portrait
   they're missing from it. Campaign › Art saves one from the device's portraits.
 - The app downloads the campaign and everything it names, keeps a copy for offline

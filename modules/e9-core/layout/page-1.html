@@ -2,20 +2,20 @@
      no section is split across a page break unless it is longer than a page. -->
 <div class="pg">
   <div class="head">
-    <e9-portrait class="portrait"></e9-portrait>
+    <hexmarch-portrait class="portrait"></hexmarch-portrait>
     <div class="who">
-      <h1 class="name"><e9-value key="d.name"></e9-value></h1>
-      <div class="sub"><e9-value key="d.title"></e9-value> · Hit die <e9-value key="d.hitDie"></e9-value> · XP <e9-value key="d.xp"></e9-value></div>
+      <h1 class="name"><hexmarch-value key="d.name"></hexmarch-value></h1>
+      <div class="sub"><hexmarch-value key="d.title"></hexmarch-value> · Hit die <hexmarch-value key="d.hitDie"></hexmarch-value> · XP <hexmarch-value key="d.xp"></hexmarch-value></div>
     </div>
-    <div class="brand"><e9-value key="d.brand"></e9-value></div>
+    <div class="brand"><hexmarch-value key="d.brand"></hexmarch-value></div>
   </div>
 
   <div class="vitals">
-    <div><span>Hit points</span><b><i class="blank"></i> / <e9-value key="d.hpMax"></e9-value></b></div>
-    <div><span>Armor</span><b><e9-value key="d.defense"></e9-value></b><small><e9-value key="d.wornName"></e9-value></small></div>
-    <div><span>Melee</span><b><e9-value key="d.attacks.melee"></e9-value>+</b></div>
-    <div><span>Ranged</span><b><e9-value key="d.attacks.ranged"></e9-value>+</b></div>
-    <div><span>Carry</span><b><e9-value key="d.carry.load"></e9-value> / <e9-value key="d.carry.capacity"></e9-value></b><small>enc. over <e9-value key="d.carry.threshold"></e9-value></small></div>
+    <div><span>Hit points</span><b><i class="blank"></i> / <hexmarch-value key="d.hpMax"></hexmarch-value></b></div>
+    <div><span>Armor</span><b><hexmarch-value key="d.defense"></hexmarch-value></b><small><hexmarch-value key="d.wornName"></hexmarch-value></small></div>
+    <div><span>Melee</span><b><hexmarch-value key="d.attacks.melee"></hexmarch-value>+</b></div>
+    <div><span>Ranged</span><b><hexmarch-value key="d.attacks.ranged"></hexmarch-value>+</b></div>
+    <div><span>Carry</span><b><hexmarch-value key="d.carry.load"></hexmarch-value> / <hexmarch-value key="d.carry.capacity"></hexmarch-value></b><small>enc. over <hexmarch-value key="d.carry.threshold"></hexmarch-value></small></div>
   </div>
 
   <div class="grid-2">
@@ -23,9 +23,9 @@
       <h2 class="h2">Abilities and saves</h2>
       <table class="tbl">
         <tbody>
-          <e9-each list="d.abilities" as="a">
-            <tr><th><e9-value key="a.name"></e9-value></th><td class="num"><e9-value key="a.score"></e9-value></td><td>Save vs. <e9-value key="a.save"></e9-value></td><td class="num"><e9-value key="a.threshold"></e9-value>+</td></tr>
-          </e9-each>
+          <hexmarch-each list="d.abilities" as="a">
+            <tr><th><hexmarch-value key="a.name"></hexmarch-value></th><td class="num"><hexmarch-value key="a.score"></hexmarch-value></td><td>Save vs. <hexmarch-value key="a.save"></hexmarch-value></td><td class="num"><hexmarch-value key="a.threshold"></hexmarch-value>+</td></tr>
+          </hexmarch-each>
         </tbody>
       </table>
     </section>
@@ -34,9 +34,9 @@
       <h2 class="h2">Talents <small>(d6, * expertise)</small></h2>
       <table class="tbl">
         <tbody>
-          <e9-each list="d.talents" as="t">
-            <tr><th><e9-value key="t.label"></e9-value></th><td class="num"><e9-value key="t.threshold"></e9-value>+</td><td class="use"><e9-value key="t.use"></e9-value></td></tr>
-          </e9-each>
+          <hexmarch-each list="d.talents" as="t">
+            <tr><th><hexmarch-value key="t.label"></hexmarch-value></th><td class="num"><hexmarch-value key="t.threshold"></hexmarch-value>+</td><td class="use"><hexmarch-value key="t.use"></hexmarch-value></td></tr>
+          </hexmarch-each>
         </tbody>
       </table>
     </section>
@@ -45,88 +45,88 @@
       <h2 class="h2">Weapons</h2>
       <table class="tbl">
         <tbody>
-          <e9-each list="d.weapons" as="w" min="3">
-            <tr e9-class="empty:w.blank"><th><e9-value key="w.label" empty="&nbsp;"></e9-value></th><td><e9-value key="w.damage"></e9-value></td><td><e9-value key="w.info"></e9-value></td><td class="num"><e9-value key="w.hit"></e9-value></td></tr>
-          </e9-each>
+          <hexmarch-each list="d.weapons" as="w" min="3">
+            <tr hexmarch-class="empty:w.blank"><th><hexmarch-value key="w.label" empty="&nbsp;"></hexmarch-value></th><td><hexmarch-value key="w.damage"></hexmarch-value></td><td><hexmarch-value key="w.info"></hexmarch-value></td><td class="num"><hexmarch-value key="w.hit"></hexmarch-value></td></tr>
+          </hexmarch-each>
         </tbody>
       </table>
     </section>
 
     <section class="sec">
-      <h2 class="h2"><e9-value key="d.cls.name"></e9-value> <small><e9-value key="d.cls.book"></e9-value> p. <e9-value key="d.cls.page"></e9-value></small></h2>
+      <h2 class="h2"><hexmarch-value key="d.cls.name"></hexmarch-value> <small><hexmarch-value key="d.cls.book"></hexmarch-value> p. <hexmarch-value key="d.cls.page"></hexmarch-value></small></h2>
       <ul class="list features">
-        <e9-each list="d.features" as="f"><li><b><e9-value key="f.name"></e9-value>.</b> <e9-value key="f.summary"></e9-value></li></e9-each>
+        <hexmarch-each list="d.features" as="f"><li><b><hexmarch-value key="f.name"></hexmarch-value>.</b> <hexmarch-value key="f.summary"></hexmarch-value></li></hexmarch-each>
       </ul>
-      <e9-if key="d.cls.martial"><p class="small"><e9-value key="d.cls.martial"></e9-value>.</p></e9-if>
+      <hexmarch-if key="d.cls.martial"><p class="small"><hexmarch-value key="d.cls.martial"></hexmarch-value>.</p></hexmarch-if>
     </section>
 
-    <e9-if key="d.magicItems">
+    <hexmarch-if key="d.magicItems">
       <section class="sec wide">
         <h2 class="h2">Magic items</h2>
         <ul class="list features">
-          <e9-each list="d.magicItems" as="m"><li><b><e9-value key="m.source"></e9-value>:</b> <e9-value key="m.text"></e9-value></li></e9-each>
+          <hexmarch-each list="d.magicItems" as="m"><li><b><hexmarch-value key="m.source"></hexmarch-value>:</b> <hexmarch-value key="m.text"></hexmarch-value></li></hexmarch-each>
         </ul>
       </section>
-    </e9-if>
+    </hexmarch-if>
 
     <section class="sec wide">
       <h2 class="h2">Inventory</h2>
       <ul class="list items">
-        <e9-each list="d.items" as="i" min="6"><li e9-class="empty:i.blank"><e9-value key="i.label" empty="&nbsp;"></e9-value></li></e9-each>
+        <hexmarch-each list="d.items" as="i" min="6"><li hexmarch-class="empty:i.blank"><hexmarch-value key="i.label" empty="&nbsp;"></hexmarch-value></li></hexmarch-each>
       </ul>
     </section>
 
-    <e9-if key="d.magic.prepared">
+    <hexmarch-if key="d.magic.prepared">
       <section class="sec">
-        <h2 class="h2"><e9-value key="d.magic.prepared"></e9-value></h2>
+        <h2 class="h2"><hexmarch-value key="d.magic.prepared"></hexmarch-value></h2>
         <table class="tbl">
           <tbody>
-            <e9-each list="d.prepared" as="p" min="3">
-              <tr e9-class="empty:p.blank"><td class="box"><e9-value key="p.box" empty="☐"></e9-value></td><td><e9-value key="p.circle"></e9-value></td><th><e9-value key="p.magic" empty="&nbsp;"></e9-value></th></tr>
-            </e9-each>
+            <hexmarch-each list="d.prepared" as="p" min="3">
+              <tr hexmarch-class="empty:p.blank"><td class="box"><hexmarch-value key="p.box" empty="☐"></hexmarch-value></td><td><hexmarch-value key="p.circle"></hexmarch-value></td><th><hexmarch-value key="p.magic" empty="&nbsp;"></hexmarch-value></th></tr>
+            </hexmarch-each>
           </tbody>
         </table>
       </section>
       <section class="sec">
-        <h2 class="h2"><e9-value key="d.magic.book"></e9-value></h2>
+        <h2 class="h2"><hexmarch-value key="d.magic.book"></hexmarch-value></h2>
         <table class="tbl">
           <tbody>
-            <e9-each list="d.book" as="b"><tr><td><e9-value key="b.circle"></e9-value></td><th><e9-value key="b.magic"></e9-value></th></tr></e9-each>
-            <e9-if key="d.book" not><tr class="empty"><td></td><th>&nbsp;</th></tr></e9-if>
+            <hexmarch-each list="d.book" as="b"><tr><td><hexmarch-value key="b.circle"></hexmarch-value></td><th><hexmarch-value key="b.magic"></hexmarch-value></th></tr></hexmarch-each>
+            <hexmarch-if key="d.book" not><tr class="empty"><td></td><th>&nbsp;</th></tr></hexmarch-if>
           </tbody>
         </table>
       </section>
-    </e9-if>
+    </hexmarch-if>
 
-    <e9-if key="d.followers">
+    <hexmarch-if key="d.followers">
       <section class="sec wide">
         <h2 class="h2">Retinue</h2>
         <table class="tbl">
           <thead><tr><th>Name</th><th>Kind</th><th>HP</th><th>Attitude</th><th>Traits and notes</th></tr></thead>
           <tbody>
-            <e9-each list="d.followers" as="f">
-              <tr><th><e9-value key="f.name"></e9-value></th><td><e9-value key="f.kind"></e9-value></td><td class="num"><e9-value key="f.hpMax"></e9-value></td><td><e9-value key="f.attitude"></e9-value></td><td class="use"><e9-value key="f.notes"></e9-value></td></tr>
-            </e9-each>
+            <hexmarch-each list="d.followers" as="f">
+              <tr><th><hexmarch-value key="f.name"></hexmarch-value></th><td><hexmarch-value key="f.kind"></hexmarch-value></td><td class="num"><hexmarch-value key="f.hpMax"></hexmarch-value></td><td><hexmarch-value key="f.attitude"></hexmarch-value></td><td class="use"><hexmarch-value key="f.notes"></hexmarch-value></td></tr>
+            </hexmarch-each>
           </tbody>
         </table>
       </section>
-    </e9-if>
+    </hexmarch-if>
 
     <section class="sec wide">
       <h2 class="h2">Level history</h2>
       <table class="tbl">
         <tbody>
-          <e9-each list="d.levels" as="l">
-            <tr><th>Level <e9-value key="l.level"></e9-value></th><td>+<e9-value key="l.hp"></e9-value> HP</td><td><e9-value key="l.trained"></e9-value></td><td class="use"><e9-value key="l.feat"></e9-value></td></tr>
-          </e9-each>
+          <hexmarch-each list="d.levels" as="l">
+            <tr><th>Level <hexmarch-value key="l.level"></hexmarch-value></th><td>+<hexmarch-value key="l.hp"></hexmarch-value> HP</td><td><hexmarch-value key="l.trained"></hexmarch-value></td><td class="use"><hexmarch-value key="l.feat"></hexmarch-value></td></tr>
+          </hexmarch-each>
         </tbody>
       </table>
     </section>
 
     <section class="sec wide notes">
       <h2 class="h2">Notes</h2>
-      <p class="notes-text"><e9-value key="flavor.notes"></e9-value></p>
+      <p class="notes-text"><hexmarch-value key="flavor.notes"></hexmarch-value></p>
     </section>
   </div>
-  <div class="foot"><e9-value key="d.appName"></e9-value> · <e9-value key="d.rulesName"></e9-value> rules</div>
+  <div class="foot"><hexmarch-value key="d.appName"></hexmarch-value> · <hexmarch-value key="d.rulesName"></hexmarch-value> rules</div>
 </div>

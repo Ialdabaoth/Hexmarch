@@ -1,5 +1,5 @@
 // The parts of a module manifest the engine reads (WORKFLOWS.md "Dependencies", SCRIBE.md sections 2 and 3).
-// Works for adventure modules (mm-module/1), rules modules (e9-rules/1) and campaigns alike; every other
+// Works for adventure modules (hexmarch-module/1), rules modules (hexmarch-rules/1) and campaigns alike; every other
 // field is kept as it came.
 
 import { isVersion, validRange } from './semver';

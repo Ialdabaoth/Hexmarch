@@ -1,5 +1,5 @@
-// Open module protocol mm-module/1 (modules/MODULE_FORMAT.md). A repository publishes
-// mm.json for discovery. Each entry's path says where the module's built site sits,
+// Open module protocol hexmarch-module/1 (modules/MODULE_FORMAT.md). A repository publishes
+// hexmarch.json for discovery. Each entry's path says where the module's built site sits,
 // relative to the repository's base: its manifest is at <base><path>module.json and its
 // viewer at <base><path>.
 
@@ -9,7 +9,7 @@ export interface RepoEntry {
 }
 
 export interface RepoFile {
-  format: 'mm-repo/1';
+  format: 'hexmarch-repo/1';
   name: string;
   publisher?: string;
   systems?: string[];
@@ -27,7 +27,7 @@ export interface ModuleBook {
 
 // Only the fields the app shows or needs. The rest of the manifest is kept as it came.
 export interface ModuleManifest {
-  format: 'mm-module/1';
+  format: 'hexmarch-module/1';
   id: string;
   title: string;
   version: string;
@@ -48,7 +48,7 @@ export interface SavedModule {
 }
 
 // A link typed by a referee: an https site (or localhost for trying a build), with or
-// without the trailing slash, mm.json's own path or a query string.
+// without the trailing slash, hexmarch.json's own path or a query string.
 export function normaliseBase(input: string): string {
   let url: URL;
   try {
@@ -62,13 +62,13 @@ export function normaliseBase(input: string): string {
   }
   url.search = '';
   url.hash = '';
-  let path = url.pathname.replace(/mm\.json$/, '');
+  let path = url.pathname.replace(/hexmarch\.json$/, '');
   if (!path.endsWith('/')) path += '/';
   url.pathname = path;
   return url.toString();
 }
 
-// A module path from mm.json, as a relative folder ending in "/". Paths that leave the
+// A module path from hexmarch.json, as a relative folder ending in "/". Paths that leave the
 // repository (absolute, or with "..") are refused.
 export function normalisePath(path: string): string {
   const p = path.trim().replace(/^\.\//, '');
@@ -88,9 +88,9 @@ export function viewerUrl(base: string, path: string): string {
 
 export function parseRepo(data: unknown): RepoFile {
   const r = data as Partial<RepoFile> | null;
-  if (typeof data !== 'object' || data === null) throw new Error('mm.json is not an object.');
-  if (r!.format !== 'mm-repo/1') throw new Error('This site is not an MM repository (mm-repo/1).');
-  if (!Array.isArray(r!.modules) || r!.modules.length === 0) throw new Error('mm.json lists no modules.');
+  if (typeof data !== 'object' || data === null) throw new Error('hexmarch.json is not an object.');
+  if (r!.format !== 'hexmarch-repo/1') throw new Error('This site is not an MM repository (hexmarch-repo/1).');
+  if (!Array.isArray(r!.modules) || r!.modules.length === 0) throw new Error('hexmarch.json lists no modules.');
   for (const m of r!.modules) {
     if (typeof m?.id !== 'string' || !/^[a-z0-9-]+$/.test(m.id)) throw new Error(`Module id "${m?.id}" is not valid.`);
   }
@@ -100,8 +100,8 @@ export function parseRepo(data: unknown): RepoFile {
 export function parseModule(data: unknown, id: string): ModuleManifest {
   const m = data as Partial<ModuleManifest> | null;
   if (typeof data !== 'object' || data === null) throw new Error('module.json is not an object.');
-  if (m!.format !== 'mm-module/1') throw new Error(`${id} is not an mm-module/1 manifest.`);
-  if (m!.id !== id) throw new Error(`module.json says "${m!.id}", but mm.json lists "${id}".`);
+  if (m!.format !== 'hexmarch-module/1') throw new Error(`${id} is not an hexmarch-module/1 manifest.`);
+  if (m!.id !== id) throw new Error(`module.json says "${m!.id}", but hexmarch.json lists "${id}".`);
   if (typeof m!.title !== 'string' || typeof m!.version !== 'string' || typeof m!.license !== 'string') {
     throw new Error(`${id} needs a title, version and licence.`);
   }
@@ -115,7 +115,7 @@ export async function loadRepo(
   now: () => number = Date.now
 ): Promise<{ base: string; repo: RepoFile; modules: SavedModule[] }> {
   const base = normaliseBase(input);
-  const repo = parseRepo(await getJson(fetcher, `${base}mm.json`));
+  const repo = parseRepo(await getJson(fetcher, `${base}hexmarch.json`));
   const modules: SavedModule[] = [];
   for (const entry of repo.modules) {
     const path = normalisePath(entry.path);

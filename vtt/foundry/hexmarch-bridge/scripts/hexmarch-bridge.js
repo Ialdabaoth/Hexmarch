@@ -1,25 +1,25 @@
-// E9 Bridge for Foundry VTT (v12, v13): the Foundry side of the e9-vtt/1 adapter protocol (ENCOUNTER_FORMAT.md section 14.2).
-// The referee (a GM) opens the E9 Atlas from Foundry; the Atlas then sends commands here with window.postMessage.
+// Hexmarch Bridge for Foundry VTT (v12, v13): the Foundry side of the hexmarch-vtt/1 adapter protocol (ENCOUNTER_FORMAT.md section 14.2).
+// The referee (a GM) opens the Hexmarch Atlas from Foundry; the Atlas then sends commands here with window.postMessage.
 // Only messages from that window, from the Atlas's own origin, carrying this session's pairing code, are obeyed, and only for a GM.
-const MOD = 'e9-bridge', PROTOCOL = 'e9-vtt/1';
+const MOD = 'hexmarch-bridge', PROTOCOL = 'hexmarch-vtt/1';
 let atlas = null, pair = null;
 
 Hooks.once('init', () => {
   game.settings.register(MOD, 'atlasUrl', {
-    name: 'E9 Atlas address', hint: 'Where the E9 Atlas lives. Change it only for a copy of the Atlas you host yourself.',
+    name: 'Hexmarch Atlas address', hint: 'Where the Hexmarch Atlas lives. Change it only for a copy of the Atlas you host yourself.',
     scope: 'world', config: true, type: String, default: 'https://ialdabaoth.github.io/MateriaMundiRPG/atlas/'
   });
   game.settings.register(MOD, 'folder', {
-    name: 'Folder for map pictures', hint: 'Inside Foundry\'s data folder.', scope: 'world', config: true, type: String, default: 'e9-maps'
+    name: 'Folder for map pictures', hint: 'Inside Foundry\'s data folder.', scope: 'world', config: true, type: String, default: 'hexmarch-maps'
   });
 });
 
 // a button in the scene controls (left toolbar, token tools) opens the Atlas
 Hooks.on('getSceneControlButtons', controls => {
   if (!game.user.isGM) return;
-  const tool = { name: 'e9-atlas', title: 'Open the E9 Atlas', icon: 'fas fa-map', button: true, onClick: openAtlas, onChange: openAtlas };
+  const tool = { name: 'hexmarch-atlas', title: 'Open the Hexmarch Atlas', icon: 'fas fa-map', button: true, onClick: openAtlas, onChange: openAtlas };
   if (Array.isArray(controls)) controls.find(c => c.name === 'token')?.tools.push(tool);   // v12
-  else if (controls.tokens) controls.tokens.tools['e9-atlas'] = { ...tool, order: 99 };   // v13
+  else if (controls.tokens) controls.tokens.tools['hexmarch-atlas'] = { ...tool, order: 99 };   // v13
 });
 
 function atlasUrl() { return new URL(game.settings.get(MOD, 'atlasUrl')); }
@@ -27,8 +27,8 @@ function openAtlas() {
   const abc = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789', r = crypto.getRandomValues(new Uint8Array(4));
   pair = Array.from(r, v => abc[v % abc.length]).join('');
   const u = atlasUrl(); u.searchParams.set('vtt', 'foundry'); u.searchParams.set('pair', pair);
-  atlas = window.open(u.href, 'e9-atlas');
-  ui.notifications.info(`E9 Atlas opened. Pairing code ${pair}: check that the Atlas shows the same code.`, { permanent: true });
+  atlas = window.open(u.href, 'hexmarch-atlas');
+  ui.notifications.info(`Hexmarch Atlas opened. Pairing code ${pair}: check that the Atlas shows the same code.`, { permanent: true });
 }
 globalThis.E9Bridge = { open: openAtlas };
 
@@ -40,7 +40,7 @@ window.addEventListener('message', async ev => {
   const fn = COMMANDS[d.cmd];
   if (!fn) return reply({ ok: false, error: `Unknown command ${d.cmd}` });
   try { reply({ ok: true, result: await fn(d.args || {}) }); }
-  catch (err) { console.error('E9 Bridge', d.cmd, err); reply({ ok: false, error: err.message }); }
+  catch (err) { console.error('Hexmarch Bridge', d.cmd, err); reply({ ok: false, error: err.message }); }
 });
 
 const FP = () => foundry.applications?.apps?.FilePicker?.implementation ?? FilePicker;

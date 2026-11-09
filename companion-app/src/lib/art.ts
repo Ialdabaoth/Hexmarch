@@ -3,7 +3,7 @@
 // campaign file (or wherever the campaign file's "art" link says); every player's app
 // fills in portraits it's missing from there. The same file saves and loads by hand.
 
-export const ART_FORMAT = 'materia-mundi-art';
+export const ART_FORMAT = 'hexmarch-art';
 
 export interface ArtFile {
   format: typeof ART_FORMAT;

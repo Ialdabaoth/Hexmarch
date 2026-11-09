@@ -82,11 +82,11 @@ const cap = t => t ? t[0].toUpperCase() + t.slice(1) : '';
 // Language box: names in the module's languages (module.json "languages", drawn language first), translated from "names"
 const LANGS = D.languages || [];
 $('lang').replaceChildren(...LANGS.map(l => new Option(l.label, l.code))); $('lang').hidden = LANGS.length < 2;
-let LANG = ''; try { LANG = localStorage.getItem('mm-lang') || ''; } catch (e) {}
+let LANG = ''; try { LANG = localStorage.getItem('hexmarch-lang') || ''; } catch (e) {}
 if (!LANGS.some(l => l.code === LANG)) LANG = LANGS.length ? LANGS[0].code : '';
 $('lang').value = LANG;
 function L(s) { const n = D.names && D.names[s]; return (n && n[LANG]) || s; }
-$('lang').addEventListener('change', () => { LANG = $('lang').value; try { localStorage.setItem('mm-lang', LANG); } catch (e) {} draw(); });
+$('lang').addEventListener('change', () => { LANG = $('lang').value; try { localStorage.setItem('hexmarch-lang', LANG); } catch (e) {} draw(); });
 
 const SITE = Object.fromEntries(D.sites.map(s => [s.slug, s]));
 const CR = Object.fromEntries((D.creatures || []).map(c => [c.id, c]));

@@ -48,7 +48,7 @@ def main():
     else:
         doors = [{'at': [P(b) for b in pt['bounds']], 'closed': bool(pt.get('closed', True)), 'secret': False} for pt in u.get('portals', []) if len(pt.get('bounds', [])) == 2]
     env = u.get('environment') or {}
-    m = {'format': 'e9-encounter-map/1', 'id': mid, 'title': a.title or e9.get('title') or mid.replace('-', ' ').capitalize(),
+    m = {'format': 'hexmarch-encounter-map/1', 'id': mid, 'title': a.title or e9.get('title') or mid.replace('-', ' ').capitalize(),
          'size': [res['map_size']['x'], res['map_size']['y']],
          'grid': dict(e9.get('grid') or {'ft': 5, 'show': True}, **({'ft': a.ft} if a.ft else {})),
          'layers': [{'src': src, 'at': [0, 0], 'px': res['pixels_per_grid']}], 'ground': 'none'}

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""E9 Atlas tile cache (ATLAS_FORMAT.md "Tile cache", Atlas 0.4.9): cut a built atlas into small pieces the browser loads near the view.
+"""Hexmarch Atlas tile cache (ATLAS_FORMAT.md "Tile cache", Atlas 0.4.9): cut a built atlas into small pieces the browser loads near the view.
 
     python3 -I modules/tools/atlas_cache.py <out>/atlas
 
@@ -126,7 +126,7 @@ def main(adir):
     save(ov, os.path.join(cdir, 'overview.png'))
     if w * h > OVERVIEW_MAX: print(f'atlas cache: warning: the overview is {w} x {h} = {w * h} Leagues, more than {OVERVIEW_MAX}')
 
-    J['cache'] = {'format': 'e9-atlas-cache/1', 'stamp': hashlib.sha256(''.join(sorted(srcs.values())).encode()).hexdigest()[:10],  # tiles are fetched with ?v=<stamp>, so a browser never mixes old and new pieces
+    J['cache'] = {'format': 'hexmarch-atlas-cache/1', 'stamp': hashlib.sha256(''.join(sorted(srcs.values())).encode()).hexdigest()[:10],  # tiles are fetched with ?v=<stamp>, so a browser never mixes old and new pieces
                   'overview': {'png': 'cache/overview.png', 'i0': i0, 'j0': j0, 'w': w, 'h': h},
                   'fields': {'dir': 'cache/f/', 'w': 65, 'h': 49, 'du': 32, 'dv': 24},
                   'furlongs': {'dir': 'cache/u/', 'w': 2 * U_TILE[0] + 1, 'h': U_TILE[1] + U_TILE[2] + 1, 'du': U_TILE[0], 'dv': U_TILE[1], 'leagues': sorted([list(k) for k in UT])},

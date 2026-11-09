@@ -2,7 +2,7 @@
 """Build a fantasy-world module's Atlas map into one self-contained file (Atlas 0.5.14, ATLAS_FORMAT.md "Fantasy worlds").
 
 usage: python3 -I modules/tools/atlas_flat.py <module folder> <out file> [--assets <data repo>/modules/assets]
-  e.g. python3 -I modules/tools/atlas_flat.py /mnt/project-files/mystara/module mystara.e9atlas.json
+  e.g. python3 -I modules/tools/atlas_flat.py /mnt/project-files/mystara/module mystara.hexmarch-atlas.json
 
 The module folder holds module.json and the painted terrain picture it names. module.json gives:
   "scales": {"unit_ft", "mile_ft", "levels": five levels coarse to fine, each {"id", "name", "hex": "64 mi" | "660 ft"},
@@ -111,7 +111,7 @@ for kind, f in (('e', 'edge.png'), ('c', 'corner.png')):
 
 tv = AT.get('travel') or {}
 bundle = {
-    'format': 'e9-atlas-file', 'version': 1,
+    'format': 'hexmarch-atlas-file', 'version': 1,
     'module': {k: MOD[k] for k in ('id', 'title', 'short', 'version', 'license', 'credits', 'languages', 'requires') if k in MOD},
     'map': {'title': MOD.get('short', MOD['title']), 'flat': True,
             'scales': {'unit_ft': UNIT, 'mile_ft': MILE, 'levels': levels, 'paint': SC['paint']},

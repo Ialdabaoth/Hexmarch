@@ -4,8 +4,8 @@ import { PublishError, checkUpload, pointer, privateParts, publicState, publishP
 const now = new Date('2026-11-09T13:00:00Z');
 const kells = {
   campaign: 'kells-1422', ruleset: 'e9mm', site: 'https://example.org/data/',
-  module: { id: 'kells-1422', title: 'Kells, 1422', kind: 'campaign' }, lock: { format: 'e9-lock/1', modules: [] },
-  state: { format: 'e9-campaign-state', campaign: 'kells-1422', clock: { start: '3507-05-01', hours: 8 }, revealed: { 'isle-of-mists': { hexes: [], places: ['baile-atha-troim'] } } }
+  module: { id: 'kells-1422', title: 'Kells, 1422', kind: 'campaign' }, lock: { format: 'hexmarch-lock/1', modules: [] },
+  state: { format: 'hexmarch-campaign-state', campaign: 'kells-1422', clock: { start: '3507-05-01', hours: 8 }, revealed: { 'isle-of-mists': { hexes: [], places: ['baile-atha-troim'] } } }
 };
 
 describe('services from a static folder', () => {

@@ -5,8 +5,8 @@
 // - an invitation being opened is kept in sessionStorage until it has opened, surviving a reload;
 // - when a new version takes over soon after the page opened, or while an invitation waits, the page reloads.
 
-const PENDING = 'e9-pending-invite';
-const TRIES = 'e9-pending-invite-tries';
+const PENDING = 'hexmarch-pending-invite';
+const TRIES = 'hexmarch-pending-invite-tries';
 const opened = Date.now();
 
 function session(): Storage | null {

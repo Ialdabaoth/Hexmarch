@@ -6,12 +6,12 @@ import { rootChoices } from './rules';
 
 const json = (p: string) => JSON.parse(readFileSync(new URL(p, import.meta.url), 'utf8'));
 const e9core = json('../../../modules/e9-core/module.json');
-const mmcore = { format: 'e9-rules/1', kind: 'rules', id: 'mm-core', title: 'Materia Mundi', version: '0.1.0', ruleset: 'mm', options: [{ id: 'e9', title: 'Materia Mundi for E9', ruleset: 'e9mm', requires: { 'e9-core': '^0.1' } }] };
+const mmcore = { format: 'hexmarch-rules/1', kind: 'rules', id: 'mm-core', title: 'Materia Mundi', version: '0.1.0', ruleset: 'mm', options: [{ id: 'e9', title: 'Materia Mundi for E9', ruleset: 'e9mm', requires: { 'e9-core': '^0.1' } }] };
 const RULES = [e9core, mmcore];
 
 // the built Beyond the Pale manifest, cut down to what Scribe reads
 const btp = siteModule('modules/isle-of-mists/', {
-  format: 'mm-module/1', id: 'isle-of-mists', title: 'Beyond the Pale: The Isle of Mists, 1422', version: 'v0.4.11+d6e2247 · 2026-11-08', semver: '0.4.11',
+  format: 'hexmarch-module/1', id: 'isle-of-mists', title: 'Beyond the Pale: The Isle of Mists, 1422', version: 'v0.4.11+d6e2247 · 2026-11-08', semver: '0.4.11',
   books: [{ id: 'B2', title: 'The Pale Keep' }, { id: 'B3', title: 'The Palace of Silver and Crimson' }, { id: 'B5', title: 'Dinn Ríg' }, { id: 'B4', title: 'Almhain' }],
   sites: [{ slug: 'baile-atha-troim', name: 'Baile Átha Troim' }],
   starts: [{ id: 'arrive-at-the-keep', title: 'Arriving in the Pale', date: '3507-05-01', hour: 8, site: 'Baile Átha Troim', scenes: ['keep-arrival', 'keep-east-gate'], revealed: { places: ['Baile Átha Troim'] }, levels: [1, 3], uses: ['B2'] }]
@@ -43,7 +43,7 @@ describe('a new campaign from Beyond the Pale', () => {
     expect(Object.keys(b.manifest.requires as object)[0]).toBe('mm-core'); // the root comes first
     expect(b.lock.modules.map((m) => `${m.id}@${m.version}`)).toEqual([`e9-core@${e9core.version}`, 'mm-core@0.1.0', 'isle-of-mists@0.4.11']);
     expect(b.state).toMatchObject({
-      format: 'e9-campaign-state', version: 1, campaign: 'kells-1422', revision: 1,
+      format: 'hexmarch-campaign-state', version: 1, campaign: 'kells-1422', revision: 1,
       rules: { ruleset: 'e9mm', module: 'mm-core', option: 'e9', version: '0.1.0' },
       clock: { start: '3507-05-01', hours: 8 }, party: null,
       revealed: { 'isle-of-mists': { hexes: [], places: ['baile-atha-troim'] } },

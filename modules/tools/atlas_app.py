@@ -4,9 +4,9 @@
 usage: python3 -I modules/tools/atlas_app.py <site dir>
   e.g. python3 -I modules/tools/atlas_app.py companion-app/dist
 
-The app reads <site>/mm.json for the module list and each module's module.json; a module whose manifest
+The app reads <site>/hexmarch.json for the module list and each module's module.json; a module whose manifest
 has "atlas_map" (build.py writes it when the module has an Atlas map) can be loaded with ?module=<id>.
-Build the modules into <site>/modules/<id>/ with build.py and copy mm.json to <site>/mm.json.
+Build the modules into <site>/modules/<id>/ with build.py and copy hexmarch.json to <site>/hexmarch.json.
 """
 import json, os, sys
 
@@ -15,7 +15,7 @@ site = os.path.abspath(sys.argv[1])
 ATLAS = open(TOOLS + '/ATLAS_VERSION').read().strip()
 LINKS = os.path.join(REPO, 'links.json')  # copied in from the data repo (scripts/data.sh); shared with the Hexmarch Companion
 PATREON = json.load(open(LINKS)).get('patreon', '') if os.path.exists(LINKS) else ''  # empty hides the link
-# Where the Atlas finds mm.json and the modules: site.json "data.url" (the apps repo), else '' = the folder above /atlas/
+# Where the Atlas finds hexmarch.json and the modules: site.json "data.url" (the apps repo), else '' = the folder above /atlas/
 SITE_JSON = os.path.join(REPO, 'site.json')
 SITE = json.load(open(SITE_JSON)) if os.path.exists(SITE_JSON) else {}
 APP = SITE.get('name') or 'Hexmarch'  # the apps' name (Heph 2026-11-09): Hexmarch Companion, Hexmarch Atlas, Hexmarch Scribe

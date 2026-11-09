@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build one module: its page, E9 Atlas map and app manifest (print pages and PDFs only with --pdf).
+"""Build one module: its page, Hexmarch Atlas map and app manifest (print pages and PDFs only with --pdf).
 
 usage: python3 -I modules/tools/build.py <module dir> <out dir> [--pdf]
   e.g. python3 -I modules/tools/build.py modules/isle-of-mists dist/modules/isle-of-mists
@@ -28,7 +28,7 @@ def slug(t):
 geo = os.path.join(ROOT, '.cache', 'geo'); os.makedirs(geo, exist_ok=True)
 try: sha = subprocess.run(['git', 'rev-parse', '--short', 'HEAD'], capture_output=True, text=True, cwd=ROOT).stdout.strip()
 except Exception: sha = ''
-ATLAS = open(TOOLS + '/ATLAS_VERSION').read().strip()  # the E9 Atlas app and tools (Heph 2026-11-05); patch per PR, separate from each module's version
+ATLAS = open(TOOLS + '/ATLAS_VERSION').read().strip()  # the Hexmarch Atlas app and tools (Heph 2026-11-05); patch per PR, separate from each module's version
 VER = f"v{MOD['version']}" + (f"+{os.environ.get('GITHUB_SHA', sha)[:7]}" if (os.environ.get('GITHUB_SHA') or sha) else '') + ' · ' + datetime.date.today().isoformat()
 ENV = dict(os.environ, HEXDEM=','.join(map(str, MOD['dem'])), HEXADMIN=os.path.normpath(os.path.join(mdir, MOD['admin'])),
            HEXTILES=os.path.join(ROOT, 'assets', 'tiles', 'icons'), HEXGEO=geo, MODVER=VER, MODATLAS=ATLAS, MODTITLE=MOD.get('short', MOD['title']),
@@ -102,7 +102,7 @@ def map_stages():  # steps 1-4: everything drawn from the terrain (most of a sit
     world = dict(MOD['world'], hex_mi=HX, px=round(96 / (HX * MI_KM), 4), master=True, title=MOD['title'], subtitle='', sites=sites)
     json.dump({'world': world}, open(work + '/world.json', 'w'), ensure_ascii=False)
     run(*PY, TOOLS + '/hexmap.py', geo, work, work + '/world.json')
-    # atlas.land = "island": the E9 Atlas covers every county on the island (Heph 2026-11-06, all of Ireland), while the print maps
+    # atlas.land = "island": the Hexmarch Atlas covers every county on the island (Heph 2026-11-06, all of Ireland), while the print maps
     # stay on the books' counties; this second, unprinted run only gives atlas_convert.py its Marches and the island's rivers
     if MOD['atlas'].get('land') == 'island':
         json.dump({'island': dict(world, counties='*', sites=[])}, open(work + '/island.json', 'w'), ensure_ascii=False)
@@ -110,7 +110,7 @@ def map_stages():  # steps 1-4: everything drawn from the terrain (most of a sit
     # 2. March pages (the print atlas: one 24-mile hex per page), 3. League pages (one 3-mile hex per page)
     run(*PY, TOOLS + '/atlas_pages.py', work + '/world.svg', work + '/world-grid.json', work + '/atlas.html')
     run(*PY, TOOLS + '/league_pages.py', os.path.join(mdir, 'module.json'), work + '/atlas-index.json', work + '/world-grid.json', work + '/league')
-    # E9 Atlas format (ATLAS_FORMAT.md): the same terrain as one map JSON + one PNG per March, for the dynamic renderer
+    # Hexmarch Atlas format (ATLAS_FORMAT.md): the same terrain as one map JSON + one PNG per March, for the dynamic renderer
     if 'centroid' in MOD['atlas']:
         run(*PY, TOOLS + '/atlas_convert.py', os.path.join(mdir, 'module.json'), work, out + '/atlas')
         run(*PY, TOOLS + '/atlas_cache.py', out + '/atlas')  # the pieces the Atlas loads around the view (rebuilt when a March PNG changes)
@@ -138,8 +138,8 @@ def map_stages():  # steps 1-4: everything drawn from the terrain (most of a sit
                     x.paste(x.crop((4, 0, 5, x.height)), (p_, 0)); x.paste(x.crop((r.width + 3, 0, r.width + 4, x.height)), (r.width + 4 + p_, 0))
                 x.save(f'{out}/atlas/tiles/mask-{kind}{k}-x.png', optimize=True)
         # the app itself lives once at <site>/atlas/ (atlas_app.py, Atlas 0.3.0); this old address forwards there, keeping the #link
-        open(out + '/atlas/index.html', 'w').write(f'<!doctype html><meta charset="utf-8"><title>{MOD["title"]} · E9 Atlas</title><meta name="robots" content="noindex">'
-            f'<script>location.replace("../../../atlas/?module={MOD["id"]}" + location.hash)</script><p>The E9 Atlas moved to <a href="../../../atlas/?module={MOD["id"]}">its own page</a>.</p>')
+        open(out + '/atlas/index.html', 'w').write(f'<!doctype html><meta charset="utf-8"><title>{MOD["title"]} · Hexmarch Atlas</title><meta name="robots" content="noindex">'
+            f'<script>location.replace("../../../atlas/?module={MOD["id"]}" + location.hash)</script><p>The Hexmarch Atlas moved to <a href="../../../atlas/?module={MOD["id"]}">its own page</a>.</p>')
     # 4. PDFs
     if PDF:
         os.makedirs(out + '/print', exist_ok=True)
@@ -242,7 +242,7 @@ _LG = MOD.get('languages')
 if _LG is not None and not (isinstance(_LG, dict) and _LG and all(isinstance(k, str) and isinstance(v, str) and k and v for k, v in _LG.items())):
     sys.exit('module.json languages: {code: label}, e.g. {"de": "Deutsch", "en": "English"}, the drawn language first')
 LANGS = [{'code': k, 'label': v} for k, v in _LG.items()] if _LG else ([{'code': 'ga', 'label': 'Gaeilge'}, {'code': 'en', 'label': 'English'}] if MOD.get('names') else [])
-M = {'format': 'mm-module/1', 'id': MOD['id'], 'title': MOD['title'], 'short': MOD.get('short', MOD['title']), 'version': VER, 'atlas': ATLAS, 'license': MOD.get('license', 'CC-BY-4.0'),
+M = {'format': 'hexmarch-module/1', 'id': MOD['id'], 'title': MOD['title'], 'short': MOD.get('short', MOD['title']), 'version': VER, 'atlas': ATLAS, 'license': MOD.get('license', 'CC-BY-4.0'),
      'scales': {'mile_ft': 5000, 'region_hex_mi': MOD['atlas']['page_hex_mi'], 'march_hex_mi': HX, 'league_hex_mi': MOD['league']['hex_mi'], 'field_hex_ft': 100, 'encounter_square_ft': 5},
      'books': MOD['books'],
      'world': {'width': round(G['W'], 1), 'height': round(G['H'], 1), 'hex_px': round(G['hex_px'], 3), 'col_px': round(G['w_px'], 3),
@@ -254,7 +254,7 @@ M = {'format': 'mm-module/1', 'id': MOD['id'], 'title': MOD['title'], 'short': M
      'sites': SITES, 'aliases': ALIASES,
      **({'encounters': 'encounters.json', 'bestiary': {r: f'bestiary/{r}.json' for r in BEST}} if ENC else {}),
      **({'encounter_maps': EMAPS} if EMAPS else {}),
-     **({'atlas_map': 'atlas/map.json'} if os.path.isdir(out + '/atlas') else {}),  # the E9 Atlas app (<site>/atlas/) lists modules that have one
+     **({'atlas_map': 'atlas/map.json'} if os.path.isdir(out + '/atlas') else {}),  # the Hexmarch Atlas app (<site>/atlas/) lists modules that have one
      'semver': MOD['version'],  # the plain version (`version` above is the display stamp); E9 Scribe resolves dependencies with it (Atlas 0.5.13)
      # dependencies and campaign starts, as the module source has them (WORKFLOWS.md "Dependencies", SCRIBE.md "Starts")
      **{k: MOD[k] for k in ('kind', 'system', 'requires', 'recommends', 'conflicts', 'overrides', 'starts') if k in MOD},

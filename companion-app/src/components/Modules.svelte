@@ -32,7 +32,7 @@
 
 <section class="card" style="margin-top:0.75rem">
   <h3>Modules</h3>
-  <p class="small muted">Paste a module repository's web address (its site, where mm.json sits). Modules open in the browser and stay usable offline once added.</p>
+  <p class="small muted">Paste a module repository's web address (its site, where hexmarch.json sits). Modules open in the browser and stay usable offline once added.</p>
   <div class="row">
     <input class="grow" type="url" bind:value={address} placeholder="https://owner.github.io/repo/" aria-label="Module repository address" autocomplete="off" />
     <button class="primary" onclick={add} disabled={busy || !address.trim()}>{busy ? 'Reading…' : 'Add'}</button>

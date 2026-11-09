@@ -9,8 +9,8 @@ describe('art files', () => {
   });
 
   it('refuses other files and skips entries that are not pictures', () => {
-    expect(() => readArt({ format: 'materia-mundi-characters' })).toThrow(/art file/);
-    expect(readArt({ format: 'materia-mundi-art', version: 1, pictures: { ok: PIC, bad: 'https://x/y.png', 'no/slash': PIC, js: 'data:text/html;base64,AA' } })).toEqual({ ok: PIC });
+    expect(() => readArt({ format: 'hexmarch-characters' })).toThrow(/art file/);
+    expect(readArt({ format: 'hexmarch-art', version: 1, pictures: { ok: PIC, bad: 'https://x/y.png', 'no/slash': PIC, js: 'data:text/html;base64,AA' } })).toEqual({ ok: PIC });
   });
 
   it('finds art.json beside the campaign file unless told otherwise', () => {

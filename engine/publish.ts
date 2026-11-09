@@ -1,12 +1,12 @@
 // Publishing a campaign for its players (data repo modules/SCRIBE.md section 5; WORKFLOWS.md "Invitations").
 // Two plain JSON files, written by Scribe's Publish step and again by every "Update campaign" in the Companion:
-//   campaign.json  the campaign pointer (e9-campaign-pointer/1): where the campaign lives now; invite links name it
-//   snapshot.json  the player snapshot (e9-snapshot/1), at the pointer's read URL: everything a player's app reads
+//   campaign.json  the campaign pointer (hexmarch-campaign-pointer/1): where the campaign lives now; invite links name it
+//   snapshot.json  the player snapshot (hexmarch-snapshot/1), at the pointer's read URL: everything a player's app reads
 
 import { canonical } from './hash';
 
-export const POINTER_FORMAT = 'e9-campaign-pointer';
-export const SNAPSHOT_FORMAT = 'e9-snapshot';
+export const POINTER_FORMAT = 'hexmarch-campaign-pointer';
+export const SNAPSHOT_FORMAT = 'hexmarch-snapshot';
 
 export interface Services {
   // A folder on a static host the referee uploads to (the Manual adapter, PROPOSALS.md P1), ending in "/".

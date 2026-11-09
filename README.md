@@ -2,7 +2,7 @@
 
 The Hexmarch apps, for OSR hexcrawl games under any core rules: the **Hexmarch Companion** (`companion-app/`), the **Hexmarch Atlas** and the module build tools (`modules/tools/`), and **Hexmarch Scribe** (`scribe/`, the module and campaign editor, published at `/scribe/`). `engine/` is the editing engine they share. `modules/e9-core/` is the E9 rules module, kept here as the example root module. `vtt/` holds the Foundry bridge and the Materia Mundi Roll20 sheet.
 
-All setting data (Materia Mundi rules in mm-core, the adventure modules, the format specs, `mm.json`, `links.json`) lives in the data repo named in [`site.json`](site.json), [Ialdabaoth/MateriaMundiRPG](https://github.com/Ialdabaoth/MateriaMundiRPG). The apps load modules from its site by link.
+All setting data (Materia Mundi rules in mm-core, the adventure modules, the format specs, `hexmarch.json`, `links.json`) lives in the data repo named in [`site.json`](site.json), [Ialdabaoth/MateriaMundiRPG](https://github.com/Ialdabaoth/MateriaMundiRPG). The apps load modules from its site by link.
 
 ## Build
 

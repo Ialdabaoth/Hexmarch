@@ -35,7 +35,7 @@ export interface Monster {
 }
 
 export interface BestiaryFile {
-  format: 'materia-mundi-bestiary';
+  format: 'hexmarch-bestiary';
   version: number;
   id: string;
   name: string;

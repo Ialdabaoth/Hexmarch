@@ -26,7 +26,7 @@ export type LNode =
   | ({ t: 'ref'; ref: string; children: LNode[] } & Common);
 
 export const PLAIN = new Set(['div', 'span', 'p', 'h1', 'h2', 'h3', 'h4', 'strong', 'em', 'small', 'b', 'i', 'br', 'hr', 'ul', 'ol', 'li', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'header', 'footer', 'section']);
-const VOID = new Set(['br', 'hr', 'e9-portrait']);
+const VOID = new Set(['br', 'hr', 'hexmarch-portrait']);
 export const CHECKS = ['talent', 'save', 'attack', 'damage', 'dice'] as const;
 export type Check = (typeof CHECKS)[number];
 // Taps that open one of the Companion's own editors instead of rolling. On paper they are plain text.
@@ -82,13 +82,13 @@ function* tokens(src: string): Generator<Tag | { text: string }> {
 
 function common(tag: Tag, allowed: string[]): Common {
   for (const a of Object.keys(tag.attrs)) {
-    if (!['class', 'data-print', 'e9-class', ...allowed].includes(a)) throw new LayoutError(`line ${tag.line}: <${tag.name}> can't have "${a}"`);
+    if (!['class', 'data-print', 'hexmarch-class', ...allowed].includes(a)) throw new LayoutError(`line ${tag.line}: <${tag.name}> can't have "${a}"`);
   }
   const cls = (tag.attrs.class ?? '').split(/\s+/).filter(Boolean);
   for (const c of cls) if (!CLASS.test(c)) throw new LayoutError(`line ${tag.line}: "${c}" isn't a class name`);
-  const when = (tag.attrs['e9-class'] ?? '').split(/\s+/).filter(Boolean).map((w) => {
+  const when = (tag.attrs['hexmarch-class'] ?? '').split(/\s+/).filter(Boolean).map((w) => {
     const [c, key] = w.split(':');
-    if (!c || !CLASS.test(c) || !key || !KEY.test(key)) throw new LayoutError(`line ${tag.line}: e9-class "${w}" should read class:value`);
+    if (!c || !CLASS.test(c) || !key || !KEY.test(key)) throw new LayoutError(`line ${tag.line}: hexmarch-class "${w}" should read class:value`);
     return { cls: c, key };
   });
   const print = tag.attrs['data-print'];
@@ -117,24 +117,24 @@ function node(tag: Tag, children: LNode[]): LNode {
   const n = tag.name;
   if (PLAIN.has(n)) return { t: 'el', tag: n, children, ...common(tag, []) };
   switch (n) {
-    case 'e9-value': {
+    case 'hexmarch-value': {
       const format = tag.attrs.format;
       if (format !== undefined && format !== 'signed') throw new LayoutError(`line ${tag.line}: format is "signed" or left out`);
       return { t: 'value', key: key(tag, 'key'), ...(format ? { format } : {}), ...(tag.attrs.empty !== undefined ? { fallback: tag.attrs.empty } : {}), ...common(tag, ['key', 'format', 'empty']) };
     }
-    case 'e9-roll': {
+    case 'hexmarch-roll': {
       const check = tag.attrs.check as Check;
       if (!CHECKS.includes(check)) throw new LayoutError(`line ${tag.line}: check is one of ${CHECKS.join(', ')}`);
       return { t: 'roll', check, key: key(tag, 'key'), ...(tag.attrs.label !== undefined ? { label: tag.attrs.label } : {}), ...(count(tag, 'min') !== undefined ? { min: count(tag, 'min') } : {}), children, ...common(tag, ['check', 'key', 'label', 'min']) };
     }
-    case 'e9-action': {
+    case 'hexmarch-action': {
       const act = tag.attrs.do as Action;
       if (!ACTIONS.includes(act)) throw new LayoutError(`line ${tag.line}: do is one of ${ACTIONS.join(', ')}`);
       const k = key(tag, 'key', false);
       const off = key(tag, 'off', false);
       return { t: 'action', do: act, ...(k ? { key: k } : {}), ...(off ? { off } : {}), children, ...common(tag, ['do', 'key', 'off']) };
     }
-    case 'e9-each': {
+    case 'hexmarch-each': {
       const as = tag.attrs.as ?? '';
       if (!/^[a-z]\w*$/.test(as) || ['stats', 'gear', 'knowledge', 'flavor', 'd', 'frame'].includes(as)) throw new LayoutError(`line ${tag.line}: as="${as}" should be a short new name`);
       const more = tag.attrs.more;
@@ -146,11 +146,11 @@ function node(tag: Tag, children: LNode[]): LNode {
         ...common(tag, ['list', 'as', 'max', 'min', 'more'])
       };
     }
-    case 'e9-if':
+    case 'hexmarch-if':
       return { t: 'if', key: key(tag, 'key'), not: 'not' in tag.attrs, children, ...common(tag, ['key', 'not']) };
-    case 'e9-portrait':
+    case 'hexmarch-portrait':
       return { t: 'portrait', ...common(tag, []) };
-    case 'e9-page-ref': {
+    case 'hexmarch-page-ref': {
       const ref = tag.attrs.ref ?? '';
       if (!KEY.test(ref) && !/^[\w:-]+$/.test(ref)) throw new LayoutError(`line ${tag.line}: ref="${ref}" isn't a page reference`);
       return { t: 'ref', ref, children, ...common(tag, ['ref']) };
@@ -175,7 +175,7 @@ export function parseLayout(src: string): LNode[] {
       continue;
     }
     if (tk.close) {
-      // <e9-portrait></e9-portrait> and <br></br> close themselves already.
+      // <hexmarch-portrait></hexmarch-portrait> and <br></br> close themselves already.
       if (VOID.has(tk.name)) continue;
       const top = stack.pop();
       if (!top || top.tag.name !== tk.name) throw new LayoutError(`line ${tk.line}: </${tk.name}> doesn't close ${top ? `<${top.tag.name}> from line ${top.tag.line}` : 'anything'}`);
@@ -206,7 +206,7 @@ function trimEnd(list: LNode[]): LNode[] {
   return list;
 }
 
-// Every value name a layout uses, with the names an e9-each brings into scope, for the load check.
+// Every value name a layout uses, with the names an hexmarch-each brings into scope, for the load check.
 export function keysIn(nodes: LNode[], local: Set<string> = new Set()): { key: string; local: boolean }[] {
   const out: { key: string; local: boolean }[] = [];
   const add = (k: string) => out.push({ key: k, local: local.has(k.split('.')[0]) });
