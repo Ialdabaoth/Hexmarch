@@ -123,7 +123,7 @@ export async function applyUpdate(e: Envelope): Promise<UpdateResult> {
   const had = (await idbGet(`play:${e.campaign}`)) as Play | undefined;
   const newer = !had || revisionOf(b.state) >= revisionOf(had.state);
   if (newer) await idbSet(`play:${e.campaign}`, { state: b.state, knowledge: b.knowledge ?? {}, receipts: Array.isArray(b.receipts) ? b.receipts : [], at: e.sent });
-  await idbSet('applied', [...applied, e.id].slice(-200));
+  await idbSet('applied', [...applied, e.id].slice(-500));
   return { ...base, status: newer ? 'applied' : 'older' };
 }
 
