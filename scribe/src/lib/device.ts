@@ -150,7 +150,14 @@ export async function savedCampaign(id: string): Promise<SavedCampaign | null> {
   return r && r.format === SCRIBE_FORMAT ? r : null;
 }
 
-export async function publishOnDevice(id: string, services: Services, now = new Date()): Promise<{ pointer: Pointer; snapshot: Snapshot; record: SavedCampaign }> {
+// `deliver` puts the two files where players read them (an adapter's upload) before anything is recorded, so a
+// failed upload leaves the campaign as it was.
+export async function publishOnDevice(
+  id: string,
+  services: Services,
+  now = new Date(),
+  deliver?: (files: { pointer: Pointer; snapshot: Snapshot }) => Promise<unknown>
+): Promise<{ pointer: Pointer; snapshot: Snapshot; record: SavedCampaign }> {
   const rec = await savedCampaign(id);
   if (!rec) throw new Error('Save the campaign on this device first (step 7).');
   // the same parts the Companion's Update campaign publishes: state, each party member's knowledge, receipts
@@ -162,6 +169,7 @@ export async function publishOnDevice(id: string, services: Services, now = new 
     now
   );
   const ptr = pointer(id, String(rec.manifest.title ?? id), services, now);
+  if (deliver) await deliver({ pointer: ptr, snapshot: snap });
   const record: SavedCampaign = { ...rec, services, published: { revision: snap.revision, at: snap.published } };
   await idbSet(`scribe-campaign:${id}`, record);
   await idbSet(`published:${id}`, { pointer: ptr, snapshot: snap }); // what the Test button compares the folder with
@@ -173,3 +181,12 @@ export async function testUpload(id: string, services: Services): Promise<Upload
   const last = (await idbGet(`published:${id}`)) as { pointer: Pointer; snapshot: Snapshot } | undefined;
   return last ? checkUpload(services, last) : null;
 }
+
+// The adapter's secret (a GitHub token, or the Apps Script's key) stays on this device under its own key, never on
+// the campaign record, which travels to the Companion in links. The Companion's Update campaign may read it too.
+export const secretKey = (id: string) => `publish-secret:${id}`;
+export async function publishSecret(id: string): Promise<string> {
+  const v = await idbGet(secretKey(id));
+  return typeof v === 'string' ? v : '';
+}
+export const savePublishSecret = (id: string, secret: string) => idbSet(secretKey(id), secret.trim());
