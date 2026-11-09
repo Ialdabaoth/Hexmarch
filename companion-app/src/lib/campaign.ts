@@ -78,7 +78,7 @@ export async function fetchCampaign(url: string): Promise<CampaignCache> {
   const campaign = await fetchJson(url);
   const format = (campaign as { format?: unknown } | null)?.format;
   if (format === POINTER_FORMAT) return publishedCampaign(url, campaign);
-  if (typeof format === 'string' && /^hexmarch-/.test(format)) throw new NewerAppError('This campaign needs a newer Companion.');
+  if (typeof format === 'string' && /^hexmarch-campaign-pointer\b/.test(format)) throw new NewerAppError('This campaign needs a newer Companion.');
   checkCampaign(campaign);
   const at = (link: string) => new URL(link, url).href;
   let rules: RulesetOptions | undefined;

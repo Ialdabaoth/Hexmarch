@@ -488,7 +488,7 @@ function drawRoute() {
 
 // ---- the campaign state (STATE_FORMAT.md, hexmarch-campaign-state/1; Atlas 0.5.11): where the party stands, the clock, what the party has found.
 // The Atlas reads it from, in order: the app around it (the Hexmarch Companion sends {type: 'hexmarch-atlas', state}), the Companion on this device
-// (same site, its saved file for the campaign in use), or its own copy (a file loaded here, or a party placed before 0.5.11).
+// (same site, its saved file for the campaign in use), or its own copy (a file loaded here).
 // The party marker (Heph 2026-11-07, Atlas 0.4.17; ATLAS_FORMAT.md "Party marker") is always one 100-ft hex, drawn at every zoom.
 // Moving it along a route adds the travel time, which also passes on the campaign clock.
 let PARTY = null, PLACE = false, PBOX = false;  // PARTY: {hex: [C, R], hours}; PLACE: the next click puts the party there; PBOX: its box is open
@@ -532,10 +532,6 @@ async function loadState() {
   if (CS_SRC === 'host') return;
   try { const s = await deviceState(); if (s) { CS = s; CS_SRC = 'device'; } } catch (e) {}
   if (!CS) try { const s = JSON.parse(store.get(CS_KEY) || 'null'); if (s) { CS = csRead(s); CS_SRC = 'local'; } } catch (e) {}
-  if (!CS) try {  // a party placed in this browser before 0.5.11 ('hexmarch-atlas-party:<module>') starts the Atlas's own copy
-    const p = JSON.parse(store.get('hexmarch-atlas-party:' + MOD.id) || 'null');
-    if (p && typeof p.hex === 'string' && CS_ADDR.test(p.hex)) { CS = csBlank(); CS.party = { base: MOD.base, module: MOD.id, map: 'atlas', hex: p.hex, label: p.hex.slice(6), hours: +p.hours || 0 }; CS_SRC = 'local'; store.set(CS_KEY, JSON.stringify(CS)); }
-  } catch (e) {}
   fromState();
   if (CS && CS_SRC === 'device' && !CS.party && ASK_PLACE && !LOCK) { const m = ASK_PLACE.match(/^site:([a-z0-9-]{1,80})$/), p = m && D.pois.find(q => q.id === m[1]); if (p) await setParty(p.hex, 0); }
 }
