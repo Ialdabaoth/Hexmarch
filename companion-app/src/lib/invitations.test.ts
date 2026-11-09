@@ -39,8 +39,9 @@ describe('invitations on the device', () => {
     const { invitations, invitation } = addInvitation([], { url: 'c', role: 'player' }, NOW);
     const bound = bindCharacter(invitations, invitation.id, 'aoife');
     expect(bound[0].character).toBe('aoife');
-    expect(invitationLabel(bound[0], 'Kells', 'Aoife')).toBe('Kells · playing Aoife');
-    expect(invitationLabel({ ...bound[0], role: 'referee' }, 'Kells')).toBe('Kells · referee');
+    expect(invitationLabel(bound[0], 'Kells', 'Aoife')).toBe('Kells · Playing Aoife');
+    expect(invitationLabel({ ...bound[0], role: 'referee' }, 'Kells')).toBe('Kells · Referee');
+    expect(invitationLabel(invitations[0], 'Kells')).toBe('Kells · (Roll a character)');
   });
 });
 

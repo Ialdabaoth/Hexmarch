@@ -99,7 +99,7 @@
   <h3>Campaign</h3>
   <select aria-label="Campaign" value={app.invitation ? app.invitation.id : ''} disabled={busy}
     onchange={(e) => choose((e.target as HTMLSelectElement).value)}>
-    <option value="">This device · referee</option>
+    <option value="">This device · Referee</option>
     {#each invitations as s (s.id)}<option value={s.id}>{label(s)}</option>{/each}
   </select>
   {#if app.campaign}
