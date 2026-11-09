@@ -18,6 +18,7 @@ import { CORE_RULES } from '../rules/core-modules';
 import { addMail, answer, joinRequest, loadMail, mailFileName, post, readMailFile, saveMail, sendBack, type MailItem } from './mail';
 import { downloadJson } from './storage';
 import { inviteDone, keepInvite, pendingInvite, updateForInvite } from './update';
+import { readShared, withoutShared } from './share';
 import { pointer as campaignPointer, publishParts, snapshot as campaignSnapshot, type Services } from '../../../engine/publish';
 import { envelope as mailEnvelope, messageLink, readMessageHash, type Envelope } from '../../../engine/mail';
 import { readState as readStateFile } from './state';
@@ -156,8 +157,10 @@ class AppState {
     if (typeof document !== 'undefined') document.addEventListener('visibilitychange', () => { if (!document.hidden) void this.refreshState(); });
     if (await this.cacheInlinePortraits(this.sheets)) await this.persist();
     if (this.settings.dice3d) preloadDice();
+    await this.openShared();
     await this.openAsked();
     await this.openMessage();
+    this.listenForFiles();
     void this.refreshCampaign();
   }
 
@@ -603,6 +606,45 @@ class AppState {
         await this.persist();
       }
     }
+  }
+
+  // A link shared to the installed app from another app (manifest share_target, lib/share.ts): a message link is
+  // applied like one opened in the address, an invitation is handed to openAsked.
+  private async openShared() {
+    if (typeof location === 'undefined') return;
+    const s = readShared(location.search);
+    if (!s) return;
+    history.replaceState(history.state, '', location.pathname + withoutShared(location.search) + location.hash);
+    if (s.kind === 'invite') return keepInvite(s.search);
+    if (s.kind === 'other') return this.notify("That isn't a Hexmarch link. Share a message or an invitation link to the Companion.");
+    try {
+      const e = await readMessageHash(s.hash);
+      if (e) await this.applyMessage(e);
+    } catch (err) {
+      this.notify((err as Error).message);
+    }
+  }
+
+  // Message files opened with the installed app from the computer's files (manifest file_handlers, Chromium on
+  // desktop): each message is applied as if its link had been opened.
+  private listenForFiles() {
+    type LaunchParams = { files?: readonly { name: string; getFile(): Promise<File> }[] };
+    const queue = (globalThis as { launchQueue?: { setConsumer(cb: (p: LaunchParams) => void): void } }).launchQueue;
+    queue?.setConsumer(async (p) => {
+      for (const h of p.files ?? []) {
+        try {
+          let data: unknown;
+          try {
+            data = JSON.parse(await (await h.getFile()).text());
+          } catch {
+            throw new Error(`${h.name} isn't a message file`);
+          }
+          for (const e of readMailFile(data)) await this.applyMessage(e);
+        } catch (err) {
+          this.notify((err as Error).message);
+        }
+      }
+    });
   }
 
   // A link may be an invitation: the campaign to open, and the seat (Scribe's "Open in the Companion":

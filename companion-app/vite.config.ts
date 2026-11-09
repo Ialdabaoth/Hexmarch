@@ -45,6 +45,11 @@ export default defineConfig({
         display: 'standalone',
         start_url: '.',
         scope: '.',
+        // Links and files from other apps open in the installed Companion (lib/share.ts; WORKFLOWS.md "Apps talk by links")
+        share_target: { action: './', method: 'GET', params: { title: 'share-title', text: 'share-text', url: 'share-url' } },
+        file_handlers: [{ action: './', accept: { 'application/json': ['.json'] } }],
+        // an open Companion window takes the link instead of a second window opening
+        launch_handler: { client_mode: ['navigate-existing', 'auto'] },
         icons: [
           { src: 'icon-192.png', sizes: '192x192', type: 'image/png' },
           { src: 'icon-512.png', sizes: '512x512', type: 'image/png' },
