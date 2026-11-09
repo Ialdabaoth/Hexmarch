@@ -1,25 +1,25 @@
-// E9 Bridge for Foundry VTT (v12, v13): the Foundry side of the e9-vtt/1 adapter protocol (ENCOUNTER_FORMAT.md section 14.2).
-// The referee (a GM) opens the E9 Atlas from Foundry; the Atlas then sends commands here with window.postMessage.
+// Hexmarch Bridge for Foundry VTT (v12, v13): the Foundry side of the hexmarch-vtt/1 adapter protocol (ENCOUNTER_FORMAT.md section 14.2).
+// The referee (a GM) opens the Hexmarch Atlas from Foundry; the Atlas then sends commands here with window.postMessage.
 // Only messages from that window, from the Atlas's own origin, carrying this session's pairing code, are obeyed, and only for a GM.
-const MOD = 'e9-bridge', PROTOCOL = 'e9-vtt/1';
+const MOD = 'hexmarch-bridge', PROTOCOL = 'hexmarch-vtt/1';
 let atlas = null, pair = null;
 
 Hooks.once('init', () => {
   game.settings.register(MOD, 'atlasUrl', {
-    name: 'E9 Atlas address', hint: 'Where the E9 Atlas lives. Change it only for a copy of the Atlas you host yourself.',
-    scope: 'world', config: true, type: String, default: 'https://ialdabaoth.github.io/MateriaMundiRPG/atlas/'
+    name: 'Hexmarch Atlas address', hint: 'Where the Hexmarch Atlas lives. Change it only for a copy of the Atlas you host yourself.',
+    scope: 'world', config: true, type: String, default: 'https://ialdabaoth.github.io/Hexmarch/atlas/'
   });
   game.settings.register(MOD, 'folder', {
-    name: 'Folder for map pictures', hint: 'Inside Foundry\'s data folder.', scope: 'world', config: true, type: String, default: 'e9-maps'
+    name: 'Folder for map pictures', hint: 'Inside Foundry\'s data folder.', scope: 'world', config: true, type: String, default: 'hexmarch-maps'
   });
 });
 
 // a button in the scene controls (left toolbar, token tools) opens the Atlas
 Hooks.on('getSceneControlButtons', controls => {
   if (!game.user.isGM) return;
-  const tool = { name: 'e9-atlas', title: 'Open the E9 Atlas', icon: 'fas fa-map', button: true, onClick: openAtlas, onChange: openAtlas };
+  const tool = { name: 'hexmarch-atlas', title: 'Open the Hexmarch Atlas', icon: 'fas fa-map', button: true, onClick: openAtlas, onChange: openAtlas };
   if (Array.isArray(controls)) controls.find(c => c.name === 'token')?.tools.push(tool);   // v12
-  else if (controls.tokens) controls.tokens.tools['e9-atlas'] = { ...tool, order: 99 };   // v13
+  else if (controls.tokens) controls.tokens.tools['hexmarch-atlas'] = { ...tool, order: 99 };   // v13
 });
 
 function atlasUrl() { return new URL(game.settings.get(MOD, 'atlasUrl')); }
@@ -27,20 +27,20 @@ function openAtlas() {
   const abc = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789', r = crypto.getRandomValues(new Uint8Array(4));
   pair = Array.from(r, v => abc[v % abc.length]).join('');
   const u = atlasUrl(); u.searchParams.set('vtt', 'foundry'); u.searchParams.set('pair', pair);
-  atlas = window.open(u.href, 'e9-atlas');
-  ui.notifications.info(`E9 Atlas opened. Pairing code ${pair}: check that the Atlas shows the same code.`, { permanent: true });
+  atlas = window.open(u.href, 'hexmarch-atlas');
+  ui.notifications.info(`Hexmarch Atlas opened. Pairing code ${pair}: check that the Atlas shows the same code.`, { permanent: true });
 }
-globalThis.E9Bridge = { open: openAtlas };
+globalThis.HexmarchBridge = { open: openAtlas };
 
 window.addEventListener('message', async ev => {
   const d = ev.data;
   if (!atlas || ev.source !== atlas || ev.origin !== atlasUrl().origin || !d || d.protocol !== PROTOCOL || d.pair !== pair) return;
   const reply = body => atlas.postMessage({ protocol: PROTOCOL, pair, id: d.id, ...body }, ev.origin);
-  if (!game.user.isGM) return reply({ ok: false, error: 'Only a GM can run E9 commands' });
+  if (!game.user.isGM) return reply({ ok: false, error: 'Only a GM can run Hexmarch commands' });
   const fn = COMMANDS[d.cmd];
   if (!fn) return reply({ ok: false, error: `Unknown command ${d.cmd}` });
   try { reply({ ok: true, result: await fn(d.args || {}) }); }
-  catch (err) { console.error('E9 Bridge', d.cmd, err); reply({ ok: false, error: err.message }); }
+  catch (err) { console.error('Hexmarch Bridge', d.cmd, err); reply({ ok: false, error: err.message }); }
 });
 
 const FP = () => foundry.applications?.apps?.FilePicker?.implementation ?? FilePicker;
@@ -74,8 +74,8 @@ const COMMANDS = {
       for (const line of uvtt.line_of_sight || []) for (let k = 1; k < line.length; k++) walls.push({ c: [...P(line[k - 1]), ...P(line[k])] });
       for (const line of uvtt.objects_line_of_sight || []) for (let k = 1; k < line.length; k++) walls.push({ c: [...P(line[k - 1]), ...P(line[k])] });
       // doors: the e9 block keeps secret and locked; a plain Universal VTT portal is an ordinary door
-      const e9doors = uvtt.e9?.doors || [];
-      (uvtt.portals || []).forEach((pt, k) => { const d = e9doors[k] || {};
+      const hmdoors = uvtt.hexmarch?.doors || [];
+      (uvtt.portals || []).forEach((pt, k) => { const d = hmdoors[k] || {};
         walls.push({ c: [...P(pt.bounds[0]), ...P(pt.bounds[1])], door: d.secret ? 2 : 1, ds: d.locked ? 2 : pt.closed === false ? 1 : 0 }); });
       if (walls.length) await scene.createEmbeddedDocuments('Wall', walls);
       const lights = (uvtt.lights || []).map(l => { const [x, y] = P(l.position), dim = l.range * ft;
@@ -87,7 +87,7 @@ const COMMANDS = {
 
   async 'scene.activate'({ scene }) { await sceneOf(scene).activate(); return true; },
 
-  // creatures: actorless tokens named after the creature (the E9 card stays the stat block for now)
+  // creatures: actorless tokens named after the creature (the Hexmarch card stays the stat block for now)
   async 'tokens.spawn'({ scene, tokens }) {
     const s = sceneOf(scene), px = s.grid.size, out = {};
     const made = await s.createEmbeddedDocuments('Token', tokens.map(t => ({
@@ -115,7 +115,7 @@ const COMMANDS = {
     return { tokens: out };
   },
 
-  async 'tokens.move'({ scene, moves }) {  // moves: [{id, square}], id is the E9 id or a Foundry token id
+  async 'tokens.move'({ scene, moves }) {  // moves: [{id, square}], id is the Hexmarch id or a Foundry token id
     const s = sceneOf(scene), px = s.grid.size;
     await s.updateEmbeddedDocuments('Token', moves.map(m => ({ _id: find(s, m.id).id, x: m.square[0] * px, y: m.square[1] * px })));
     return true;

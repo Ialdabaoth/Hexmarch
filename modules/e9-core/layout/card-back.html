@@ -2,60 +2,60 @@
 <div class="face back">
   <!-- One column per ability, its three talents underneath. -->
   <div class="talents">
-    <e9-each list="d.talentColumns" as="col">
+    <hexmarch-each list="d.talentColumns" as="col">
       <div class="tcol">
-        <e9-each list="col.talents" as="t">
-          <e9-roll check="talent" key="t.id" class="tal"><span><e9-value key="t.label"></e9-value></span><b><e9-value key="t.threshold"></e9-value>+</b></e9-roll>
-        </e9-each>
+        <hexmarch-each list="col.talents" as="t">
+          <hexmarch-roll check="talent" key="t.id" class="tal"><span><hexmarch-value key="t.label"></hexmarch-value></span><b><hexmarch-value key="t.threshold"></hexmarch-value>+</b></hexmarch-roll>
+        </hexmarch-each>
       </div>
-    </e9-each>
+    </hexmarch-each>
   </div>
 
   <div class="cols">
     <div>
       <h2 class="h2">Class Feats</h2>
-      <ul class="list"><e9-each list="d.features" as="f"><li><e9-value key="f.name"></e9-value></li></e9-each></ul>
-      <e9-each list="d.feats" as="l"><div class="note">L<e9-value key="l.level"></e9-value>: <e9-value key="l.feat"></e9-value></div></e9-each>
+      <ul class="list"><hexmarch-each list="d.features" as="f"><li><hexmarch-value key="f.name"></hexmarch-value></li></hexmarch-each></ul>
+      <hexmarch-each list="d.feats" as="l"><div class="note">L<hexmarch-value key="l.level"></hexmarch-value>: <hexmarch-value key="l.feat"></hexmarch-value></div></hexmarch-each>
     </div>
     <div>
-      <e9-if key="d.magic.prepared">
-        <h2 class="h2"><e9-value key="d.magic.prepared"></e9-value></h2>
+      <hexmarch-if key="d.magic.prepared">
+        <h2 class="h2"><hexmarch-value key="d.magic.prepared"></hexmarch-value></h2>
         <ul class="list">
-          <e9-each list="d.prepLines" as="p">
-            <e9-if key="frame.edit">
-              <e9-if key="p.filled">
-                <li class="tagged"><span class="tag circle"><e9-value key="p.tag"></e9-value></span><e9-action do="prep" key="p.i" off="p.off" class="prep" e9-class="spent:p.spent"><e9-if key="p.spent"><span class="act">Prepare</span></e9-if><span class="what"><e9-value key="p.magic"></e9-value></span></e9-action></li>
-              </e9-if>
-              <e9-if key="p.filled" not>
-                <li class="tagged"><span class="tag circle"><e9-value key="p.tag"></e9-value></span><e9-action do="prepslot" key="p.circle" off="p.off" class="prep empty"><span class="act">Prepare</span><span class="what">________</span></e9-action></li>
-              </e9-if>
-            </e9-if>
-            <e9-if key="frame.edit" not>
-              <li e9-class="muted:p.empty"><e9-value key="p.text"></e9-value></li>
-            </e9-if>
-          </e9-each>
-          <e9-if key="d.prepMore"><li class="muted"><e9-value key="d.prepMore"></e9-value></li></e9-if>
+          <hexmarch-each list="d.prepLines" as="p">
+            <hexmarch-if key="frame.edit">
+              <hexmarch-if key="p.filled">
+                <li class="tagged"><span class="tag circle"><hexmarch-value key="p.tag"></hexmarch-value></span><hexmarch-action do="prep" key="p.i" off="p.off" class="prep" hexmarch-class="spent:p.spent"><hexmarch-if key="p.spent"><span class="act">Prepare</span></hexmarch-if><span class="what"><hexmarch-value key="p.magic"></hexmarch-value></span></hexmarch-action></li>
+              </hexmarch-if>
+              <hexmarch-if key="p.filled" not>
+                <li class="tagged"><span class="tag circle"><hexmarch-value key="p.tag"></hexmarch-value></span><hexmarch-action do="prepslot" key="p.circle" off="p.off" class="prep empty"><span class="act">Prepare</span><span class="what">________</span></hexmarch-action></li>
+              </hexmarch-if>
+            </hexmarch-if>
+            <hexmarch-if key="frame.edit" not>
+              <li hexmarch-class="muted:p.empty"><hexmarch-value key="p.text"></hexmarch-value></li>
+            </hexmarch-if>
+          </hexmarch-each>
+          <hexmarch-if key="d.prepMore"><li class="muted"><hexmarch-value key="d.prepMore"></hexmarch-value></li></hexmarch-if>
         </ul>
-      </e9-if>
-      <e9-if key="d.magic.prepared" not>
+      </hexmarch-if>
+      <hexmarch-if key="d.magic.prepared" not>
         <h2 class="h2">Gear</h2>
         <ul class="list">
-          <e9-each list="d.cardItems" as="i"><li><e9-value key="i.label"></e9-value></li></e9-each>
-          <e9-if key="d.cardItemsMore"><li class="muted"><e9-value key="d.cardItemsMore"></e9-value></li></e9-if>
+          <hexmarch-each list="d.cardItems" as="i"><li><hexmarch-value key="i.label"></hexmarch-value></li></hexmarch-each>
+          <hexmarch-if key="d.cardItemsMore"><li class="muted"><hexmarch-value key="d.cardItemsMore"></hexmarch-value></li></hexmarch-if>
         </ul>
-      </e9-if>
+      </hexmarch-if>
     </div>
     <div>
       <h2 class="h2">Equipped Items</h2>
       <ul class="list">
-        <e9-each list="d.equipped" as="s">
-          <e9-if key="frame.edit">
-            <li class="tagged"><span class="tag slot"><e9-value key="s.label"></e9-value></span><e9-action do="equip" key="s.id" class="prep"><span class="what"><e9-value key="s.name" empty="—"></e9-value></span></e9-action></li>
-          </e9-if>
-          <e9-if key="frame.edit" not>
-            <li><e9-value key="s.label"></e9-value> <e9-value key="s.name"></e9-value></li>
-          </e9-if>
-        </e9-each>
+        <hexmarch-each list="d.equipped" as="s">
+          <hexmarch-if key="frame.edit">
+            <li class="tagged"><span class="tag slot"><hexmarch-value key="s.label"></hexmarch-value></span><hexmarch-action do="equip" key="s.id" class="prep"><span class="what"><hexmarch-value key="s.name" empty="—"></hexmarch-value></span></hexmarch-action></li>
+          </hexmarch-if>
+          <hexmarch-if key="frame.edit" not>
+            <li><hexmarch-value key="s.label"></hexmarch-value> <hexmarch-value key="s.name"></hexmarch-value></li>
+          </hexmarch-if>
+        </hexmarch-each>
       </ul>
     </div>
   </div>

@@ -79,11 +79,11 @@ const cap = t => t ? t[0].toUpperCase() + t.slice(1) : '';
 // Language box: names in the module's languages (module.json "languages", drawn language first), translated from "names"
 const LANGS = D.languages || [];
 $('lang').replaceChildren(...LANGS.map(l => new Option(l.label, l.code))); $('lang').hidden = LANGS.length < 2;
-let LANG = ''; try { LANG = localStorage.getItem('mm-lang') || ''; } catch (e) {}
+let LANG = ''; try { LANG = localStorage.getItem('hexmarch-lang') || ''; } catch (e) {}
 if (!LANGS.some(l => l.code === LANG)) LANG = LANGS.length ? LANGS[0].code : '';
 $('lang').value = LANG;
 function L(s) { const n = D.names && D.names[s]; return (n && n[LANG]) || s; }
-$('lang').addEventListener('change', () => { LANG = $('lang').value; try { localStorage.setItem('mm-lang', LANG); } catch (e) {} draw(); });
+$('lang').addEventListener('change', () => { LANG = $('lang').value; try { localStorage.setItem('hexmarch-lang', LANG); } catch (e) {} draw(); });
 
 const SITE = Object.fromEntries(D.sites.map(s => [s.slug, s]));
 const CR = Object.fromEntries((D.creatures || []).map(c => [c.id, c]));
@@ -91,11 +91,11 @@ const FA = Object.fromEntries((D.factions || []).map(f => [f.id, f]));
 const SCENES = Object.entries(D.scenes || {}).map(([id, s]) => ({ id, ...s }));
 const onMap = slug => D.atlas_map ? `<a class="btn" href="${esc(ATLAS + '#site:' + slug)}" title="Open this place in the Atlas">Show on the map</a>` : '';
 const siteName = slug => SITE[slug] ? L(SITE[slug].name) : slug;
-if (window.E9Map) Object.assign(E9Map, { base: '', module: D.id, creatures: D.creatures || [], scenes: D.scenes || {},
+if (window.HexmarchMap) Object.assign(HexmarchMap, { base: '', module: D.id, creatures: D.creatures || [], scenes: D.scenes || {},
   places: D.sites.filter(s => s.encounter).map(s => ({ get name() { return L(s.name); }, pointers: s.encounter, go: () => { if (D.atlas_map) location.href = ATLAS + '#site:' + s.slug; } })) });
 function crButton(id, extra) {
   const c = CR[id], b = el('button', '', esc(c ? c.name : id) + (extra ? ` <small>${esc(extra)}</small>` : '')); b.type = 'button';
-  if (c && window.E9Card) b.onclick = () => E9Card.show(c); else b.disabled = true;
+  if (c && window.HexmarchCard) b.onclick = () => HexmarchCard.show(c); else b.disabled = true;
   const li = el('li'); li.append(b); return li;
 }
 function chips(items) { const ul = el('ul', 'e9cr'); ul.append(...items); return ul; }
@@ -106,7 +106,7 @@ function placeCard(s, kids) {
   const sc = SCENES.filter(x => x.where && x.where.site === s.slug).length, here = (D.creatures || []).filter(x => x.site === s.slug);
   c.innerHTML = `<h4>${esc(L(s.name))}${alt ? ` <small>${esc(alt)}</small>` : ''}</h4><div class="meta">${esc(cap(s.kind))}${s.county ? ' · ' + esc(s.county) : ''}</div>${s.note ? `<p>${esc(s.note)}</p>` : ''}`;
   const acts = el('div', 'acts', onMap(s.slug));
-  for (const p of s.encounter || []) { const b = el('button', '', esc(p.label || p.map)); b.type = 'button'; b.title = 'Open the encounter map'; b.onclick = () => E9Map.show(p); if (window.E9Map) acts.append(b); }
+  for (const p of s.encounter || []) { const b = el('button', '', esc(p.label || p.map)); b.type = 'button'; b.title = 'Open the encounter map'; b.onclick = () => HexmarchMap.show(p); if (window.HexmarchMap) acts.append(b); }
   if (sc) acts.append(Object.assign(el('a'), { href: '#scenes-' + s.slug, textContent: sc + (sc > 1 ? ' scenes' : ' scene') }));
   if (acts.childNodes.length) c.append(acts);
   if (here.length) { const p = el('div', 'acts', '<span class="lb">Lives here</span>'); p.append(chips(here.map(x => crButton(x.id)))); c.append(p); }
@@ -142,7 +142,7 @@ function scenes() {
       if (s.description) body.append(el('p', '', esc(s.description)));
       for (const [k, t] of [['wants', 'Wants'], ['tactics', 'Tactics'], ['treasure', 'Treasure']]) if (s[k]) body.append(el('p', '', `<span class="lb">${t}</span>${esc(s[k])}`));
       if (s.who && s.who.length) { const p = el('div', 'acts', '<span class="lb">Who</span>'); p.append(chips(s.who.map(w => crButton(w.creature, [w.count ? '×' + w.count : '', w.chance ? w.chance : ''].filter(Boolean).join(' '))))); body.append(p); }
-      if (s.map && window.E9Map) { const ptr = typeof s.map === 'string' ? { map: s.map } : s.map, b = el('button', '', 'Encounter map'); b.type = 'button'; b.onclick = () => E9Map.show(ptr); const p = el('div', 'acts'); p.append(b); body.append(p); }
+      if (s.map && window.HexmarchMap) { const ptr = typeof s.map === 'string' ? { map: s.map } : s.map, b = el('button', '', 'Encounter map'); b.type = 'button'; b.onclick = () => HexmarchMap.show(ptr); const p = el('div', 'acts'); p.append(b); body.append(p); }
       d.append(body);
       d.dataset.q = [s.title, s.description, s.players, siteName(slug), ...(s.who || []).map(w => CR[w.creature] ? CR[w.creature].name : w.creature)].join(' ').toLowerCase();
       l.append(d);
@@ -152,7 +152,7 @@ function scenes() {
   return sec;
 }
 function creatures() {
-  const cs = D.creatures || []; if (!cs.length || !window.E9Card) return null;
+  const cs = D.creatures || []; if (!cs.length || !window.HexmarchCard) return null;
   const sec = el('section'); sec.id = 'creatures';
   sec.innerHTML = `<h2>Creatures and NPCs</h2><p class="lead">${cs.length} entries. Each opens its index card.</p>`;
   const KIND = { npc: 'NPCs', monster: 'Monsters' }, by = {};

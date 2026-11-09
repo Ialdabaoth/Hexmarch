@@ -1,4 +1,4 @@
-// Reads a published module site (mm.json plus each module's built module.json, MODULE_FORMAT.md) for step 2.
+// Reads a published module site (hexmarch.json plus each module's built module.json, MODULE_FORMAT.md) for step 2.
 
 export interface SiteModule {
   id: string;
@@ -38,7 +38,7 @@ export async function loadSite(base: string, fetcher: typeof fetch = fetch): Pro
     if (!r.ok) throw new Error(`Could not read ${url} (${r.status}).`);
     return r.json();
   };
-  const repo = await get(root + 'mm.json');
+  const repo = await get(root + 'hexmarch.json');
   const out: SiteModule[] = [];
   for (const e of repo.modules ?? []) {
     const path = String(e.path ?? e.id).replace(/^\.\//, '').replace(/\/?$/, '/');

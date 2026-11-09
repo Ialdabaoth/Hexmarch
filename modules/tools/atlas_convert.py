@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Convert a module's current maps to the E9 Atlas format (modules/ATLAS_FORMAT.md): one map JSON + one PNG per March.
+"""Convert a module's current maps to the Hexmarch Atlas format (modules/ATLAS_FORMAT.md): one map JSON + one PNG per March.
 
 usage: python3 -I atlas_convert.py <module.json> <work dir> <out dir>
   <work dir> is build.py's _work folder after a run with HEXDUMP=1 (world-atlas.json, league/l-*-atlas.json).
@@ -277,10 +277,10 @@ if os.path.exists(f'{WORK}/atlas-index.json') and _G['hexes']:
         legacy[f"march-{v['page']}"] = f'march:{label(i - M0[0])}{label(j - M0[1])}'
 
 la, lo = A['centroid'][1:3]
-J = {'format': 'e9-atlas/1', 'id': MOD['id'], 'title': MOD['title'], 'names': MOD.get('names', {}),
+J = {'format': 'hexmarch-atlas/1', 'id': MOD['id'], 'title': MOD['title'], 'names': MOD.get('names', {}),
      'origin': {'projection': 'dymaxion', 'centroid': {'name': A['centroid'][0], 'lat': la, 'lon': lo}, 'x_ft': 0, 'y_ft': 0},
      'labels': {'march': list(M0), 'league': list(L0)},
      'terrain': {'types': [dict(color=c, id=t, name=n, tile=tl, **({'icon': ic} if ic else {}), travel=tv) for c, t, n, tl, ic, tv in TYPES], 'marches': MJ, 'overrides': {}},
      'travel': TRAVEL, 'rivers': rivers, 'roads': [], 'crossings': [], 'regions': regions, 'pois': pois, 'legacy': legacy}
 json.dump(J, open(f'{OUT}/map.json', 'w'), ensure_ascii=False, separators=(',', ':'))
-print(f"E9 Atlas map: {len(MJ)} Marches, {len(rivers)} rivers, {len(regions)} regions, {len(pois)} POIs, map.json {os.path.getsize(OUT + '/map.json') // 1024} KB -> {OUT}")
+print(f"Hexmarch Atlas map: {len(MJ)} Marches, {len(rivers)} rivers, {len(regions)} regions, {len(pois)} POIs, map.json {os.path.getsize(OUT + '/map.json') // 1024} KB -> {OUT}")

@@ -9,7 +9,7 @@ const mod: SavedModule = {
   path: 'modules/isle-of-mists/',
   fetchedAt: 0,
   manifest: {
-    format: 'mm-module/1', id: 'isle-of-mists', title: 'Beyond the Pale', version: '0.3.5', license: 'CC0-1.0',
+    format: 'hexmarch-module/1', id: 'isle-of-mists', title: 'Beyond the Pale', version: '0.3.5', license: 'CC0-1.0',
     sites: [{ slug: 'baile-atha-troim', name: 'Baile Átha Troim' }],
     encounters: 'encounters.json', bestiary: { mm: 'bestiary/mm.json' }
   }
@@ -26,7 +26,7 @@ const files: Record<string, unknown> = {
     }
   },
   'https://example.org/site/modules/isle-of-mists/bestiary/mm.json': {
-    format: 'e9-bestiary/1',
+    format: 'hexmarch-bestiary/1',
     creatures: {
       guard: { from: 'blank', replace: { level: 1, armor: '3', hp: '1d6+1', attacks: ['Spear (2d6 pierce)'], talents: ['alertness'] } },
       sergeant: { from: 'guard', replace: { level: 3 }, adjust: { abilities: { str: 1 } } }

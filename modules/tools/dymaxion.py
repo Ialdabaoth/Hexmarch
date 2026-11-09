@@ -1,4 +1,4 @@
-"""Dymaxion face projection for the E9 Atlas (see ATLAS_FORMAT.md, "Projection").
+"""Dymaxion face projection for the Hexmarch Atlas (see ATLAS_FORMAT.md, "Projection").
 
 One icosahedron face is centred on the region's centroid, with one vertex due north, and points on that face go
 through Robert W. Gray's exact transform (as in his dymax.c). Output is in feet on the face: x east, y south, scaled

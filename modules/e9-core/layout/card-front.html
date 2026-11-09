@@ -2,50 +2,50 @@
      and the 5 x 3 in print match. -->
 <div class="face front">
   <div class="head">
-    <e9-portrait class="portrait"></e9-portrait>
+    <hexmarch-portrait class="portrait"></hexmarch-portrait>
     <div class="who">
-      <h1 class="name"><e9-value key="d.name"></e9-value></h1>
-      <div class="sub"><e9-value key="d.title"></e9-value></div>
+      <h1 class="name"><hexmarch-value key="d.name"></hexmarch-value></h1>
+      <div class="sub"><hexmarch-value key="d.title"></hexmarch-value></div>
     </div>
-    <e9-action do="xp" class="xp"><span>XP</span><b><e9-value key="d.xp"></e9-value></b></e9-action>
+    <hexmarch-action do="xp" class="xp"><span>XP</span><b><hexmarch-value key="d.xp"></hexmarch-value></b></hexmarch-action>
   </div>
 
   <!-- Stats and weapons read as one block, spaced like the boxes within a row. -->
   <div class="kit">
     <div class="vitals">
       <div class="stats">
-        <e9-action do="hp">
-          <span>HP</span><b><e9-if key="frame.live"><e9-value key="d.hp"></e9-value> </e9-if><e9-if key="frame.live" not><i class="blank"></i></e9-if>/ <e9-value key="d.hpMax"></e9-value></b>
-        </e9-action>
-        <e9-roll check="dice" key="d.hitDie" label="Hit die" min="1"><span>Hit die</span><b><e9-value key="d.hitDie"></e9-value></b></e9-roll>
-        <e9-action do="armor"><span>Armor</span><b><e9-value key="d.defense"></e9-value></b></e9-action>
-        <e9-action do="carry" e9-class="over:d.carry.encumbered"><span>Carry</span><b><e9-value key="d.carry.load"></e9-value>/<e9-value key="d.carry.capacity"></e9-value></b></e9-action>
+        <hexmarch-action do="hp">
+          <span>HP</span><b><hexmarch-if key="frame.live"><hexmarch-value key="d.hp"></hexmarch-value> </hexmarch-if><hexmarch-if key="frame.live" not><i class="blank"></i></hexmarch-if>/ <hexmarch-value key="d.hpMax"></hexmarch-value></b>
+        </hexmarch-action>
+        <hexmarch-roll check="dice" key="d.hitDie" label="Hit die" min="1"><span>Hit die</span><b><hexmarch-value key="d.hitDie"></hexmarch-value></b></hexmarch-roll>
+        <hexmarch-action do="armor"><span>Armor</span><b><hexmarch-value key="d.defense"></hexmarch-value></b></hexmarch-action>
+        <hexmarch-action do="carry" hexmarch-class="over:d.carry.encumbered"><span>Carry</span><b><hexmarch-value key="d.carry.load"></hexmarch-value>/<hexmarch-value key="d.carry.capacity"></hexmarch-value></b></hexmarch-action>
       </div>
-      <e9-roll check="attack" key="d.attacks.melee" label="Melee attack" class="atk"><span>Melee</span><b><e9-value key="d.attacks.melee"></e9-value>+</b></e9-roll>
-      <e9-roll check="attack" key="d.attacks.ranged" label="Ranged attack" class="atk"><span>Ranged</span><b><e9-value key="d.attacks.ranged"></e9-value>+</b></e9-roll>
+      <hexmarch-roll check="attack" key="d.attacks.melee" label="Melee attack" class="atk"><span>Melee</span><b><hexmarch-value key="d.attacks.melee"></hexmarch-value>+</b></hexmarch-roll>
+      <hexmarch-roll check="attack" key="d.attacks.ranged" label="Ranged attack" class="atk"><span>Ranged</span><b><hexmarch-value key="d.attacks.ranged"></hexmarch-value>+</b></hexmarch-roll>
     </div>
 
     <!-- Two hands: tap a name to change what's held, tap the dice to roll damage.
          A weapon held in both hands greys out the off hand. -->
     <div class="hands">
       <div class="hand">
-        <e9-action do="main" class="slot"><span>Main hand</span><b><e9-value key="d.mainName"></e9-value></b></e9-action>
-        <e9-roll check="damage" key="d.mainDamage" class="chip"><e9-value key="d.damage"></e9-value></e9-roll>
+        <hexmarch-action do="main" class="slot"><span>Main hand</span><b><hexmarch-value key="d.mainName"></hexmarch-value></b></hexmarch-action>
+        <hexmarch-roll check="damage" key="d.mainDamage" class="chip"><hexmarch-value key="d.damage"></hexmarch-value></hexmarch-roll>
       </div>
-      <div class="hand" e9-class="blocked:d.mainHeavy">
-        <e9-action do="off" off="d.mainHeavy" class="slot"><span>Off hand</span><b e9-class="aside:d.bothHands"><e9-value key="d.offName"></e9-value></b></e9-action>
-        <e9-if key="d.offNote"><span class="chip note"><e9-value key="d.offNote"></e9-value></span></e9-if>
+      <div class="hand" hexmarch-class="blocked:d.mainHeavy">
+        <hexmarch-action do="off" off="d.mainHeavy" class="slot"><span>Off hand</span><b hexmarch-class="aside:d.bothHands"><hexmarch-value key="d.offName"></hexmarch-value></b></hexmarch-action>
+        <hexmarch-if key="d.offNote"><span class="chip note"><hexmarch-value key="d.offNote"></hexmarch-value></span></hexmarch-if>
       </div>
     </div>
   </div>
 
   <div class="abilities">
-    <e9-each list="d.abilities" as="a">
-      <e9-roll check="save" key="a.id" class="ab">
-        <span class="lbl"><e9-value key="a.short"></e9-value> <e9-value key="a.score"></e9-value></span>
-        <span class="save">vs. <e9-value key="a.save"></e9-value></span>
-        <b><e9-value key="a.threshold"></e9-value>+</b>
-      </e9-roll>
-    </e9-each>
+    <hexmarch-each list="d.abilities" as="a">
+      <hexmarch-roll check="save" key="a.id" class="ab">
+        <span class="lbl"><hexmarch-value key="a.short"></hexmarch-value> <hexmarch-value key="a.score"></hexmarch-value></span>
+        <span class="save">vs. <hexmarch-value key="a.save"></hexmarch-value></span>
+        <b><hexmarch-value key="a.threshold"></hexmarch-value>+</b>
+      </hexmarch-roll>
+    </hexmarch-each>
   </div>
 </div>

@@ -8,7 +8,7 @@
 
   const VERSION = __SCRIBE_VERSION__;
   const params = new URLSearchParams(location.search);
-  const DRAFT = 'e9-scribe-draft';
+  const DRAFT = 'hexmarch-scribe-draft';
 
   interface Draft {
     title: string;

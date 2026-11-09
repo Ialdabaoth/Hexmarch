@@ -1,4 +1,4 @@
-"""Real-world terrain for the E9 Atlas, pushed back to about 1420 (Heph 2026-11-05: the first step of every new campaign module).
+"""Real-world terrain for the Hexmarch Atlas, pushed back to about 1420 (Heph 2026-11-05: the first step of every new campaign module).
 
 Used by atlas_convert.py --real. For each 100-ft hex it reads real data at that spot and applies period rules:
   - land cover: ESA WorldCover 2021, 10 m (esa-worldcover.s3.eu-central-1.amazonaws.com, CC BY 4.0), cached in modules/.cache/worldcover

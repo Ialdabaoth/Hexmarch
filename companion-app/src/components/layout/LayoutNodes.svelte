@@ -29,7 +29,7 @@
     return [extra, n.cls, ...on, print].filter(Boolean).join(' ');
   }
 
-  // An e9-each's list, capped at max and padded to min with blank entries ({ blank: true }).
+  // An hexmarch-each's list, capped at max and padded to min with blank entries ({ blank: true }).
   function items(n: Extract<LNode, { t: 'each' }>): unknown[] {
     const v = lookup(scope, n.list);
     let list = Array.isArray(v) ? v : [];

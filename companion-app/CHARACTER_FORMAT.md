@@ -33,12 +33,12 @@ Every file starts with the same header (`format`, `version`, `id`, `rules`, and 
 
 - **Export JSON** on a sheet writes the whole character. Below it, **Export one part only** writes a file with the header and that one part (Stats, Gear, Knowledge, or Name, portrait and notes). A gear file carries the custom equipment it uses.
 - **Load a part** on a sheet, or Import on the Party tab, reads any of these files. The parts in the file replace the same parts of the character with that `id`; the parts it leaves out stay as they are. A file without `stats` needs the character to be on the device already.
-- **Export all** writes `{ "format": "materia-mundi-characters", "version": 4, "characters": [ ... ] }`, each one a whole character. Import accepts any of these, so sheets can also be written or edited by hand.
+- **Export all** writes `{ "format": "hexmarch-characters", "version": 4, "characters": [ ... ] }`, each one a whole character. Import accepts any of these, so sheets can also be written or edited by hand.
 - Older files, with every field at the top level (version 3 and before), still import. The device keeps its own copy in that flat layout.
 
 ```json
 {
-  "format": "materia-mundi-character",
+  "format": "hexmarch-character",
   "version": 4,
   "id": "c0ffee00-0000-4000-8000-000000000001",
   "rules": "mm",

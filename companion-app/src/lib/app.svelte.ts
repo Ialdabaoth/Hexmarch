@@ -72,7 +72,7 @@ class AppState {
   // Campaigns this device has opened, by link, and its own custom equipment file.
   campaigns = $state<Record<string, CampaignCache>>({});
   local = $state<EquipmentFileData>(blankLocal());
-  // Module repositories added on this device (maps and adventures, mm-module/1).
+  // Module repositories added on this device (maps and adventures, hexmarch-module/1).
   modules = $state<SavedModule[]>([]);
   // Saved characters the app can't read (kept, not shown).
   unreadable = $state(0);
@@ -670,7 +670,7 @@ class AppState {
   // Scribe's record, so the campaign opens here whichever browser or profile Scribe ran in.
   private async receiveCampaign(e: Envelope) {
     const rec = e.body.record as { format?: string; id?: string } | undefined;
-    if (!rec || rec.format !== 'e9-scribe-campaign' || rec.id !== e.campaign) throw new Error("That link doesn't carry a campaign from Scribe.");
+    if (!rec || rec.format !== 'hexmarch-scribe-campaign' || rec.id !== e.campaign) throw new Error("That link doesn't carry a campaign from Scribe.");
     await idbSet(`scribe-campaign:${rec.id}`, rec);
     if (e.body.state) {
       try {

@@ -1,0 +1,11 @@
+{
+  "id": "hexmarch-bridge",
+  "title": "Hexmarch Bridge",
+  "description": "Links Foundry VTT to the Hexmarch Atlas: build an encounter map as a scene with its walls, doors and lights, place its creatures, and move the party to its entrance (hexmarch-vtt/1 adapter).",
+  "version": "0.1.0",
+  "compatibility": { "minimum": "12", "verified": "13" },
+  "authors": [{ "name": "Heph (Bakagaijin Productions)" }],
+  "esmodules": ["scripts/hexmarch-bridge.js"],
+  "url": "https://github.com/Ialdabaoth/Hexmarch",
+  "license": "CC-BY-4.0"
+}

@@ -30,10 +30,10 @@ function localFile(): EquipmentFileData {
 }
 
 const campaign: CampaignData = {
-  format: 'materia-mundi-campaign', version: 1, id: 'pale', name: 'The Pale', rules: 'mm', equipment: ['mm', './pale-equipment.json']
+  format: 'hexmarch-campaign', version: 1, id: 'pale', name: 'The Pale', rules: 'mm', equipment: ['mm', './pale-equipment.json']
 };
 const paleFile: EquipmentFileData = {
-  format: 'materia-mundi-equipment', version: 1, id: 'pale', name: 'The Pale', rules: ['mm'],
+  format: 'hexmarch-equipment', version: 1, id: 'pale', name: 'The Pale', rules: ['mm'],
   items: [{ id: 'pale-pike', name: 'Pale pike', kind: 'weapon', size: 'heavy', reach: 1 }], magic: []
 };
 
@@ -109,7 +109,7 @@ describe('campaigns', () => {
     local.magic.push({ id: 'ember-blade', name: 'Ember Blade', system: 'dweomer', form: 'weapon', base: 'local:falchion' });
     const out = publishCampaign({ id: 'pale', name: 'The Pale', referee: 'Brent', rules: 'mm', base: ['mm'] }, local);
     expect(out.campaign).toEqual({
-      format: 'materia-mundi-campaign', version: 1, id: 'pale', name: 'The Pale', referee: 'Brent', rules: 'mm', equipment: ['mm', './pale-equipment.json']
+      format: 'hexmarch-campaign', version: 1, id: 'pale', name: 'The Pale', referee: 'Brent', rules: 'mm', equipment: ['mm', './pale-equipment.json']
     });
     expect(out.equipment?.fileName).toBe('pale-equipment.json');
     expect(out.equipment?.data.id).toBe('pale');
@@ -126,7 +126,7 @@ describe('campaigns', () => {
 
 describe('campaigns made in Scribe', () => {
   const saved = {
-    format: 'e9-scribe-campaign', version: 1, id: 'kells-1422', site: 'https://example.org/data/', ruleset: 'e9mm',
+    format: 'hexmarch-scribe-campaign', version: 1, id: 'kells-1422', site: 'https://example.org/data/', ruleset: 'e9mm',
     manifest: { id: 'kells-1422', title: 'Kells 1422', kind: 'campaign', requires: { 'mm-core': '^0.1.0' } }, lock: {}, saved: '2026-11-08T23:00:00.000Z'
   };
 
@@ -150,7 +150,7 @@ describe('campaigns made in Scribe', () => {
 
 describe('opening a Scribe campaign by its link', () => {
   it('reads the copy Scribe saved on this device', async () => {
-    store.set('scribe-campaign:kells-1422', { format: 'e9-scribe-campaign', version: 1, id: 'kells-1422', site: '', ruleset: 'mm', manifest: { title: 'Kells' }, lock: {}, saved: '' });
+    store.set('scribe-campaign:kells-1422', { format: 'hexmarch-scribe-campaign', version: 1, id: 'kells-1422', site: '', ruleset: 'mm', manifest: { title: 'Kells' }, lock: {}, saved: '' });
     expect((await scribeCampaign('scribe:kells-1422')).campaign.name).toBe('Kells');
     await expect(scribeCampaign('scribe:elsewhere')).rejects.toThrow(/saved by Scribe on this device/);
   });
@@ -158,8 +158,8 @@ describe('opening a Scribe campaign by its link', () => {
 
 describe('published campaigns', () => {
   const services = { folder: 'https://example.org/kells/', read: 'https://example.org/kells/snapshot.json', post: '', pointer: 'https://example.org/kells/campaign.json' };
-  const record = { format: 'e9-scribe-campaign', version: 1, id: 'kells-1422', site: 'https://example.org/data/', ruleset: 'e9mm', manifest: { title: 'Kells 1422' }, lock: {}, saved: '2026-11-09T00:00:00Z' };
-  const state = { format: 'e9-campaign-state', version: 1, campaign: 'kells-1422', revision: 7, characters: [{ id: 'holly', name: 'Holly', player: 'Ann', hp: 3 }], private: { secret: 1 } };
+  const record = { format: 'hexmarch-scribe-campaign', version: 1, id: 'kells-1422', site: 'https://example.org/data/', ruleset: 'e9mm', manifest: { title: 'Kells 1422' }, lock: {}, saved: '2026-11-09T00:00:00Z' };
+  const state = { format: 'hexmarch-campaign-state', version: 1, campaign: 'kells-1422', revision: 7, characters: [{ id: 'holly', name: 'Holly', player: 'Ann', hp: 3 }], private: { secret: 1 } };
   afterEach(() => vi.unstubAllGlobals());
 
   it('lets the referee invite once Scribe has published, naming the pointer', () => {
@@ -190,11 +190,11 @@ describe('published campaigns', () => {
   });
 
   it('asks for a newer app when a campaign file is in a format this build does not know', async () => {
-    vi.stubGlobal('fetch', async () => ({ ok: true, json: async () => ({ format: 'e9-campaign-pointer-2', version: 1 }) }));
+    vi.stubGlobal('fetch', async () => ({ ok: true, json: async () => ({ format: 'hexmarch-campaign-pointer-2', version: 1 }) }));
     await expect(fetchCampaign(services.pointer)).rejects.toThrow(NewerAppError);
     vi.stubGlobal('fetch', async () => ({ ok: true, json: async () => ({ ...pointer('kells-1422', 'Kells 1422', services), version: 2 }) }));
     await expect(fetchCampaign(services.pointer)).rejects.toThrow(NewerAppError);
-    vi.stubGlobal('fetch', async () => ({ ok: true, json: async () => ({ format: 'materia-mundi-equipment' }) }));
+    vi.stubGlobal('fetch', async () => ({ ok: true, json: async () => ({ format: 'hexmarch-equipment' }) }));
     await expect(fetchCampaign(services.pointer)).rejects.not.toThrow(NewerAppError);
   });
 

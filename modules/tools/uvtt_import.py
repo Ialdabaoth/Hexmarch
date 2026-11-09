@@ -6,7 +6,7 @@
 Writes encounter-maps/<id>/map.<png|jpg|webp> (the embedded picture, bytes unchanged) and encounter-maps/<id>.json:
 size and pixels per square from "resolution", walls from "line_of_sight" and "objects_line_of_sight", doors from
 "portals", lights and environment as they are. Points are moved by "map_origin" so the map starts at square 0, 0.
-A file that E9 exported carries an "e9" block; its title, grid, areas, links, anchor, spawns, secret and locked doors,
+A file the Hexmarch Atlas exported carries a "hexmarch" block; its title, grid, areas, links, anchor, spawns, secret and locked doors,
 licence and credit come back too. Anything else (areas, links, scenes, the site_encounters pointer) is the module
 author's to add. The licence is left empty for a file from elsewhere: set it before publishing.
 Run encounter_check.py on the module afterwards.
@@ -30,7 +30,7 @@ def main():
     ap.add_argument('file'); ap.add_argument('out', help='the module\'s encounter-maps folder')
     ap.add_argument('--id'); ap.add_argument('--title'); ap.add_argument('--ft', type=float)
     a = ap.parse_args()
-    u = json.load(open(a.file, encoding='utf-8')); e9 = u.get('e9') or {}
+    u = json.load(open(a.file, encoding='utf-8')); e9 = u.get('hexmarch') or {}
     mid = a.id or e9.get('id') or re.sub(r'[^a-z0-9]+', '-', os.path.splitext(os.path.basename(a.file))[0].lower()).strip('-')
     if not re.fullmatch(r'[a-z0-9][a-z0-9-]*', mid): sys.exit(f'map id {mid!r}: use lower-case letters, digits and hyphens')
     res = u['resolution']; ox, oy = res.get('map_origin', {}).get('x', 0), res.get('map_origin', {}).get('y', 0)
@@ -48,7 +48,7 @@ def main():
     else:
         doors = [{'at': [P(b) for b in pt['bounds']], 'closed': bool(pt.get('closed', True)), 'secret': False} for pt in u.get('portals', []) if len(pt.get('bounds', [])) == 2]
     env = u.get('environment') or {}
-    m = {'format': 'e9-encounter-map/1', 'id': mid, 'title': a.title or e9.get('title') or mid.replace('-', ' ').capitalize(),
+    m = {'format': 'hexmarch-encounter-map/1', 'id': mid, 'title': a.title or e9.get('title') or mid.replace('-', ' ').capitalize(),
          'size': [res['map_size']['x'], res['map_size']['y']],
          'grid': dict(e9.get('grid') or {'ft': 5, 'show': True}, **({'ft': a.ft} if a.ft else {})),
          'layers': [{'src': src, 'at': [0, 0], 'px': res['pixels_per_grid']}], 'ground': 'none'}

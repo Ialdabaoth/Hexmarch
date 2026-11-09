@@ -40,7 +40,7 @@ describe('character sheet', () => {
 
   it('accepts a hand-written sheet', () => {
     const [s] = importFile({
-      format: 'materia-mundi-character',
+      format: 'hexmarch-character',
       name: 'Brother Aldric',
       origin: 'dwarf',
       class: { name: 'priest', levelups: [{ level: 1 }, { level: 2, hp: '+4', feat: 'Domain: Hearth' }] },
@@ -98,7 +98,7 @@ describe('character sheet', () => {
   });
 
   it('explains bad files', () => {
-    const base = { format: 'materia-mundi-character', name: 'X', origin: 'human', class: { name: 'warrior', levelups: [{ level: 1, hp: 8 }] }, abilities: { con: 0, str: 0, dex: 0, int: 0, wis: 0, cha: 0 } };
+    const base = { format: 'hexmarch-character', name: 'X', origin: 'human', class: { name: 'warrior', levelups: [{ level: 1, hp: 8 }] }, abilities: { con: 0, str: 0, dex: 0, int: 0, wis: 0, cha: 0 } };
     expect(() => readSheet({ ...base, origin: 'orc' })).toThrow(/origin/);
     expect(() => readSheet({ ...base, abilities: { ...base.abilities, dex: { score: 0, agility: '*' } } })).toThrow(/agility/);
     expect(() => readSheet({ ...base, class: { name: 'warrior', levelups: [] } })).toThrow(/level 1/);
@@ -127,7 +127,7 @@ describe('equipment references (format version 3)', () => {
 
   it('gives a version 2 sheet references where its numbers match the file', () => {
     const [s] = importFile({
-      format: 'materia-mundi-character', version: 2, rules: 'mm', name: 'Old', origin: 'human',
+      format: 'hexmarch-character', version: 2, rules: 'mm', name: 'Old', origin: 'human',
       class: { name: 'warrior', levelups: [{ level: 1 }] },
       abilities: { con: 0, str: 0, dex: 0, int: 0, wis: 0, cha: 0 },
       inventory: {
@@ -149,7 +149,7 @@ describe('equipment references (format version 3)', () => {
 
   it('keeps a reference this device cannot find, with the numbers saved alongside it', () => {
     const [s] = importFile({
-      format: 'materia-mundi-character', version: 3, rules: 'mm', name: 'Hansa', origin: 'human',
+      format: 'hexmarch-character', version: 3, rules: 'mm', name: 'Hansa', origin: 'human',
       class: { name: 'warrior', levelups: [{ level: 1 }] },
       abilities: { con: 0, str: 0, dex: 0, int: 0, wis: 0, cha: 0 },
       inventory: {
@@ -165,7 +165,7 @@ describe('equipment references (format version 3)', () => {
 
 describe('magic items (item + dweomer)', () => {
   const sheetWith = (inventory: object) => importFile({
-    format: 'materia-mundi-character', version: 3, rules: 'mm', name: 'M', origin: 'human',
+    format: 'hexmarch-character', version: 3, rules: 'mm', name: 'M', origin: 'human',
     class: { name: 'warrior', levelups: [{ level: 1 }] },
     abilities: { con: 0, str: 0, dex: 0, int: 0, wis: 0, cha: 0 },
     inventory

@@ -13,7 +13,7 @@ import { RULESETS, registerRuleset, type RulesetOptions } from '../rules/rules';
 import { FORMAT_VERSION, PARTS, writeParts, type Part, type SheetData } from './sheet';
 import { POINTER_FORMAT, PublishError, readPointer, readSnapshot, type Snapshot } from '../../../engine/publish';
 
-export const CAMPAIGN_FORMAT = 'materia-mundi-campaign';
+export const CAMPAIGN_FORMAT = 'hexmarch-campaign';
 
 export interface CampaignData {
   format: typeof CAMPAIGN_FORMAT;
@@ -78,7 +78,7 @@ export async function fetchCampaign(url: string): Promise<CampaignCache> {
   const campaign = await fetchJson(url);
   const format = (campaign as { format?: unknown } | null)?.format;
   if (format === POINTER_FORMAT) return publishedCampaign(url, campaign);
-  if (typeof format === 'string' && /^e9-/.test(format)) throw new NewerAppError('This campaign needs a newer Companion.');
+  if (typeof format === 'string' && /^hexmarch-campaign-pointer\b/.test(format)) throw new NewerAppError('This campaign needs a newer Companion.');
   checkCampaign(campaign);
   const at = (link: string) => new URL(link, url).href;
   let rules: RulesetOptions | undefined;
@@ -135,10 +135,10 @@ export const SCRIBE_LINK = 'scribe:';
 export const isScribeLink = (url: string) => url.startsWith(SCRIBE_LINK);
 
 export interface ScribeCampaign {
-  format: 'e9-scribe-campaign';
+  format: 'hexmarch-scribe-campaign';
   version: number;
   id: string;
-  // The data site the campaign's modules came from (its mm.json), ending in "/".
+  // The data site the campaign's modules came from (its hexmarch.json), ending in "/".
   site: string;
   // The ruleset id its root provides (state.rules.ruleset).
   ruleset: string;
@@ -150,7 +150,7 @@ export interface ScribeCampaign {
 
 export function fromScribe(url: string, d: unknown): CampaignCache {
   const r = d as Partial<ScribeCampaign> | null;
-  if (!r || typeof r !== 'object' || r.format !== 'e9-scribe-campaign') throw new CampaignError("That isn't a campaign saved by Scribe");
+  if (!r || typeof r !== 'object' || r.format !== 'hexmarch-scribe-campaign') throw new CampaignError("That isn't a campaign saved by Scribe");
   if (typeof r.version !== 'number' || r.version > 1) throw new CampaignError('That campaign was saved by a newer Scribe. Update the app to open it.');
   if (typeof r.id !== 'string' || !/^[a-z0-9-]{1,80}$/.test(r.id)) throw new CampaignError('The campaign saved by Scribe has no id');
   const rules = RULESETS.find((x) => x.id === r.ruleset);
@@ -182,7 +182,7 @@ export async function publishedCampaign(url: string, data: unknown): Promise<Cam
     const p = readPointer(data);
     const snap = readSnapshot(await fetchJson(p.read), p.campaign);
     const c = fromScribe(url, {
-      format: 'e9-scribe-campaign', version: 1, id: p.campaign, site: snap.site, ruleset: snap.ruleset,
+      format: 'hexmarch-scribe-campaign', version: 1, id: p.campaign, site: snap.site, ruleset: snap.ruleset,
       manifest: { ...snap.module, title: p.title }, lock: snap.lock, saved: snap.published
     });
     return { ...c, published: { pointer: url, read: p.read, post: p.post, revision: snap.revision, snapshot: { state: snap.state, private: snap.private, receipts: snap.receipts, module: snap.module, lock: snap.lock } } };
@@ -214,7 +214,7 @@ export async function saveCampaigns(all: Record<string, CampaignCache>) {
 
 // This device's own equipment file.
 export function blankLocal(): EquipmentFileData {
-  return { format: 'materia-mundi-equipment', version: 1, id: LOCAL_ID, name: 'This device', rules: [], items: [], magic: [] };
+  return { format: 'hexmarch-equipment', version: 1, id: LOCAL_ID, name: 'This device', rules: [], items: [], magic: [] };
 }
 
 export async function loadLocal(): Promise<EquipmentFileData> {
@@ -275,7 +275,7 @@ export function exportSheet(d: SheetData, parts: readonly Part[] = PARTS): objec
 }
 
 export function exportSheets(list: SheetData[]) {
-  return { format: 'materia-mundi-characters', version: FORMAT_VERSION, characters: list.map((d) => exportSheet(d)) };
+  return { format: 'hexmarch-characters', version: FORMAT_VERSION, characters: list.map((d) => exportSheet(d)) };
 }
 
 // Before reading imported sheets: entries from this device's custom file go back into
@@ -300,7 +300,7 @@ export async function absorbCustom(data: unknown, local: EquipmentFileData): Pro
       continue;
     }
     if (isBuiltIn(file) || (hasEquipment(file) && !fallbacks[file])) continue;
-    const f = (fallbacks[file] ??= { format: 'materia-mundi-equipment', version: 1, id: file, name: `${file} (from imported characters)`, rules: [], items: [], magic: [] });
+    const f = (fallbacks[file] ??= { format: 'hexmarch-equipment', version: 1, id: file, name: `${file} (from imported characters)`, rules: [], items: [], magic: [] });
     if (![...f.items, ...f.magic].some((e) => e.id === entry.id)) {
       ((isMagic ? f.magic : f.items) as { id: string }[]).push(entry as never);
       fallbackChanged = true;

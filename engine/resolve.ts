@@ -123,14 +123,14 @@ function pickVersion(versions: Manifest[], rs: string[], locked?: string): Manif
 }
 
 export interface Lockfile {
-  format: 'e9-lock/1';
+  format: 'hexmarch-lock/1';
   module: string; // the module this lock belongs to
   modules: { id: string; version: string; hash: string }[];
 }
 
 export async function lockfile(top: Manifest, resolution: Resolution): Promise<Lockfile> {
   return {
-    format: 'e9-lock/1',
+    format: 'hexmarch-lock/1',
     module: top.id,
     modules: await Promise.all(resolution.modules.map(async ({ manifest: m }) => ({ id: m.id, version: m.version, hash: await sha256(canonical(m)) })))
   };

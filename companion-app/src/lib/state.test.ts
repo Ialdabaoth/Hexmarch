@@ -7,7 +7,7 @@ const at = (hex: string, hours = 0) => ({ base: 'https://x/', module: 'isle-of-m
 describe('campaign state', () => {
   it('starts on 1 May 3507 at 08:00', () => {
     const s = blankState('', now);
-    expect(s).toMatchObject({ format: 'e9-campaign-state', version: 1, revision: 0, party: null, session: { number: 0, open: false } });
+    expect(s).toMatchObject({ format: 'hexmarch-campaign-state', version: 1, revision: 0, party: null, session: { number: 0, open: false } });
     expect(clockLabel(s)).toBe('1 May 3507, 08:00 (day 1)');
   });
 
@@ -49,7 +49,7 @@ describe('campaign state', () => {
   it('reads its own files back and fills gaps', () => {
     const s = moveParty(blankState('c1', now), at('world:6947:25B2', 1), now);
     expect(readState(writeState(s), 'c1')).toEqual(s);
-    const thin = readState({ format: 'e9-campaign-state', version: 1, revealed: { 'isle-of-mists': { hexes: ['world:6947:25B2', 'nonsense'] } } }, 'c1');
+    const thin = readState({ format: 'hexmarch-campaign-state', version: 1, revealed: { 'isle-of-mists': { hexes: ['world:6947:25B2', 'nonsense'] } } }, 'c1');
     expect(thin.revealed['isle-of-mists']).toEqual({ hexes: ['world:6947:25B2'], places: [] });
     expect(thin.clock).toEqual({ start: '3507-05-01', hours: 8 });
   });
@@ -65,8 +65,8 @@ describe('campaign state', () => {
   });
 
   it('refuses other files', () => {
-    expect(() => readState({ format: 'materia-mundi-campaign' }, '')).toThrow(/isn't an E9 campaign state/);
-    expect(() => readState({ format: 'e9-campaign-state', version: 2 }, '')).toThrow(/newer app/);
-    expect(() => readState({ format: 'e9-campaign-state', version: 1, campaign: 'other' }, 'c1')).toThrow(/another campaign/);
+    expect(() => readState({ format: 'hexmarch-campaign' }, '')).toThrow(/isn't a campaign state/);
+    expect(() => readState({ format: 'hexmarch-campaign-state', version: 2 }, '')).toThrow(/newer app/);
+    expect(() => readState({ format: 'hexmarch-campaign-state', version: 1, campaign: 'other' }, 'c1')).toThrow(/another campaign/);
   });
 });

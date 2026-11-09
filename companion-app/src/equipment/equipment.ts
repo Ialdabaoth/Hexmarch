@@ -124,7 +124,7 @@ export function magicLevels(e: MagicEntry): number[] {
 }
 
 export interface EquipmentFileData {
-  format: 'materia-mundi-equipment';
+  format: 'hexmarch-equipment';
   version: number;
   id: string;
   name: string;
@@ -324,7 +324,7 @@ export function checkEquipment(d: unknown): asserts d is EquipmentFileData {
   const fail = (why: string) => {
     throw new EquipmentError(`${f?.name ? `${f.name}: ` : ''}${why}`);
   };
-  if (!f || typeof f !== 'object' || f.format !== 'materia-mundi-equipment') fail('not a Materia Mundi equipment file');
+  if (!f || typeof f !== 'object' || f.format !== 'hexmarch-equipment') fail('not a Materia Mundi equipment file');
   if (typeof f!.id !== 'string' || !/^[a-z0-9]+(-[a-z0-9]+)*$/.test(f!.id)) fail('needs an "id" in lower-case letters, digits and dashes');
   if (!Array.isArray(f!.items) || !Array.isArray(f!.magic)) fail('needs "items" and "magic" lists');
   const ids = new Set<string>();

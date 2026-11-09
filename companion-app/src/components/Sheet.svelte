@@ -128,7 +128,7 @@
     app.view = { name: 'list' };
   }
   // Each panel folds away and starts folded (Heph 2026-11-09). The ones opened are remembered on this device.
-  const OPEN_KEY = 'e9-sheet-open';
+  const OPEN_KEY = 'hexmarch-sheet-open';
   let opened = $state<string[]>((() => {
     try {
       const v = JSON.parse(localStorage.getItem(OPEN_KEY) ?? '[]');

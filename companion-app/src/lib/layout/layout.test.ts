@@ -11,11 +11,11 @@ import { defaultTalents } from '../character';
 describe('layout markup', () => {
   it('reads the whitelist and the Companion elements', () => {
     const nodes = parseLayout(`
-      <div class="row" data-print="never"><e9-portrait class="p"></e9-portrait>
-        <h2>Hi <e9-value key="flavor.name"></e9-value></h2>
-        <e9-each list="d.saves" as="s" max="6"><e9-roll check="save" key="s.id" e9-class="hot:s.low"><e9-value key="s.target" format="signed"></e9-value>+</e9-roll></e9-each>
-        <e9-action do="hp" off="d.dead">HP</e9-action>
-        <e9-if key="d.magic" not>No magic&nbsp;here</e9-if>
+      <div class="row" data-print="never"><hexmarch-portrait class="p"></hexmarch-portrait>
+        <h2>Hi <hexmarch-value key="flavor.name"></hexmarch-value></h2>
+        <hexmarch-each list="d.saves" as="s" max="6"><hexmarch-roll check="save" key="s.id" hexmarch-class="hot:s.low"><hexmarch-value key="s.target" format="signed"></hexmarch-value>+</hexmarch-roll></hexmarch-each>
+        <hexmarch-action do="hp" off="d.dead">HP</hexmarch-action>
+        <hexmarch-if key="d.magic" not>No magic&nbsp;here</hexmarch-if>
       </div>`);
     expect(nodes).toHaveLength(1);
     const div = nodes[0] as Extract<(typeof nodes)[0], { t: 'el' }>;
@@ -34,9 +34,9 @@ describe('layout markup', () => {
       '<img src="x">',
       '<div style="color:red">x</div>',
       '<iframe></iframe>',
-      '<e9-roll check="eval" key="d.x">x</e9-roll>',
-      '<e9-value key="constructor[0]"></e9-value>',
-      '<e9-action do="delete">x</e9-action>',
+      '<hexmarch-roll check="eval" key="d.x">x</hexmarch-roll>',
+      '<hexmarch-value key="constructor[0]"></hexmarch-value>',
+      '<hexmarch-action do="delete">x</hexmarch-action>',
       '<div>unclosed',
       '<div></span>'
     ];

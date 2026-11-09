@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 512 512">
-  <!-- Heavy woods: the E9 Atlas forest icon and green ground tile, from Hex Tiles: Fantasy by C. Martins
+  <!-- Heavy woods: the Hexmarch Atlas forest icon and green ground tile, from Hex Tiles: Fantasy by C. Martins
        (https://cmartins.itch.io/hex-tiles-fantasy), CC BY-SA 4.0; see icons/README.md -->
   <defs><clipPath id="h"><polygon points="256,72 415,164 415,348 256,440 97,348 97,164"/></clipPath></defs>
   <rect width="512" height="512" rx="96" fill="#2b2118"/>

@@ -1,7 +1,7 @@
 // Saving a campaign on this device (SCRIBE.md section 1, step 7). The apps hand each other the campaign and play by
 // links (below); this device's IndexedDB is only a cache, shared by the three apps because they share one site
 // (idb-keyval's "keyval-store" database, as the Companion uses it). Scribe writes:
-//   scribe-campaign:<id>  its record of the campaign: module, lockfile, services, published (e9-scribe-campaign/1)
+//   scribe-campaign:<id>  its record of the campaign: module, lockfile, services, published (hexmarch-scribe-campaign/1)
 //   state:<id>            the first state file, the one every app reads and writes for that campaign (STATE_FORMAT.md)
 //   invitations           the creator's Referee invitation is added to the Companion's list (below)
 //   play:<id>             play the Companion sent back by link, for Publish
@@ -11,7 +11,7 @@ import type { Built } from './campaign';
 import type { RootChoice } from './rules';
 import { checkUpload, envelope, pointer, publishParts, snapshot, type Envelope, type UploadReport, type Pointer, type Services, type Snapshot } from '../../../engine';
 
-export const SCRIBE_FORMAT = 'e9-scribe-campaign';
+export const SCRIBE_FORMAT = 'hexmarch-scribe-campaign';
 
 export function scribeRecord(built: Built, root: RootChoice, site: string, now = new Date()) {
   return {
@@ -92,7 +92,7 @@ export async function saveOnDevice(built: Built, root: RootChoice, site: string,
   return { link, wroteState };
 }
 
-// Apps talk by links (WORKFLOWS.md, Heph 2026-11-09): the apps hand each other data in e9-mail/1 envelopes after
+// Apps talk by links (WORKFLOWS.md, Heph 2026-11-09): the apps hand each other data in hexmarch-mail/1 envelopes after
 // "#m=" in a link; this device's storage is only a cache.
 //   campaign  Scribe -> Companion: {record, state?}, the saved record (with services and published once it has
 //             them) and, when Scribe has just written it, the state file to start play from

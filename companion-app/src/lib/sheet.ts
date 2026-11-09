@@ -16,7 +16,7 @@ import {
   type AbilityId, type Attitude, type ClassId, type OriginId, type Ruleset, type TalentId
 } from '../rules/rules';
 
-export const FORMAT = 'materia-mundi-character';
+export const FORMAT = 'hexmarch-character';
 // Version 3 points items at equipment files ("ref": "mm:longsword") instead of copying
 // their numbers. Version 2 made armor and weapons items with their own properties;
 // version 1 had an armor rating and weapons as name, damage and melee/ranged. All load.
@@ -757,5 +757,5 @@ export function writeParts(d: SheetData, parts: readonly Part[] = PARTS): Record
 }
 
 export function exportBundle(list: SheetData[]) {
-  return { format: 'materia-mundi-characters', version: FORMAT_VERSION, characters: list.map((d) => writeParts(d)) };
+  return { format: 'hexmarch-characters', version: FORMAT_VERSION, characters: list.map((d) => writeParts(d)) };
 }

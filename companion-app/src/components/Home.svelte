@@ -227,7 +227,7 @@
         </div>
       {/if}
       <div class="row">
-        <button onclick={() => downloadJson('materia-mundi-characters.json', exportSheets(app.sheets))} disabled={!app.sheets.length}>Export all (JSON)</button>
+        <button onclick={() => downloadJson('hexmarch-characters.json', exportSheets(app.sheets))} disabled={!app.sheets.length}>Export all (JSON)</button>
         <button onclick={() => fileInput?.click()}>Import JSON</button>
         <input bind:this={fileInput} type="file" accept="application/json,.json" hidden onchange={onImport} />
         <button onclick={toggleJson}>{jsonText === null ? 'Show JSON (copy / paste)' : 'Hide JSON'}</button>

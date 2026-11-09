@@ -1,4 +1,4 @@
-// The one envelope every request travels in (data repo modules/WORKFLOWS.md "One envelope", working name e9-mail/1).
+// The one envelope every request travels in (data repo modules/WORKFLOWS.md "One envelope", working name hexmarch-mail/1).
 // Adapters move envelopes and never read the body: the Manual adapter as a file the player sends and the referee
 // opens, a post URL as the body of one POST. Kinds so far:
 //   join       player -> referee: a seat's character, asking to join (WORKFLOWS.md "Joining")
@@ -8,7 +8,7 @@
 // Approval needs no envelope of its own: the request's id appears in the next snapshot's `receipts`, and the
 // character in its state's `characters`.
 
-export const MAIL_FORMAT = 'e9-mail';
+export const MAIL_FORMAT = 'hexmarch-mail';
 export const MAIL_KINDS = ['join', 'sent-back', 'campaign', 'update'] as const;
 export type MailKind = (typeof MAIL_KINDS)[number];
 

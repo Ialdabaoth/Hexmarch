@@ -1,4 +1,4 @@
-<!-- Export for VTT (ENCOUNTER_FORMAT.md section 7, Atlas 0.4.1): plugs into the encounter map viewer through E9Map.actions; build.py and atlas_app.py inline it after encounter_view.html -->
+<!-- Export for VTT (ENCOUNTER_FORMAT.md section 7, Atlas 0.4.1): plugs into the encounter map viewer through HexmarchMap.actions; build.py and atlas_app.py inline it after encounter_view.html -->
 <style>
 #e9vtt{border:1px solid #8a7f66;border-radius:6px;padding:14px 16px;max-width:min(460px,calc(100vw - 32px));background:#f4efe1;color:#2b2418;font:14px/1.4 Georgia,serif;box-shadow:0 6px 24px #0005}
 #e9vtt::backdrop{background:#0004}
@@ -13,8 +13,8 @@
 <dialog id="e9vtt" aria-labelledby="e9vtt-h"></dialog>
 <script>
 "use strict";
-// E9VTT.uvtt(map) -> Universal VTT object, E9VTT.picture(map) -> {canvas, px}: also usable from the console or other tools.
-window.E9VTT = (() => {
+// HexmarchVTT.uvtt(map) -> Universal VTT object, HexmarchVTT.picture(map) -> {canvas, px}: also usable from the console or other tools.
+window.HexmarchVTT = (() => {
   const dlg = document.getElementById('e9vtt');
   const e = t => String(t ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
   const MAXPX = 16e6, MAXSIDE = 16000;  // stay under the smallest browser canvas limit (iOS Safari, about 16.7 megapixels)
@@ -30,7 +30,7 @@ window.E9VTT = (() => {
     const g = cv.getContext('2d');
     g.fillStyle = m.ground && m.ground !== 'none' && m.ground !== 'generate' ? m.ground : '#f4efe1'; g.fillRect(0, 0, cv.width, cv.height);
     for (const L of lay) {
-      const im = await img(E9Map.base + 'encounter-maps/' + L.src), s = px / L.px;
+      const im = await img(HexmarchMap.base + 'encounter-maps/' + L.src), s = px / L.px;
       g.save(); g.globalAlpha = L.opacity; g.translate(L.at[0] * px, L.at[1] * px); if (L.rotate) g.rotate(L.rotate * Math.PI / 180);
       g.drawImage(im, 0, 0, im.naturalWidth * s, im.naturalHeight * s); g.restore();
     }
@@ -51,7 +51,7 @@ window.E9VTT = (() => {
       environment: { baked_lighting: !!env.baked, ambient_light: argb(env.ambient) },
       lights: m.lights.map(l => ({ position: xy(l.at), range: l.range, intensity: l.intensity ?? 1, color: argb(l.colour), shadows: true })),
       // what Universal VTT has no field for; other tools ignore it, the Atlas import reads it back
-      e9: { format: m.format, module: E9Map.module, id: m.id, title: m.title, grid: m.grid, areas: m.areas, links: m.links, anchor: m.anchor, spawns: m.spawns,
+      hexmarch: { format: m.format, module: HexmarchMap.module, id: m.id, title: m.title, grid: m.grid, areas: m.areas, links: m.links, anchor: m.anchor, spawns: m.spawns,
             doors: m.doors, licence: m.licence, credit: m.credit },
       image
     };
@@ -60,7 +60,7 @@ window.E9VTT = (() => {
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.append(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(a.href), 60e3);
   }
-  const fname = (m, ext) => [E9Map.module, m.id].filter(Boolean).join('-') + ext;
+  const fname = (m, ext) => [HexmarchMap.module, m.id].filter(Boolean).join('-') + ext;
   function open(m) {
     const [w, h] = m.size, ft = m.grid.ft || 5;
     dlg.innerHTML = `<button class="x" aria-label="Close">×</button><h3 id="e9vtt-h">Export for VTT</h3>
@@ -86,7 +86,7 @@ window.E9VTT = (() => {
     dlg.addEventListener('click', ev => { if (ev.target === dlg) dlg.close(); });
     dlg.showModal();
   }
-  if (window.E9Map) E9Map.actions.push({ label: 'Export for VTT', title: 'Save this map for Foundry, Fantasy Grounds, Roll20, Owlbear Rodeo…', run: open });
+  if (window.HexmarchMap) HexmarchMap.actions.push({ label: 'Export for VTT', title: 'Save this map for Foundry, Fantasy Grounds, Roll20, Owlbear Rodeo…', run: open });
   return { picture, uvtt: async m => { const { canvas, px } = await picture(m); return uvtt(m, px, await b64(await blobOf(canvas, 'image/png'))); }, open };
 })();
 </script>

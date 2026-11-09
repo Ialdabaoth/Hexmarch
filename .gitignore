@@ -4,3 +4,4 @@ modules/mm-core/
 links.json
 node_modules/
 dist/
+__pycache__/
