@@ -207,11 +207,9 @@
         <div class="small muted">{carry.burdened ? 'burdened' : carry.encumbered ? 'encumbered' : `encumbered past ${carry.threshold}`}</div>
       </div>
     </div>
-    <XpPanel character={c} />
   </section>
   <Effects character={c!} />
   {/snippet}
-  {@render panel('status', 'Status', status)}
 
   {#snippet attacks()}
   <div class="grid2">
@@ -238,7 +236,6 @@
     {#if gear.off?.shield}<span class="small muted">Shield: attacks you see coming are harder.</span>{/if}
   </div>
   {/snippet}
-  {@render panel('attacks', 'Attacks', attacks)}
 
   {#snippet abilities()}
   <div class="grid2">
@@ -260,7 +257,6 @@
     {/each}
   </div>
   {/snippet}
-  {@render panel('abilities', 'Abilities and saves', abilities)}
 
   {#snippet talents()}
   <!-- One column per ability, like the card. -->
@@ -279,9 +275,9 @@
   </div>
   <p class="small muted">* expertise: easy for this class's specialty (see p. {cls.page}). Hold any roll and slide up for Easy or down for Hard.</p>
   {/snippet}
-  {@render panel('talents', 'Talents (d6)', talents)}
 
   {#snippet features()}
+  <XpPanel character={c!} />
   <ul class="features">
     {#each cls.features.filter((f) => f.level <= c!.level) as f}
       <li><strong>{f.name}.</strong> {f.summary}</li>
@@ -301,15 +297,10 @@
     </details>
   {/if}
   {/snippet}
-  {@render panel('features', 'Class features', features)}
 
-  {#if cls.magic}
-    {#snippet magic()}<Magic character={c!} />{/snippet}
-    {@render panel('magic', 'Magic', magic, 'magic')}
-  {/if}
+  {#snippet magic()}<Magic character={c!} />{/snippet}
 
   {#snippet retinue()}<Followers character={c!} />{/snippet}
-  {@render panel('retinue', 'Retinue', retinue)}
 
   {#snippet gearPanel()}
   <GearEditor character={c!} />
@@ -317,7 +308,16 @@
   <label for="notes">Notes, feats, spells</label>
   <textarea id="notes" bind:value={c!.data.notes} onchange={save}></textarea>
   {/snippet}
+
+  <!-- Panel order (Heph 2026-11-09). -->
+  {@render panel('status', 'Status', status)}
+  {@render panel('abilities', 'Abilities and saves', abilities)}
+  {@render panel('attacks', 'Attacks', attacks)}
+  {@render panel('talents', 'Talents (d6)', talents)}
+  {#if cls.magic}{@render panel('magic', 'Magic', magic, 'magic')}{/if}
+  {@render panel('features', 'Class features', features)}
   {@render panel('gear', 'Gear', gearPanel, 'inventory')}
+  {@render panel('retinue', 'Retinue', retinue)}
 
   <h2>Manage</h2>
   <div class="row">
