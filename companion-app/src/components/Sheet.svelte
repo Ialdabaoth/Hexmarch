@@ -124,7 +124,33 @@
     await app.remove(id);
     app.view = { name: 'list' };
   }
+  // Each panel folds away (Heph 2026-11-09). Which ones are folded is remembered on this device.
+  const FOLD_KEY = 'e9-sheet-folded';
+  let folded = $state<string[]>((() => {
+    try {
+      const v = JSON.parse(localStorage.getItem(FOLD_KEY) ?? '[]');
+      return Array.isArray(v) ? v.filter((x) => typeof x === 'string') : [];
+    } catch {
+      return [];
+    }
+  })());
+  function fold(name: string, e: Event) {
+    const open = (e.currentTarget as HTMLDetailsElement).open;
+    folded = open ? folded.filter((x) => x !== name) : folded.includes(name) ? folded : [...folded, name];
+    try {
+      localStorage.setItem(FOLD_KEY, JSON.stringify(folded));
+    } catch {
+      // storage blocked: the panels still fold, just not remembered
+    }
+  }
 </script>
+
+{#snippet panel(name: string, title: string, body: import('svelte').Snippet, id?: string)}
+  <details class="section panel" open={!folded.includes(name)} ontoggle={(e) => fold(name, e)} {id}>
+    <summary><h2>{title}</h2></summary>
+    {@render body()}
+  </details>
+{/snippet}
 
 {#if c && cls}
   {@const atk = attackThresholds(c)}
@@ -159,6 +185,7 @@
   </div>
 
 
+  {#snippet status()}
   <section class="card">
     <div class="grid3 vitals">
       <div>
@@ -182,8 +209,11 @@
     </div>
     <XpPanel character={c} />
   </section>
+  <Effects character={c!} />
+  {/snippet}
+  {@render panel('status', 'Status', status)}
 
-  <h2>Attacks</h2>
+  {#snippet attacks()}
   <div class="grid2">
     <button class="stat" use:holdRoll={(d) => check('Melee attack', 20, atk.melee, d, { attack: true })}>
       <span>Melee</span><strong>{atk.melee}+</strong>
@@ -207,8 +237,10 @@
     <span class="small muted">{gear.damageTypes}</span>
     {#if gear.off?.shield}<span class="small muted">Shield: attacks you see coming are harder.</span>{/if}
   </div>
+  {/snippet}
+  {@render panel('attacks', 'Attacks', attacks)}
 
-  <h2>Abilities and saves</h2>
+  {#snippet abilities()}
   <div class="grid2">
     {#each ABILITIES as a}
       {@const s = saveThreshold(c, a.id)}
@@ -227,8 +259,10 @@
       <button class="mini" use:holdRoll={(d) => rollExpr(`${a.name} check${d === 'normal' ? '' : ` (${d})`}`, `${{ easy: '2d6kh1', normal: 'd6', hard: '2d6kl1' }[d]}${c!.abilities[a.id] ? signed(c!.abilities[a.id]) : ''}`)}>{a.short}</button>
     {/each}
   </div>
+  {/snippet}
+  {@render panel('abilities', 'Abilities and saves', abilities)}
 
-  <h2>Talents <small class="muted">(d6)</small></h2>
+  {#snippet talents()}
   <!-- One column per ability, like the card. -->
   <div class="talents">
     {#each ABILITIES.filter((a) => TALENTS.some((t) => t.ability === a.id)) as a}
@@ -244,8 +278,10 @@
     {/each}
   </div>
   <p class="small muted">* expertise: easy for this class's specialty (see p. {cls.page}). Hold any roll and slide up for Easy or down for Hard.</p>
+  {/snippet}
+  {@render panel('talents', 'Talents (d6)', talents)}
 
-  <h2>Class features</h2>
+  {#snippet features()}
   <ul class="features">
     {#each cls.features.filter((f) => f.level <= c!.level) as f}
       <li><strong>{f.name}.</strong> {f.summary}</li>
@@ -264,26 +300,29 @@
       </ul>
     </details>
   {/if}
-
-  <MagicItems magic={c.magic} />
-
-  <Effects character={c} />
+  {/snippet}
+  {@render panel('features', 'Class features', features)}
 
   {#if cls.magic}
-    <div id="magic"><Magic character={c} /></div>
+    {#snippet magic()}<Magic character={c!} />{/snippet}
+    {@render panel('magic', 'Magic', magic, 'magic')}
   {/if}
 
-  <Followers character={c} />
+  {#snippet retinue()}<Followers character={c!} />{/snippet}
+  {@render panel('retinue', 'Retinue', retinue)}
 
-  <h2 id="inventory">Gear</h2>
-  <GearEditor character={c} />
+  {#snippet gearPanel()}
+  <GearEditor character={c!} />
+  <MagicItems magic={c!.magic} />
   <label for="notes">Notes, feats, spells</label>
-  <textarea id="notes" bind:value={c.data.notes} onchange={save}></textarea>
+  <textarea id="notes" bind:value={c!.data.notes} onchange={save}></textarea>
+  {/snippet}
+  {@render panel('gear', 'Gear', gearPanel, 'inventory')}
 
   <h2>Manage</h2>
   <div class="row">
-    <button class="primary" onclick={() => (app.view = { name: 'render', id: c!.id, mode: 'postcard' })}>Postcard / PDF</button>
-    <button onclick={() => (app.view = { name: 'render', id: c!.id, mode: 'page' })}>Full page</button>
+    <button class="primary" onclick={() => (app.view = { name: 'render', id: c!.id, mode: 'postcard' })}>Print card</button>
+    <button onclick={() => (app.view = { name: 'render', id: c!.id, mode: 'page' })}>Print page</button>
     <button onclick={() => downloadJson(`${slug(c!.name)}.json`, exportSheet(c!.data))}>Export JSON</button>
     <button onclick={() => partInput?.click()}>Load a part</button>
     <input bind:this={partInput} type="file" accept="application/json,.json" hidden onchange={loadPart} />

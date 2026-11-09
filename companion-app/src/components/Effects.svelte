@@ -21,8 +21,8 @@
   }
 </script>
 
-<h2>Effects</h2>
-<p class="small muted">Temporary boosts and debuffs. They change the live numbers above, never the sheet.</p>
+<h3>Effects</h3>
+<p class="small muted">Temporary boosts and debuffs. They change the live numbers, never the sheet.</p>
 {#each c.state.effects as e, i}
   <div class="row effect">
     <span class="grow"><strong>{e.amount > 0 ? '+' : ''}{e.amount} {effectTargetName(e.target)}</strong> <span class="muted">{e.label}</span></span>

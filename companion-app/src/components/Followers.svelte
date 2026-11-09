@@ -98,7 +98,6 @@
   }
 </script>
 
-<h2>Retinue</h2>
 <p class="small muted">
   Followers {followers.length} / {limit} (from Bearing {talentThreshold(c, 'bearing')}+).
   {#if beastLimit !== null}Beast companions {beastHd} / {beastLimit} HD (from Survival).{/if}
