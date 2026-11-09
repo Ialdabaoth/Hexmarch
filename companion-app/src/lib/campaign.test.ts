@@ -7,7 +7,7 @@ vi.mock('idb-keyval', () => ({
 }));
 
 import {
-  CampaignError, absorbCustom, activateCampaign, campaignRulesId, fromScribe, isScribeLink, scribeCampaign, blankLocal, campaignFileIds, checkCampaign, exportSheet, fetchCampaign, publishCampaign,
+  CampaignError, NewerAppError, absorbCustom, activateCampaign, campaignRulesId, fromScribe, isScribeLink, scribeCampaign, blankLocal, campaignFileIds, checkCampaign, exportSheet, fetchCampaign, publishCampaign,
   registerCampaign, type CampaignData
 } from './campaign';
 import { catalogFor, registerEquipment, resolve, type EquipmentFileData } from '../equipment/equipment';
@@ -165,7 +165,7 @@ describe('published campaigns', () => {
   it('lets the referee invite once Scribe has published, naming the pointer', () => {
     expect(fromScribe('scribe:kells-1422', record).published).toBeUndefined();
     const c = fromScribe('scribe:kells-1422', { ...record, services, published: { revision: 2, at: '2026-11-09T01:00:00Z' } });
-    expect(c.published).toEqual({ pointer: services.pointer, read: services.read, post: '', revision: 2 });
+    expect(c.published).toEqual({ pointer: services.pointer, read: services.read, post: '', revision: 2, at: '2026-11-09T01:00:00Z' });
   });
 
   it('opens an invitation by its pointer, then the snapshot it names', async () => {
@@ -187,6 +187,15 @@ describe('published campaigns', () => {
     expect(c.published?.snapshot?.state.characters).toEqual([{ id: 'holly', name: 'Holly', player: 'Ann' }]);
     expect(c.published?.snapshot?.state.private).toBeUndefined();
     expect(c.published?.snapshot?.private).toEqual({ holly: { characters: { holly: { knowledge: [{ hex: 'world:0101:0101' }] } } } });
+  });
+
+  it('asks for a newer app when a campaign file is in a format this build does not know', async () => {
+    vi.stubGlobal('fetch', async () => ({ ok: true, json: async () => ({ format: 'e9-campaign-pointer-2', version: 1 }) }));
+    await expect(fetchCampaign(services.pointer)).rejects.toThrow(NewerAppError);
+    vi.stubGlobal('fetch', async () => ({ ok: true, json: async () => ({ ...pointer('kells-1422', 'Kells 1422', services), version: 2 }) }));
+    await expect(fetchCampaign(services.pointer)).rejects.toThrow(NewerAppError);
+    vi.stubGlobal('fetch', async () => ({ ok: true, json: async () => ({ format: 'materia-mundi-equipment' }) }));
+    await expect(fetchCampaign(services.pointer)).rejects.not.toThrow(NewerAppError);
   });
 
   it("says so when the snapshot isn't the pointer's campaign", async () => {

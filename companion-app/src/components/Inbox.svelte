@@ -55,12 +55,23 @@
   </section>
 {:else}
   {#if app.mode === 'referee'}
+    {#if app.unpublished}
+      <section class="card publish">
+        <p>{app.unpublished === 1 ? '1 answer' : `${app.unpublished} answers`} not yet sent to players.</p>
+        {#if app.canUpdate}
+          <button class="primary" disabled={busy} onclick={() => run(() => app.updateCampaign())}>Update campaign</button>
+          <p class="small muted">Saves campaign.json and snapshot.json to upload to your campaign's folder, replacing the old ones.</p>
+        {:else}
+          <p class="small muted">Publish the campaign in Scribe first; then Update campaign appears here.</p>
+        {/if}
+      </section>
+    {/if}
     {#each incoming as m (m.envelope.id)}
       <section class="card request">
         <p><strong>{m.envelope.from.name || 'A player'}</strong> asks to join with <strong>{charName(m.envelope.body.character)}</strong>.</p>
         <p class="small muted">Sent {when(m.envelope.sent)}</p>
         {#if m.answer?.kind === 'approved'}
-          <p class="small">Approved {when(m.answer.at)}. {app.receipts.includes(m.envelope.id) ? 'The next Update campaign tells the player.' : ''}</p>
+          <p class="small">Approved {when(m.answer.at)}. {m.answer.at > (app.campaign.published?.at ?? '') ? 'The next Update campaign tells the player.' : 'Sent to the player.'}</p>
         {:else if m.answer?.kind === 'sent-back'}
           <p class="small">Sent back {when(m.answer.at)}: “{m.answer.note}”</p>
         {:else if returning === m.envelope.id}
@@ -113,7 +124,8 @@
 {/if}
 
 <style>
-  .request p { margin: 0.2rem 0; }
+  .request p, .publish p { margin: 0.2rem 0; }
+  .publish button { margin: 0.4rem 0; }
   .request .row { margin-top: 0.5rem; }
   textarea { width: 100%; margin-top: 0.5rem; }
 </style>

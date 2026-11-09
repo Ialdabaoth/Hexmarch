@@ -1,0 +1,1 @@
+The referee's Inbox shows "1 answer not yet sent to players" with an Update campaign button whenever an approval or a sent-back note hasn't been published yet; each request says whether its answer has reached the player.

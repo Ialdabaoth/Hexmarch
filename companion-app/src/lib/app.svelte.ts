@@ -11,12 +11,13 @@ import {
 } from './state';
 import { loadRepo, type SavedModule } from './modules';
 import {
-  absorbCustom, activateCampaign, blankLocal, campaignRulesId, exportSheet, isScribeLink, openCampaignLink, loadCampaigns, loadFallbacks, loadLocal, registerCampaign, saveCampaigns,
+  NewerAppError, absorbCustom, activateCampaign, blankLocal, campaignRulesId, exportSheet, isScribeLink, openCampaignLink, loadCampaigns, loadFallbacks, loadLocal, registerCampaign, saveCampaigns,
   saveLocal, type CampaignCache
 } from './campaign';
 import { CORE_RULES } from '../rules/core-modules';
 import { addMail, answer, joinRequest, loadMail, mailFileName, post, readMailFile, saveMail, sendBack, type MailItem } from './mail';
 import { downloadJson } from './storage';
+import { inviteDone, keepInvite, pendingInvite, updateForInvite } from './update';
 import { pointer as campaignPointer, publishParts, snapshot as campaignSnapshot, type Services } from '../../../engine/publish';
 import { get as idbGet, set as idbSet } from 'idb-keyval';
 import { addInvitation, bindCharacter, invitationLabel, loadInvitations, readInvite, saveInvitations, withRefereeInvitations, type Invite, type Mode, type Invitation } from './invitations';
@@ -55,6 +56,8 @@ class AppState {
   log = $state<LogEntry[]>([]);
   // Requests sent and received on this device, every campaign (lib/mail.ts).
   mail = $state<MailItem[]>([]);
+  // Whether this device holds Scribe's record of the campaign in use, published: Update campaign needs it.
+  canUpdate = $state(false);
   settings = $state<Settings>({ ...DEFAULT_SETTINGS });
   view = $state<View>({ name: 'list' });
   toast = $state('');
@@ -143,6 +146,7 @@ class AppState {
       console.warn('Portraits unavailable', e);
     }
     await this.loadState();
+    await this.checkCanUpdate();
     this.loaded = true;
     // The E9 Atlas in another tab of this site saves party moves into the same file (Atlas 0.5.11): read it again on coming back.
     if (typeof document !== 'undefined') document.addEventListener('visibilitychange', () => { if (!document.hidden) void this.refreshState(); });
@@ -220,6 +224,7 @@ class AppState {
   // Takes the saved state file when it is newer than the one in memory (another tab, such as the Atlas, changed it).
   async refreshState() {
     const id = this.campaignId;
+    void this.checkCanUpdate();
     try {
       const saved = await loadStateFile(id);
       if (!saved) return;
@@ -321,7 +326,9 @@ class AppState {
   // Opens a campaign by an invitation (its link, as referee unless it says player) and takes that seat. Throws
   // with a message for the player.
   async useCampaign(url: string, role: Invite['role'] = 'referee', character?: string) {
-    const c = await openCampaignLink(url.trim());
+    let c = await openCampaignLink(url.trim());
+    // the referee opening their own published campaign by its pointer: run it from Scribe's copy on this device
+    if (role === 'referee' && !isScribeLink(c.url) && (await idbGet(`scribe-campaign:${c.campaign.id}`))) c = await openCampaignLink(`scribe:${c.campaign.id}`);
     const seat = await this.takeInvitation({ url: c.url, role, ...(character ? { character } : {}) });
     await this.adoptCampaign(c, seat.id);
     if (seat.role === 'player' && seat.character) await this.claim(seat.character);
@@ -414,6 +421,7 @@ class AppState {
     await saveCampaigns(this.campaigns);
     await this.updateSettings({ campaign: c.url, invitation: seat });
     activateCampaign(c);
+    await this.checkCanUpdate();
     await this.takeSnapshotState(c);
     await this.rereadSheets();
     this.equipmentChanged();
@@ -494,12 +502,22 @@ class AppState {
     this.notify('Saved the reply. Send that file to the player.');
   }
 
+  private async checkCanUpdate() {
+    const id = this.campaignId;
+    try {
+      const rec = id ? ((await idbGet(`scribe-campaign:${id}`)) as { services?: unknown; published?: unknown } | undefined) : undefined;
+      this.canUpdate = !!(rec?.services && rec.published);
+    } catch {
+      this.canUpdate = false;
+    }
+  }
+
   // Referee mode, a campaign Scribe published: writes the pointer and a new snapshot (WORKFLOWS.md "Invitations"),
   // with the state as it is now, each party member's knowledge for their player alone, and the requests answered.
   // Until an adapter can upload, the referee uploads the two files into the campaign's folder, replacing the old.
   async updateCampaign() {
     const c = this.campaign;
-    if (!c?.published || !isScribeLink(c.url) || this.mode !== 'referee') throw new Error('Publish the campaign in Scribe first');
+    if (!c || this.mode !== 'referee') throw new Error('Switch to the referee seat first');
     const id = c.campaign.id;
     type Rec = { site: string; ruleset: string; manifest: Record<string, unknown>; lock: unknown; services?: Services; published?: { revision: number; at: string } };
     const rec = (await idbGet(`scribe-campaign:${id}`)) as Rec | undefined;
@@ -512,12 +530,22 @@ class AppState {
     const snap = campaignSnapshot({ campaign: id, ruleset: rec.ruleset, site: rec.site, module: rec.manifest, lock: rec.lock, state: parts.state, knowledge: parts.knowledge }, rec.published, parts.receipts);
     const ptr = campaignPointer(id, String(rec.manifest.title ?? c.campaign.name), rec.services);
     await idbSet(`scribe-campaign:${id}`, { ...rec, published: { revision: snap.revision, at: snap.published } });
-    this.campaigns = { ...this.campaigns, [c.url]: { ...c, published: { ...c.published, revision: snap.revision } } };
+    // the pair as built, which Scribe's Test compares the uploaded folder against (engine checkUpload, #29)
+    await idbSet(`published:${id}`, JSON.parse(JSON.stringify({ pointer: ptr, snapshot: snap })));
+    const was = c.published ?? { pointer: rec.services.pointer, read: rec.services.read, post: rec.services.post, revision: 0 };
+    this.campaigns = { ...this.campaigns, [c.url]: { ...c, published: { ...was, revision: snap.revision, at: snap.published } } };
     await saveCampaigns(this.campaigns);
     downloadJson('campaign.json', ptr);
     await new Promise((r) => setTimeout(r, 400));
     downloadJson('snapshot.json', snap);
     this.notify(`Update ${snap.revision} saved. Upload campaign.json and snapshot.json to ${rec.services.folder}`);
+  }
+
+  // Referee mode: answers (approved or sent back) made since the campaign was last published, which players
+  // learn of only at the next Update campaign.
+  get unpublished(): number {
+    const since = this.campaign?.published?.at ?? '';
+    return this.requests.filter((m) => m.box === 'in' && m.answer && m.envelope.kind === 'join' && m.answer.at > since).length;
   }
 
   // The requests this device has answered, for the next snapshot's receipts.
@@ -558,18 +586,28 @@ class AppState {
   // afterwards, so reloading doesn't switch campaigns again.
   private async openAsked() {
     if (typeof location === 'undefined') return;
-    const invite = readInvite(location.search);
     const q = new URLSearchParams(location.search);
-    if (!q.has('campaign')) return;
-    for (const k of ['campaign', 'as', 'character']) q.delete(k);
-    history.replaceState(history.state, '', location.pathname + (q.size ? `?${q}` : '') + location.hash);
-    if (!invite) return;
+    // the invitation in the address, or one kept across a reload into a newer app (lib/update.ts)
+    const search = q.has('campaign') ? location.search : pendingInvite();
+    if (q.has('campaign')) {
+      keepInvite(location.search);
+      for (const k of ['campaign', 'as', 'character']) q.delete(k);
+      history.replaceState(history.state, '', location.pathname + (q.size ? `?${q}` : '') + location.hash);
+    }
+    const invite = search ? readInvite(search) : null;
+    if (!invite) return inviteDone();
     try {
       const here = this.invitation;
       const same = here && here.url === invite.url && here.role === invite.role && (invite.role === 'referee' || !invite.character || here.character === invite.character);
       if (!same || !this.campaign) await this.useCampaign(invite.url, invite.role, invite.character);
+      inviteDone();
     } catch (e) {
-      this.notify((e as Error).message);
+      if (e instanceof NewerAppError && (await updateForInvite())) {
+        this.notify('This campaign needs a newer Companion. Updating…');
+        return;
+      }
+      inviteDone();
+      this.notify(e instanceof NewerAppError ? `${e.message} Close the app and open it again to update.` : (e as Error).message);
     }
   }
 

@@ -40,10 +40,12 @@ export interface CampaignCache {
   scribe?: { site: string };
   // A campaign its referee has published (data repo modules/SCRIBE.md section 5): the pointer invitations name,
   // where players read the snapshot and send requests, and, on a player's device, the snapshot as last read.
-  published?: { pointer: string; read: string; post: string; revision: number; snapshot?: Pick<Snapshot, 'state' | 'private' | 'receipts'> };
+  published?: { pointer: string; read: string; post: string; revision: number; at?: string; snapshot?: Pick<Snapshot, 'state' | 'private' | 'receipts'> };
 }
 
 export class CampaignError extends Error {}
+// A campaign file in a format this build doesn't know: a newer app made it.
+export class NewerAppError extends CampaignError {}
 
 // Anything with a slash or ending in .json is a link, relative to the campaign file.
 export const isLink = (s: string) => /[/]|\.json$/i.test(s);
@@ -74,7 +76,9 @@ async function fetchJson(url: string): Promise<unknown> {
 
 export async function fetchCampaign(url: string): Promise<CampaignCache> {
   const campaign = await fetchJson(url);
-  if ((campaign as { format?: unknown } | null)?.format === POINTER_FORMAT) return publishedCampaign(url, campaign);
+  const format = (campaign as { format?: unknown } | null)?.format;
+  if (format === POINTER_FORMAT) return publishedCampaign(url, campaign);
+  if (typeof format === 'string' && /^e9-/.test(format)) throw new NewerAppError('This campaign needs a newer Companion.');
   checkCampaign(campaign);
   const at = (link: string) => new URL(link, url).href;
   let rules: RulesetOptions | undefined;
@@ -162,9 +166,12 @@ export function fromScribe(url: string, d: unknown): CampaignCache {
   };
   const out: CampaignCache = { url, campaign, files: [], fetchedAt: typeof r.saved === 'string' ? r.saved : new Date().toISOString(), scribe: { site: typeof r.site === 'string' ? r.site : '' } };
   // Scribe's Publish step (Hexmarch #21) records where it published: the referee's invitations name that pointer.
-  const { services, published } = r as { services?: { pointer?: unknown; read?: unknown; post?: unknown }; published?: { revision?: unknown } };
+  const { services, published } = r as { services?: { pointer?: unknown; read?: unknown; post?: unknown }; published?: { revision?: unknown; at?: unknown } };
   if (published && typeof services?.pointer === 'string' && services.pointer)
-    out.published = { pointer: services.pointer, read: String(services.read ?? ''), post: String(services.post ?? ''), revision: Number(published.revision) || 0 };
+    out.published = {
+      pointer: services.pointer, read: String(services.read ?? ''), post: String(services.post ?? ''), revision: Number(published.revision) || 0,
+      ...(typeof published.at === 'string' ? { at: published.at } : {})
+    };
   return out;
 }
 
@@ -180,7 +187,8 @@ export async function publishedCampaign(url: string, data: unknown): Promise<Cam
     });
     return { ...c, published: { pointer: url, read: p.read, post: p.post, revision: snap.revision, snapshot: { state: snap.state, private: snap.private, receipts: snap.receipts } } };
   } catch (e) {
-    throw e instanceof PublishError ? new CampaignError(e.message) : e;
+    if (e instanceof PublishError) throw /newer app/.test(e.message) ? new NewerAppError(e.message) : new CampaignError(e.message);
+    throw e;
   }
 }
 
