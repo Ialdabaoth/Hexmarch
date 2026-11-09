@@ -1,5 +1,5 @@
 import { Character, freshState, type LiveState } from './character';
-import { importFile, mergeKnowledge, type KnowledgeEntry, type SheetData } from './sheet';
+import { importFile, mergeKnowledge, readKnowledge, type KnowledgeEntry, type SheetData } from './sheet';
 import type { LogEntry } from './checks';
 import { postToDiscord, isWebhookUrl } from './discord';
 import {
@@ -7,14 +7,18 @@ import {
   unreadableSheets, loadStateFile, saveStateFile, type PartyAt, type Settings
 } from './storage';
 import {
-  StateError, blankState, closeSession, moveParty, openSession, passTime, readState, setStart, withCharacters, withRules, writeState, type CampaignState, type StateRules
+  StateError, blankState, closeSession, moveParty, openSession, passTime, readState, setStart, withCharacters, withPlayer, withRules, writeState, type CampaignState, type StateRules
 } from './state';
 import { loadRepo, type SavedModule } from './modules';
 import {
-  absorbCustom, activateCampaign, blankLocal, campaignRulesId, isScribeLink, openCampaignLink, loadCampaigns, loadFallbacks, loadLocal, registerCampaign, saveCampaigns,
+  absorbCustom, activateCampaign, blankLocal, campaignRulesId, exportSheet, isScribeLink, openCampaignLink, loadCampaigns, loadFallbacks, loadLocal, registerCampaign, saveCampaigns,
   saveLocal, type CampaignCache
 } from './campaign';
 import { CORE_RULES } from '../rules/core-modules';
+import { addMail, answer, joinRequest, loadMail, mailFileName, post, readMailFile, saveMail, sendBack, type MailItem } from './mail';
+import { downloadJson } from './storage';
+import { pointer as campaignPointer, snapshot as campaignSnapshot, type Services } from '../../../engine/publish';
+import { get as idbGet, set as idbSet } from 'idb-keyval';
 import { addInvitation, bindCharacter, invitationLabel, loadInvitations, readInvite, saveInvitations, withRefereeInvitations, type Invite, type Mode, type Invitation } from './invitations';
 import { hasEquipment, registerEquipment, type EquipmentFileData } from '../equipment/equipment';
 import { preloadDice, showDice } from './dice3d';
@@ -49,6 +53,8 @@ class AppState {
     this.mode === 'player' ? this.characters.filter((c) => c.id === this.invitation?.character) : this.characters.filter((c) => c.data.owner !== 'referee')
   );
   log = $state<LogEntry[]>([]);
+  // Requests sent and received on this device, every campaign (lib/mail.ts).
+  mail = $state<MailItem[]>([]);
   settings = $state<Settings>({ ...DEFAULT_SETTINGS });
   view = $state<View>({ name: 'list' });
   toast = $state('');
@@ -98,10 +104,15 @@ class AppState {
   }
 
   // The active campaign's id; '' for "This device".
-  // Inbox items not yet opened: invitations, players' updates, sent-back notes.
-  // Shared campaigns (sign-in) fill the inbox; until then nothing arrives.
+  // The campaign in use's messages, newest first.
+  get requests(): MailItem[] {
+    const id = this.campaignId;
+    return id ? this.mail.filter((m) => m.envelope.campaign === id).reverse() : [];
+  }
+
+  // Inbox items waiting on you: players' requests for the referee, sent-back notes for a player.
   get unread(): number {
-    return 0;
+    return this.requests.filter((m) => m.box === 'in' && !m.answer && (this.mode === 'referee' ? m.envelope.kind === 'join' : m.envelope.to === this.me?.id)).length;
   }
 
   get campaignId(): string {
@@ -165,6 +176,11 @@ class AppState {
           console.warn(e);
         }
       }
+    }
+    try {
+      this.mail = await loadMail();
+    } catch (e) {
+      console.warn('Mail unavailable', e);
     }
     // Campaigns opened before invitations existed were opened as their referee.
     try {
@@ -407,6 +423,110 @@ class AppState {
     if (site && !this.modules.some((m) => m.base === site)) void this.addModuleRepo(site).catch((e) => console.warn('Campaign modules not read', e));
   }
 
+  private async keepMail(list: MailItem[]) {
+    this.mail = list;
+    await saveMail($state.snapshot(list) as MailItem[]);
+  }
+
+  // Player mode: sends the seat's character to the referee (WORKFLOWS.md "Joining"), by the campaign's post URL
+  // when it has one, or else as a file the player passes on. Says which, for the player.
+  async sendJoin(name: string): Promise<'posted' | 'saved'> {
+    const me = this.me, c = this.campaign;
+    if (!me || !c || this.mode !== 'player') throw new Error('Pick the character you play first');
+    const e = joinRequest(c.campaign.id, me, exportSheet($state.snapshot(me.data) as typeof me.data), name.trim());
+    let how: 'posted' | 'saved' = 'saved';
+    if (c.published?.post) {
+      try {
+        await post(c.published.post, e);
+        how = 'posted';
+      } catch (err) {
+        console.warn('Request not posted; saving it as a file', err);
+      }
+    }
+    if (how === 'saved') downloadJson(mailFileName(e, me.name), e);
+    // a note the referee sent back is answered by sending again
+    let list = this.mail.map((m) => (m.box === 'in' && m.envelope.kind === 'sent-back' && m.envelope.to === me.id && !m.answer ? { ...m, answer: { kind: 'approved' as const, at: e.sent } } : m));
+    list = addMail(list, { envelope: e, box: 'out' });
+    await this.keepMail(list);
+    this.notify(how === 'posted' ? `Sent ${me.name} to the referee` : `Saved ${me.name}'s request. Send that file to your referee.`);
+    return how;
+  }
+
+  // A message file opened in the Inbox: a player's request (referee mode) or the referee's reply (player mode).
+  // Throws with a message for the reader.
+  async openMail(data: unknown): Promise<number> {
+    const list = readMailFile(data);
+    let mail = this.mail;
+    for (const e of list) {
+      if (e.campaign !== this.campaignId) throw new Error(`That message is for another campaign (${e.campaign}). Switch to it first.`);
+      if (this.mode === 'referee' && e.kind !== 'join') throw new Error("That's a reply for a player. Open it on the player's device.");
+      if (this.mode === 'player' && (e.kind === 'join' || e.to !== this.me?.id)) throw new Error("That message isn't for the character you play here.");
+      mail = addMail(mail, { envelope: e, box: 'in' });
+    }
+    await this.keepMail(mail);
+    return list.length;
+  }
+
+  // Referee mode: takes a join request. The character joins this campaign's party on this device, and the request
+  // counts as received in the next Update campaign.
+  async approve(id: string) {
+    const m = this.mail.find((x) => x.box === 'in' && x.envelope.id === id && x.envelope.kind === 'join');
+    if (!m || this.mode !== 'referee') return;
+    const imported = await this.importCharacters($state.snapshot(m.envelope.body.character));
+    for (const s of this.sheets) if (imported.some((x) => x.id === s.id)) { s.campaign = this.campaignId || undefined; delete s.owner; }
+    await this.persist();
+    await this.exportState();
+    const who = m.envelope.from.name;
+    for (const x of imported) if (who) await this.saveState(withPlayer($state.snapshot(this.state) as CampaignState, x.id, who));
+    await this.keepMail(answer(this.mail, id, { kind: 'approved', at: new Date().toISOString() }));
+    this.notify(`${imported.map((x) => x.name).join(', ') || 'The character'} joined the party. Update campaign to tell the player.`);
+  }
+
+  // Referee mode: returns a request with a note, as a file for the player; the seat stays open.
+  async sendBackRequest(id: string, note: string) {
+    const m = this.mail.find((x) => x.box === 'in' && x.envelope.id === id);
+    if (!m || this.mode !== 'referee') return;
+    const reply = sendBack(m.envelope, note.trim());
+    downloadJson(mailFileName(reply, m.envelope.from.name ?? ''), reply);
+    let list = answer(this.mail, id, { kind: 'sent-back', note: note.trim(), at: reply.sent });
+    list = addMail(list, { envelope: reply, box: 'out' });
+    await this.keepMail(list);
+    this.notify('Saved the reply. Send that file to the player.');
+  }
+
+  // Referee mode, a campaign Scribe published: writes the pointer and a new snapshot (WORKFLOWS.md "Invitations"),
+  // with the state as it is now, each party member's knowledge for their player alone, and the requests answered.
+  // Until an adapter can upload, the referee uploads the two files into the campaign's folder, replacing the old.
+  async updateCampaign() {
+    const c = this.campaign;
+    if (!c?.published || !isScribeLink(c.url) || this.mode !== 'referee') throw new Error('Publish the campaign in Scribe first');
+    const id = c.campaign.id;
+    type Rec = { site: string; ruleset: string; manifest: Record<string, unknown>; lock: unknown; services?: Services; published?: { revision: number; at: string } };
+    const rec = (await idbGet(`scribe-campaign:${id}`)) as Rec | undefined;
+    if (!rec?.services || !rec.published) throw new Error('Publish the campaign in Scribe first');
+    const state = await this.exportState();
+    const knowledge = Object.fromEntries(
+      state.characters.flatMap((x) => {
+        const s = this.sheets.find((y) => y.id === x.id);
+        return s ? [[x.id, $state.snapshot(s.knowledge)]] : [];
+      })
+    );
+    const snap = campaignSnapshot({ campaign: id, ruleset: rec.ruleset, site: rec.site, module: rec.manifest, lock: rec.lock, state: state as unknown as Record<string, unknown>, knowledge }, rec.published, this.receipts);
+    const ptr = campaignPointer(id, String(rec.manifest.title ?? c.campaign.name), rec.services);
+    await idbSet(`scribe-campaign:${id}`, { ...rec, published: { revision: snap.revision, at: snap.published } });
+    this.campaigns = { ...this.campaigns, [c.url]: { ...c, published: { ...c.published, revision: snap.revision } } };
+    await saveCampaigns(this.campaigns);
+    downloadJson('campaign.json', ptr);
+    await new Promise((r) => setTimeout(r, 400));
+    downloadJson('snapshot.json', snap);
+    this.notify(`Update ${snap.revision} saved. Upload campaign.json and snapshot.json to ${rec.services.folder}`);
+  }
+
+  // The requests this device has answered, for the next snapshot's receipts.
+  get receipts(): string[] {
+    return this.requests.filter((m) => m.box === 'in' && m.answer && m.envelope.kind === 'join').map((m) => m.envelope.id);
+  }
+
   // A published campaign read from its snapshot (a player's device): the shared state there (clock, party, what
   // everyone knows) replaces this device's copy when the referee's is newer.
   private async takeSnapshotState(c: CampaignCache) {
@@ -414,11 +534,24 @@ class AppState {
     if (!shared || this.campaignId !== c.campaign.id) return;
     try {
       const s = readState(shared, c.campaign.id);
-      if (s.revision <= this.state.revision) return;
-      this.state = s;
-      await saveStateFile(s.campaign, writeState(s));
+      if (s.revision > this.state.revision) {
+        this.state = s;
+        await saveStateFile(s.campaign, writeState(s));
+      }
     } catch (e) {
       console.warn('Shared campaign state unreadable', e);
+    }
+    // What the character this seat plays knows, which only the referee writes (WORKFLOWS.md "Who writes what").
+    const me = this.mode === 'player' ? this.invitation?.character : undefined;
+    const part = me ? (c.published?.snapshot?.private?.[me] as { characters?: Record<string, { knowledge?: unknown }> } | undefined) : undefined;
+    const known = part?.characters?.[me!]?.knowledge;
+    const sheet = me ? this.sheets.find((x) => x.id === me) : undefined;
+    if (sheet && Array.isArray(known)) {
+      const next = readKnowledge(known);
+      if (JSON.stringify(next) !== JSON.stringify(sheet.knowledge)) {
+        sheet.knowledge = next;
+        await this.persist();
+      }
     }
   }
 
