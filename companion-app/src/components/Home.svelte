@@ -49,6 +49,25 @@
   let choices = $derived(app.mode === 'player' && !app.me ? app.characters.filter((c) => c.data.owner !== 'referee') : []);
   let view = $derived(active ? sheetView(active.data, active.state) : undefined);
 
+  // Player mode: the character goes to the referee as a join request until it is in the party (WORKFLOWS.md "Joining").
+  let joining = $derived(app.mode === 'player' && !!app.me && !app.state.characters.some((c) => c.id === app.me!.id));
+  let sentJoin = $derived(app.requests.find((m) => m.box === 'out' && m.envelope.kind === 'join' && m.envelope.from.character === app.me?.id));
+  let playerName = $state('');
+  let sending = $state(false);
+  $effect(() => {
+    if (!playerName && sentJoin?.envelope.from.name) playerName = sentJoin.envelope.from.name;
+  });
+  async function sendJoin() {
+    sending = true;
+    try {
+      await app.sendJoin(playerName);
+    } catch (e) {
+      app.notify((e as Error).message);
+    } finally {
+      sending = false;
+    }
+  }
+
   function select(id: string) {
     app.updateSettings({ activeId: id });
     page = 0;
@@ -148,6 +167,21 @@
       <p class="muted small">Roll one up, or import a saved sheet from the Character tab below.</p>
     {/if}
     <button class="primary" onclick={() => (app.view = { name: 'build' })}>New character</button>
+  </div>
+{/if}
+
+{#if joining && app.me}
+  <div class="card join">
+    {#if sentJoin}
+      <p>{app.me.name}'s request to join was sent {new Date(sentJoin.envelope.sent).toLocaleDateString()}. <button class="link" onclick={() => (app.view = { name: 'inbox' })}>Follow it in the Inbox</button></p>
+    {:else}
+      <p>{app.me.name} isn't in the party yet. When the character is ready, send it to the referee.</p>
+    {/if}
+    <div class="row">
+      <input placeholder="Your name, for the referee" bind:value={playerName} aria-label="Your name" />
+      <button class:primary={!sentJoin} disabled={sending} onclick={sendJoin}>{sentJoin ? 'Send again' : 'Send to the referee'}</button>
+    </div>
+    {#if !app.campaign?.published?.post}<p class="small muted">This campaign has no mailbox yet, so the request is saved as a file. Send that file to your referee however you like.</p>{/if}
   </div>
 {/if}
 
@@ -254,4 +288,6 @@
   .backup .row { flex-wrap: wrap; }
   .json { width: 100%; box-sizing: border-box; height: 14rem; margin: 0.5rem 0; font: 0.75rem/1.35 ui-monospace, Menlo, monospace; }
   .link { background: none; border: 0; padding: 0; min-height: 0; color: var(--accent); text-decoration: underline; font: inherit; }
+  .join p { margin: 0 0 0.5rem; }
+  .join .row input { flex: 1; min-width: 0; }
 </style>

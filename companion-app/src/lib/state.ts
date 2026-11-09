@@ -169,6 +169,13 @@ export function withCharacters(s: CampaignState, list: { id: string; name: strin
   return same ? s : bump(s, { characters: next }, now);
 }
 
+// Who plays a character in the party list (an approved join request names its player).
+export function withPlayer(s: CampaignState, id: string, player: string, now = new Date()): CampaignState {
+  const c = s.characters.find((x) => x.id === id);
+  if (!c || c.player === player) return s;
+  return bump(s, { characters: s.characters.map((x) => (x.id === id ? { ...x, player } : x)) }, now);
+}
+
 // Records which rules (and which version of their module) the campaign is played with.
 export function withRules(s: CampaignState, rules: StateRules | null, now = new Date()): CampaignState {
   const a = s.rules, b = rules;

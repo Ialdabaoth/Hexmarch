@@ -40,7 +40,7 @@ export interface CampaignCache {
   scribe?: { site: string };
   // A campaign its referee has published (data repo modules/SCRIBE.md section 5): the pointer invitations name,
   // where players read the snapshot and send requests, and, on a player's device, the snapshot as last read.
-  published?: { pointer: string; read: string; post: string; revision: number; snapshot?: Pick<Snapshot, 'state' | 'private'> };
+  published?: { pointer: string; read: string; post: string; revision: number; snapshot?: Pick<Snapshot, 'state' | 'private' | 'receipts'> };
 }
 
 export class CampaignError extends Error {}
@@ -178,7 +178,7 @@ export async function publishedCampaign(url: string, data: unknown): Promise<Cam
       format: 'e9-scribe-campaign', version: 1, id: p.campaign, site: snap.site, ruleset: snap.ruleset,
       manifest: { ...snap.module, title: p.title }, lock: snap.lock, saved: snap.published
     });
-    return { ...c, published: { pointer: url, read: p.read, post: p.post, revision: snap.revision, snapshot: { state: snap.state, private: snap.private } } };
+    return { ...c, published: { pointer: url, read: p.read, post: p.post, revision: snap.revision, snapshot: { state: snap.state, private: snap.private, receipts: snap.receipts } } };
   } catch (e) {
     throw e instanceof PublishError ? new CampaignError(e.message) : e;
   }

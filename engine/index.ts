@@ -7,3 +7,4 @@ export * from './resolve';
 export * from './content';
 export * from './sites';
 export * from './publish';
+export * from './mail';

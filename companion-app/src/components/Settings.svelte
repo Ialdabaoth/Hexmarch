@@ -110,6 +110,12 @@
       <button class="link" disabled={busy} onclick={refresh}>Check for changes</button>
       {#if app.invitation}<button class="link" disabled={busy} onclick={() => app.invitation && run(() => app.forgetInvitation(app.invitation!.id))}>Remove from this device</button>{/if}
     </p>
+    {#if app.mode === 'referee' && app.campaign.published && isScribeLink(app.settings.campaign)}
+      <p class="small muted">
+        Published (update {app.campaign.published.revision}). <button class="link" disabled={busy} onclick={() => run(() => app.updateCampaign())}>Update campaign</button>
+        saves the campaign as players will see it now (the clock, the party, what each character knows, and the requests you answered) as two files to upload in place of the old ones.
+      </p>
+    {/if}
     {#if app.mode === 'referee'}
       <details>
         <summary class="small">Invite a player</summary>
