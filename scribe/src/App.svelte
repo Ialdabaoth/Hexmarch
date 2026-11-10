@@ -14,14 +14,12 @@
     title: string;
     root: string; // "<module>/<option>"
     modules: string[];
-    start: string; // "<module>/<start id>", or "manual"
-    manual: { module: string; site: string; date: string; hour: number };
   }
-  const blank: Draft = { title: '', root: '', modules: [], start: '', manual: { module: '', site: '', date: '3507-05-01', hour: 8 } };
+  const blank: Draft = { title: '', root: '', modules: [] };
   function loadDraft(): Draft {
     try {
       const d = JSON.parse(localStorage.getItem(DRAFT) ?? 'null');
-      return d ? { ...blank, ...d, manual: { ...blank.manual, ...(d.manual ?? {}) } } : structuredClone(blank);
+      return d ? { title: String(d.title ?? ''), root: String(d.root ?? ''), modules: Array.isArray(d.modules) ? d.modules : [] } : structuredClone(blank);
     } catch {
       return structuredClone(blank);
     }
@@ -37,8 +35,6 @@
   const rootKey = (r: RootChoice) => `${r.module}/${r.option}`;
   const root = $derived(ROOTS.find((r) => rootKey(r) === draft.root) ?? null);
   const picked = $derived(site.filter((m) => draft.modules.includes(m.id)));
-  const offers = $derived(picked.flatMap((m) => startsOf(m).map((s) => ({ module: m, start: s }))));
-  const manualModule = $derived(site.find((m) => m.id === (draft.manual.module || picked[0]?.id)) ?? null);
 
   async function refresh() {
     if (!siteUrl) return;
@@ -69,19 +65,12 @@
       built = null;
       return;
     }
-    let start: Choices['start'] = null;
-    if (d.start === 'manual') start = { module: d.manual.module || d.modules[0], site: d.manual.site, date: d.manual.date, hour: Number(d.manual.hour) || 0 };
-    else if (d.start) {
-      const [module, ...rest] = d.start.split('/');
-      start = { module, id: rest.join('/') };
-    }
-    const choices: Choices = { title: d.title, root, modules: d.modules, start };
+    const choices: Choices = { title: d.title, root, modules: d.modules };
     buildCampaign(choices, $state.snapshot(site) as SiteModule[], RULES_MANIFESTS).then((b) => (built = b));
   });
 
   function toggle(id: string) {
     draft.modules = draft.modules.includes(id) ? draft.modules.filter((m) => m !== id) : [...draft.modules, id];
-    if (draft.start && draft.start !== 'manual' && !draft.modules.includes(draft.start.split('/')[0])) draft.start = '';
   }
 
   function download(name: string, data: unknown) {
@@ -91,17 +80,14 @@
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
+  // Preview in Atlas opens the first picked module at its first start's place, when it has one.
   const startSite = $derived.by(() => {
-    if (!built) return null;
-    const s = built.manifest.start as { module: string; id: string } | undefined;
-    const module = s?.module ?? (draft.start === 'manual' ? draft.manual.module || draft.modules[0] : '');
-    const places = (built.state.revealed as Record<string, { places: string[] }>)[module]?.places ?? [];
-    const slugOf = draft.start === 'manual' ? draft.manual.site : places[0];
-    return module ? { module, slug: slugOf ?? '' } : null;
+    if (!built || !picked.length) return null;
+    const m = picked[0];
+    const first = startsOf(m)[0];
+    const name = first?.site ?? '';
+    return { module: m.id, slug: m.sites.find((x) => x.name === name)?.slug ?? '' };
   });
-  const atlasLink = $derived(
-    startSite ? `../atlas/?site=${encodeURIComponent(siteUrl)}&module=${encodeURIComponent(startSite.module)}${startSite.slug ? `#site:${startSite.slug}` : ''}` : ''
-  );
 
   // Step 7: save the campaign on this device and open it in the Companion (by link) or the Atlas.
   let saveError = $state('');
@@ -113,7 +99,7 @@
     const title = String(built.manifest.title);
     try {
       const saved = await saveOnDevice($state.snapshot(built) as Built, root, siteUrl, (rev) =>
-        confirm(`This device already has play for “${title}” (state revision ${rev}): where the party is, the clock and what it has found. Start it again from this campaign's start?\n\nOK starts again; Cancel keeps the play and saves only the campaign.`)
+        confirm(`This device already has play for “${title}” (state revision ${rev}): where the party is, the clock and what it has found. Start it again from scratch (no parties yet)?\n\nOK starts again; Cancel keeps the play and saves only the campaign.`)
       );
       wroteState = saved.wroteState;
       savedAs = saved.link;
@@ -123,6 +109,13 @@
       return null;
     }
   }
+  let building = $state(false);
+  async function build() {
+    building = true;
+    await save();
+    building = false;
+  }
+
   // Steps 8 and 9: Services and Publish (SCRIBE.md section 5).
   let record = $state<SavedCampaign | null>(null);
   let folder = $state('');
@@ -131,7 +124,25 @@
   // Google Drive through their own Apps Script, or by hand as before.
   let storeKind = $state<StoreKind>('github');
   let scriptUrl = $state('');
-  let ghRepo = $state('');
+  // Repository = the referee's GitHub username / the repository name (step 2 suggests one from the campaign name).
+  let ghUser = $state('');
+  let ghName = $state('');
+  const ghRepo = $derived(ghUser.trim() && ghName.trim() ? `${ghUser.trim()}/${ghName.trim()}` : '');
+  const suggestedName = $derived(
+    (built ? String(built.manifest.title) : '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'my-campaign'
+  );
+  $effect(() => {
+    if (storeKind === 'github' && !ghName && built) ghName = suggestedName;
+  });
+  const newRepoLink = $derived(`https://github.com/new?${new URLSearchParams({ name: ghName.trim() || suggestedName, visibility: 'public', description: 'Hexmarch campaign files' })}`);
+  const tokenLink = $derived(
+    `https://github.com/settings/personal-access-tokens/new?${new URLSearchParams({
+      name: `Hexmarch Scribe ${ghName.trim() || suggestedName}`.slice(0, 40),
+      description: 'Lets Hexmarch Scribe publish this campaign',
+      ...(ghUser.trim() ? { target_name: ghUser.trim() } : {}),
+      contents: 'write'
+    })}`
+  );
   let ghDir = $state('');
   let ghBranch = $state('main');
   let secret = $state('');
@@ -167,7 +178,8 @@
         storeKind = st?.kind ?? 'manual';
         if (st?.kind === 'apps-script') scriptUrl = st.url;
         if (st?.kind === 'github') {
-          ghRepo = `${st.owner}/${st.repo}`;
+          ghUser = st.owner;
+          ghName = st.repo;
           ghDir = st.dir;
           ghBranch = st.branch;
         }
@@ -234,9 +246,14 @@
     }
   })();
 
+  // Built = this device holds the campaign exactly as the page shows it now (Heph 2026-11-10: Build Campaign first,
+  // then Open in the Companion or the Atlas). Changing the campaign after building asks for another build.
+  const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+  const isBuilt = $derived(!!built && !!record && same(record.manifest, $state.snapshot(built.manifest)) && same(record.lock, $state.snapshot(built.lock)));
+
   async function openIn(app: 'companion' | 'atlas') {
-    const link = await save();
-    if (!link) return;
+    if (!isBuilt || !built) return;
+    const link = campaignLink(String(built.manifest.id));
     const c = encodeURIComponent(link);
     if (app === 'companion') {
       // Apps talk by links: the Companion gets the campaign, and the state to start from when Scribe just wrote it
@@ -294,6 +311,17 @@
           {#if m.books.length}<br /><span class="small muted">{m.books.map((b) => `${b.id} ${b.title}`).join(' · ')}</span>{/if}
         </span>
       </label>
+      {#if startsOf(m).length}
+        <details class="starts">
+          <summary>Show Player Start Locations</summary>
+          <ul>
+            {#each startsOf(m) as st (st.id)}
+              <li><strong>{st.title ?? st.id}</strong>
+                <span class="small muted">{[st.site, st.date, st.levels ? `levels ${st.levels[0]}–${st.levels[1]}` : '', st.uses?.length ? `plays ${st.uses.join(', ')}` : ''].filter(Boolean).join(' · ')}</span></li>
+            {/each}
+          </ul>
+        </details>
+      {/if}
     {/each}
     <details class="small">
       <summary class="muted">Modules from another site</summary>
@@ -306,81 +334,80 @@
 
   {/if}
 
-  {#if root && picked.length}
-  <section>
-    <h2>Start</h2>
-
-      {#each offers as o (o.module.id + '/' + o.start.id)}
-        <label class="opt">
-          <input type="radio" name="start" value={`${o.module.id}/${o.start.id}`} bind:group={draft.start} />
-          <span>
-            <strong>{o.start.title ?? o.start.id}</strong> <span class="small muted">{o.module.title}</span>
-            <br /><span class="small muted">
-              {[o.start.site, o.start.date, o.start.levels ? `levels ${o.start.levels[0]}–${o.start.levels[1]}` : '', o.start.uses?.length ? `plays ${o.start.uses.join(', ')}` : '']
-                .filter(Boolean)
-                .join(' · ')}
-            </span>
-          </span>
-        </label>
-      {/each}
-      <label class="opt">
-        <input type="radio" name="start" value="manual" bind:group={draft.start} />
-        <span><strong>Place the party yourself</strong></span>
-      </label>
-      {#if draft.start === 'manual'}
-        <div class="row">
-          <select bind:value={draft.manual.module}>
-            {#each picked as m (m.id)}<option value={m.id}>{m.title}</option>{/each}
-          </select>
-          <select bind:value={draft.manual.site}>
-            <option value="">No place yet</option>
-            {#each manualModule?.sites ?? [] as s (s.slug)}<option value={s.slug}>{s.name}</option>{/each}
-          </select>
-          <input type="text" bind:value={draft.manual.date} placeholder="3507-05-01" />
-          <input type="number" min="0" max="23" bind:value={draft.manual.hour} />
-        </div>
-      {/if}
-  </section>
-  {/if}
-
   {#if built}
     <section>
-      <h2>Your campaign</h2>
+      <h2><button type="button" class="tip" data-tip="The campaign stays on this device: the Companion, the Atlas and Scribe share it here. The Atlas puts the party at the start the first time it opens.">Your campaign</button></h2>
       {#if built.problems.length}
         <p class="bad">Scribe can't settle the modules yet:</p>
         <ul class="problems">{#each built.problems as p}<li>{describeProblem(p)}</li>{/each}</ul>
       {:else}
         <p class="small muted">{built.lock.modules.map((m) => `${m.id} ${m.version}`).join(' · ')}</p>
       {/if}
-      <h3><button type="button" class="tip" data-tip="The campaign stays on this device: the Companion, the Atlas and Scribe share it here. The Atlas puts the party at the start the first time it opens.">Play it</button></h3>
-      <div class="row">
-        <button disabled={!!built.problems.length} onclick={() => openIn('companion')}>Save and open in the Companion</button>
-        {#if startSite}<button disabled={!!built.problems.length} onclick={() => openIn('atlas')}>Save and open the start in the Atlas</button>{/if}
-        <button class="quiet" disabled={!!built.problems.length} onclick={save}>Save on this device</button>
-      </div>
+      <button disabled={!!built.problems.length || building} onclick={build}>{building ? 'Building…' : 'Build Campaign'}</button>
       {#if saveError}<p class="bad">{saveError}</p>{/if}
-      {#if savedAs}<p class="small muted">Saved on this device, with your Referee invitation: the Companion lists it in its campaigns. Its link is <code>{savedAs}</code>{#if savedAs !== campaignLink(String(built.manifest.id))} (renamed since: save again){/if}.</p>{/if}
+      {#if !isBuilt && record}
+        <p class="small muted">The campaign has changed since you built it. Build it again to open or publish it.</p>
+      {/if}
+      {#if isBuilt}
       <details class="files">
         <summary><span class="tip" data-tip="Keep these three files together to back up the campaign or move it to another device.">Campaign Files</span></summary>
         <ul>
           <li><a href="#module.json" onclick={(e) => (e.preventDefault(), download('module.json', built!.manifest))}>module.json</a></li>
           <li><a href="#campaign.lock.json" onclick={(e) => (e.preventDefault(), download('campaign.lock.json', built!.lock))}>campaign.lock.json</a></li>
           <li><a href="#state.json" onclick={(e) => (e.preventDefault(), download('state.json', built!.state))}>state.json</a></li>
-          {#if atlasLink}<li><a href={atlasLink}>Look at the start in the Atlas</a></li>{/if}
         </ul>
       </details>
+      {/if}
     </section>
   {/if}
 
-  {#if built && !built.problems.length}
+  {#if built && isBuilt}
+    <section>
+      <h2>Preview My Campaign</h2>
+      <div class="row">
+        <button onclick={() => openIn('companion')}>Preview in Companion</button>
+        {#if startSite}<button onclick={() => openIn('atlas')}>Preview in Atlas</button>{/if}
+      </div>
+    </section>
+  {/if}
+
+  {#if built && !built.problems.length && isBuilt}
     <section>
       <h2><button type="button" class="tip" data-tip="Players read the campaign from a web address you choose. Publish puts the files there for you, free, on an account of yours.">Where players find it</button></h2>
       {#if !record}
         <p class="small muted">Save the campaign on this device first (above). Players can't join until it is published.</p>
       {:else}
         <label class="opt"><input type="radio" name="store" value="github" bind:group={storeKind} /><span><button type="button" class="tip" data-tip="GitHub is a free, open-source repository that anyone can use. It is unaffiliated with Hexmarch, so your files will always be yours. Hexmarch will provide step-by-step instructions for setting up your campaign."><strong>GitHub</strong></button> (preferred)</span></label>
+        {#if storeKind === 'github'}
+          <ol class="small gh">
+            <li>
+              Make a free <a href="https://github.com/signup" target="_blank" rel="noopener">GitHub account</a>, if you don't have one.
+              <button type="button" class="tip" data-tip="GitHub stores your campaign files for free, and your players read them from there.">Why GitHub?</button>
+              <label class="field">Your GitHub username <input type="text" bind:value={ghUser} placeholder="heph" autocapitalize="off" autocomplete="username" /></label>
+            </li>
+            <li>
+              Name your <button type="button" class="tip" data-tip="A repository is a folder on GitHub. It has to be Public so players can read it, but only you can change it.">repository</button>,
+              then <a href={newRepoLink} target="_blank" rel="noopener">create it on GitHub</a> and press <strong>Create repository</strong>.
+              <label class="field">Repository name <input type="text" bind:value={ghName} placeholder={suggestedName} autocapitalize="off" /></label>
+            </li>
+            <li>
+              Make a <button type="button" class="tip" data-tip="The key stays on this device and never goes into your campaign or its links. It can only touch this one repository.">key</button>
+              so Scribe can save there: <a href={tokenLink} target="_blank" rel="noopener">open the key page</a>. Check that your
+              repository is picked and <strong>Contents</strong> says <strong>Read and write</strong>, then press <strong>Generate token</strong> and copy it.
+            </li>
+            <li>Paste the key here, then press Publish (below).
+              <label class="field">Key <input type="password" bind:value={secret} autocomplete="off" /></label>
+            </li>
+          </ol>
+          <details class="small">
+            <summary>Advanced</summary>
+            <div class="row">
+              <label class="field">Folder (optional) <input type="text" bind:value={ghDir} placeholder="kells" autocapitalize="off" /></label>
+              <label class="field">Branch <input type="text" bind:value={ghBranch} autocapitalize="off" /></label>
+            </div>
+          </details>
+        {/if}
         <label class="opt"><input type="radio" name="store" value="apps-script" bind:group={storeKind} /><span><button type="button" class="tip" data-tip="Google Drive is a popular file storage service that comes with any GMail account. Hexmarch will walk you through setting up an Apps Script, which will give Hexmarch limited access to the files on your Drive that Hexmarch will use to share your campaign with players and co-referees."><strong>Google Drive</strong></button></span></label>
-        <label class="opt"><input type="radio" name="store" value="manual" bind:group={storeKind} /><span><button type="button" class="tip" data-tip="If you have your own website or server, Hexmarch can simply hand you the campaign files and let you place them somewhere that your players and co-referees can access them."><strong>My Own Host</strong></button></span></label>
         {#if storeKind === 'apps-script'}
           <details class="small" open={!scriptUrl}>
             <summary>Set up your script (once, about two minutes)</summary>
@@ -393,25 +420,13 @@
           </details>
           <label class="field">Web app URL <input type="url" bind:value={scriptUrl} placeholder="https://script.google.com/macros/s/…/exec" /></label>
           <label class="field">Key (the KEY line in your script) <input type="password" bind:value={secret} autocomplete="off" /></label>
-        {:else if storeKind === 'github'}
-          <details class="small" open={!ghRepo}>
-            <summary>Set up GitHub (once)</summary>
-            <ol>
-              <li>Make a <strong>public</strong> repository for your campaigns (players read the files from it, so keep secrets out of it).</li>
-              <li>Make a <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">fine-grained token</a>: Only select repositories › that one; Permissions › Contents › Read and write. Paste it below. It stays on this device.</li>
-            </ol>
-          </details>
-          <div class="row">
-            <label class="field">Repository <input type="text" bind:value={ghRepo} placeholder="you/kells-1422" autocapitalize="off" /></label>
-            <label class="field">Folder (optional) <input type="text" bind:value={ghDir} placeholder="kells" autocapitalize="off" /></label>
-            <label class="field">Branch <input type="text" bind:value={ghBranch} autocapitalize="off" /></label>
-          </div>
-          <label class="field">Token <input type="password" bind:value={secret} autocomplete="off" /></label>
-        {:else}
+        {/if}
+        <label class="opt"><input type="radio" name="store" value="manual" bind:group={storeKind} /><span><button type="button" class="tip" data-tip="If you have your own website or server, Hexmarch can simply hand you the campaign files and let you place them somewhere that your players and co-referees can access them."><strong>My Own Host</strong></button></span></label>
+        {#if storeKind === 'manual'}
           <label class="field">Folder you upload to <input type="url" bind:value={folder} placeholder="https://you.github.io/kells-1422/" /></label>
         {/if}
-        <button class="quiet" disabled={!storeReady || !record.published || testing} onclick={runTest}>{testing ? 'Testing…' : 'Test'}</button>
-        {#if test === 'none'}<p class="small muted">Publish first (below), then test.</p>
+        <button disabled={!storeReady || !record.published || testing} onclick={runTest}>{testing ? 'Verifying…' : 'Verify Campaign Files'}</button>
+        {#if test === 'none'}<p class="small muted">Publish first (below), then verify.</p>
         {:else if typeof test === 'string'}<p class="bad">{test}</p>
         {:else if test}
           <ul class="small test">

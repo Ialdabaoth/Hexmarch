@@ -486,27 +486,43 @@ function drawRoute() {
   if (ROUTE && !drawRoute.q) drawRoute.q = setTimeout(() => { drawRoute.q = 0; routeBox(); }, 150);  // tiles landing change the sums
 }
 
-// ---- the campaign state (STATE_FORMAT.md, hexmarch-campaign-state/1; Atlas 0.5.11): where the party stands, the clock, what the party has found.
+// ---- the campaign state (STATE_FORMAT.md, hexmarch-campaign-state/1; Atlas 0.5.11): where each party stands, its clock, what everyone knows.
+// Parties (Heph 2026-11-10): a campaign has any number of parties, each with its own start, clock and session; the referee creates them here,
+// in the party box. One party is shown and moved at a time: ?party=<id>, else the party of the character shown (?as=), else the state's active one.
 // The Atlas reads it from, in order: the app around it (the Hexmarch Companion sends {type: 'hexmarch-atlas', state}), the Companion on this device
 // (same site, its saved file for the campaign in use), or its own copy (a file loaded here).
 // The party marker (Heph 2026-11-07, Atlas 0.4.17; ATLAS_FORMAT.md "Party marker") is always one 100-ft hex, drawn at every zoom.
 // Moving it along a route adds the travel time, which also passes on the campaign clock.
 let PARTY = null, PLACE = false, PBOX = false;  // PARTY: {hex: [C, R], hours}; PLACE: the next click puts the party there; PBOX: its box is open
 let CS = null, CS_SRC = '';  // the state file and where it came from: 'host', 'device' or 'local'
+let PID = '', NEWP = false, OTHERS = [], CMODS = null;  // CMODS: the campaign's modules (its lockfile), whose starts the party creator offers  // PID: the party shown; NEWP: the party creator is open; OTHERS: the other parties' markers on this map (referee view)
+const ASK_PARTY = new URLSearchParams(location.search).get('party');
+const csDate = v => typeof v === 'string' && /^\d{1,5}-\d{2}-\d{2}$/.test(v);
 const CS_KEY = 'hexmarch-atlas-state', CS_ADDR = /^world:(?:([0-9A-HJ-NPR-Z][0-9]){2}:([0-9A-HJ-NPR-Z][0-9]){2}|-?\d{1,6}\.-?\d{1,6}:-?\d{1,7}\.-?\d{1,7})$/;  // or a fantasy world's numbers (0.5.14)
 function csRead(d) {  // as the Companion reads it (lib/state.ts readState): anything missing gets its default, a newer version is refused
   if (!d || typeof d !== 'object' || d.format !== 'hexmarch-campaign-state') throw new Error("That isn't a campaign state file.");
   if (typeof d.version !== 'number' || d.version > 1) throw new Error('That state file was written by a newer app.');
   const num = (v, f) => typeof v === 'number' && isFinite(v) && v >= 0 ? v : f, str = (v, f) => typeof v === 'string' ? v : f;
-  const p = d.party, revealed = {};
+  const revealed = {};
   for (const [id, r] of Object.entries(d.revealed && typeof d.revealed === 'object' ? d.revealed : {})) if (/^[a-z0-9-]{1,80}$/.test(id) && r && typeof r === 'object')
     revealed[id] = { hexes: (Array.isArray(r.hexes) ? r.hexes : []).filter(h => typeof h === 'string' && CS_ADDR.test(h)), places: (Array.isArray(r.places) ? r.places : []).filter(x => typeof x === 'string') };
+  const marker = p => p && typeof p === 'object' && typeof p.module === 'string' && typeof p.hex === 'string' && p.hex ? { base: str(p.base, ''), module: p.module, map: str(p.map, 'atlas'), hex: p.hex, label: str(p.label, p.hex.slice(6)), hours: num(p.hours, 0) } : null;
+  const start = t => t && typeof t === 'object' && typeof t.module === 'string' ? { module: t.module, ...(typeof t.id === 'string' ? { id: t.id } : {}), ...(typeof t.site === 'string' ? { site: t.site } : {}),
+    ...(csDate(t.date) ? { date: t.date } : {}), ...(typeof t.hour === 'number' ? { hour: t.hour } : {}) } : null;  // null (or "place it yourself"): the referee places the party
+  const parties = (Array.isArray(d.parties) ? d.parties : []).flatMap(q => q && typeof q === 'object' && typeof q.id === 'string' && /^[a-z0-9-]{1,40}$/.test(q.id) ? [{ ...q, id: q.id, name: str(q.name, q.id), start: start(q.start),
+    clock: { start: csDate(q.clock && q.clock.start) ? q.clock.start : '3507-05-01', hours: num(q.clock && q.clock.hours, 8) },
+    session: { number: Math.floor(num(q.session && q.session.number, 0)), open: !!(q.session && q.session.open === true) }, at: marker(q.at) }] : []);
   return { ...d, format: 'hexmarch-campaign-state', version: 1, campaign: str(d.campaign, ''), revision: Math.floor(num(d.revision, 0)), updated: str(d.updated, new Date().toISOString()),
-    clock: { start: /^\d{1,5}-\d{2}-\d{2}$/.test(d.clock && d.clock.start) ? d.clock.start : '3507-05-01', hours: num(d.clock && d.clock.hours, 8) },
-    party: p && typeof p === 'object' && typeof p.module === 'string' && typeof p.hex === 'string' && p.hex ? { base: str(p.base, ''), module: p.module, map: str(p.map, 'atlas'), hex: p.hex, label: str(p.label, p.hex.slice(6)), hours: num(p.hours, 0) } : null,
-    revealed, session: { number: Math.floor(num(d.session && d.session.number, 0)), open: !!(d.session && d.session.open === true) }, characters: Array.isArray(d.characters) ? d.characters : [] };
+    parties, active: parties.some(q => q.id === d.active) ? d.active : parties.length ? parties[0].id : '', revealed, characters: Array.isArray(d.characters) ? d.characters : [] };
 }
-const csBlank = () => ({ format: 'hexmarch-campaign-state', version: 1, campaign: '', revision: 0, updated: new Date().toISOString(), rules: null, clock: { start: '3507-05-01', hours: 8 }, party: null, revealed: {}, session: { number: 0, open: false }, characters: [] });
+const csBlank = () => ({ format: 'hexmarch-campaign-state', version: 1, campaign: '', revision: 0, updated: new Date().toISOString(), rules: null, parties: [], active: '', revealed: {}, characters: [] });
+// the party shown: asked for by the link, else the shown character's own party, else the state's active one
+function partyOf(id) { const c = CS && id && CS.characters.find(x => x && x.id === id); return c && typeof c.party === 'string' ? c.party : ''; }
+function pickParty() {
+  const ps = CS ? CS.parties : [], has = id => id && ps.some(q => q.id === id);
+  PID = has(ASK_PARTY) ? ASK_PARTY : has(partyOf(AS)) ? partyOf(AS) : LOCK ? '' : has(CS && CS.active) ? CS.active : ps.length ? ps[0].id : '';
+}
+const AP = () => CS && PID ? CS.parties.find(q => q.id === PID) || null : null;
 // the Companion keeps its files in this site's IndexedDB (idb-keyval's "keyval-store"): its settings name the campaign in use, and state:<campaign> is that campaign's file
 function idb(fn) {
   return new Promise((ok, no) => { let rq; try { rq = indexedDB.open('keyval-store'); } catch (e) { no(e); return; }
@@ -515,9 +531,9 @@ function idb(fn) {
 }
 const idbGet = k => idb((db, ok, no) => { const r = db.transaction('keyval').objectStore('keyval').get(k); r.onsuccess = () => { db.close(); ok(r.result); }; r.onerror = () => { db.close(); no(r.error); }; });
 const idbSet = (k, v) => idb((db, ok, no) => { const t = db.transaction('keyval', 'readwrite'); t.objectStore('keyval').put(v, k); t.oncomplete = () => { db.close(); ok(); }; t.onerror = () => { db.close(); no(t.error); }; });
-// A link may name the campaign (Hexmarch Scribe's "Open in the Atlas", Atlas 0.5.16): ?campaign=<the Companion's link for it>, and ?place=site:<id> puts the party
-// on that place's hex when the campaign has no party yet (a new campaign's start). The settings and the campaigns list hold links; state files go by campaign id.
-const ASK = new URLSearchParams(location.search), ASK_CAMPAIGN = ASK.get('campaign'), ASK_PLACE = ASK.get('place');
+// A link may name the campaign (Hexmarch Scribe's "Open in the Atlas", Atlas 0.5.16): ?campaign=<the Companion's link for it>. A new campaign has no
+// parties: the referee creates them in the party box. The settings and the campaigns list hold links; state files go by campaign id.
+const ASK = new URLSearchParams(location.search), ASK_CAMPAIGN = ASK.get('campaign');
 async function campaignIdOf(url) {
   if (!url) return '';
   const cs = await idbGet('campaigns'), c = cs && cs[url];
@@ -525,19 +541,35 @@ async function campaignIdOf(url) {
   const m = url.match(/^scribe:([a-z0-9-]{1,80})$/); return m ? m[1] : url;  // a campaign saved by Scribe that the Companion hasn't opened yet
 }
 async function deviceState() {
-  const set = await idbGet('settings'), url = ASK_CAMPAIGN !== null ? ASK_CAMPAIGN : set && typeof set.campaign === 'string' ? set.campaign : '';
-  const raw = await idbGet('state:' + await campaignIdOf(url)); return raw ? csRead(raw) : null;
+  const set = await idbGet('settings'), url = ASK_CAMPAIGN !== null ? ASK_CAMPAIGN : set && typeof set.campaign === 'string' ? set.campaign : '', id = await campaignIdOf(url);
+  const raw = await idbGet('state:' + id);
+  if (raw && !CMODS) await campaignLock(url, id);
+  return raw ? csRead(raw) : null;
 }
+// the campaign's lockfile, for the party creator's starts. Apps talk by links and never rely on each other's storage (WORKFLOWS.md), so
+// besides the shortcuts on this device (Scribe's record, the Companion's copy) the Atlas reads the published campaign itself: the link
+// names the pointer, the pointer the snapshot, and the snapshot holds the lock. The app around the Atlas may also send {lock}.
+async function campaignLock(url, id) {
+  try { const sc = await idbGet('scribe-campaign:' + id), cs = await idbGet('campaigns'), c = cs && cs[url], snap = c && c.published && c.published.snapshot;
+    lockMods((sc && sc.lock) || (c && c.lock) || (snap && snap.lock)); } catch (e) {}
+  if (CMODS || !/^https:\/\//.test(url)) return;
+  try { const p = await (await fetch(url, { cache: 'no-cache' })).json();
+    if (p && p.format === 'hexmarch-campaign-pointer' && typeof p.read === 'string' && /^https:\/\//.test(p.read)) { const sn = await (await fetch(p.read, { cache: 'no-cache' })).json(); if (sn && sn.campaign === p.campaign) lockMods(sn.lock); }
+  } catch (e) {}
+}
+function lockMods(lock) { if (lock && Array.isArray(lock.modules)) CMODS = new Set(lock.modules.map(m => m && m.id).filter(x => typeof x === 'string')); }
 async function loadState() {
   if (CS_SRC === 'host') return;
   try { const s = await deviceState(); if (s) { CS = s; CS_SRC = 'device'; } } catch (e) {}
   if (!CS) try { const s = JSON.parse(store.get(CS_KEY) || 'null'); if (s) { CS = csRead(s); CS_SRC = 'local'; } } catch (e) {}
   fromState();
-  if (CS && CS_SRC === 'device' && !CS.party && ASK_PLACE && !LOCK) { const m = ASK_PLACE.match(/^site:([a-z0-9-]{1,80})$/), p = m && D.pois.find(q => q.id === m[1]); if (p) await setParty(p.hex, 0); }
 }
-function fromState() {  // the marker from the state file: the party shows only on its own module's map
-  const p = CS && CS.party, q = p && p.module === MOD.id && parse('#' + p.hex);
-  PARTY = q && q.sel ? { hex: q.sel, hours: p.hours || 0 } : null; FOUND = new Set(CS && CS.revealed[MOD.id] ? CS.revealed[MOD.id].places : []);
+function fromState() {  // the markers from the state file: a party shows only on its own module's map
+  pickParty(); startHere();
+  const on = p => { const q = p && p.module === MOD.id && parse('#' + p.hex); return q && q.sel ? { hex: q.sel, hours: p.hours || 0 } : null; };
+  const ap = AP(); PARTY = ap ? on(ap.at) : null;
+  OTHERS = CS && !LOCK ? CS.parties.filter(q => q.id !== PID).flatMap(q => { const m = on(q.at); return m ? [{ ...m, id: q.id, name: q.name }] : []; }) : [];
+  FOUND = new Set(CS && CS.revealed[MOD.id] ? CS.revealed[MOD.id].places : []);
   know();  // what everyone knows is part of every creature's view
 }
 let FOUND = new Set();
@@ -568,7 +600,7 @@ async function loadWho() {
     try { const kept = whoFile(JSON.parse(store.get(WHO_KEY) || '[]')); if (kept.length) { whoMerge(WHO, kept); WHO_SRC = WHO_SRC || 'local'; } } catch (e) {}
   }
   const q = new URLSearchParams(location.search).get('as'); AS = q !== null ? q : LOCK ? AS : store.get('hexmarch-atlas-as:' + MOD.id) || '';
-  know();
+  if (CS) fromState(); else know();  // the party shown follows the character shown
 }
 function know() {
   // locked to a character this map hasn't been given yet: it knows only what everyone knows, never the referee's whole map
@@ -593,7 +625,9 @@ const SIGHT = { grass: 3, woods: 1.5, forest: .5, hills: 6, mount: 12, bog: 2, s
   'scrub-desert': 4, 'sandy-desert': 4, 'rocky-desert': 4, marsh: 2, swamp: 1, 'black-sand': 4, 'deep-ocean': 6, ocean: 6, shallows: 6 };
 const lkey = (C, R) => nearest(C, R, NL).join(',');  // the painted-level hex that owns a lattice hex
 const lAddr = k => { const [i, j] = k.split(',').map(Number); return addr(...centre(i, j, NL)).slice(1); };
-function partyIds() { return CS && CS.characters.length ? CS.characters.map(c => c && c.id).filter(Boolean) : WHO.filter(w => w.owner !== 'referee').map(w => w.id); }
+function partyIds() {  // the shown party's members (characters[].party); a state without characters: the player characters loaded here
+  return CS && CS.characters.length ? CS.characters.filter(c => c && c.id && (!PID || c.party === PID || (CS.parties.length < 2 && !c.party))).map(c => c.id) : WHO.filter(w => w.owner !== 'referee').map(w => w.id);
+}
 function sightFrom(x, y, out) {  // the painted-level hexes whose centre lies within sight (plus half a hex) of a point
   const [li, lj] = hexAt(x, y, NL), t = T(li, lj, NL), ty = TYPES[t - 1], mi = ty ? (ty.sight ?? SIGHT[ty.id] ?? 3) : 3, R = mi * MILE + NL * 50, n = Math.ceil(R / (NL * 100)) + 1;
   for (let i = li - n; i <= li + n; i++) for (let j = lj - n - 1; j <= lj + n + 1; j++) { const [cx, cy] = hexFt(i, j, NL); if (Math.hypot(cx - x, cy - y) <= R) out.add(i + ',' + j); }
@@ -611,7 +645,7 @@ function fogBuild() {
     if (e.rumour) { if (e.place) f.rumPlaces.add(e.place); if (k) f.rum.add(k); continue; }
     if (e.place) f.places.add(e.place);
     if (k) { f.vis.add(k); if (e.explored) f.exp.add(k); } }
-  const inParty = !KNOW || !CS || !CS.characters.length || CS.characters.some(c => c && c.id === KNOW.who.id);
+  const inParty = !KNOW || !CS || !CS.characters.length || partyIds().includes(KNOW.who.id);
   if (PARTY && inParty) sightFrom(...ft(...PARTY.hex), f.sight);
   for (const k of f.sight) f.vis.add(k);
   FOG = f;
@@ -655,7 +689,7 @@ async function addKnowledge(ids, add, remove = []) {
   try { const kept = whoFile(JSON.parse(store.get(WHO_KEY) || '[]')); if (kept.some(w => ids.includes(w.id))) { for (const w of kept) if (ids.includes(w.id)) w.knowledge = kMerge(w.knowledge, add, remove); store.set(WHO_KEY, JSON.stringify(kept)); } } catch (e) {}
   know();
 }
-function seenEntries(keys, extra) { const n = CS ? CS.session.number : 0; return [...keys].map(k => ({ ...(n ? { session: n } : {}), module: MOD.id, hex: lAddr(k), how: 'seen', ...extra })); }
+function seenEntries(keys, extra) { const ap = AP(), n = ap ? ap.session.number : 0; return [...keys].map(k => ({ ...(n ? { session: n } : {}), module: MOD.id, hex: lAddr(k), how: 'seen', ...extra })); }
 async function brushAt(x, y) {  // the referee's brush: paints one painted-level hex for the creature shown, or for the party
   const k = hexAt(x, y, NL).join(','), ids = KNOW ? [KNOW.who.id] : partyIds();
   if (!ids.length) { document.getElementById('hover').textContent = 'No characters to paint for: load or add some first.'; return; }
@@ -666,7 +700,7 @@ async function brushAt(x, y) {  // the referee's brush: paints one painted-level
 }
 function setAs(id, quiet) {
   if (LOCK && !quiet) return;
-  AS = id; store.set('hexmarch-atlas-as:' + MOD.id, id); know();
+  AS = id; store.set('hexmarch-atlas-as:' + MOD.id, id); if (CS) fromState(); else know();
   if (!quiet && parent !== window) parent.postMessage({ type: 'hexmarch-atlas', event: 'as', module: MOD.id, id }, '*');
 }
 function shown(p) {  // a place drawn and listed in this view: in character mode one it knows (or can see), in the fog one the fog shows
@@ -703,13 +737,11 @@ function drawKnown() {  // the 100-ft hexes this creature knows, in gold, never 
   ctx.fillStyle = 'rgba(201,154,46,.3)'; ctx.strokeStyle = '#a87b16'; ctx.lineWidth = 1.5;
   for (const [C, R] of KNOW.hexes) { const [sx, sy] = S(...ft(C, R)); if (sx < -r || sy < -r || sx > W + r || sy > H + r) continue; hexPath(sx, sy, r); ctx.fill(); ctx.stroke(); }
 }
-function csMove(s, party) {  // STATE_FORMAT.md "How it changes": one revision on; travel time passes on the clock; the arrival hex counts as seen
-  const n = { ...s, revision: s.revision + 1, updated: new Date().toISOString() };
-  if (!party) { n.party = null; return n; }
-  const before = s.party && s.party.module === party.module ? s.party.hours || 0 : 0;
-  n.clock = { ...s.clock, hours: s.clock.hours + Math.max(0, party.hours - before) }; n.party = party;
-  const r = s.revealed[party.module] || { hexes: [], places: [] };
-  if (!r.hexes.includes(party.hex)) n.revealed = { ...s.revealed, [party.module]: { ...r, hexes: [...r.hexes, party.hex] } };
+function csMove(s, party) {  // STATE_FORMAT.md "How it changes": one revision on; travel time passes on the moving party's own clock
+  const n = { ...s, revision: s.revision + 1, updated: new Date().toISOString() };  // (what it sees goes to its members as knowledge, not to everyone)
+  n.parties = s.parties.map(q => { if (q.id !== PID) return q;
+    const before = q.at && party && q.at.module === party.module ? q.at.hours || 0 : 0;
+    return { ...q, at: party, clock: party ? { ...q.clock, hours: q.clock.hours + Math.max(0, party.hours - before) } : q.clock }; });
   return n;
 }
 async function saveState() {
@@ -720,10 +752,10 @@ async function saveState() {
 async function setParty(hex, hours, quiet, path) {
   const party = hex ? { base: MOD.base, module: MOD.id, map: 'atlas', hex: addr(...hex).slice(1), label: addr(...hex).slice(7), hours: hours || 0 } : null;
   if (CS_SRC === 'device') try { const s = await deviceState(); if (s && s.campaign === CS.campaign && s.revision > CS.revision) CS = s; } catch (e) {}  // the Companion may have changed it since
-  if (!quiet) { CS = csMove(CS || csBlank(), party); await saveState(); }
-  else if (CS) CS = { ...CS, party };
+  if (!AP()) return;  // no party yet: the referee creates one first
+  if (!quiet) { CS = csMove(CS, party); await saveState(); }
   PARTY = hex ? { hex, hours: hours || 0 } : null;
-  if (!quiet && parent !== window) parent.postMessage({ type: 'hexmarch-atlas', event: 'party', module: MOD.id, hex: party ? party.hex : null, hours: party ? party.hours : 0 }, '*');
+  if (!quiet && parent !== window) parent.postMessage({ type: 'hexmarch-atlas', event: 'party', module: MOD.id, party: PID, hex: party ? party.hex : null, hours: party ? party.hours : 0 }, '*');
   if (!quiet && hex) {  // the hexes in sight from every point along the way (every quarter hex), or from where the party was put
     const seen = new Set(), pts = path && path.length > 1 ? path : [ft(...hex)];
     for (let k = 1; k < pts.length; k++) { const [ax, ay] = pts[k - 1], [bx, by] = pts[k], n = Math.max(1, Math.ceil(Math.hypot(bx - ax, by - ay) / (NL * 25)));
@@ -749,22 +781,72 @@ function clockLabel(c) {  // "1 May 3507, 08:00 (day 1)", as the Companion write
   return `${at.getUTCDate()} ${MONTHS[at.getUTCMonth()]} ${y + at.getUTCFullYear() - 2000}, ${String(Math.floor(h)).padStart(2, '0')}:${String(Math.round((h % 1) * 60) % 60).padStart(2, '0')} (day ${day + 1})`;
 }
 function stateLine() {
-  if (!CS) return '<small>No campaign state yet: placing the party starts one in this browser.</small><br><button data-p="load">Load state file…</button>';
+  if (!CS) return '<small>No campaign state yet: creating a party starts one in this browser.</small><br><button data-p="load">Load state file…</button>';
   const r = CS.revealed[MOD.id] || { hexes: [], places: [] }, src = { host: 'from the Companion', device: 'the Companion’s file on this device', local: 'kept in this browser' }[CS_SRC] || '';
-  return `<small>${esc(CS.campaign ? 'Campaign file' : 'This device')} · ${esc(clockLabel(CS.clock))}${CS.session.number ? ` · session ${CS.session.number}${CS.session.open ? ' (in play)' : ''}` : ''}<br>`
+  const ap = AP();
+  return `<small>${esc(CS.campaign ? 'Campaign file' : 'This device')}${ap ? ` · ${esc(clockLabel(ap.clock))}${ap.session.number ? ` · session ${ap.session.number}${ap.session.open ? ' (in play)' : ''}` : ''}` : ''}<br>`
     + `Found ${r.places.length} place${r.places.length === 1 ? '' : 's'}, ${r.hexes.length} hex${r.hexes.length === 1 ? '' : 'es'} seen · ${esc(src)}</small><br>`
     + (CS_SRC === 'host' ? '' : '<button data-p="load">Load state file…</button>') + '<button data-p="save">Save state file</button>';
+}
+// a party whose start is on this map but which has not been placed yet goes to its start's place (the referee's view only)
+const startOf = t => { const m = t && MODS.find(x => x.id === t.module); return t && t.id && m ? (m.starts || []).find(x => x && x.id === t.id) || null : null; };
+const placeOf = site => site && D && D.pois.find(p => p.id === site || p.name === site || p.id === slugify(site));
+const slugify = t => t.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+function startHere() {
+  const ap = AP(); if (!ap || ap.at || LOCK || CS_SRC === 'host' && parent === window || !D || !ap.start || ap.start.module !== MOD.id) return;
+  const st = startOf(ap.start), p = placeOf(st ? st.site : ap.start.site); if (!p) return;
+  const hex = addr(...p.hex).slice(1); ap.at = { base: MOD.base, module: MOD.id, map: 'atlas', hex, label: hex.slice(6), hours: 0 };
+  CS = { ...CS, revision: CS.revision + 1, updated: new Date().toISOString() }; saveState();
+  if (parent !== window) parent.postMessage({ type: 'hexmarch-atlas', event: 'party', module: MOD.id, party: PID, hex, hours: 0 }, '*');
+}
+// the party creator (Heph 2026-11-10: "the Party creator belongs in the Referee mode of the Atlas"): a name, one of the campaign's starts
+// (every start of the campaign's modules, from its lockfile; every module this site lists when no campaign is loaded) or "Place the party
+// yourself", and the party's own clock, which a start sets
+function newPartyForm() {
+  const ms = CMODS ? MODS.filter(m => CMODS.has(m.id)) : MODS;  // the campaign's modules; with no campaign loaded, every module the site lists
+  const opts = ms.flatMap(m => (m.starts || []).filter(t => t && t.id).map(t => `<option value="${esc(m.id + '|' + t.id)}">${esc((t.title || t.id) + ' · ' + m.title)}</option>`)).join('');
+  const t0 = ms.flatMap(m => m.starts || [])[0] || {};
+  return `<b>New party</b><br><label><small>Name</small> <input data-np="name" size="18" placeholder="The party"></label><br>`
+    + `<label><small>Start</small> <select data-np="start">${opts}<option value="">Place the party yourself</option></select></label><br>`
+    + `<label><small>Date</small> <input data-np="date" size="10" value="${esc(csDate(t0.date) ? t0.date : '3507-05-01')}"></label> <label><small>Hour</small> <input data-np="hour" type="number" min="0" max="23" style="width:3.5em" value="${typeof t0.hour === 'number' ? t0.hour : 8}"></label><br>`
+    + '<button data-p="create">Create</button><button data-p="cancelnew">Cancel</button>';
+}
+async function createParty(box) {
+  const v = k => box.querySelector(`[data-np="${k}"]`).value.trim(), name = v('name') || 'The party', [mid, sid] = v('start').split('|');
+  const date = csDate(v('date')) ? v('date') : '3507-05-01', hour = Math.min(23, Math.max(0, +v('hour') || 0));
+  let id = slugify(name).slice(0, 34) || 'party'; const taken = new Set((CS ? CS.parties : []).map(q => q.id)); for (let k = 2; taken.has(id); k++) id = slugify(name).slice(0, 34) + '-' + k;
+  const party = { id, name, start: sid ? { module: mid, id: sid } : { module: MOD.id, site: '', date, hour }, clock: { start: date, hours: hour }, session: { number: 0, open: false }, at: null };
+  CS = CS || csBlank(); CS = { ...CS, parties: [...CS.parties, party], active: id, revision: CS.revision + 1, updated: new Date().toISOString() };
+  if (parent !== window) parent.postMessage({ type: 'hexmarch-atlas', event: 'party-new', module: MOD.id, party }, '*');
+  await saveState(); NEWP = false; PID = id; fromState();
+  if (!PARTY && !sid) { PLACE = true; hoverHint(); }  // placed by hand: the next click puts it down
+  partyBox(); redraw();
+}
+async function setActive(id) {
+  if (!CS || !CS.parties.some(q => q.id === id)) return;
+  CS = { ...CS, active: id }; await saveState(); if (parent !== window) parent.postMessage({ type: 'hexmarch-atlas', event: 'active', module: MOD.id, party: id }, '*');
+  PID = id; fromState(); partyBox(); redraw();
+}
+function partiesLine() {  // the referee's party switcher and creator
+  if (LOCK) return '';
+  const ps = CS ? CS.parties : [];
+  return (ps.length > 1 ? '<small>Party</small> <select data-party aria-label="Party">' + ps.map(q => `<option value="${esc(q.id)}"${q.id === PID ? ' selected' : ''}>${esc(q.name)}</option>`).join('') + '</select> ' : '')
+    + '<button data-p="new">New party…</button>';
 }
 function partyBox() {
   const box = document.getElementById('party'); box.hidden = !(PBOX || PLACE); document.getElementById('partybtn').classList.toggle('on', !box.hidden); if (box.hidden) return;
   const P = (D.travel || {}).pace || {}, day = P.hours_per_day || 8;
-  if (PLACE) { box.innerHTML = '<b>Party</b> · click a hex to put the party there. <small>Esc cancels.</small><br><button data-p="cancel">Cancel</button>'; return; }
-  if (!PARTY && LOCK) { box.innerHTML = `<b>Party</b> · not on this map.<br><button data-p="close">Close</button><hr>${stateLine()}${asLine()}`; return; }
-  if (!PARTY) { box.innerHTML = `<b>Party</b> · not on this map.<br><button data-p="place">Place the party</button><button data-p="close">Close</button><hr>${stateLine()}${asLine()}${fogLine()}`; return; }
+  const ap = AP(), nm = ap ? esc(ap.name) : 'Party';
+  if (NEWP && !LOCK) { box.innerHTML = newPartyForm(); return; }
+  if (PLACE) { box.innerHTML = `<b>${nm}</b> · click a hex to put the party there. <small>Esc cancels.</small><br><button data-p="cancel">Cancel</button>`; return; }
+  if (!ap && LOCK) { box.innerHTML = `<b>Party</b> · your character is in no party yet.<br><button data-p="close">Close</button><hr>${stateLine()}${asLine()}`; return; }
+  if (!ap) { box.innerHTML = `<b>No party yet</b><br>${partiesLine()}<button data-p="close">Close</button><hr>${stateLine()}${asLine()}${fogLine()}`; return; }
+  if (!PARTY && LOCK) { box.innerHTML = `<b>${nm}</b> · not on this map.<br><button data-p="close">Close</button><hr>${stateLine()}${asLine()}`; return; }
+  if (!PARTY) { box.innerHTML = `<b>${nm}</b> · not on this map.<br><button data-p="place">Place the party</button><button data-p="close">Close</button><br>${partiesLine()}<hr>${stateLine()}${asLine()}${fogLine()}`; return; }
   const [C, R] = PARTY.hex, t = T(C, R, 1), h = addr(C, R), lbl = h.slice(7);
-  box.innerHTML = `<b>Party</b> · at <a href="${h}">${lbl}</a>${t ? ' · ' + esc(TYPES[t - 1].name.toLowerCase()) : ''}<br><small>Travelled ${hm(PARTY.hours)}${PARTY.hours >= day / 2 ? ` (${(PARTY.hours / day).toFixed(1)} days of ${day} h)` : ''}</small><br>`
+  box.innerHTML = `<b>${nm}</b> · at <a href="${h}">${lbl}</a>${t ? ' · ' + esc(TYPES[t - 1].name.toLowerCase()) : ''}<br><small>Travelled ${hm(PARTY.hours)}${PARTY.hours >= day / 2 ? ` (${(PARTY.hours / day).toFixed(1)} days of ${day} h)` : ''}</small><br>`
     + (LOCK ? '<button data-p="go">Go to</button><button data-p="close">Close</button>'
-      : '<button data-p="go">Go to</button><button data-p="place">Move</button><button data-p="reset" title="Set the travel time back to zero (the campaign clock keeps its time)">Reset time</button><button data-p="remove">Remove</button><button data-p="close">Close</button>')
+      : '<button data-p="go">Go to</button><button data-p="place">Move</button><button data-p="reset" title="Set the travel time back to zero (the party’s clock keeps its time)">Reset time</button><button data-p="remove">Remove</button><button data-p="close">Close</button><br>' + partiesLine())
     + `<hr>${stateLine()}${asLine()}${fogLine()}`;
 }
 function saveFile() {  // the state file as written: plain JSON, as the Companion saves it (Campaign › State)
@@ -781,33 +863,41 @@ function loadFile() {
   inp.click();
 }
 document.getElementById('party').addEventListener('click', e => { const b = e.target.closest('button[data-p]'); if (!b) return; const a = b.dataset.p;
-  if (a === 'place' && !LOCK) { PLACE = true; hoverHint(); } else if (a === 'cancel') { PLACE = false; hoverHint(); } else if (a === 'close') PBOX = false;
+  if (a === 'new' && !LOCK) NEWP = true; else if (a === 'cancelnew') NEWP = false; else if (a === 'create') { createParty(document.getElementById('party')); return; }
+  else if (a === 'place' && !LOCK && AP()) { PLACE = true; hoverHint(); } else if (a === 'cancel') { PLACE = false; hoverHint(); } else if (a === 'close') { PBOX = false; NEWP = false; }
   else if (a === 'go') location.hash = addr(...PARTY.hex); else if (a === 'reset') setParty(PARTY.hex, 0); else if (a === 'remove') setParty(null);
   else if (a === 'save') { if (CS) saveFile(); return; } else if (a === 'load') { loadFile(); return; } else if (a === 'who') { loadWhoFile(); return; }
   partyBox(); });
 document.getElementById('party').addEventListener('change', e => { if (e.target.matches('select[data-as]')) setAs(e.target.value);
+  else if (e.target.matches('select[data-party]')) setActive(e.target.value);
+  else if (e.target.matches('select[data-np="start"]')) { const [mid, sid] = e.target.value.split('|'), t = sid && startOf({ module: mid, id: sid }), box = e.target.closest('#party');
+    if (t && csDate(t.date)) box.querySelector('[data-np="date"]').value = t.date; if (t && typeof t.hour === 'number') box.querySelector('[data-np="hour"]').value = t.hour; }
   else if (e.target.matches('input[data-fog]')) { PREVIEW = e.target.checked; if (!PREVIEW && !KNOW) BRUSH = ''; know(); } });
 document.getElementById('party').addEventListener('click', e => { const b = e.target.closest('button[data-fb]'); if (!b) return; BRUSH = BRUSH === b.dataset.fb ? '' : b.dataset.fb; PLACE = false;
   document.getElementById('hover').textContent = BRUSH ? `Brush: click a hex to mark it ${BRUSH === 'hide' ? 'unknown' : BRUSH}.` : 'Click a hex to zoom in.'; partyBox(); });
-document.getElementById('partybtn').onclick = () => { if (PBOX || PLACE) { PBOX = PLACE = false; hoverHint(); } else { PBOX = true; if (!PARTY && !CS && !LOCK) { PLACE = true; hoverHint(); } } partyBox(); };
+document.getElementById('partybtn').onclick = () => { if (PBOX || PLACE) { PBOX = PLACE = NEWP = false; hoverHint(); } else { PBOX = true; if (!LOCK && !(CS && CS.parties.length)) NEWP = true; } partyBox(); };
 // the Companion's own tab may change the file: read it again when this tab comes back
 document.addEventListener('visibilitychange', () => { if (!document.hidden && MOD && D && CS_SRC === 'device') deviceState().then(s => { if (s && (!CS || s.campaign !== CS.campaign || s.revision !== CS.revision)) { CS = s; fromState(); } }).catch(() => {}); if (!document.hidden && MOD && D && WHO_SRC !== 'host') loadWho(); });
 // an app that embeds the Atlas may show an address ({type: 'hexmarch-atlas', show: '#world:LLLL:HHHH'}, Atlas 0.5.6)
 addEventListener('message', e => { const d = e.data; if (D && d && d.type === 'hexmarch-atlas' && typeof d.show === 'string' && /^#[\w:-]{0,60}$/.test(d.show)) location.hash = d.show; });
 // an app that embeds the Atlas sends the whole state file ({type: 'hexmarch-atlas', state}, Atlas 0.5.11) on load and after each change; it keeps
-// the file, so the Atlas only tells it of party moves. Without a state file it sends just the party ({party: {hex, hours} | null}); it is not told back
+// the file, so the Atlas only tells it what changes: a party moved ({event: 'party', party: id, hex, hours}), a party created ({event: 'party-new', party}),
+// the party shown switched ({event: 'active', party: id}). Every party's marker is in the state file (Atlas 0.6, parties).
 addEventListener('message', e => { const d = e.data; if (e.source !== parent || parent === window || !D || !MOD || !d || d.type !== 'hexmarch-atlas') return;
   // and the creatures it keeps, with what each knows ({characters: [{id, name, owner, knowledge}]}), and which one to show the map as ({as: id | ''}), Atlas 0.5.12
   if ('characters' in d) { WHO = whoFile(Array.isArray(d.characters) ? d.characters : []); WHO_SRC = 'host'; know(); }
   if (d.lock === true) LOCK = true;
   if (typeof d.as === 'string') setAs(d.as, true);
-  if ('state' in d) { try { CS = csRead(d.state); CS_SRC = 'host'; fromState(); } catch (x) {} return; }
-  if (!('party' in d)) return;
-  if (d.party === null) { setParty(null, 0, true); return; }
-  const q = d.party && typeof d.party.hex === 'string' && parse('#' + d.party.hex); if (!q) return;
-  if (q.sel) setParty(q.sel, +d.party.hours || 0, true);
+  if (d.lock && typeof d.lock === 'object') lockMods(d.lock);  // the campaign's lockfile ({lock}), for the party creator's starts
+  if ('state' in d) { try { CS = csRead(d.state); CS_SRC = 'host'; fromState(); } catch (x) {} }
 });
 function drawParty() {  // a red pennant planted on the party's hex centre, over everything; the hex itself shaded once it is big enough to see
+  for (const o of OTHERS) {  // the referee's view: every other party, a smaller slate pennant with its name
+    const [ox, oy] = S(...ft(...o.hex)); if (ox < -80 || oy < -60 || ox > W + 80 || oy > H + 60) continue; const g = 22;
+    ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(ox, oy); ctx.lineTo(ox, oy - g); ctx.strokeStyle = '#f4efe1'; ctx.lineWidth = 4; ctx.stroke(); ctx.strokeStyle = '#2b2418'; ctx.lineWidth = 1.5; ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(ox + 1, oy - g); ctx.lineTo(ox + 14, oy - g + 5); ctx.lineTo(ox + 1, oy - g + 10); ctx.closePath(); ctx.fillStyle = '#4a6378'; ctx.fill(); ctx.strokeStyle = '#f4efe1'; ctx.lineWidth = 1; ctx.stroke();
+    ctx.font = '600 11px Georgia, serif'; ctx.lineWidth = 3; ctx.strokeStyle = '#f4efe1'; ctx.strokeText(o.name, ox + 16, oy - g + 9); ctx.fillStyle = '#2b2418'; ctx.fillText(o.name, ox + 16, oy - g + 9);
+  }
   if (!PARTY) return; const [sx, sy] = S(...ft(...PARTY.hex)), F = 100 * cam.s;
   if (PBOX && !drawParty.q) drawParty.q = setTimeout(() => { drawParty.q = 0; partyBox(); }, 150);  // the hex's terrain once its tile lands
   if (sx < -60 || sy < -60 || sx > W + 60 || sy > H + 60) return;
@@ -1056,7 +1146,7 @@ document.getElementById('modlist').addEventListener('click', e => { const fg = e
 // and opened here. It is kept in this browser (IndexedDB) and listed with the site's modules as "on this device"; nothing is uploaded
 const FILES_KEY = 'hexmarch-atlas-files', FILE_KEY = 'hexmarch-atlas-file:';
 async function fileMods() { let list = []; try { list = (await idbGet(FILES_KEY)) || []; } catch (e) {}
-  return list.map(f => ({ id: f.id, path: 'on this device', title: f.title || f.id, version: f.version || '', base: '', credits: f.credits || [], languages: f.languages, ok: true, local: true })); }
+  return list.map(f => ({ id: f.id, path: 'on this device', title: f.title || f.id, version: f.version || '', base: '', credits: f.credits || [], languages: f.languages, starts: f.starts || [], ok: true, local: true })); }
 function openFile() {
   const inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.json,application/json';
   inp.onchange = async () => { const f = inp.files && inp.files[0]; if (!f) return;
@@ -1064,7 +1154,7 @@ function openFile() {
       if (!b || b.format !== 'hexmarch-atlas-file' || !b.module || !/^[a-z0-9-]{1,80}$/.test(b.module.id || '') || !b.map || !b.map.paint) throw new Error(`That isn't a ${APP} Atlas map file.`);
       if (b.version > 1) throw new Error('That map file was made by a newer Atlas.');
       await idbSet(FILE_KEY + b.module.id, b); const list = ((await idbGet(FILES_KEY)) || []).filter(x => x.id !== b.module.id);
-      list.push({ id: b.module.id, title: b.module.title, version: b.module.version, credits: b.module.credits, languages: b.module.languages }); await idbSet(FILES_KEY, list);
+      list.push({ id: b.module.id, title: b.module.title, version: b.module.version, credits: b.module.credits, languages: b.module.languages, starts: Array.isArray(b.module.starts) ? b.module.starts : [] }); await idbSet(FILES_KEY, list);
       pick(b.module.id);
     } catch (e) { alert(e.message || 'That file could not be read.'); } };
   inp.click();
@@ -1080,7 +1170,7 @@ async function loadModules() {
   let repo = {}; try { repo = await (await fetch(new URL('hexmarch.json', SITE))).json(); } catch (e) {}
   MODS = (await Promise.all((repo.modules || []).filter(m => !local.some(l => l.id === m.id)).map(async m => {
     const base = new URL(m.path.replace(/\/?$/, '/'), SITE).href, r = { id: m.id, path: m.path, title: m.id, version: '', base, ok: false };
-    try { const j = await (await fetch(base + 'module.json')).json(); Object.assign(r, { title: j.title || m.id, version: j.version || '', credits: j.credits || [], languages: j.languages, ok: !!j.atlas_map }); } catch (e) {}
+    try { const j = await (await fetch(base + 'module.json')).json(); Object.assign(r, { title: j.title || m.id, version: j.version || '', credits: j.credits || [], languages: j.languages, starts: Array.isArray(j.starts) ? j.starts : [], ok: !!j.atlas_map }); } catch (e) {}
     return r; }))).concat(local);
   const want = new URLSearchParams(location.search).get('module') || store.get('hexmarch-atlas-module');
   MOD = MODS.find(m => m.id === want && m.ok) || MODS.find(m => m.ok);
