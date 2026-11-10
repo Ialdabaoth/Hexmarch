@@ -45,7 +45,7 @@ describe('github store', () => {
   it('says what went wrong', async () => {
     const f = (async () => json(401, { message: 'Bad credentials' })) as unknown as typeof fetch;
     await expect(upload(githubStore('heph/kells'), 'tok', files, 'x', f)).rejects.toThrow(/refused the key/);
-    await expect(upload(githubStore('heph/kells'), '', files)).rejects.toThrow(/token/);
+    await expect(upload(githubStore('heph/kells'), '', files)).rejects.toThrow(/key first/);
     const missing = (async () => json(404, { message: 'Not Found' })) as unknown as typeof fetch;
     await expect(upload(githubStore('heph/kells'), 'tok', files, 'x', missing)).rejects.toThrow(/doesn't know the repository heph\/kells/);
     const secret = (async () => json(200, { private: true })) as unknown as typeof fetch;
