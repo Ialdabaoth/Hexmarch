@@ -55,6 +55,8 @@ footer a{color:var(--red)}
 <dialog id="credits"><h2>Credits</h2><ul id="creditlist"></ul><button id="creditclose">Close</button></dialog>
 <!--CARD-->
 <script>
+// Scribe's answer to a publish request ('published', #m=…) comes back in the fragment; take it out before the map reads the fragment as a place
+let MAIL_IN = /^#m=/.test(location.hash) ? location.hash.slice(3) : ''; if (MAIL_IN) history.replaceState(null, '', location.pathname + location.search);
 "use strict";
 const CW = 50 * Math.sqrt(3), SQ3 = Math.sqrt(3), LAB = '0123456789ABCDEFGHJKLMNPRSTUVWXYZ';
 const lab = n => n < 100 ? String(n).padStart(2, '0') : LAB[10 + Math.floor((n - 100) / 10)] + (n % 10);
@@ -544,6 +546,7 @@ async function deviceState() {
   const set = await idbGet('settings'), url = ASK_CAMPAIGN !== null ? ASK_CAMPAIGN : set && typeof set.campaign === 'string' ? set.campaign : '', id = await campaignIdOf(url);
   const raw = await idbGet('state:' + id);
   if (raw && !CMODS) await campaignLock(url, id);
+  if (raw) { CID = id; await campaignLink(url, id); }
   return raw ? csRead(raw) : null;
 }
 // the campaign's lockfile, for the party creator's starts. Apps talk by links and never rely on each other's storage (WORKFLOWS.md), so
@@ -557,12 +560,71 @@ async function campaignLock(url, id) {
     if (p && p.format === 'hexmarch-campaign-pointer' && typeof p.read === 'string' && /^https:\/\//.test(p.read)) { const sn = await (await fetch(p.read, { cache: 'no-cache' })).json(); if (sn && sn.campaign === p.campaign) lockMods(sn.lock); }
   } catch (e) {}
 }
+// the campaign's public link (its pointer), which a player's invitation names: the settings' link when it is one, else the one Scribe or the
+// Companion recorded when the campaign was published. Unset until the campaign is published.
+let CLINK = '', CID = '', INVITE = '', HOSTINV = false;
+async function campaignLink(url, id) {
+  if (/^https:\/\//.test(url)) { CLINK = url; return; }
+  try { const sc = await idbGet('scribe-campaign:' + id), cs = await idbGet('campaigns'), c = cs && cs[url];
+    const l = (c && c.published && c.published.pointer) || (sc && sc.services && sc.services.pointer); if (typeof l === 'string' && /^https:\/\//.test(l)) CLINK = l; } catch (e) {}
+}
+// the Companion that opens an invitation: the one beside this Atlas on the Hexmarch site, else the live one
+const COMPANION = /\/atlas\/(index\.html)?$/.test(location.pathname) ? new URL('../', location.href).href : 'https://ialdabaoth.github.io/Hexmarch/';
+// the handoff to the referee's Companion for one invitation (Companion 0.6.X): a hexmarch-mail/1 'campaign' envelope carrying Scribe's record,
+// the state with its parties, and {invite: {party}}, in the Companion's #m= link (engine/mail.ts messageLink). The Companion adopts the
+// campaign, makes the party active and opens Settings › Invite a player with it picked. Null when this device has no Scribe record.
+async function inviteHandoff(party) {
+  let rec = null; try { rec = CID && await idbGet('scribe-campaign:' + CID); } catch (e) {}
+  if (!rec || rec.format !== 'hexmarch-scribe-campaign' || !window.CompressionStream) return null;
+  return mailLink(COMPANION, 'campaign', { record: rec, state: CS, invite: { party } });
+}
+// a hexmarch-mail/1 envelope from the referee in <app>#m=<data>: JSON, deflate-raw, base64url (engine/mail.ts messageLink)
+async function mailLink(app, kind, body) {
+  const env = { format: 'hexmarch-mail', version: 1, id: crypto.randomUUID ? crypto.randomUUID() : 'm' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10),
+    campaign: CID, kind, from: { role: 'referee' }, to: 'referee', body, sent: new Date().toISOString() };
+  const z = new Uint8Array(await new Response(new Blob([new TextEncoder().encode(JSON.stringify(env))]).stream().pipeThrough(new CompressionStream('deflate-raw'))).arrayBuffer());
+  let bin = ''; for (let i = 0; i < z.length; i += 0x8000) bin += String.fromCharCode(...z.subarray(i, i + 0x8000));
+  return `${app.replace(/#.*$/, '')}#m=${btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')}`;
+}
+// Scribe is the only publisher (Heph 2026-11-10). Standalone, the parties players need (made, moved, made active) go to Scribe as an
+// 'update' envelope, {state, return}: Scribe publishes and then opens the return link. Unpublished = this device's last publish
+// ("published:<id>", which every app that publishes keeps) holds other parties than the state here. Embedded, the host publishes.
+async function unpublished() {
+  if (!CID || !CS || parent !== window) return false;
+  let pub = null; try { pub = await idbGet('published:' + CID); } catch (e) {}
+  const st = pub && pub.snapshot && pub.snapshot.state;
+  if (!st) return true;
+  const key = x => x && typeof x === 'object' ? (Array.isArray(x) ? x.map(key) : Object.keys(x).sort().filter(k => x[k] !== undefined).map(k => [k, key(x[k])])) : x;  // order-blind
+  const ps = q => JSON.stringify(key((q || []).map(p => ({ id: p.id, name: p.name, start: p.start || null, clock: p.clock, session: p.session, at: p.at || null }))));
+  return ps(st.parties) !== ps(CS.parties) || (st.active || '') !== CS.active;
+}
+let UNPUB = false;
+async function checkPublished() { const u = await unpublished(); if (u !== UNPUB) { UNPUB = u; if (PBOX) partyBox(); } }
+async function publishLink(back) { return mailLink(COMPANION + 'scribe/', 'update', { state: CS, back }); }
+// the Atlas again after publishing; with &invite=<party> it goes on to the Companion's invitation once Scribe says it published
+function backHere(invite) { const u = new URL(location.href); u.hash = ''; u.searchParams.delete('invite'); if (invite) u.searchParams.set('invite', invite); return u.href; }
+let PUBMSG = '';
+async function readPublished() {  // Scribe's 'published' answer: {ok, revision, at} or {ok: false, error, firstPublish}
+  const m = MAIL_IN; MAIL_IN = ''; if (!m) return;
+  let e = null; try { const b = Uint8Array.from(atob(m.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - m.length % 4) % 4)), c => c.charCodeAt(0));
+    e = JSON.parse(new TextDecoder().decode(await new Response(new Blob([b]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer())); } catch (x) { return; }
+  if (!e || e.format !== 'hexmarch-mail' || e.kind !== 'published' || !e.body) return;
+  const inv = ASK.get('invite'); if (inv) history.replaceState(null, '', backHere(''));
+  if (e.body.ok) {
+    UNPUB = false; PUBMSG = `Published for players${e.body.revision ? ` (revision ${e.body.revision})` : ''}.`;
+    if (inv && CS && CS.parties.some(q => q.id === inv)) { const l = await inviteHandoff(inv); if (l) { location.href = l; return; } INVITE = inv; PID = inv; }
+  } else PUBMSG = e.body.firstPublish ? 'Publish the campaign once in Scribe first, then invite players.' : `Not published: ${e.body.error || 'Scribe could not publish.'}`;
+  PBOX = true; partyBox();
+}
+function pubLine() { const m = PUBMSG; return m ? `<br><small>${esc(m)}</small>` : ''; }
+function publishLine() { return pubLine() + (UNPUB ? '<br><small>Players don’t have these parties yet.</small> <button data-p="publish" title="Scribe publishes the campaign, then brings you back here">Publish for players</button>' : ''); }
+function inviteFor(party) { const q = new URLSearchParams({ campaign: CLINK, as: 'player', party }); return `${COMPANION}?${q}`; }  // the Companion's inviteLink
 function lockMods(lock) { if (lock && Array.isArray(lock.modules)) CMODS = new Set(lock.modules.map(m => m && m.id).filter(x => typeof x === 'string')); }
 async function loadState() {
   if (CS_SRC === 'host') return;
   try { const s = await deviceState(); if (s) { CS = s; CS_SRC = 'device'; } } catch (e) {}
   if (!CS) try { const s = JSON.parse(store.get(CS_KEY) || 'null'); if (s) { CS = csRead(s); CS_SRC = 'local'; } } catch (e) {}
-  fromState();
+  fromState(); if (CS_SRC === 'device') await checkPublished(); readPublished();
 }
 function fromState() {  // the markers from the state file: a party shows only on its own module's map
   pickParty(); startHere();
@@ -747,7 +809,7 @@ function csMove(s, party) {  // STATE_FORMAT.md "How it changes": one revision o
 async function saveState() {
   if (CS_SRC === 'local' || !CS_SRC) { CS_SRC = 'local'; store.set(CS_KEY, JSON.stringify(CS)); return; }
   if (CS_SRC !== 'device') return;  // the app around the Atlas keeps its own file and hears the party event
-  try { await idbSet('state:' + CS.campaign, CS); } catch (e) { document.getElementById('hover').textContent = 'Could not save the campaign state on this device.'; }
+  try { await idbSet('state:' + CS.campaign, CS); checkPublished(); } catch (e) { document.getElementById('hover').textContent = 'Could not save the campaign state on this device.'; }
 }
 async function setParty(hex, hours, quiet, path) {
   const party = hex ? { base: MOD.base, module: MOD.id, map: 'atlas', hex: addr(...hex).slice(1), label: addr(...hex).slice(7), hours: hours || 0 } : null;
@@ -831,7 +893,13 @@ function partiesLine() {  // the referee's party switcher and creator
   if (LOCK) return '';
   const ps = CS ? CS.parties : [];
   return (ps.length > 1 ? '<small>Party</small> <select data-party aria-label="Party">' + ps.map(q => `<option value="${esc(q.id)}"${q.id === PID ? ' selected' : ''}>${esc(q.name)}</option>`).join('') + '</select> ' : '')
-    + '<button data-p="new">New party…</button>';
+    + (AP() ? `<button data-p="invite" title="${HOSTINV ? 'Invite a player into this party with the Companion' : 'Make a link that invites a player into this party'}">Invite a player</button>` : '')
+    + '<button data-p="new">New party…</button>' + publishLine() + inviteLine();
+}
+function inviteLine() {  // the invitation made standalone, for the referee to send (Heph 2026-11-10: Atlas hands to the Companion per invitation)
+  if (!INVITE || INVITE !== PID) return '';
+  if (!CLINK) return '<br><small>Publish the campaign in Scribe first: an invitation names its link.</small>';
+  return `<br><small>Invitation to ${esc(AP().name)}</small><br><input readonly data-inv value="${esc(inviteFor(PID))}" aria-label="Invitation link" style="width:100%"><br><button data-p="copyinv">Copy</button><a href="${esc(inviteFor(PID))}" target="_blank" rel="noopener">Open in the Companion</a>`;
 }
 function partyBox() {
   const box = document.getElementById('party'); box.hidden = !(PBOX || PLACE); document.getElementById('partybtn').classList.toggle('on', !box.hidden); if (box.hidden) return;
@@ -864,8 +932,12 @@ function loadFile() {
 }
 document.getElementById('party').addEventListener('click', e => { const b = e.target.closest('button[data-p]'); if (!b) return; const a = b.dataset.p;
   if (a === 'new' && !LOCK) NEWP = true; else if (a === 'cancelnew') NEWP = false; else if (a === 'create') { createParty(document.getElementById('party')); return; }
-  else if (a === 'place' && !LOCK && AP()) { PLACE = true; hoverHint(); } else if (a === 'cancel') { PLACE = false; hoverHint(); } else if (a === 'close') { PBOX = false; NEWP = false; }
+  else if (a === 'place' && !LOCK && AP()) { PLACE = true; hoverHint(); } else if (a === 'cancel') { PLACE = false; hoverHint(); } else if (a === 'close') { PBOX = false; NEWP = false; PUBMSG = ''; }
   else if (a === 'go') location.hash = addr(...PARTY.hex); else if (a === 'reset') setParty(PARTY.hex, 0); else if (a === 'remove') setParty(null);
+  else if (a === 'invite' && !LOCK && AP()) { if (HOSTINV && parent !== window) { parent.postMessage({ type: 'hexmarch-atlas', event: 'invite', module: MOD.id, party: PID }, '*'); return; }
+    const w = window.open('', '_blank'); inviteHandoff(PID).then(async l => { if (l && w) { w.location.href = UNPUB ? await publishLink(backHere(PID)) : l; return; } if (w) w.close(); INVITE = PID; partyBox(); }); return; }
+  else if (a === 'publish') { publishLink(backHere('')).then(l => { location.href = l; }); return; }
+  else if (a === 'copyinv') { const i = document.querySelector('#party input[data-inv]'); if (i) { i.select(); try { navigator.clipboard.writeText(i.value); b.textContent = 'Copied'; } catch (x) { document.execCommand('copy'); } } return; }
   else if (a === 'save') { if (CS) saveFile(); return; } else if (a === 'load') { loadFile(); return; } else if (a === 'who') { loadWhoFile(); return; }
   partyBox(); });
 document.getElementById('party').addEventListener('change', e => { if (e.target.matches('select[data-as]')) setAs(e.target.value);
@@ -889,6 +961,10 @@ addEventListener('message', e => { const d = e.data; if (e.source !== parent || 
   if (d.lock === true) LOCK = true;
   if (typeof d.as === 'string') setAs(d.as, true);
   if (d.lock && typeof d.lock === 'object') lockMods(d.lock);  // the campaign's lockfile ({lock}), for the party creator's starts
+  if (typeof d.campaign === 'string' && /^https:\/\//.test(d.campaign)) CLINK = d.campaign;  // its public link ({campaign}), for invitations
+  // actions the host carries out itself ({hostActions: ['invite']}): "Invite a player" then sends {event: 'invite', module, party} and the host
+  // opens the Companion's invitation for that party (Heph 2026-11-10); without it the Atlas makes the invitation link itself
+  if (Array.isArray(d.hostActions)) { HOSTINV = d.hostActions.includes('invite'); if (PBOX) partyBox(); }
   if ('state' in d) { try { CS = csRead(d.state); CS_SRC = 'host'; fromState(); } catch (x) {} }
 });
 function drawParty() {  // a red pennant planted on the party's hex centre, over everything; the hex itself shaded once it is big enough to see
