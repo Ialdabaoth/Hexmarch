@@ -123,7 +123,15 @@ export async function applyUpdate(e: Envelope): Promise<UpdateResult> {
   if (applied.includes(e.id)) return { ...base, status: 'repeat' };
   const had = (await idbGet(`play:${e.campaign}`)) as Play | undefined;
   const newer = !had || revisionOf(b.state) >= revisionOf(had.state);
-  if (newer) await idbSet(`play:${e.campaign}`, { state: b.state, knowledge: b.knowledge ?? {}, receipts: Array.isArray(b.receipts) ? b.receipts : [], at: e.sent });
+  // A part the update leaves out is unchanged (the Atlas sends only the state), not empty.
+  const kept = newer && (!b.knowledge || !Array.isArray(b.receipts)) ? await playFor(e.campaign) : null;
+  if (newer)
+    await idbSet(`play:${e.campaign}`, {
+      state: b.state,
+      knowledge: b.knowledge ?? kept?.knowledge ?? {},
+      receipts: Array.isArray(b.receipts) ? b.receipts : kept?.receipts ?? [],
+      at: e.sent
+    });
   await idbSet('applied', [...applied, e.id].slice(-500));
   return { ...base, status: newer ? 'applied' : 'older' };
 }

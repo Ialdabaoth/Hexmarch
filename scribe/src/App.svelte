@@ -282,8 +282,12 @@
         : rec?.published ? { ok: true, revision: rec.published.revision, at: rec.published.at }
         : { ok: false, firstPublish: true, error: 'Publish the campaign once in Scribe first.' };
       autoStatus = result;
+      // back (the Companion): return with a 'published' message, whatever happened. return (the Atlas): a page to open
+      // as it is, e.g. the Companion's invite link, only once publishing worked. Both only on this site.
       const back = backUrl(e.body.back, location.href);
+      const onward = backUrl(e.body.return, location.href);
       if (back) location.href = await messageLink(back, publishedMessage(e.campaign, e.id, result));
+      else if (onward && result.ok) location.href = onward;
     } catch (e) {
       receiveError = `Scribe couldn't read that link: ${(e as Error).message || e}`;
     }
