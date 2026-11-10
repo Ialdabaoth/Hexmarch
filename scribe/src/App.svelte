@@ -366,9 +366,7 @@
       {/if}
       <button disabled={!!built.problems.length || building} onclick={build}>{building ? 'Building…' : 'Build Campaign'}</button>
       {#if saveError}<p class="bad">{saveError}</p>{/if}
-      {#if isBuilt}
-        <p class="small muted">Built on this device, with your Referee invitation in the Companion.</p>
-      {:else if record}
+      {#if !isBuilt && record}
         <p class="small muted">The campaign has changed since you built it. Build it again to open or publish it.</p>
       {/if}
       {#if isBuilt}
