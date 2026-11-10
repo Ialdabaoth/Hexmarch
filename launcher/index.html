@@ -64,8 +64,14 @@ footer { margin-top: 24px; text-align: center; }
 // The Launcher (Heph 2026-11-10): the site's front page. The apps sit side by side at companion/, atlas/ and scribe/, each
 // installed as its own app, and share this site's browser storage. The Launcher opens them, lists and picks the campaigns
 // this device holds, and backs up, restores or clears that storage. The storage is a cache: apps still talk by links.
-// "hexmarch-current" (keyval-store) = {campaign: id | null, at}: the campaign picked here, which the Companion and the
-// Atlas open with when their address names none (each app writes it too when it switches campaign itself).
+// "hexmarch-current" (keyval-store) = {campaign: id | null, party?, character?, seat?, at}: the campaign picked here, which
+// the Companion and the Atlas open with when their address names none (each app writes it too when it switches campaign
+// itself). Beside the campaign, the pick from its dropdown (Heph 2026-11-10):
+//   party: <id>      referee, that party active (Atlas: ?party=)
+//   character: <id>  referee, as that character, NPCs included (Heph: "NPCs may not have a seat but will still need
+//                    referee management"); the Companion shows them as their player would, the Atlas shows their fog (?as=)
+//   seat: <id>       a player seat on this device (one invitation = one character): player mode
+// none of the three: referee, all parties.
 const CURRENT = 'hexmarch-current';
 let RESET_WAITING = false;  // after a reset an open app may still hold a database; reading it now would make it again
 const $ = id => document.getElementById(id);
@@ -103,32 +109,58 @@ async function campaignList() {
     const at = k => values[keys.indexOf(k)];
     keys.forEach((k, i) => { if (typeof k === 'string' && k.startsWith('scribe-campaign:')) { const r = values[i] || {}, id = k.slice(16);
       found.set(id, { id, title: r.manifest?.title || r.manifest?.name || id, scribe: true, seats: [], saved: r.saved, published: r.published }); } });
+    // the play state (state:<id>, shared by the Companion and the Atlas): its parties and characters
     const cache = at('campaigns') || {}, seats = Array.isArray(at('invitations')) ? at('invitations') : [];
     for (const s of seats) { const c = cache[s.url]?.campaign || {}; const id = c.id || (String(s.url).startsWith('scribe:') ? String(s.url).slice(7) : s.url);
       const e = found.get(id) || { id, title: c.title || c.name || s.name || id, scribe: false, seats: [] }; e.seats.push(s); found.set(id, e); }
+    for (const e of found.values()) { const st = at('state:' + e.id) || {}; e.parties = Array.isArray(st.parties) ? st.parties : []; e.characters = Array.isArray(st.characters) ? st.characters : []; }
   } finally { db.close(); }
   return [...found.values()].sort((a, b) => a.title.localeCompare(b.title));
 }
 async function showCampaigns() {
   let list = [], cur = null;
   try { list = await campaignList(); cur = (await kv('get', CURRENT))?.campaign ?? null; } catch (e) { $('campaigns').innerHTML = `<li class="bad small">${esc(e.message)}</li>`; return; }
+  const opt = (v, t, sel) => `<option value="${esc(v)}"${v === sel ? ' selected' : ''}>${esc(t)}</option>`;
+  // the dropdown: what the referee can open (all, a party, any character), then this device's player seats
+  const choices = c => {
+    const referee = c.scribe || c.seats.some(s => s.role === 'referee'), sel = lastPick(c.id), out = [];
+    const nameOf = id => c.characters.find(x => x.id === id)?.name;
+    if (referee) {
+      const pname = id => c.parties.find(p => p.id === id)?.name || id;
+      out.push('<optgroup label="Referee">' + opt('', 'All parties', sel) + c.parties.map(p => opt('p:' + p.id, p.name || p.id, sel)).join('') + '</optgroup>');
+      const chars = [...c.characters].sort((a, b) => (a.party ? 0 : 1) - (b.party ? 0 : 1) || String(a.party || '').localeCompare(String(b.party || '')) || a.name.localeCompare(b.name));  // no party last
+      if (chars.length) out.push('<optgroup label="Referee, as a character">' + chars.map(x => opt('c:' + x.id, `${x.name}${x.player ? '' : ' (NPC)'} · ${x.party ? pname(x.party) : 'no party'}`, sel)).join('') + '</optgroup>');
+    }
+    const mine = c.seats.filter(s => s.role !== 'referee');
+    if (mine.length) out.push('<optgroup label="Playing">' + mine.map(s => opt('s:' + s.id, s.character ? (nameOf(s.character) || s.name || s.character) : '(Roll a character)', sel)).join('') + '</optgroup>');
+    return out.length > 1 || (out.length && !referee) || c.parties.length || c.characters.length ? `<select data-as="${esc(c.id)}" aria-label="Open as">${out.join('')}</select> ` : '';
+  };
   const row = c => {
     const roles = [...new Set(c.seats.map(s => s.role === 'referee' ? 'Referee' : 'Player'))];
     const what = [c.scribe ? 'made in Scribe here' : '', roles.join(' and '), c.published ? `published (revision ${c.published.revision})` : ''].filter(Boolean).join(' · ');
     return `<li class="${c.id === cur ? 'current' : ''}"><b>${esc(c.title)}</b>${c.id === cur ? ' <span class="small muted">(picked)</span>' : ''}<br><span class="small muted">${esc(what)}</span><br>`
-      + `<button data-pick="${esc(c.id)}" data-open="companion">Companion</button><button data-pick="${esc(c.id)}" data-open="atlas">Atlas</button>`
+      + choices(c) + `<button data-pick="${esc(c.id)}" data-open="companion">Companion</button><button data-pick="${esc(c.id)}" data-open="atlas">Atlas</button>`
       + (c.scribe ? `<button class="quiet" data-pick="${esc(c.id)}" data-open="scribe">Scribe</button>` : '') + `</li>`;
   };
   $('campaigns').innerHTML = (list.length ? list.map(row).join('') : '<li class="muted small">No campaigns on this device yet.</li>')
     + `<li class="${cur === null ? 'current' : ''}"><b>No campaign</b><br><span class="small muted">The apps offer every module this device has.</span><br>`
     + `<button class="quiet" data-pick="" data-open="companion">Companion</button><button class="quiet" data-pick="" data-open="atlas">Atlas</button></li>`;
 }
+// the last pick per campaign, on this device (a convenience: the apps read hexmarch-current, not this)
+const PICK = 'hexmarch-launcher-pick:';
+function lastPick(id) { try { return localStorage.getItem(PICK + id) || ''; } catch (e) { return ''; } }
+$('campaigns').addEventListener('change', e => { const s = e.target.closest('select[data-as]'); if (s) try { localStorage.setItem(PICK + s.dataset.as, s.value); } catch (x) {} });
 $('campaigns').addEventListener('click', async e => {
   const b = e.target.closest('button[data-open]'); if (!b) return;
-  const id = b.dataset.pick || null;
-  try { await kv('put', CURRENT, { campaign: id, at: new Date().toISOString() }); } catch (x) { say(x.message, true); return; }
-  // a campaign Scribe made here opens in the Companion by its link (the referee's seat); the Atlas and Scribe read hexmarch-current
-  location.href = b.dataset.open === 'companion' && id ? `companion/?${new URLSearchParams({ campaign: 'scribe:' + id })}` : `${b.dataset.open}/`;
+  const id = b.dataset.pick || null, app = b.dataset.open;
+  const v = id ? (b.closest('li').querySelector('select[data-as]')?.value || '') : '';
+  const pick = { party: v.startsWith('p:') ? v.slice(2) : null, character: v.startsWith('c:') ? v.slice(2) : null, seat: v.startsWith('s:') ? v.slice(2) : null };
+  try { await kv('put', CURRENT, { campaign: id, ...pick, at: new Date().toISOString() }); } catch (x) { say(x.message, true); return; }
+  // the apps open on hexmarch-current; the Atlas also takes the view in its address (?party=, ?as=)
+  const q = new URLSearchParams();
+  if (app === 'atlas' && pick.party) q.set('party', pick.party);
+  if (app === 'atlas' && pick.character) q.set('as', pick.character);
+  location.href = `${app}/${q.size ? '?' + q : ''}`;
 });
 
 // --- What the device keeps
