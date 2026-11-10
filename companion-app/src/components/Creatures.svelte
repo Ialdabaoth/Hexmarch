@@ -37,10 +37,10 @@
   let rulesId = $derived(app.campaign ? campaignRulesId(app.campaign) : app.settings.rules);
   let rules = $derived(findRules(rulesId) ?? rulesFor('mm'));
 
-  // Creatures from the saved modules (Settings › Modules), with stats for the campaign's rules.
+  // Creatures from the saved modules (Settings › Modules; the campaign's own when one is in use), with stats for the campaign's rules.
   let fromModules = $state.raw<ModuleCreature[]>([]);
   $effect(() => {
-    const mods = app.modules, rid = rulesId;
+    const mods = app.campaignModules, rid = rulesId;
     Promise.allSettled(mods.map((m) => loadModuleCreatures(m, rid))).then((rs) => {
       fromModules = rs.flatMap((r) => (r.status === 'fulfilled' ? r.value : []));
       for (const r of rs) if (r.status === 'rejected') console.warn('Module creatures', r.reason);

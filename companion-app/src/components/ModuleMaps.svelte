@@ -20,10 +20,10 @@
   let at = $derived(app.currentParty?.at ?? null);
   // until one is picked: the module the party is in, else the first with an Atlas map
   let current = $derived(
-    app.modules.find((m) => keyOf(m) === chosen) ??
-      app.modules.find((m) => at && m.base === at.base && m.id === at.module && m.manifest.atlas_map) ??
-      app.modules.find((m) => m.manifest.atlas_map) ??
-      app.modules[0]
+    app.campaignModules.find((m) => keyOf(m) === chosen) ??
+      app.campaignModules.find((m) => at && m.base === at.base && m.id === at.module && m.manifest.atlas_map) ??
+      app.campaignModules.find((m) => m.manifest.atlas_map) ??
+      app.campaignModules[0]
   );
   let here = $derived(!!current && !!at && at.base === current.base && at.module === current.id);
   let atlas = $derived(current?.manifest.atlas_map ? atlasUrl(current.base, current.id) : '');
@@ -147,9 +147,9 @@
 <svelte:window onmessage={onMessage} />
 
 {#if current}
-  {#if app.modules.length > 1}
+  {#if app.campaignModules.length > 1}
     <select value={keyOf(current)} onchange={(e) => (chosen = (e.target as HTMLSelectElement).value)} aria-label="Module" style="margin-bottom:0.5rem">
-      {#each app.modules as m (keyOf(m))}<option value={keyOf(m)}>{m.manifest.title}</option>{/each}
+      {#each app.campaignModules as m (keyOf(m))}<option value={keyOf(m)}>{m.manifest.title}</option>{/each}
     </select>
   {/if}
   {#if atlas}
@@ -175,7 +175,7 @@
 {:else}
   <section class="card">
     <p class="small muted" style="margin-top:0">
-      No module maps on this device yet. Add the Beyond the Pale maps (The Isle of Mists, 1422), or add another module's site under Manage › Modules.
+      {app.campaignModuleIds && app.modules.length ? "None of this campaign's modules is on this device yet." : 'No module maps on this device yet.'} Add the Beyond the Pale maps (The Isle of Mists, 1422), or add another module's site under Manage › Modules.
     </p>
     <button class="primary" onclick={addBeyondThePale} disabled={busy}>{busy ? 'Adding…' : 'Add Beyond the Pale maps'}</button>
     {#if problem}<p class="small failure" role="alert">{problem}</p>{/if}
