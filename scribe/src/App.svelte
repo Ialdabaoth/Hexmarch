@@ -267,13 +267,9 @@
   {#if receiveError}<p class="bad">{receiveError}</p>{/if}
 
   <section>
-    <h2>Campaign name</h2>
+    <h2>Campaign</h2>
     <input type="text" bind:value={draft.title} placeholder="Kells, 1422" />
-  </section>
-
-  <section>
-    <h2>1. Rules</h2>
-    <p class="small muted">A campaign plays one set of core rules (its root). Everything else is added on top.</p>
+    <h3><button type="button" class="tip" data-tip="A campaign plays one set of core rules (its root). Everything else is added on top.">Core Rules</button></h3>
     {#each ROOTS as r (rootKey(r))}
       <label class="opt">
         <input type="radio" name="root" value={rootKey(r)} bind:group={draft.root} />
@@ -282,8 +278,9 @@
     {/each}
   </section>
 
+  {#if root}
   <section>
-    <h2>2. Modules</h2>
+    <h2>Modules</h2>
     {#if loading}
       <p class="muted">Reading the modules…</p>
     {:else if siteError}
@@ -307,11 +304,12 @@
     </details>
   </section>
 
+  {/if}
+
+  {#if root && picked.length}
   <section>
-    <h2>3. Start</h2>
-    {#if !picked.length}
-      <p class="muted">Pick a module first.</p>
-    {:else}
+    <h2>Start</h2>
+
       {#each offers as o (o.module.id + '/' + o.start.id)}
         <label class="opt">
           <input type="radio" name="start" value={`${o.module.id}/${o.start.id}`} bind:group={draft.start} />
@@ -342,8 +340,8 @@
           <input type="number" min="0" max="23" bind:value={draft.manual.hour} />
         </div>
       {/if}
-    {/if}
   </section>
+  {/if}
 
   {#if built}
     <section>
@@ -354,7 +352,7 @@
       {:else}
         <p class="small muted">{built.lock.modules.map((m) => `${m.id} ${m.version}`).join(' · ')}</p>
       {/if}
-      <h3>Play it</h3>
+      <h3><button type="button" class="tip" data-tip="The campaign stays on this device: the Companion, the Atlas and Scribe share it here. The Atlas puts the party at the start the first time it opens.">Play it</button></h3>
       <div class="row">
         <button disabled={!!built.problems.length} onclick={() => openIn('companion')}>Save and open in the Companion</button>
         {#if startSite}<button disabled={!!built.problems.length} onclick={() => openIn('atlas')}>Save and open the start in the Atlas</button>{/if}
@@ -362,23 +360,24 @@
       </div>
       {#if saveError}<p class="bad">{saveError}</p>{/if}
       {#if savedAs}<p class="small muted">Saved on this device, with your Referee invitation: the Companion lists it in its campaigns. Its link is <code>{savedAs}</code>{#if savedAs !== campaignLink(String(built.manifest.id))} (renamed since: save again){/if}.</p>{/if}
-      <p class="small muted">The campaign stays on this device: the Companion, the Atlas and Scribe share it here. The Atlas puts the party at the start the first time it opens.</p>
-      <h3>Or keep the files</h3>
-      <button class="quiet" onclick={() => download('module.json', built!.manifest)}>module.json</button>
-      <button class="quiet" onclick={() => download('campaign.lock.json', built!.lock)}>campaign.lock.json</button>
-      <button class="quiet" onclick={() => download('state.json', built!.state)}>state.json</button>
-      {#if atlasLink}<a class="button quiet" href={atlasLink}>Look at the start in the Atlas</a>{/if}
-      <p class="small muted">Keep the three files together in the campaign's folder (state.json goes in <code>campaign/</code>). The Companion loads state.json under Campaign › State.</p>
+      <details class="files">
+        <summary><span class="tip" data-tip="Keep these three files together to back up the campaign or move it to another device.">Campaign Files</span></summary>
+        <ul>
+          <li><a href="#module.json" onclick={(e) => (e.preventDefault(), download('module.json', built!.manifest))}>module.json</a></li>
+          <li><a href="#campaign.lock.json" onclick={(e) => (e.preventDefault(), download('campaign.lock.json', built!.lock))}>campaign.lock.json</a></li>
+          <li><a href="#state.json" onclick={(e) => (e.preventDefault(), download('state.json', built!.state))}>state.json</a></li>
+          {#if atlasLink}<li><a href={atlasLink}>Look at the start in the Atlas</a></li>{/if}
+        </ul>
+      </details>
     </section>
   {/if}
 
   {#if built && !built.problems.length}
     <section>
-      <h2>8. Where players find it</h2>
+      <h2><button type="button" class="tip" data-tip="Players read the campaign from a web address you choose. Publish puts the files there for you, free, on an account of yours.">Where players find it</button></h2>
       {#if !record}
         <p class="small muted">Save the campaign on this device first (above). Players can't join until it is published.</p>
       {:else}
-        <p class="small muted">Players read the campaign from a web address you choose. Publish puts the files there for you, free, on an account of yours.</p>
         <label class="opt"><input type="radio" name="store" value="apps-script" bind:group={storeKind} /><span><strong>Google Drive</strong> <span class="small muted">through your own Apps Script, set up once</span></span></label>
         <label class="opt"><input type="radio" name="store" value="github" bind:group={storeKind} /><span><strong>GitHub</strong> <span class="small muted">a public repository of yours</span></span></label>
         <label class="opt"><input type="radio" name="store" value="manual" bind:group={storeKind} /><span><strong>Upload by hand</strong> <span class="small muted">to any web folder; Publish hands you the two files</span></span></label>
@@ -412,7 +411,7 @@
           <label class="field">Folder you upload to <input type="url" bind:value={folder} placeholder="https://you.github.io/kells-1422/" /></label>
         {/if}
         <button class="quiet" disabled={!storeReady || !record.published || testing} onclick={runTest}>{testing ? 'Testing…' : 'Test'}</button>
-        {#if test === 'none'}<p class="small muted">Publish first (step 9), then test.</p>
+        {#if test === 'none'}<p class="small muted">Publish first (below), then test.</p>
         {:else if typeof test === 'string'}<p class="bad">{test}</p>
         {:else if test}
           <ul class="small test">
@@ -425,8 +424,7 @@
     </section>
     {#if record}
       <section>
-        <h2>9. Publish</h2>
-        <p class="small muted">Publishing writes what players may see: the campaign, its modules and the shared state (clock, party, what everyone knows), as it stands on this device now, plus each character's knowledge for their player alone and which requests you have answered. It is the same as Update campaign in the Companion, so either one can publish. Nothing only you should see goes in. Invite a player opens in the Companion once it is published.</p>
+        <h2><button type="button" class="tip" data-tip="Publishing writes what players may see: the campaign, its modules and the shared state (clock, party, what everyone knows), as it stands on this device now, plus each character's knowledge for their player alone and which requests you have answered. It is the same as Update campaign in the Companion, so either one can publish. Nothing only you should see goes in. Invite a player opens in the Companion once it is published.">Publish</button></h2>
         <button disabled={!storeReady || publishing} onclick={publish}>{publishing ? 'Publishing…' : record.published ? 'Publish again' : 'Publish'}</button>
         {#if publishError}<p class="bad">{publishError}</p>{/if}
         {#if record.published}
