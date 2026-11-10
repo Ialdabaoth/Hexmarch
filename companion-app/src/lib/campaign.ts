@@ -38,6 +38,9 @@ export interface CampaignCache {
   fetchedAt: string;
   // A campaign made in Scribe: where its modules are published.
   scribe?: { site: string };
+  // The campaign's lockfile (campaign.lock.json) as Scribe saved it, so the Atlas's party creator can offer the
+  // starts of the campaign's modules even when Scribe ran in another browser profile.
+  lock?: unknown;
   // A campaign its referee has published (data repo modules/SCRIBE.md section 5): the pointer invitations name,
   // where players read the snapshot and send requests, and, on a player's device, the snapshot as last read.
   published?: { pointer: string; read: string; post: string; revision: number; at?: string; snapshot?: Pick<Snapshot, 'state' | 'private' | 'receipts'> & Partial<Pick<Snapshot, 'module' | 'lock'>> };
@@ -164,7 +167,9 @@ export function fromScribe(url: string, d: unknown): CampaignCache {
     rules: rules.id,
     equipment: (Array.isArray(own) ? own : [own]).filter((e) => isBuiltIn(e))
   };
-  const out: CampaignCache = { url, campaign, files: [], fetchedAt: typeof r.saved === 'string' ? r.saved : new Date().toISOString(), scribe: { site: typeof r.site === 'string' ? r.site : '' } };
+  const out: CampaignCache = { url, campaign, files: [], fetchedAt: typeof r.saved === 'string' ? r.saved : new Date().toISOString(), scribe: { site: typeof r.site === 'string' ? r.site : '' },
+    ...(r.lock && typeof r.lock === 'object' ? { lock: r.lock } : {})
+  };
   // Scribe's Publish step (Hexmarch #21) records where it published: the referee's invitations name that pointer.
   const { services, published } = r as { services?: { pointer?: unknown; read?: unknown; post?: unknown }; published?: { revision?: unknown; at?: unknown } };
   if (published && typeof services?.pointer === 'string' && services.pointer)
