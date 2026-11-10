@@ -29,9 +29,10 @@ describe('apps talk by links', () => {
   const now = new Date('2026-11-09T16:30:00Z');
   it('hands the Companion the record, and the state only when Scribe wrote it', () => {
     const rec = { id: 'kells-1422', manifest: { title: 'Kells 1422' } } as unknown as SavedCampaign;
-    const m = campaignMessage(rec, { revision: 1 }, now);
+    const m = campaignMessage(rec, { revision: 1 }, undefined, now);
     expect(m).toMatchObject({ format: 'hexmarch-mail', kind: 'campaign', campaign: 'kells-1422', from: { role: 'referee' }, to: 'referee', body: { record: rec, state: { revision: 1 } } });
-    expect(campaignMessage(rec, undefined, now).body).toEqual({ record: rec });
+    expect(campaignMessage(rec, undefined, undefined, now).body).toEqual({ record: rec });
+    expect(campaignMessage(rec, undefined, { party: 'red-hand' }, now).body).toEqual({ record: rec, invite: { party: 'red-hand' } });
   });
   it('publishes the play the Companion sent, unless this device holds newer', async () => {
     const sent = { state: { revision: 5, characters: [] }, knowledge: { holly: [] }, receipts: ['j1'], at: '' };

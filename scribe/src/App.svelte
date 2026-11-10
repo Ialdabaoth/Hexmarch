@@ -2,7 +2,8 @@
   import { ROOTS, RULES_MANIFESTS, type RootChoice } from './lib/rules';
   import { loadSite, type SiteModule } from './lib/data';
   import { buildCampaign, describeProblem, startsOf, type Built, type Choices } from './lib/campaign';
-  import { applyUpdate, campaignLink, campaignMessage, publishOnDevice, publishSecret, saveOnDevice, savePublishSecret, savedCampaign, testUpload, type SavedCampaign, type UpdateResult } from './lib/device';
+  import { applyUpdate, campaignMessage, playFor, publishOnDevice, savePlayState, publishSecret, saveOnDevice, savePublishSecret, savedCampaign, testUpload, type SavedCampaign, type UpdateResult } from './lib/device';
+  import { applyAtlas, atlasEvent, type State } from './lib/parties';
   import type { UploadCheck, UploadReport } from '../../engine';
   import { appsScriptCode, appsScriptStore, githubStore, messageLink, newKey, readMessageHash, servicesFor, staticServices, upload, type Services, type StoreKind } from '../../engine';
 
@@ -251,18 +252,81 @@
   const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
   const isBuilt = $derived(!!built && !!record && same(record.manifest, $state.snapshot(built.manifest)) && same(record.lock, $state.snapshot(built.lock)));
 
-  async function openIn(app: 'companion' | 'atlas') {
-    if (!isBuilt || !built) return;
-    const link = campaignLink(String(built.manifest.id));
-    const c = encodeURIComponent(link);
-    if (app === 'companion') {
-      // Apps talk by links: the Companion gets the campaign, and the state to start from when Scribe just wrote it
-      const rec = await savedCampaign(String(built!.manifest.id));
-      if (rec) location.href = await messageLink(new URL('../', location.href).href, campaignMessage(rec, wroteState ? $state.snapshot(built!.state) : undefined));
+  async function previewAtlas() {
+    if (!isBuilt || !built || !startSite) return;
+    play = (await playFor(campaignKey)).state as State;
+    atlasShown = true;
+    setAtlasOpen(true);
+  }
+
+  // An invitation, from the embedded Atlas's party builder (Heph 2026-11-10: Scribe sets up the campaign and hands it to
+  // the Atlas; the Atlas builds the party; the party builder hands to the Companion per invite, so there is no Preview
+  // in Companion button). Apps talk by links: the Companion gets the campaign, Scribe's play state with that party
+  // active, and `invite: {party}` so it opens Invite a player for that party.
+  async function invite(party: string) {
+    const rec = built && (await savedCampaign(String(built.manifest.id)));
+    if (!rec || !play) return;
+    const state = applyAtlas($state.snapshot(play) as State, { event: 'active', module: '', party }, siteUrl);
+    location.href = await messageLink(new URL('../', location.href).href, campaignMessage(rec, state, { party }));
+  }
+
+  // Preview in Atlas (Heph 2026-11-10): the Atlas embedded here, as in the Companion's Campaign › Maps, in a header
+  // that folds (open or closed is remembered on this device). Scribe is its host: it hands the Atlas the play state
+  // and the lockfile (whose starts the party creator offers) and applies the parties made, moved or picked there to
+  // its own copy, which Publish reads. A folded Atlas stays loaded, so its messages keep coming.
+  const ATLAS_OPEN = 'hexmarch-scribe-atlas-open';
+  let atlasShown = $state(false);
+  let atlasOpen = $state(true);
+  try {
+    atlasOpen = localStorage.getItem(ATLAS_OPEN) !== '0';
+  } catch {
+    // storage blocked: start open
+  }
+  function setAtlasOpen(open: boolean) {
+    atlasOpen = open;
+    try {
+      localStorage.setItem(ATLAS_OPEN, open ? '1' : '0');
+    } catch {
+      // not kept
     }
-    else if (startSite) location.href = `../atlas/?site=${encodeURIComponent(siteUrl)}&module=${encodeURIComponent(startSite.module)}&campaign=${c}${startSite.slug ? `&place=site:${startSite.slug}#site:${startSite.slug}` : ''}`;
+  }
+  let play = $state<State | null>(null);
+  let frame = $state<HTMLIFrameElement>();
+  const atlasSrc = $derived(
+    startSite ? `../atlas/?module=${encodeURIComponent(startSite.module)}&site=${encodeURIComponent(siteUrl)}${startSite.slug ? `#site:${startSite.slug}` : ''}` : ''
+  );
+  const postAtlas = (msg: object) => frame?.contentWindow?.postMessage({ type: 'hexmarch-atlas', ...msg }, '*');
+  function sendAtlas() {
+    if (play) postAtlas({ state: $state.snapshot(play) });
+    if (built) postAtlas({ lock: $state.snapshot(built.lock) });
+  }
+  // The Atlas may still be loading its map when the frame loads, so both go again when it first reports its view.
+  let greeted = false;
+  function onAtlasLoad() {
+    greeted = false;
+    sendAtlas();
+  }
+  async function onAtlasMessage(e: MessageEvent) {
+    if (!frame || e.source !== frame.contentWindow || !play) return;
+    const ev = atlasEvent(e.data);
+    if (!ev) return;
+    if (ev.event === 'invite') return invite(ev.party);
+    if (ev.event === 'view') {
+      if (!greeted) {
+        greeted = true;
+        sendAtlas();
+      }
+      return;
+    }
+    const next = applyAtlas($state.snapshot(play) as State, ev, siteUrl);
+    if (next.revision === play.revision) return;
+    play = next;
+    await savePlayState(campaignKey, next);
+    postAtlas({ state: next });
   }
 </script>
+
+<svelte:window onmessage={onAtlasMessage} />
 
 <main>
   <header>
@@ -365,9 +429,14 @@
     <section>
       <h2>Preview My Campaign</h2>
       <div class="row">
-        <button onclick={() => openIn('companion')}>Preview in Companion</button>
-        {#if startSite}<button onclick={() => openIn('atlas')}>Preview in Atlas</button>{/if}
+        {#if startSite && !atlasShown}<button onclick={previewAtlas}>Preview in Atlas</button>{/if}
       </div>
+      {#if atlasShown && atlasSrc}
+        <details class="atlas" open={atlasOpen} ontoggle={(e) => setAtlasOpen((e.currentTarget as HTMLDetailsElement).open)}>
+          <summary>Atlas <span class="small muted">{picked[0]?.title}</span></summary>
+          <div class="frame"><iframe bind:this={frame} src={atlasSrc} title="Atlas preview" onload={onAtlasLoad}></iframe></div>
+        </details>
+      {/if}
     </section>
   {/if}
 

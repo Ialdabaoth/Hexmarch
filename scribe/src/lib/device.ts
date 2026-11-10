@@ -97,8 +97,9 @@ export async function saveOnDevice(built: Built, root: RootChoice, site: string,
 //   campaign  Scribe -> Companion: {record, state?}, the saved record (with services and published once it has
 //             them) and, when Scribe has just written it, the state file to start play from
 //   update    Companion -> Scribe: {state, knowledge, receipts}, the parts Publish needs, as the Companion has them
-export function campaignMessage(record: SavedCampaign, state?: unknown, now = new Date()): Envelope {
-  return envelope({ campaign: record.id, kind: 'campaign', from: { role: 'referee' }, to: 'referee', body: { record, ...(state ? { state } : {}) } }, now);
+// `invite` (from the Atlas's party builder): the Companion opens Invite a player for that party.
+export function campaignMessage(record: SavedCampaign, state?: unknown, invite?: { party: string }, now = new Date()): Envelope {
+  return envelope({ campaign: record.id, kind: 'campaign', from: { role: 'referee' }, to: 'referee', body: { record, ...(state ? { state } : {}), ...(invite ? { invite } : {}) } }, now);
 }
 
 export interface Play {
@@ -190,3 +191,10 @@ export async function publishSecret(id: string): Promise<string> {
   return typeof v === 'string' ? v : '';
 }
 export const savePublishSecret = (id: string, secret: string) => idbSet(secretKey(id), secret.trim());
+
+// The embedded Atlas (Preview in Atlas) moves parties on Scribe's own copy of the play state: it is kept as
+// play:<id>, with the knowledge and receipts Publish would send, so Publish sees it even across browser profiles.
+export async function savePlayState(id: string, state: Record<string, unknown>, now = new Date()): Promise<void> {
+  const p = await playFor(id);
+  await idbSet(`play:${id}`, { ...p, state, at: now.toISOString() });
+}
