@@ -55,6 +55,8 @@ footer a{color:var(--red)}
 <dialog id="credits"><h2>Credits</h2><ul id="creditlist"></ul><button id="creditclose">Close</button></dialog>
 <!--CARD-->
 <script>
+// Scribe's answer to a publish request ('published', #m=…) comes back in the fragment; take it out before the map reads the fragment as a place
+let MAIL_IN = /^#m=/.test(location.hash) ? location.hash.slice(3) : ''; if (MAIL_IN) history.replaceState(null, '', location.pathname + location.search);
 "use strict";
 const CW = 50 * Math.sqrt(3), SQ3 = Math.sqrt(3), LAB = '0123456789ABCDEFGHJKLMNPRSTUVWXYZ';
 const lab = n => n < 100 ? String(n).padStart(2, '0') : LAB[10 + Math.floor((n - 100) / 10)] + (n % 10);
@@ -598,15 +600,31 @@ async function unpublished() {
 }
 let UNPUB = false;
 async function checkPublished() { const u = await unpublished(); if (u !== UNPUB) { UNPUB = u; if (PBOX) partyBox(); } }
-async function publishLink(ret) { return mailLink(COMPANION + 'scribe/', 'update', { state: CS, return: ret }); }
-function publishLine() { return UNPUB ? '<br><small>Players don’t have these parties yet.</small> <button data-p="publish" title="Scribe publishes the campaign, then brings you back here">Publish for players</button>' : ''; }
+async function publishLink(back) { return mailLink(COMPANION + 'scribe/', 'update', { state: CS, back }); }
+// the Atlas again after publishing; with &invite=<party> it goes on to the Companion's invitation once Scribe says it published
+function backHere(invite) { const u = new URL(location.href); u.hash = ''; u.searchParams.delete('invite'); if (invite) u.searchParams.set('invite', invite); return u.href; }
+let PUBMSG = '';
+async function readPublished() {  // Scribe's 'published' answer: {ok, revision, at} or {ok: false, error, firstPublish}
+  const m = MAIL_IN; MAIL_IN = ''; if (!m) return;
+  let e = null; try { const b = Uint8Array.from(atob(m.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - m.length % 4) % 4)), c => c.charCodeAt(0));
+    e = JSON.parse(new TextDecoder().decode(await new Response(new Blob([b]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer())); } catch (x) { return; }
+  if (!e || e.format !== 'hexmarch-mail' || e.kind !== 'published' || !e.body) return;
+  const inv = ASK.get('invite'); if (inv) history.replaceState(null, '', backHere(''));
+  if (e.body.ok) {
+    UNPUB = false; PUBMSG = `Published for players${e.body.revision ? ` (revision ${e.body.revision})` : ''}.`;
+    if (inv && CS && CS.parties.some(q => q.id === inv)) { const l = await inviteHandoff(inv); if (l) { location.href = l; return; } INVITE = inv; PID = inv; }
+  } else PUBMSG = e.body.firstPublish ? 'Publish the campaign once in Scribe first, then invite players.' : `Not published: ${e.body.error || 'Scribe could not publish.'}`;
+  PBOX = true; partyBox();
+}
+function pubLine() { const m = PUBMSG; return m ? `<br><small>${esc(m)}</small>` : ''; }
+function publishLine() { return pubLine() + (UNPUB ? '<br><small>Players don’t have these parties yet.</small> <button data-p="publish" title="Scribe publishes the campaign, then brings you back here">Publish for players</button>' : ''); }
 function inviteFor(party) { const q = new URLSearchParams({ campaign: CLINK, as: 'player', party }); return `${COMPANION}?${q}`; }  // the Companion's inviteLink
 function lockMods(lock) { if (lock && Array.isArray(lock.modules)) CMODS = new Set(lock.modules.map(m => m && m.id).filter(x => typeof x === 'string')); }
 async function loadState() {
   if (CS_SRC === 'host') return;
   try { const s = await deviceState(); if (s) { CS = s; CS_SRC = 'device'; } } catch (e) {}
   if (!CS) try { const s = JSON.parse(store.get(CS_KEY) || 'null'); if (s) { CS = csRead(s); CS_SRC = 'local'; } } catch (e) {}
-  fromState(); if (CS_SRC === 'device') checkPublished();
+  fromState(); if (CS_SRC === 'device') await checkPublished(); readPublished();
 }
 function fromState() {  // the markers from the state file: a party shows only on its own module's map
   pickParty(); startHere();
@@ -914,11 +932,11 @@ function loadFile() {
 }
 document.getElementById('party').addEventListener('click', e => { const b = e.target.closest('button[data-p]'); if (!b) return; const a = b.dataset.p;
   if (a === 'new' && !LOCK) NEWP = true; else if (a === 'cancelnew') NEWP = false; else if (a === 'create') { createParty(document.getElementById('party')); return; }
-  else if (a === 'place' && !LOCK && AP()) { PLACE = true; hoverHint(); } else if (a === 'cancel') { PLACE = false; hoverHint(); } else if (a === 'close') { PBOX = false; NEWP = false; }
+  else if (a === 'place' && !LOCK && AP()) { PLACE = true; hoverHint(); } else if (a === 'cancel') { PLACE = false; hoverHint(); } else if (a === 'close') { PBOX = false; NEWP = false; PUBMSG = ''; }
   else if (a === 'go') location.hash = addr(...PARTY.hex); else if (a === 'reset') setParty(PARTY.hex, 0); else if (a === 'remove') setParty(null);
   else if (a === 'invite' && !LOCK && AP()) { if (HOSTINV && parent !== window) { parent.postMessage({ type: 'hexmarch-atlas', event: 'invite', module: MOD.id, party: PID }, '*'); return; }
-    const w = window.open('', '_blank'); inviteHandoff(PID).then(async l => { if (l && w) { w.location.href = UNPUB ? await publishLink(l) : l; return; } if (w) w.close(); INVITE = PID; partyBox(); }); return; }
-  else if (a === 'publish') { publishLink(location.href).then(l => { location.href = l; }); return; }
+    const w = window.open('', '_blank'); inviteHandoff(PID).then(async l => { if (l && w) { w.location.href = UNPUB ? await publishLink(backHere(PID)) : l; return; } if (w) w.close(); INVITE = PID; partyBox(); }); return; }
+  else if (a === 'publish') { publishLink(backHere('')).then(l => { location.href = l; }); return; }
   else if (a === 'copyinv') { const i = document.querySelector('#party input[data-inv]'); if (i) { i.select(); try { navigator.clipboard.writeText(i.value); b.textContent = 'Copied'; } catch (x) { document.execCommand('copy'); } } return; }
   else if (a === 'save') { if (CS) saveFile(); return; } else if (a === 'load') { loadFile(); return; } else if (a === 'who') { loadWhoFile(); return; }
   partyBox(); });
