@@ -1,0 +1,1 @@
+**Build Campaign** (Heph 2026-11-10) replaces "Save on this device" and the two "Save and open…" buttons. Building saves the campaign and your Referee invitation on this device. Only then do **Open in the Companion**, **Open the start in the Atlas**, Where players find it and Publish appear. Changing the campaign after building hides them again until you build it again.

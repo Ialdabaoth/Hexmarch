@@ -123,6 +123,13 @@
       return null;
     }
   }
+  let building = $state(false);
+  async function build() {
+    building = true;
+    await save();
+    building = false;
+  }
+
   // Steps 8 and 9: Services and Publish (SCRIBE.md section 5).
   let record = $state<SavedCampaign | null>(null);
   let folder = $state('');
@@ -234,9 +241,14 @@
     }
   })();
 
+  // Built = this device holds the campaign exactly as the page shows it now (Heph 2026-11-10: Build Campaign first,
+  // then Open in the Companion or the Atlas). Changing the campaign after building asks for another build.
+  const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+  const isBuilt = $derived(!!built && !!record && same(record.manifest, $state.snapshot(built.manifest)) && same(record.lock, $state.snapshot(built.lock)));
+
   async function openIn(app: 'companion' | 'atlas') {
-    const link = await save();
-    if (!link) return;
+    if (!isBuilt || !built) return;
+    const link = campaignLink(String(built.manifest.id));
     const c = encodeURIComponent(link);
     if (app === 'companion') {
       // Apps talk by links: the Companion gets the campaign, and the state to start from when Scribe just wrote it
@@ -353,13 +365,17 @@
         <p class="small muted">{built.lock.modules.map((m) => `${m.id} ${m.version}`).join(' · ')}</p>
       {/if}
       <h3><button type="button" class="tip" data-tip="The campaign stays on this device: the Companion, the Atlas and Scribe share it here. The Atlas puts the party at the start the first time it opens.">Play it</button></h3>
-      <div class="row">
-        <button disabled={!!built.problems.length} onclick={() => openIn('companion')}>Save and open in the Companion</button>
-        {#if startSite}<button disabled={!!built.problems.length} onclick={() => openIn('atlas')}>Save and open the start in the Atlas</button>{/if}
-        <button class="quiet" disabled={!!built.problems.length} onclick={save}>Save on this device</button>
-      </div>
+      <button disabled={!!built.problems.length || building} onclick={build}>{building ? 'Building…' : 'Build Campaign'}</button>
       {#if saveError}<p class="bad">{saveError}</p>{/if}
-      {#if savedAs}<p class="small muted">Saved on this device, with your Referee invitation: the Companion lists it in its campaigns. Its link is <code>{savedAs}</code>{#if savedAs !== campaignLink(String(built.manifest.id))} (renamed since: save again){/if}.</p>{/if}
+      {#if isBuilt}
+        <p class="small muted">Built on this device, with your Referee invitation in the Companion.</p>
+        <div class="row">
+          <button onclick={() => openIn('companion')}>Open in the Companion</button>
+          {#if startSite}<button onclick={() => openIn('atlas')}>Open the start in the Atlas</button>{/if}
+        </div>
+      {:else if record}
+        <p class="small muted">The campaign has changed since you built it. Build it again to open or publish it.</p>
+      {/if}
       <details class="files">
         <summary><span class="tip" data-tip="Keep these three files together to back up the campaign or move it to another device.">Campaign Files</span></summary>
         <ul>
@@ -372,7 +388,7 @@
     </section>
   {/if}
 
-  {#if built && !built.problems.length}
+  {#if built && !built.problems.length && isBuilt}
     <section>
       <h2><button type="button" class="tip" data-tip="Players read the campaign from a web address you choose. Publish puts the files there for you, free, on an account of yours.">Where players find it</button></h2>
       {#if !record}
