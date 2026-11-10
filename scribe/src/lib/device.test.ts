@@ -43,3 +43,14 @@ describe('apps talk by links', () => {
     expect((await playFor('k', get({ 'state:k': { revision: 2 } }))).state).toEqual({ revision: 2 });
   });
 });
+
+describe('back address after an Update link', () => {
+  it('returns only to the same site', async () => {
+    const { backUrl } = await import('./device');
+    const here = 'https://ialdabaoth.github.io/Hexmarch/scribe/#m=x';
+    expect(backUrl('https://ialdabaoth.github.io/Hexmarch/?tab=inbox', here)).toBe('https://ialdabaoth.github.io/Hexmarch/?tab=inbox');
+    expect(backUrl('../', here)).toBe('https://ialdabaoth.github.io/Hexmarch/');
+    expect(backUrl('https://evil.example/', here)).toBeNull();
+    expect(backUrl(undefined, here)).toBeNull();
+  });
+});

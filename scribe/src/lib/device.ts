@@ -9,7 +9,7 @@
 
 import type { Built } from './campaign';
 import type { RootChoice } from './rules';
-import { checkUpload, envelope, pointer, publishParts, snapshot, type Envelope, type UploadReport, type Pointer, type Services, type Snapshot } from '../../../engine';
+import { checkUpload, envelope, pointer, publishParts, snapshot, upload, type Envelope, type UploadReport, type Pointer, type Services, type Snapshot } from '../../../engine';
 
 export const SCRIBE_FORMAT = 'hexmarch-scribe-campaign';
 
@@ -197,4 +197,41 @@ export const savePublishSecret = (id: string, secret: string) => idbSet(secretKe
 export async function savePlayState(id: string, state: Record<string, unknown>, now = new Date()): Promise<void> {
   const p = await playFor(id);
   await idbSet(`play:${id}`, { ...p, state, at: now.toISOString() });
+}
+
+// Publishing again without the page (Heph 2026-11-10: Scribe is the only publisher; after the first, deliberate
+// Publish, what players need is published by itself): for an Update link from the Companion and for parties changed
+// in the embedded Atlas. Uses the campaign's own adapter and the key kept on this device; never My Own Host, which
+// can't upload. The answer is what Scribe shows, and what goes back to the Companion as a 'published' message.
+export type PublishResult = { ok: true; revision: number; at: string } | { ok: false; error: string; firstPublish?: true };
+export async function publishAgain(id: string, now = new Date(), f: typeof fetch = fetch): Promise<PublishResult> {
+  const rec = await savedCampaign(id);
+  if (!rec) return { ok: false, error: "Scribe on this device doesn't have this campaign. Build it in Scribe first." };
+  if (!rec.published || !rec.services) return { ok: false, firstPublish: true, error: 'Publish the campaign once in Scribe first.' };
+  const store = rec.services.store;
+  if (!store || store.kind === 'manual') return { ok: false, error: 'This campaign lives on your own host, so publish it from Scribe and upload the files by hand.' };
+  const secret = await publishSecret(id);
+  try {
+    const out = await publishOnDevice(id, rec.services, now, (x) =>
+      upload(store, secret, { 'campaign.json': x.pointer, 'snapshot.json': x.snapshot }, `Publish ${String(rec.manifest.title ?? id)}, revision ${x.snapshot.revision}`, f)
+    );
+    return { ok: true, revision: out.record.published!.revision, at: out.record.published!.at };
+  } catch (e) {
+    return { ok: false, error: (e as Error).message || String(e) };
+  }
+}
+
+export function publishedMessage(id: string, re: string, result: PublishResult, now = new Date()): Envelope {
+  return envelope({ campaign: id, kind: 'published', from: { role: 'referee' }, to: 'referee', re, body: { ...result } }, now);
+}
+
+// Where to return after an Update link: only an address on Scribe's own site (the apps share one), never elsewhere.
+export function backUrl(back: unknown, here: string): string | null {
+  if (typeof back !== 'string') return null;
+  try {
+    const u = new URL(back, here);
+    return u.origin === new URL(here).origin ? u.href : null;
+  } catch {
+    return null;
+  }
 }

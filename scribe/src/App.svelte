@@ -2,7 +2,7 @@
   import { ROOTS, RULES_MANIFESTS, type RootChoice } from './lib/rules';
   import { loadSite, type SiteModule } from './lib/data';
   import { buildCampaign, describeProblem, startsOf, type Built, type Choices } from './lib/campaign';
-  import { applyUpdate, campaignMessage, playFor, publishOnDevice, savePlayState, publishSecret, saveOnDevice, savePublishSecret, savedCampaign, testUpload, type SavedCampaign, type UpdateResult } from './lib/device';
+  import { applyUpdate, backUrl, campaignMessage, playFor, publishAgain, publishedMessage, type PublishResult, publishOnDevice, savePlayState, publishSecret, saveOnDevice, savePublishSecret, savedCampaign, testUpload, type SavedCampaign, type UpdateResult } from './lib/device';
   import { applyAtlas, atlasEvent, type State } from './lib/parties';
   import type { UploadCheck, UploadReport } from '../../engine';
   import { appsScriptCode, appsScriptStore, githubStore, messageLink, newKey, readMessageHash, servicesFor, staticServices, upload, type Services, type StoreKind } from '../../engine';
@@ -233,6 +233,38 @@
     unreadable: "can't be read: it isn't JSON, or the host doesn't let other sites read it"
   };
 
+  // Auto-publish (Heph 2026-11-10: Scribe is the only publisher, and the referee shouldn't bounce back and forth). The
+  // first publish stays the Publish button; after it, parties made, moved or picked in the embedded Atlas are published
+  // a few seconds later, and an invitation waits for any publish still pending, so the player joins a campaign that
+  // already has their party.
+  const AUTO_DELAY = 3000;
+  let autoTimer: ReturnType<typeof setTimeout> | undefined;
+  let autoRun: Promise<PublishResult> | null = null;
+  let autoStatus = $state<'publishing' | PublishResult | null>(null);
+  function schedulePublish() {
+    if (!record?.published) return;
+    clearTimeout(autoTimer);
+    autoTimer = setTimeout(() => void publishNow(), AUTO_DELAY);
+  }
+  async function runPublish(id: string): Promise<PublishResult> {
+    autoStatus = 'publishing';
+    const r = await publishAgain(id);
+    autoStatus = r;
+    if (id === campaignKey) record = await savedCampaign(id);
+    return r;
+  }
+  // Runs a pending auto-publish now, or waits for one under way; false when that publish failed.
+  async function publishNow(): Promise<boolean> {
+    if (autoTimer !== undefined) {
+      clearTimeout(autoTimer);
+      autoTimer = undefined;
+      const before = autoRun;
+      autoRun = (async () => (await before, runPublish(campaignKey)))().finally(() => (autoRun = null));
+    }
+    const r = autoRun ? await autoRun : null;
+    return !r || r.ok;
+  }
+
   // Update in Scribe (Companion -> Scribe, a link to scribe/#m=...): play to publish from.
   let received = $state<UpdateResult | null>(null);
   let receiveError = $state('');
@@ -242,6 +274,16 @@
       if (!e) return;
       received = await applyUpdate(e);
       history.replaceState(null, '', location.pathname + location.search);
+      // Scribe is the only publisher: an Update from the Companion is published straight away (after the first
+      // Publish), then the Companion gets the answer at its back address.
+      const rec = await savedCampaign(e.campaign);
+      const result: PublishResult =
+        received.status === 'applied' ? await runPublish(e.campaign)
+        : rec?.published ? { ok: true, revision: rec.published.revision, at: rec.published.at }
+        : { ok: false, firstPublish: true, error: 'Publish the campaign once in Scribe first.' };
+      autoStatus = result;
+      const back = backUrl(e.body.back, location.href);
+      if (back) location.href = await messageLink(back, publishedMessage(e.campaign, e.id, result));
     } catch (e) {
       receiveError = `Scribe couldn't read that link: ${(e as Error).message || e}`;
     }
@@ -264,6 +306,7 @@
   // in Companion button). Apps talk by links: the Companion gets the campaign, Scribe's play state with that party
   // active, and `invite: {party}` so it opens Invite a player for that party.
   async function invite(party: string) {
+    if (!(await publishNow())) return; // shown above the Atlas; the player would join a campaign without their party
     const rec = built && (await savedCampaign(String(built.manifest.id)));
     if (!rec || !play) return;
     const state = applyAtlas($state.snapshot(play) as State, { event: 'active', module: '', party }, siteUrl);
@@ -325,6 +368,7 @@
     play = next;
     await savePlayState(campaignKey, next);
     postAtlas({ state: next });
+    schedulePublish();
   }
 </script>
 
@@ -341,7 +385,8 @@
 
   {#if received}
     <section class="small">
-      {#if received.status === 'applied'}Received play for “{received.title ?? received.campaign}” from the Companion (state revision {received.revision}). Publish again to share it.
+      {#if received.status === 'applied'}Received play for “{received.title ?? received.campaign}” from the Companion (state revision {received.revision}).
+        {#if autoStatus === 'publishing'} Publishing…{:else if autoStatus?.ok} Published (revision {autoStatus.revision}).{:else if autoStatus} {autoStatus.error}{/if}
       {:else if received.status === 'older'}That link holds older play for “{received.title ?? received.campaign}” (revision {received.revision}) than Scribe already has, so Scribe kept what it has.
       {:else}Scribe already has the play in that link.{/if}
       {#if !received.title} Scribe hasn't saved this campaign on this device; open it in Scribe to publish.{/if}
@@ -434,6 +479,9 @@
         {#if startSite && !atlasShown}<button onclick={previewAtlas}>Preview in Atlas</button>{/if}
       </div>
       {#if atlasShown && atlasSrc}
+        {#if autoStatus === 'publishing'}<p class="small muted">Publishing…</p>
+        {:else if autoStatus?.ok}<p class="small muted">Published (revision {autoStatus.revision}).</p>
+        {:else if autoStatus}<p class="bad">{autoStatus.error}</p>{/if}
         <details class="atlas" open={atlasOpen} ontoggle={(e) => setAtlasOpen((e.currentTarget as HTMLDetailsElement).open)}>
           <summary>Atlas <span class="small muted">{picked[0]?.title}</span></summary>
           <div class="frame"><iframe bind:this={frame} src={atlasSrc} title="Atlas preview" onload={onAtlasLoad}></iframe></div>
