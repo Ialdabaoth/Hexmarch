@@ -584,13 +584,14 @@ class AppState {
     }
   }
 
-  // The campaign's lockfile (campaign.lock.json): Scribe's record on this device, else the last snapshot read. The
+  // The campaign's lockfile (campaign.lock.json): Scribe's record on this device, else the one the campaign came
+  // with (a Scribe link from another profile), else the last snapshot read. The
   // embedded Atlas gets it so its party creator offers only the starts of the campaign's modules.
   async campaignLock(): Promise<unknown> {
     const c = this.campaign;
     if (!c) return null;
     const rec = (await idbGet(`scribe-campaign:${c.campaign.id}`)) as { lock?: unknown } | undefined;
-    return rec?.lock ?? c.published?.snapshot?.lock ?? null;
+    return rec?.lock ?? c.lock ?? c.published?.snapshot?.lock ?? null;
   }
 
   // Referee mode, a campaign Scribe published: writes the pointer and a new snapshot (WORKFLOWS.md "Invitations"),
