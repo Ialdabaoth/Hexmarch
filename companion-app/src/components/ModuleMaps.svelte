@@ -109,6 +109,25 @@
     }
   }
 
+  // The Atlas folds away like the other panels (Heph 2026-11-10); it starts open and the device remembers it. Folded,
+  // the frame stays loaded, only hidden, so the party's moves and the messages keep working.
+  const OPEN_KEY = 'hexmarch-companion-atlas-open';
+  let atlasOpen = $state((() => {
+    try {
+      return localStorage.getItem(OPEN_KEY) !== '0';
+    } catch {
+      return true;
+    }
+  })());
+  function foldAtlas(e: Event) {
+    atlasOpen = (e.currentTarget as HTMLDetailsElement).open;
+    try {
+      localStorage.setItem(OPEN_KEY, atlasOpen ? '1' : '0');
+    } catch {
+      // storage blocked: it still folds, just not remembered
+    }
+  }
+
   async function addBeyondThePale() {
     busy = true;
     problem = '';
@@ -130,6 +149,8 @@
     </select>
   {/if}
   {#if atlas}
+    <details class="atlas" open={atlasOpen} ontoggle={foldAtlas}>
+    <summary><h3>Atlas</h3> <span class="muted">{current.manifest.title}</span></summary>
     {#key atlas}
       <div class="frame">
         <iframe bind:this={frame} src="{atlas}{lockQuery}{start}" title="{current.manifest.title}: Atlas" onload={onLoad}></iframe>
@@ -140,6 +161,7 @@
         <a href="{atlas}{lockQuery}{showing}" target="_blank" rel="noopener">Full screen</a>
       </div>
     {/key}
+    </details>
   {:else}
     <section class="card">
       <p class="small muted" style="margin-top:0">{current.manifest.title} has no Atlas map. Its own pages may still have maps.</p>
@@ -157,6 +179,9 @@
 {/if}
 
 <style>
+  .atlas > summary { cursor: pointer; }
+  .atlas > summary h3 { display: inline; margin: 0; font-size: 1rem; }
+  .atlas[open] > summary { margin-bottom: 0.4rem; }
   .frame { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--card); }
   iframe { display: block; width: 100%; height: 75vh; border: 0; }
   .strip { margin-top: 0.4rem; }
