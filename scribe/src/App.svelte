@@ -124,7 +124,25 @@
   // Google Drive through their own Apps Script, or by hand as before.
   let storeKind = $state<StoreKind>('github');
   let scriptUrl = $state('');
-  let ghRepo = $state('');
+  // Repository = the referee's GitHub username / the repository name (step 2 suggests one from the campaign name).
+  let ghUser = $state('');
+  let ghName = $state('');
+  const ghRepo = $derived(ghUser.trim() && ghName.trim() ? `${ghUser.trim()}/${ghName.trim()}` : '');
+  const suggestedName = $derived(
+    (built ? String(built.manifest.title) : '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'my-campaign'
+  );
+  $effect(() => {
+    if (storeKind === 'github' && !ghName && built) ghName = suggestedName;
+  });
+  const newRepoLink = $derived(`https://github.com/new?${new URLSearchParams({ name: ghName.trim() || suggestedName, visibility: 'public', description: 'Hexmarch campaign files' })}`);
+  const tokenLink = $derived(
+    `https://github.com/settings/personal-access-tokens/new?${new URLSearchParams({
+      name: `Hexmarch Scribe ${ghName.trim() || suggestedName}`.slice(0, 40),
+      description: 'Lets Hexmarch Scribe publish this campaign',
+      ...(ghUser.trim() ? { target_name: ghUser.trim() } : {}),
+      contents: 'write'
+    })}`
+  );
   let ghDir = $state('');
   let ghBranch = $state('main');
   let secret = $state('');
@@ -160,7 +178,8 @@
         storeKind = st?.kind ?? 'manual';
         if (st?.kind === 'apps-script') scriptUrl = st.url;
         if (st?.kind === 'github') {
-          ghRepo = `${st.owner}/${st.repo}`;
+          ghUser = st.owner;
+          ghName = st.repo;
           ghDir = st.dir;
           ghBranch = st.branch;
         }
@@ -374,24 +393,39 @@
           <label class="field">Web app URL <input type="url" bind:value={scriptUrl} placeholder="https://script.google.com/macros/s/…/exec" /></label>
           <label class="field">Key (the KEY line in your script) <input type="password" bind:value={secret} autocomplete="off" /></label>
         {:else if storeKind === 'github'}
-          <details class="small" open={!ghRepo}>
-            <summary>Set up GitHub (once)</summary>
-            <ol>
-              <li>Make a <strong>public</strong> repository for your campaigns (players read the files from it, so keep secrets out of it).</li>
-              <li>Make a <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">fine-grained token</a>: Only select repositories › that one; Permissions › Contents › Read and write. Paste it below. It stays on this device.</li>
-            </ol>
+          <ol class="small gh">
+            <li>
+              Make a free <a href="https://github.com/signup" target="_blank" rel="noopener">GitHub account</a>, if you don't have one.
+              <button type="button" class="tip" data-tip="GitHub stores your campaign files for free, and your players read them from there.">Why GitHub?</button>
+              <label class="field">Your GitHub username <input type="text" bind:value={ghUser} placeholder="heph" autocapitalize="off" autocomplete="username" /></label>
+            </li>
+            <li>
+              Name your <button type="button" class="tip" data-tip="A repository is a folder on GitHub. It has to be Public so players can read it, but only you can change it.">repository</button>,
+              then <a href={newRepoLink} target="_blank" rel="noopener">create it on GitHub</a> and press <strong>Create repository</strong>.
+              <label class="field">Repository name <input type="text" bind:value={ghName} placeholder={suggestedName} autocapitalize="off" /></label>
+            </li>
+            <li>
+              Make a <button type="button" class="tip" data-tip="The key stays on this device and never goes into your campaign or its links. It can only touch this one repository.">key</button>
+              so Scribe can save there: <a href={tokenLink} target="_blank" rel="noopener">open the key page</a>. Name the key, choose
+              <strong>Only select repositories</strong> and pick your repository, then <strong>Add permissions</strong> › <strong>Contents</strong> ›
+              <strong>Read and write</strong>. Press <strong>Generate token</strong>, then copy it.
+            </li>
+            <li>Paste the key here, then press Publish (below).
+              <label class="field">Key <input type="password" bind:value={secret} autocomplete="off" /></label>
+            </li>
+          </ol>
+          <details class="small">
+            <summary>Advanced</summary>
+            <div class="row">
+              <label class="field">Folder (optional) <input type="text" bind:value={ghDir} placeholder="kells" autocapitalize="off" /></label>
+              <label class="field">Branch <input type="text" bind:value={ghBranch} autocapitalize="off" /></label>
+            </div>
           </details>
-          <div class="row">
-            <label class="field">Repository <input type="text" bind:value={ghRepo} placeholder="you/kells-1422" autocapitalize="off" /></label>
-            <label class="field">Folder (optional) <input type="text" bind:value={ghDir} placeholder="kells" autocapitalize="off" /></label>
-            <label class="field">Branch <input type="text" bind:value={ghBranch} autocapitalize="off" /></label>
-          </div>
-          <label class="field">Token <input type="password" bind:value={secret} autocomplete="off" /></label>
         {:else}
           <label class="field">Folder you upload to <input type="url" bind:value={folder} placeholder="https://you.github.io/kells-1422/" /></label>
         {/if}
-        <button class="quiet" disabled={!storeReady || !record.published || testing} onclick={runTest}>{testing ? 'Testing…' : 'Test'}</button>
-        {#if test === 'none'}<p class="small muted">Publish first (below), then test.</p>
+        <button disabled={!storeReady || !record.published || testing} onclick={runTest}>{testing ? 'Verifying…' : 'Verify Campaign Files'}</button>
+        {#if test === 'none'}<p class="small muted">Publish first (below), then verify.</p>
         {:else if typeof test === 'string'}<p class="bad">{test}</p>
         {:else if test}
           <ul class="small test">
