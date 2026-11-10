@@ -24,6 +24,8 @@ describe('github store', () => {
     const calls: { url: string; init?: RequestInit }[] = [];
     const f = (async (url: string, init?: RequestInit) => {
       calls.push({ url, init });
+      if (url === 'https://api.github.com/repos/heph/kells') return json(200, { private: false, default_branch: 'main' });
+      if (url.endsWith('/branches/main')) return json(200, {});
       if (!init?.method) return url.includes('campaign.json') ? json(200, { sha: 'abc' }) : json(404, { message: 'Not Found' });
       return json(201, {});
     }) as typeof fetch;
@@ -42,8 +44,32 @@ describe('github store', () => {
 
   it('says what went wrong', async () => {
     const f = (async () => json(401, { message: 'Bad credentials' })) as unknown as typeof fetch;
-    await expect(upload(githubStore('heph/kells'), 'tok', files, 'x', f)).rejects.toThrow(/token was refused/);
+    await expect(upload(githubStore('heph/kells'), 'tok', files, 'x', f)).rejects.toThrow(/refused the key/);
     await expect(upload(githubStore('heph/kells'), '', files)).rejects.toThrow(/token/);
+    const missing = (async () => json(404, { message: 'Not Found' })) as unknown as typeof fetch;
+    await expect(upload(githubStore('heph/kells'), 'tok', files, 'x', missing)).rejects.toThrow(/doesn't know the repository heph\/kells/);
+    const secret = (async () => json(200, { private: true })) as unknown as typeof fetch;
+    await expect(upload(githubStore('heph/kells'), 'tok', files, 'x', secret)).rejects.toThrow(/private/);
+  });
+
+  it('writes the first files of a brand-new repository without naming a branch', async () => {
+    const puts: Record<string, unknown>[] = [];
+    const f = (async (url: string, init?: RequestInit) => {
+      if (url === 'https://api.github.com/repos/heph/kells') return json(200, { private: false, default_branch: 'main' });
+      if (url.endsWith('/branches/main')) return json(404, { message: 'Branch not found' });
+      if (url.includes('/commits')) return json(409, { message: 'Git Repository is empty.' });
+      if (init?.method === 'PUT') return puts.push(JSON.parse(String(init.body))), json(201, {});
+      return json(404, {});
+    }) as typeof fetch;
+    await upload(githubStore('heph/kells'), 'tok', files, 'x', f);
+    expect(puts[0].branch).toBeUndefined();
+    expect(puts[1].branch).toBe('main');
+  });
+
+  it('names a missing branch', async () => {
+    const f = (async (url: string) =>
+      url.endsWith('/kells') ? json(200, { default_branch: 'main' }) : url.includes('/commits') ? json(200, []) : json(404, {})) as unknown as typeof fetch;
+    await expect(upload(githubStore('heph/kells', '', 'play'), 'tok', files, 'x', f)).rejects.toThrow(/no branch called play/);
   });
 });
 
