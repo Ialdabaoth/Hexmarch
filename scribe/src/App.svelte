@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from 'svelte';
   import { ROOTS, RULES_MANIFESTS, type RootChoice } from './lib/rules';
   import { loadSite, type SiteModule } from './lib/data';
   import { buildCampaign, describeProblem, startsOf, type Built, type Choices } from './lib/campaign';
@@ -114,6 +115,7 @@
   async function build() {
     building = true;
     await save();
+    setAtlasOpen(true); // Build Campaign opens the Atlas, even if it was folded last time
     building = false;
   }
 
@@ -307,12 +309,16 @@
   const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
   const isBuilt = $derived(!!built && !!record && same(record.manifest, $state.snapshot(built.manifest)) && same(record.lock, $state.snapshot(built.lock)));
 
-  async function previewAtlas() {
-    if (!isBuilt || !built || !startSite) return;
-    play = (await playFor(campaignKey)).state as State;
-    atlasShown = true;
-    setAtlasOpen(true);
-  }
+  // The Atlas loads as soon as the campaign is built (Heph 2026-11-10: no Preview in Atlas button), and again after
+  // each new build; changing the campaign after building takes it away until the next build.
+  $effect(() => {
+    if (isBuilt && startSite) {
+      const id = campaignKey;
+      untrack(() => {
+        if (!atlasShown) playFor(id).then((p) => ((play = p.state as State), (atlasShown = true)));
+      });
+    } else atlasShown = false;
+  });
 
   // An invitation, from the embedded Atlas's party builder (Heph 2026-11-10: Scribe sets up the campaign and hands it to
   // the Atlas; the Atlas builds the party; the party builder hands to the Companion per invite, so there is no Preview
@@ -493,10 +499,6 @@
 
   {#if built && isBuilt}
     <section>
-      <h2>Preview My Campaign</h2>
-      <div class="row">
-        {#if startSite && !atlasShown}<button onclick={previewAtlas}>Preview in Atlas</button>{/if}
-      </div>
       {#if atlasShown && atlasSrc}
         {#if autoStatus === 'publishing'}<p class="small muted">Publishing…</p>
         {:else if autoStatus?.ok}<p class="small muted">Published (revision {autoStatus.revision}).</p>
