@@ -20,7 +20,7 @@ import { addMail, answer, joinRequest, loadMail, mailFileName, post, readMailFil
 import { downloadJson } from './storage';
 import { inviteDone, keepInvite, pendingInvite, updateForInvite } from './update';
 import { readShared, withoutShared } from './share';
-import { pointer as campaignPointer, publishParts, snapshot as campaignSnapshot, type Services } from '../../../engine/publish';
+import { publishParts } from '../../../engine/publish';
 import { envelope as mailEnvelope, messageLink, readMessageHash, type Envelope } from '../../../engine/mail';
 import { readState as readStateFile } from './state';
 import { get as idbGet, set as idbSet } from 'idb-keyval';
@@ -74,7 +74,7 @@ class AppState {
   log = $state<LogEntry[]>([]);
   // Requests sent and received on this device, every campaign (lib/mail.ts).
   mail = $state<MailItem[]>([]);
-  // Whether this device holds Scribe's record of the campaign in use, published: Update campaign needs it.
+  // Whether this device holds Scribe's record of the campaign in use, so Scribe can publish it.
   canUpdate = $state(false);
   settings = $state<Settings>({ ...DEFAULT_SETTINGS });
   view = $state<View>({ name: 'list' });
@@ -543,7 +543,7 @@ class AppState {
   }
 
   // Referee mode: takes a join request. The character joins this campaign's party on this device, and the request
-  // counts as received in the next Update campaign.
+  // counts as received in the next publish.
   async approve(id: string) {
     const m = this.mail.find((x) => x.box === 'in' && x.envelope.id === id && x.envelope.kind === 'join');
     if (!m || this.mode !== 'referee') return;
@@ -560,7 +560,12 @@ class AppState {
       await this.saveState(inParty(this.snap, x.id, party));
     }
     await this.keepMail(answer(this.mail, id, { kind: 'approved', at: new Date().toISOString() }));
-    this.notify(`${imported.map((x) => x.name).join(', ') || 'The character'} joined the party. Update campaign to tell the player.`);
+    const names = imported.map((x) => x.name).join(', ') || 'The character';
+    // the player learns of it when Scribe publishes, so the approval goes straight there and comes back
+    if (this.canUpdate) {
+      this.notify(`${names} joined the party. Publishing…`);
+      await this.sendToScribe();
+    } else this.notify(`${names} joined the party. Publish in Scribe to tell the player.`);
   }
 
   // Referee mode: returns a request with a note, as a file for the player; the seat stays open.
@@ -579,10 +584,62 @@ class AppState {
     const id = this.campaignId;
     try {
       const rec = id ? ((await idbGet(`scribe-campaign:${id}`)) as { services?: unknown; published?: unknown } | undefined) : undefined;
-      this.canUpdate = !!(rec?.services && rec.published) || !!this.campaign?.published?.snapshot?.module;
+      // Scribe publishes (Heph 2026-11-10: Scribe is the only publisher); it can when it has the campaign's record
+      this.canUpdate = !!rec;
+      this.publishedState = await this.readPublishedState(id);
     } catch {
       this.canUpdate = false;
     }
+  }
+
+  // The state revision players last got: the state inside the snapshot Scribe published last (shared storage,
+  // "published:<id>"), -1 when it has never published.
+  publishedState = $state(-1);
+  private async readPublishedState(id: string): Promise<number> {
+    const p = id ? ((await idbGet(`published:${id}`)) as { snapshot?: { state?: { revision?: unknown } } } | undefined) : undefined;
+    const r = Number(p?.snapshot?.state?.revision);
+    return Number.isFinite(r) ? r : -1;
+  }
+  // Referee mode: something players need that Scribe hasn't published yet (a party, a move, an answer).
+  get needsPublish(): boolean {
+    return this.mode === 'referee' && !!this.campaign && (this.state.revision > this.publishedState || this.unpublished > 0);
+  }
+
+  // Referee mode: hands the play to Scribe, which publishes it and comes back here with a 'published' message
+  // (Heph 2026-11-10: Scribe is the only publisher). `invite`: the party whose invitation to show on return.
+  async sendToScribe(invite?: string) {
+    location.href = await this.scribeLink(invite);
+  }
+
+  // Scribe -> Companion, after a publish this device asked for: {ok, revision, at} or {ok: false, error, firstPublish?}.
+  private async receivePublished(e: Envelope) {
+    if (e.campaign !== this.campaignId) {
+      const seat = this.invitations.find((s) => this.campaigns[s.url]?.campaign.id === e.campaign && s.role === 'referee');
+      if (seat) await this.chooseInvitation(seat.id);
+      else if (await idbGet(`scribe-campaign:${e.campaign}`)) await this.useCampaign(`scribe:${e.campaign}`, 'referee');
+      else throw new Error(`That message is for a campaign this device doesn't have (${e.campaign}).`);
+    }
+    const id = e.campaign;
+    const asked = (await idbGet(`publish-asked:${id}`)) as { id?: string; invite?: string } | undefined;
+    const mine = !!asked && asked.id === e.re;
+    const b = e.body as { ok?: boolean; revision?: unknown; at?: unknown; error?: unknown; firstPublish?: boolean };
+    if (b.ok) {
+      const c = this.campaign;
+      const revision = Number(b.revision) || 0, at = typeof b.at === 'string' ? b.at : e.sent;
+      if (c?.published) {
+        this.campaigns = { ...this.campaigns, [c.url]: { ...c, published: { ...c.published, revision, at } } };
+        await saveCampaigns(this.campaigns);
+      }
+      await this.checkCanUpdate();
+      this.notify(`Published update ${revision}. Players see it within a few minutes.`);
+    } else {
+      this.notify(b.firstPublish ? 'Not published yet: publish the campaign once in Scribe (its Publish step), then send again.' : `Not published: ${String(b.error ?? 'Scribe could not publish')}`);
+    }
+    if (mine) await idbSet(`publish-asked:${id}`, {});
+    if (mine && asked.invite && partyOf(this.state, asked.invite)) {
+      await this.chooseParty(asked.invite);
+      this.view = { name: 'settings', invite: asked.invite };
+    } else if (!b.ok) this.view = { name: 'settings' };
   }
 
   // The campaign's lockfile (campaign.lock.json): Scribe's record on this device, else the one the campaign came
@@ -595,48 +652,8 @@ class AppState {
     return rec?.lock ?? c.lock ?? c.published?.snapshot?.lock ?? null;
   }
 
-  // Referee mode, a campaign Scribe published: writes the pointer and a new snapshot (WORKFLOWS.md "Invitations"),
-  // with the state as it is now, each party member's knowledge for their player alone, and the requests answered.
-  // Until an adapter can upload, the referee uploads the two files into the campaign's folder, replacing the old.
-  async updateCampaign() {
-    const c = this.campaign;
-    if (!c || this.mode !== 'referee') throw new Error('Switch to the referee seat first');
-    const id = c.campaign.id;
-    type Rec = { site: string; ruleset: string; manifest: Record<string, unknown>; lock: unknown; services?: Services; published?: { revision: number; at: string } };
-    let rec = (await idbGet(`scribe-campaign:${id}`)) as Rec | undefined;
-    // without Scribe's record on this device (Scribe ran in another browser or profile), rebuild it from the
-    // published campaign itself: its pointer and the last snapshot hold the module, lock and addresses
-    const fromScribe = !!(rec?.services && rec.published);
-    if (!fromScribe) {
-      const p = c.published, s = p?.snapshot;
-      if (!p?.read || !s?.module) throw new Error('Publish the campaign in Scribe first');
-      rec = {
-        site: c.scribe?.site ?? '', ruleset: campaignRulesId(c), manifest: s.module, lock: s.lock ?? {},
-        services: { folder: new URL('.', p.read).href, read: p.read, post: p.post, pointer: p.pointer }, published: { revision: p.revision, at: p.at ?? '' }
-      };
-    }
-    if (!rec?.services || !rec.published) throw new Error('Publish the campaign in Scribe first');
-    // the state file (party list brought up to date) and the sheets saved first: the parts are read from storage,
-    // by the same rule Scribe's Publish uses (engine publishParts), so the two can't drift
-    await this.exportState();
-    await this.persist();
-    const parts = await publishParts(id, idbGet);
-    const snap = campaignSnapshot({ campaign: id, ruleset: rec.ruleset, site: rec.site, module: rec.manifest, lock: rec.lock, state: parts.state, knowledge: parts.knowledge }, rec.published, parts.receipts);
-    const ptr = campaignPointer(id, String(rec.manifest.title ?? c.campaign.name), rec.services);
-    if (fromScribe) await idbSet(`scribe-campaign:${id}`, { ...rec, published: { revision: snap.revision, at: snap.published } });
-    // the pair as built, which Scribe's Test compares the uploaded folder against (engine checkUpload, #29)
-    await idbSet(`published:${id}`, JSON.parse(JSON.stringify({ pointer: ptr, snapshot: snap })));
-    const was = c.published ?? { pointer: rec.services.pointer, read: rec.services.read, post: rec.services.post, revision: 0 };
-    this.campaigns = { ...this.campaigns, [c.url]: { ...c, published: { ...was, revision: snap.revision, at: snap.published } } };
-    await saveCampaigns(this.campaigns);
-    downloadJson('campaign.json', ptr);
-    await new Promise((r) => setTimeout(r, 400));
-    downloadJson('snapshot.json', snap);
-    this.notify(`Update ${snap.revision} saved. Upload campaign.json and snapshot.json to ${rec.services.folder}`);
-  }
-
   // Referee mode: answers (approved or sent back) made since the campaign was last published, which players
-  // learn of only at the next Update campaign.
+  // learn of only at the next publish.
   get unpublished(): number {
     const since = this.campaign?.published?.at ?? '';
     return this.requests.filter((m) => m.box === 'in' && m.answer && m.envelope.kind === 'join' && m.answer.at > since).length;
@@ -762,6 +779,7 @@ class AppState {
     const applied = ((await idbGet('applied')) as string[] | undefined) ?? [];
     if (applied.includes(e.id)) return this.notify('Already opened that link');
     if (e.kind === 'campaign') await this.receiveCampaign(e);
+    else if (e.kind === 'published') await this.receivePublished(e);
     else if (e.kind === 'join' || e.kind === 'sent-back') {
       if (e.campaign !== this.campaignId) {
         const seat = this.invitations.find((s) => this.campaigns[s.url]?.campaign.id === e.campaign && s.role === (e.kind === 'join' ? 'referee' : 'player'));
@@ -803,15 +821,19 @@ class AppState {
     }
   }
 
-  // Companion -> Scribe: what play changed, for Scribe's Publish (the same parts Update campaign publishes).
-  async scribeLink(): Promise<string> {
+  // Companion -> Scribe: what play changed, for Scribe's Publish (the parts its Publish publishes).
+  // `back`: where Scribe returns once it has published (same site only); the request's id and the party to invite to
+  // are kept here, so the 'published' answer (re: that id) can land on the invitation.
+  async scribeLink(invite?: string): Promise<string> {
     const id = this.campaignId;
     if (!id || this.mode !== 'referee') throw new Error('Switch to the referee seat first');
     await this.exportState();
     await this.persist();
     const parts = await publishParts(id, idbGet);
-    const e = mailEnvelope({ campaign: id, kind: 'update', from: { role: 'referee' }, to: 'referee', body: JSON.parse(JSON.stringify(parts)) });
-    return messageLink(new URL('scribe/', location.href.replace(/[?#].*$/, '')).href, e);
+    const here = location.href.replace(/[?#].*$/, '');
+    const e = mailEnvelope({ campaign: id, kind: 'update', from: { role: 'referee' }, to: 'referee', body: { ...JSON.parse(JSON.stringify(parts)), back: here } });
+    await idbSet(`publish-asked:${id}`, { id: e.id, ...(invite ? { invite } : {}) });
+    return messageLink(new URL('scribe/', here).href, e);
   }
 
   // The referee may have changed the campaign's files; pick that up quietly.

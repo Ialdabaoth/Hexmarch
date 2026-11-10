@@ -5,7 +5,7 @@
 
   // The campaign state file: its parties (Heph 2026-11-10: each with its own start, clock, session and place on the
   // map; the referee makes them in the Atlas), what everyone knows, and who is in which party.
-  // It lives on this device for now; with sign-in, Update campaign commits it as campaign/state.json.
+  // It lives on this device for now; Scribe publishes it inside the snapshot players read.
   // A player (player mode) reads it and can load the file the referee shares, but changes nothing.
   let { readonly = false }: { readonly?: boolean } = $props();
   let s = $derived(app.state);
@@ -97,8 +97,7 @@
   <input bind:this={fileInput} type="file" accept="application/json,.json" hidden onchange={load} />
 </div>
 <p class="small muted">
-  Change {s.revision}. This is the campaign's shared record; it stays on this device until sign-in, when Update campaign
-  saves it to the campaign's repository for the players to read.
+  Change {s.revision}. This is the campaign's shared record; players get it each time Scribe publishes the campaign.
 </p>
 
 <style>

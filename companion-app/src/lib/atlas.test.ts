@@ -11,6 +11,7 @@ describe('atlas', () => {
   it('accepts view and party messages', () => {
     expect(isAtlasMessage({ type: 'hexmarch-atlas', event: 'party-new', module: 'isle-of-mists', party: { id: 'p-kells', name: 'Kells' } })).toBe(true);
     expect(isAtlasMessage({ type: 'hexmarch-atlas', event: 'active', module: 'isle-of-mists', party: 'p-kells' })).toBe(true);
+    expect(isAtlasMessage({ type: 'hexmarch-atlas', event: 'invite', module: 'isle-of-mists', party: 'p-kells' })).toBe(true);
     expect(isAtlasMessage({ type: 'hexmarch-atlas', event: 'view', module: 'isle-of-mists', hash: '#world:6847:C587' })).toBe(true);
     expect(isAtlasMessage({ type: 'hexmarch-atlas', event: 'view', module: 'isle-of-mists', hash: '#march:0907' })).toBe(true);
     expect(isAtlasMessage({ type: 'hexmarch-atlas', event: 'party', module: 'isle-of-mists', party: 'p-kells', hex: 'world:6947:25B2', hours: 0.4 })).toBe(true);

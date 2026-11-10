@@ -133,14 +133,8 @@
     </p>
     {#if app.mode === 'referee' && app.canUpdate}
       <p class="small muted">
-        Published{app.campaign.published ? ` (update ${app.campaign.published.revision})` : ''}. <button class="link" disabled={busy} onclick={() => run(() => app.updateCampaign())}>Update campaign</button>
-        saves the campaign as players will see it now (the clock, the party, what each character knows, and the requests you answered) as two files to upload in place of the old ones.
-      </p>
-    {/if}
-    {#if app.mode === 'referee' && isScribeLink(app.settings.campaign)}
-      <p class="small muted">
-        <button class="link" disabled={busy} onclick={() => run(async () => { location.href = await app.scribeLink(); })}>Send play to Scribe</button>
-        opens Scribe with the clock, the party, what each character knows and the requests you answered, so its Publish includes them.
+        {#if app.needsPublish}Changes players haven't seen yet.{:else}Published{app.campaign.published ? ` (update ${app.campaign.published.revision})` : ''}, up to date.{/if}
+        <button class="link" disabled={busy} onclick={() => run(() => app.sendToScribe())}>Send to Scribe to publish</button>
       </p>
     {/if}
     {#if app.mode === 'referee'}
@@ -160,8 +154,13 @@
           <option value="">They pick or make a character</option>
           {#each app.characters.filter((c) => c.data.owner !== 'referee') as c (c.id)}<option value={c.id}>To play {c.name}</option>{/each}
         </select>
-        <input readonly value={invite} aria-label="Invitation link" onfocus={(e) => (e.target as HTMLInputElement).select()} />
-        <button onclick={copyInvite}>Copy link</button>
+        {#if app.needsPublish}
+          <p class="small muted">Not published yet: the player wouldn't find {app.state.parties.find((p) => p.id === toParty)?.name ?? 'the party'} or your latest changes.</p>
+          {#if app.canUpdate}<button class="primary" disabled={busy} onclick={() => run(() => app.sendToScribe(toParty))}>Send to Scribe to publish</button>{/if}
+        {:else}
+          <input readonly value={invite} aria-label="Invitation link" onfocus={(e) => (e.target as HTMLInputElement).select()} />
+          <button onclick={copyInvite}>Copy link</button>
+        {/if}
         {/if}
         {/if}
       </details>

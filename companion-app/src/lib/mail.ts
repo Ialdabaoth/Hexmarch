@@ -10,7 +10,7 @@ export interface MailItem {
   envelope: Envelope;
   // 'in': received here; 'out': sent from here.
   box: 'in' | 'out';
-  // The referee's answer to a request: approved (in the next Update campaign) or sent back with a note.
+  // The referee's answer to a request: approved (in the next publish) or sent back with a note.
   answer?: { kind: 'approved' | 'sent-back'; note?: string; at: string };
 }
 

@@ -45,6 +45,7 @@
     if (app.mode === 'player') return;
     const lock = await app.campaignLock();
     if (lock && typeof lock === 'object') post({ lock: $state.snapshot(lock) });
+    post({ hostActions: ['invite'] }); // the party builder's Invite a player comes here instead of opening another tab
   }
   $effect(() => {
     void app.state.revision;
@@ -101,6 +102,9 @@
       await app.newParty(d.party);
     } else if (d.event === 'active') {
       await app.chooseParty(d.party);
+    } else if (d.event === 'invite') {
+      await app.chooseParty(d.party);
+      app.view = { name: 'settings', invite: d.party };
     } else if (d.hex === null) {
       const p = app.state.parties.find((x) => x.id === d.party);
       if (p?.at && p.at.base === current.base && p.at.module === current.id) await app.setParty(null, d.party);
