@@ -48,7 +48,7 @@ footer a{color:var(--red)}
 <div id="gridpanel" hidden><label><input type="checkbox" id="edges" checked> Hex edges</label>
 <label class="gr">Outline colour <input type="color" id="gridc" value="#ffffff"></label>
 <label class="gr">Opacity <input type="range" id="grida" min="10" max="100" value="80"></label></div></div>
-<button id="out" title="Zoom out">−</button><button id="in" title="Zoom in">+</button><button id="fit">Fit</button><button id="routebtn" title="Plot a route and estimate the travel time">Route</button><button id="partybtn" title="Show, place or move the party">Party</button><button id="keybtn">Key</button><button id="modbtn" title="Load a different module">Modules</button><button id="hostcomp" title="Open this campaign in the Hexmarch Companion" hidden>Open in the Companion</button></div></header>
+<button id="out" title="Zoom out">−</button><button id="in" title="Zoom in">+</button><button id="fit">Fit</button><button id="routebtn" title="Plot a route and estimate the travel time">Route</button><button id="partybtn" title="Show, place or move the party">Party</button><button id="keybtn">Key</button><button id="modbtn" title="Load a different module">Modules</button></div></header>
 <div id="main"><div id="map"><canvas id="cv"></canvas><div id="route" hidden aria-live="polite"></div><div id="party" hidden aria-live="polite"></div></div><aside id="key"></aside></div>
 <footer><span id="hover">Click a hex to zoom in.</span><span><span id="support"></span>{{APP}} Atlas {{ATLAS}}<span id="modver"></span> · <a href="#" id="creditbtn">Credits</a></span></footer>
 <dialog id="modules"><h2>Load a module</h2><ul id="modlist"></ul><button id="modfile" title="A map file made by atlas_flat.py, such as a private module's. It stays in this browser and is never uploaded">Open a map file…</button> <button id="modclose">Close</button></dialog>
@@ -544,6 +544,7 @@ async function deviceState() {
   const set = await idbGet('settings'), url = ASK_CAMPAIGN !== null ? ASK_CAMPAIGN : set && typeof set.campaign === 'string' ? set.campaign : '', id = await campaignIdOf(url);
   const raw = await idbGet('state:' + id);
   if (raw && !CMODS) await campaignLock(url, id);
+  if (raw) { CID = id; await campaignLink(url, id); }
   return raw ? csRead(raw) : null;
 }
 // the campaign's lockfile, for the party creator's starts. Apps talk by links and never rely on each other's storage (WORKFLOWS.md), so
@@ -557,6 +558,29 @@ async function campaignLock(url, id) {
     if (p && p.format === 'hexmarch-campaign-pointer' && typeof p.read === 'string' && /^https:\/\//.test(p.read)) { const sn = await (await fetch(p.read, { cache: 'no-cache' })).json(); if (sn && sn.campaign === p.campaign) lockMods(sn.lock); }
   } catch (e) {}
 }
+// the campaign's public link (its pointer), which a player's invitation names: the settings' link when it is one, else the one Scribe or the
+// Companion recorded when the campaign was published. Unset until the campaign is published.
+let CLINK = '', CID = '', INVITE = '', HOSTINV = false;
+async function campaignLink(url, id) {
+  if (/^https:\/\//.test(url)) { CLINK = url; return; }
+  try { const sc = await idbGet('scribe-campaign:' + id), cs = await idbGet('campaigns'), c = cs && cs[url];
+    const l = (c && c.published && c.published.pointer) || (sc && sc.services && sc.services.pointer); if (typeof l === 'string' && /^https:\/\//.test(l)) CLINK = l; } catch (e) {}
+}
+// the Companion that opens an invitation: the one beside this Atlas on the Hexmarch site, else the live one
+const COMPANION = /\/atlas\/(index\.html)?$/.test(location.pathname) ? new URL('../', location.href).href : 'https://ialdabaoth.github.io/Hexmarch/';
+// the handoff to the referee's Companion for one invitation (Companion 0.6.X): a hexmarch-mail/1 'campaign' envelope carrying Scribe's record,
+// the state with its parties, and {invite: {party}}, in the Companion's #m= link (engine/mail.ts messageLink). The Companion adopts the
+// campaign, makes the party active and opens Settings › Invite a player with it picked. Null when this device has no Scribe record.
+async function inviteHandoff(party) {
+  let rec = null; try { rec = CID && await idbGet('scribe-campaign:' + CID); } catch (e) {}
+  if (!rec || rec.format !== 'hexmarch-scribe-campaign' || !window.CompressionStream) return null;
+  const env = { format: 'hexmarch-mail', version: 1, id: crypto.randomUUID ? crypto.randomUUID() : 'm' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10),
+    campaign: CID, kind: 'campaign', from: { role: 'referee' }, to: 'referee', body: { record: rec, state: CS, invite: { party } }, sent: new Date().toISOString() };
+  const z = new Uint8Array(await new Response(new Blob([new TextEncoder().encode(JSON.stringify(env))]).stream().pipeThrough(new CompressionStream('deflate-raw'))).arrayBuffer());
+  let bin = ''; for (let i = 0; i < z.length; i += 0x8000) bin += String.fromCharCode(...z.subarray(i, i + 0x8000));
+  return `${COMPANION}#m=${btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')}`;
+}
+function inviteFor(party) { const q = new URLSearchParams({ campaign: CLINK, as: 'player', party }); return `${COMPANION}?${q}`; }  // the Companion's inviteLink
 function lockMods(lock) { if (lock && Array.isArray(lock.modules)) CMODS = new Set(lock.modules.map(m => m && m.id).filter(x => typeof x === 'string')); }
 async function loadState() {
   if (CS_SRC === 'host') return;
@@ -831,7 +855,13 @@ function partiesLine() {  // the referee's party switcher and creator
   if (LOCK) return '';
   const ps = CS ? CS.parties : [];
   return (ps.length > 1 ? '<small>Party</small> <select data-party aria-label="Party">' + ps.map(q => `<option value="${esc(q.id)}"${q.id === PID ? ' selected' : ''}>${esc(q.name)}</option>`).join('') + '</select> ' : '')
-    + '<button data-p="new">New party…</button>';
+    + (AP() ? `<button data-p="invite" title="${HOSTINV ? 'Invite a player into this party with the Companion' : 'Make a link that invites a player into this party'}">Invite a player</button>` : '')
+    + '<button data-p="new">New party…</button>' + inviteLine();
+}
+function inviteLine() {  // the invitation made standalone, for the referee to send (Heph 2026-11-10: Atlas hands to the Companion per invitation)
+  if (!INVITE || INVITE !== PID) return '';
+  if (!CLINK) return '<br><small>Publish the campaign in Scribe first: an invitation names its link.</small>';
+  return `<br><small>Invitation to ${esc(AP().name)}</small><br><input readonly data-inv value="${esc(inviteFor(PID))}" aria-label="Invitation link" style="width:100%"><br><button data-p="copyinv">Copy</button><a href="${esc(inviteFor(PID))}" target="_blank" rel="noopener">Open in the Companion</a>`;
 }
 function partyBox() {
   const box = document.getElementById('party'); box.hidden = !(PBOX || PLACE); document.getElementById('partybtn').classList.toggle('on', !box.hidden); if (box.hidden) return;
@@ -866,6 +896,9 @@ document.getElementById('party').addEventListener('click', e => { const b = e.ta
   if (a === 'new' && !LOCK) NEWP = true; else if (a === 'cancelnew') NEWP = false; else if (a === 'create') { createParty(document.getElementById('party')); return; }
   else if (a === 'place' && !LOCK && AP()) { PLACE = true; hoverHint(); } else if (a === 'cancel') { PLACE = false; hoverHint(); } else if (a === 'close') { PBOX = false; NEWP = false; }
   else if (a === 'go') location.hash = addr(...PARTY.hex); else if (a === 'reset') setParty(PARTY.hex, 0); else if (a === 'remove') setParty(null);
+  else if (a === 'invite' && !LOCK && AP()) { if (HOSTINV && parent !== window) { parent.postMessage({ type: 'hexmarch-atlas', event: 'invite', module: MOD.id, party: PID }, '*'); return; }
+    const w = window.open('', '_blank'); inviteHandoff(PID).then(l => { if (l && w) { w.location.href = l; return; } if (w) w.close(); INVITE = PID; partyBox(); }); return; }
+  else if (a === 'copyinv') { const i = document.querySelector('#party input[data-inv]'); if (i) { i.select(); try { navigator.clipboard.writeText(i.value); b.textContent = 'Copied'; } catch (x) { document.execCommand('copy'); } } return; }
   else if (a === 'save') { if (CS) saveFile(); return; } else if (a === 'load') { loadFile(); return; } else if (a === 'who') { loadWhoFile(); return; }
   partyBox(); });
 document.getElementById('party').addEventListener('change', e => { if (e.target.matches('select[data-as]')) setAs(e.target.value);
@@ -888,12 +921,13 @@ addEventListener('message', e => { const d = e.data; if (e.source !== parent || 
   if ('characters' in d) { WHO = whoFile(Array.isArray(d.characters) ? d.characters : []); WHO_SRC = 'host'; know(); }
   if (d.lock === true) LOCK = true;
   if (typeof d.as === 'string') setAs(d.as, true);
-  if (d.lock && typeof d.lock === 'object') lockMods(d.lock);
-  // actions the host offers and carries out itself ({hostActions: ['companion']}, Heph 2026-11-10: Scribe answers with the campaign's link); referee view only
-  if (Array.isArray(d.hostActions)) document.getElementById('hostcomp').hidden = LOCK || !d.hostActions.includes('companion');  // the campaign's lockfile ({lock}), for the party creator's starts
+  if (d.lock && typeof d.lock === 'object') lockMods(d.lock);  // the campaign's lockfile ({lock}), for the party creator's starts
+  if (typeof d.campaign === 'string' && /^https:\/\//.test(d.campaign)) CLINK = d.campaign;  // its public link ({campaign}), for invitations
+  // actions the host carries out itself ({hostActions: ['invite']}): "Invite a player" then sends {event: 'invite', module, party} and the host
+  // opens the Companion's invitation for that party (Heph 2026-11-10); without it the Atlas makes the invitation link itself
+  if (Array.isArray(d.hostActions)) { HOSTINV = d.hostActions.includes('invite'); if (PBOX) partyBox(); }
   if ('state' in d) { try { CS = csRead(d.state); CS_SRC = 'host'; fromState(); } catch (x) {} }
 });
-document.getElementById('hostcomp').onclick = () => { if (parent !== window) parent.postMessage({ type: 'hexmarch-atlas', event: 'companion', module: MOD ? MOD.id : '', party: PID || null }, '*'); };
 function drawParty() {  // a red pennant planted on the party's hex centre, over everything; the hex itself shaded once it is big enough to see
   for (const o of OTHERS) {  // the referee's view: every other party, a smaller slate pennant with its name
     const [ox, oy] = S(...ft(...o.hex)); if (ox < -80 || oy < -60 || ox > W + 80 || oy > H + 60) continue; const g = 22;
