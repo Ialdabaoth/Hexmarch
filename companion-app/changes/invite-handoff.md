@@ -1,0 +1,1 @@
+The Atlas and Scribe can hand a campaign to the Companion one invite at a time: a "campaign" message whose body carries `invite: {party}` adopts the campaign in referee mode, makes that party the active one, and opens Settings › Invite a player with the party picked.

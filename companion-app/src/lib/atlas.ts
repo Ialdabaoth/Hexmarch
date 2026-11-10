@@ -16,7 +16,9 @@ export interface AtlasNewParty { type: 'hexmarch-atlas'; event: 'party-new'; mod
 export interface AtlasActive { type: 'hexmarch-atlas'; event: 'active'; module: string; party: string }
 // Knowledge to add to (or hexes to remove from) some characters: party travel and the referee's fog brush (Atlas 0.5.15).
 export interface AtlasKnowledge { type: 'hexmarch-atlas'; event: 'knowledge'; module: string; ids: string[]; add: unknown[]; remove: string[] }
-export type AtlasMessage = AtlasView | AtlasParty | AtlasNewParty | AtlasActive | AtlasKnowledge;
+// The referee pressed the party builder's "Invite a player" (offered when the app sends hostActions: ['invite']).
+export interface AtlasInvite { type: 'hexmarch-atlas'; event: 'invite'; module: string; party: string }
+export type AtlasMessage = AtlasView | AtlasParty | AtlasNewParty | AtlasActive | AtlasInvite | AtlasKnowledge;
 
 // The Atlas ships with the app (<app>/atlas/) and loads the module from its own site (?site=<base>).
 export function atlasUrl(base: string, id: string, app: string = appAtlas()): string {
@@ -42,7 +44,7 @@ export function isAtlasMessage(d: unknown): d is AtlasMessage {
   if (m.event === 'party')
     return partyId(m.party) && (m.hex === null || isAtlasAddress(m.hex)) && typeof m.hours === 'number' && Number.isFinite(m.hours) && m.hours >= 0;
   if (m.event === 'party-new') return !!m.party && typeof m.party === 'object' && partyId((m.party as { id?: unknown }).id);
-  if (m.event === 'active') return partyId(m.party);
+  if (m.event === 'active' || m.event === 'invite') return partyId(m.party);
   return false;
 }
 

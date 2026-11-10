@@ -59,10 +59,10 @@
       <section class="card publish">
         <p>{app.unpublished === 1 ? '1 answer' : `${app.unpublished} answers`} not yet sent to players.</p>
         {#if app.canUpdate}
-          <button class="primary" disabled={busy} onclick={() => run(() => app.updateCampaign())}>Update campaign</button>
-          <p class="small muted">Saves campaign.json and snapshot.json to upload to your campaign's folder, replacing the old ones.</p>
+          <button class="primary" disabled={busy} onclick={() => run(() => app.sendToScribe())}>Send to Scribe to publish</button>
+          <p class="small muted">Scribe publishes the campaign and brings you back here.</p>
         {:else}
-          <p class="small muted">This device has no published copy of “{app.campaignId}”. Publish it in Scribe in this same browser, or open the campaign's published link (its campaign.json) in Settings › Add a campaign; then Update campaign appears here.</p>
+          <p class="small muted">This device has no copy of “{app.campaignId}” from Scribe. Open the campaign in Scribe in this same browser and publish it there.</p>
         {/if}
       </section>
     {/if}
@@ -71,7 +71,7 @@
         <p><strong>{m.envelope.from.name || 'A player'}</strong> asks to join with <strong>{charName(m.envelope.body.character)}</strong>.</p>
         <p class="small muted">Sent {when(m.envelope.sent)}</p>
         {#if m.answer?.kind === 'approved'}
-          <p class="small">Approved {when(m.answer.at)}. {m.answer.at > (app.campaign.published?.at ?? '') ? 'The next Update campaign tells the player.' : 'Sent to the player.'}</p>
+          <p class="small">Approved {when(m.answer.at)}. {m.answer.at > (app.campaign.published?.at ?? '') ? 'The next publish tells the player.' : 'Sent to the player.'}</p>
         {:else if m.answer?.kind === 'sent-back'}
           <p class="small">Sent back {when(m.answer.at)}: “{m.answer.note}”</p>
         {:else if returning === m.envelope.id}
