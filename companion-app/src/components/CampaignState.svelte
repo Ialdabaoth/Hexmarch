@@ -3,11 +3,13 @@
   import { clockLabel, rulesLabel } from '../lib/state';
   import { downloadJson } from '../lib/storage';
 
-  // The campaign state file: where the party stands, the clock, what's been found and the session.
+  // The campaign state file: its parties (Heph 2026-11-10: each with its own start, clock, session and place on the
+  // map; the referee makes them in the Atlas), what everyone knows, and who is in which party.
   // It lives on this device for now; with sign-in, Update campaign commits it as campaign/state.json.
   // A player (player mode) reads it and can load the file the referee shares, but changes nothing.
   let { readonly = false }: { readonly?: boolean } = $props();
   let s = $derived(app.state);
+  let p = $derived(app.currentParty);
   let found = $derived(Object.values(s.revealed).reduce((n, r) => n + r.hexes.length + r.places.length, 0));
   let start = $state('');
   const DATE = /^\d{1,5}-\d\d-\d\d$/;
@@ -37,37 +39,51 @@
 </script>
 
 <dl class="facts">
+  <dt>Party</dt>
+  <dd>
+    {#if !readonly && s.parties.length > 1}
+      <select value={s.active} onchange={(e) => app.chooseParty((e.target as HTMLSelectElement).value)} aria-label="Party in use">
+        {#each s.parties as x (x.id)}<option value={x.id}>{x.name}</option>{/each}
+      </select>
+    {:else if p}
+      {p.name}
+    {:else}
+      {readonly ? 'not in a party yet' : 'none yet (make one in the Atlas: Maps › Party › New party)'}
+    {/if}
+  </dd>
+  {#if p}
   <dt>Clock</dt>
   <dd>
-    {clockLabel(s)}
+    {clockLabel(p.clock)}
     {#if !readonly}<span class="row">
       <button class="small" onclick={() => app.passTime(1)}>+1 hour</button>
       <button class="small" onclick={() => app.passTime(8)}>+8 hours</button>
       <button class="small" onclick={() => app.passTime(24)}>+1 day</button>
     </span>{/if}
   </dd>
-  <dt>Party</dt>
-  <dd>{s.party ? `hex ${s.party.label} · ${s.party.module}` : readonly ? 'not on a map yet' : 'not on a map yet (place them with the Atlas’s Party button below)'}</dd>
+  <dt>Where</dt>
+  <dd>{p.at ? `hex ${p.at.label} · ${p.at.module}` : readonly ? 'not on a map yet' : 'not on a map yet (place them with the Atlas’s Party button below)'}</dd>
   <dt>Session</dt>
   <dd>
-    {s.session.number ? `Session ${s.session.number}, ${s.session.open ? 'in play' : 'closed'}` : 'None played yet'}
-    {#if !readonly && s.session.open}
+    {p.session.number ? `Session ${p.session.number}, ${p.session.open ? 'in play' : 'closed'}` : 'None played yet'}
+    {#if !readonly && p.session.open}
       <button class="small" onclick={() => app.closeSession()}>End session</button>
     {:else if !readonly}
-      <button class="small" onclick={() => app.openSession()}>Start session {s.session.number + 1}</button>
+      <button class="small" onclick={() => app.openSession()}>Start session {p.session.number + 1}</button>
     {/if}
   </dd>
+  {/if}
   <dt>Rules</dt>
   <dd>{rulesLabel(s.rules)}</dd>
   <dt>Found</dt>
   <dd>{found ? `${found} hex${found === 1 ? '' : 'es'} and places` : 'Nothing yet'}</dd>
 </dl>
 
-{#if !readonly}
+{#if !readonly && p}
 <details>
   <summary class="small">Start date</summary>
   <div class="row">
-    <input type="text" placeholder={s.clock.start} bind:value={start} aria-label="Start date (YYYY-MM-DD)" />
+    <input type="text" placeholder={p.clock.start} bind:value={start} aria-label="Start date (YYYY-MM-DD)" />
     <button class="small" onclick={setStart} disabled={!DATE.test(start)}>Set</button>
   </div>
   <p class="small muted">Year, month and day in the setting's own years (Materia Mundi: AD + 2085, so 1422 is 3507).</p>

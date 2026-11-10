@@ -19,16 +19,19 @@ export interface Invitation {
   role: Role;
   // A player's character (its sheet id); unset until the player picks or makes one.
   character?: string;
+  // A player's party in the campaign (Heph 2026-11-10: invitations are to a party).
+  party?: string;
   // The campaign's name, for the switcher before the campaign has been read.
   name?: string;
   added: string;
 }
 
-// What an invitation link carries: ?campaign=<link>&as=player&character=<id> (as and character optional).
+// What an invitation link carries: ?campaign=<link>&as=player&party=<id>&character=<id> (as, party and character optional).
 export interface Invite {
   url: string;
   role: Role;
   character?: string;
+  party?: string;
 }
 
 export function readInvite(search: string): Invite | null {
@@ -37,24 +40,28 @@ export function readInvite(search: string): Invite | null {
   if (!url) return null;
   const role: Role = q.get('as') === 'player' ? 'player' : 'referee';
   const character = role === 'player' ? q.get('character')?.trim() || undefined : undefined;
-  return { url, role, ...(character ? { character } : {}) };
+  const p = role === 'player' ? q.get('party')?.trim() : '';
+  const party = p && /^[a-z0-9-]{1,40}$/.test(p) ? p : undefined;
+  return { url, role, ...(party ? { party } : {}), ...(character ? { character } : {}) };
 }
 
 export function inviteLink(base: string, i: Invite): string {
   const q = new URLSearchParams({ campaign: i.url });
   if (i.role === 'player') q.set('as', 'player');
+  if (i.role === 'player' && i.party) q.set('party', i.party);
   if (i.role === 'player' && i.character) q.set('character', i.character);
   return `${base}?${q}`;
 }
 
-const same = (s: Invitation, i: Invite) => s.url === i.url && s.role === i.role && (s.role === 'referee' || (s.character ?? '') === (i.character ?? ''));
+const same = (s: Invitation, i: Invite) =>
+  s.url === i.url && s.role === i.role && (s.role === 'referee' || ((s.character ?? '') === (i.character ?? '') && (s.party ?? '') === (i.party ?? '')));
 
 // Adds an invitation, or finds the same one already there. A player invitation without a character matches a player
 // invitation that has none yet, rather than making a second empty one.
 export function addInvitation(list: Invitation[], i: Invite, now = new Date()): { invitations: Invitation[]; invitation: Invitation } {
   const found = list.find((s) => same(s, i));
   if (found) return { invitations: list, invitation: found };
-  const seat: Invitation = { id: newId(), url: i.url, role: i.role, ...(i.character ? { character: i.character } : {}), added: now.toISOString() };
+  const seat: Invitation = { id: newId(), url: i.url, role: i.role, ...(i.party ? { party: i.party } : {}), ...(i.character ? { character: i.character } : {}), added: now.toISOString() };
   return { invitations: [...list, seat], invitation: seat };
 }
 
