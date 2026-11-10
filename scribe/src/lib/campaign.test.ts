@@ -31,35 +31,28 @@ describe('reading the site', () => {
 });
 
 describe('a new campaign from Beyond the Pale', () => {
-  it('writes the campaign module, lockfile and first state from the keep start', async () => {
-    const b = await buildCampaign({ title: 'Kells, 1422', root: mmE9, modules: ['isle-of-mists'], start: { module: 'isle-of-mists', id: 'arrive-at-the-keep' } }, [btp], RULES, new Date('2026-11-08T22:00:00Z'));
+  it('writes the campaign module, lockfile and a first state with no parties and no start', async () => {
+    const b = await buildCampaign({ title: 'Kells, 1422', root: mmE9, modules: ['isle-of-mists'] }, [btp], RULES, new Date('2026-11-08T22:00:00Z'));
     expect(b.problems).toEqual([]);
     expect(b.manifest).toMatchObject({
       id: 'kells-1422', kind: 'campaign', version: '0.1.0', option: 'e9',
       requires: { 'mm-core': '^0.1.0', 'isle-of-mists': '^0.4.11' },
-      start: { module: 'isle-of-mists', id: 'arrive-at-the-keep' },
-      exclude: ['isle-of-mists/book/b3', 'isle-of-mists/book/b5', 'isle-of-mists/book/b4']
     });
+    expect(b.manifest.start).toBeUndefined();
+    expect(b.manifest.exclude).toBeUndefined();
     expect(Object.keys(b.manifest.requires as object)[0]).toBe('mm-core'); // the root comes first
     expect(b.lock.modules.map((m) => `${m.id}@${m.version}`)).toEqual([`e9-core@${e9core.version}`, 'mm-core@0.1.0', 'isle-of-mists@0.4.11']);
     expect(b.state).toMatchObject({
       format: 'hexmarch-campaign-state', version: 1, campaign: 'kells-1422', revision: 1,
       rules: { ruleset: 'e9mm', module: 'mm-core', option: 'e9', version: '0.1.0' },
-      clock: { start: '3507-05-01', hours: 8 }, party: null,
-      revealed: { 'isle-of-mists': { hexes: [], places: ['baile-atha-troim'] } },
-      session: { number: 0, open: false }, characters: []
+      parties: [], active: '', revealed: {}, characters: []
     });
-  });
-
-  it('takes a hand-placed start', async () => {
-    const b = await buildCampaign({ title: 'Test', root: roots[0], modules: ['isle-of-mists'], start: { module: 'isle-of-mists', date: '3507-09-29', hour: 18, site: 'baile-atha-troim' } }, [btp], RULES);
-    expect(b.manifest.exclude).toBeUndefined();
-    expect(b.state).toMatchObject({ clock: { start: '3507-09-29', hours: 18 }, revealed: { 'isle-of-mists': { places: ['baile-atha-troim'] } } });
+    for (const gone of ['clock', 'party', 'session']) expect(b.state).not.toHaveProperty(gone);
   });
 
   it('explains what blocks a campaign', async () => {
     const needsMore = siteModule('m/', { id: 'needs', title: 'Needs', semver: '1.0.0', requires: { 'mm-core': '^2.0' } });
-    const b = await buildCampaign({ title: 'X', root: mmE9, modules: ['needs'], start: null }, [needsMore], RULES);
+    const b = await buildCampaign({ title: 'X', root: mmE9, modules: ['needs'] }, [needsMore], RULES);
     expect(b.problems.map(describeProblem)).toEqual(['No version of mm-core fits every request (x wants ^0.1.0; needs wants ^2.0). Published: 0.1.0.']);
   });
 

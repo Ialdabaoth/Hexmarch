@@ -47,13 +47,23 @@
   }
   const join = () => run(async () => {
     const i = invitation(joinUrl.trim());
-    await app.useCampaign(i?.url ?? joinUrl.trim(), i?.role ?? joinRole, i?.character);
+    await app.useCampaign(i?.url ?? joinUrl.trim(), i?.role ?? joinRole, i?.character, i?.party);
     joinUrl = '';
   });
 
-  // The referee's invitation link for a player: the campaign and, optionally, the character they play.
+  // The referee's invitation link for a player: the campaign, the party they join (Heph 2026-11-10: invitations are
+  // to a party) and, optionally, the character they play.
   let inviteFor = $state('');
-  let invite = $derived(app.campaign ? inviteLink(location.origin + location.pathname, { url: app.campaign.published?.pointer ?? app.settings.campaign, role: 'player', ...(inviteFor ? { character: inviteFor } : {}) }) : '');
+  let inviteTo = $state('');
+  let toParty = $derived(app.state.parties.some((p) => p.id === inviteTo) ? inviteTo : app.state.active);
+  let invite = $derived(
+    app.campaign
+      ? inviteLink(location.origin + location.pathname, {
+          url: app.campaign.published?.pointer ?? app.settings.campaign, role: 'player',
+          ...(toParty ? { party: toParty } : {}), ...(inviteFor ? { character: inviteFor } : {})
+        })
+      : ''
+  );
   async function copyInvite() {
     try {
       await navigator.clipboard.writeText(invite);
@@ -129,12 +139,19 @@
           <p class="small muted">This campaign is kept only on this device, where Scribe saved it, so a player can't open it yet. Invitations open once the campaign is published.</p>
         {:else}
         <p class="small muted">Send this link to a player. Opening it adds the campaign to their switcher in player mode.</p>
+        {#if !app.state.parties.length}
+          <p class="small muted">Make a party first (Maps › the Atlas's Party › New party): every invitation is to a party.</p>
+        {:else}
+        <select aria-label="Party the player joins" value={toParty} onchange={(e) => (inviteTo = (e.target as HTMLSelectElement).value)}>
+          {#each app.state.parties as p (p.id)}<option value={p.id}>To join {p.name}</option>{/each}
+        </select>
         <select aria-label="Character the player plays" bind:value={inviteFor}>
           <option value="">They pick or make a character</option>
           {#each app.characters.filter((c) => c.data.owner !== 'referee') as c (c.id)}<option value={c.id}>To play {c.name}</option>{/each}
         </select>
         <input readonly value={invite} aria-label="Invitation link" onfocus={(e) => (e.target as HTMLInputElement).select()} />
         <button onclick={copyInvite}>Copy link</button>
+        {/if}
         {/if}
       </details>
     {/if}

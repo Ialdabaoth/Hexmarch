@@ -14,14 +14,12 @@
     title: string;
     root: string; // "<module>/<option>"
     modules: string[];
-    start: string; // "<module>/<start id>", or "manual"
-    manual: { module: string; site: string; date: string; hour: number };
   }
-  const blank: Draft = { title: '', root: '', modules: [], start: '', manual: { module: '', site: '', date: '3507-05-01', hour: 8 } };
+  const blank: Draft = { title: '', root: '', modules: [] };
   function loadDraft(): Draft {
     try {
       const d = JSON.parse(localStorage.getItem(DRAFT) ?? 'null');
-      return d ? { ...blank, ...d, manual: { ...blank.manual, ...(d.manual ?? {}) } } : structuredClone(blank);
+      return d ? { title: String(d.title ?? ''), root: String(d.root ?? ''), modules: Array.isArray(d.modules) ? d.modules : [] } : structuredClone(blank);
     } catch {
       return structuredClone(blank);
     }
@@ -37,8 +35,6 @@
   const rootKey = (r: RootChoice) => `${r.module}/${r.option}`;
   const root = $derived(ROOTS.find((r) => rootKey(r) === draft.root) ?? null);
   const picked = $derived(site.filter((m) => draft.modules.includes(m.id)));
-  const offers = $derived(picked.flatMap((m) => startsOf(m).map((s) => ({ module: m, start: s }))));
-  const manualModule = $derived(site.find((m) => m.id === (draft.manual.module || picked[0]?.id)) ?? null);
 
   async function refresh() {
     if (!siteUrl) return;
@@ -69,19 +65,12 @@
       built = null;
       return;
     }
-    let start: Choices['start'] = null;
-    if (d.start === 'manual') start = { module: d.manual.module || d.modules[0], site: d.manual.site, date: d.manual.date, hour: Number(d.manual.hour) || 0 };
-    else if (d.start) {
-      const [module, ...rest] = d.start.split('/');
-      start = { module, id: rest.join('/') };
-    }
-    const choices: Choices = { title: d.title, root, modules: d.modules, start };
+    const choices: Choices = { title: d.title, root, modules: d.modules };
     buildCampaign(choices, $state.snapshot(site) as SiteModule[], RULES_MANIFESTS).then((b) => (built = b));
   });
 
   function toggle(id: string) {
     draft.modules = draft.modules.includes(id) ? draft.modules.filter((m) => m !== id) : [...draft.modules, id];
-    if (draft.start && draft.start !== 'manual' && !draft.modules.includes(draft.start.split('/')[0])) draft.start = '';
   }
 
   function download(name: string, data: unknown) {
@@ -91,17 +80,14 @@
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
+  // Preview in Atlas opens the first picked module at its first start's place, when it has one.
   const startSite = $derived.by(() => {
-    if (!built) return null;
-    const s = built.manifest.start as { module: string; id: string } | undefined;
-    const module = s?.module ?? (draft.start === 'manual' ? draft.manual.module || draft.modules[0] : '');
-    const places = (built.state.revealed as Record<string, { places: string[] }>)[module]?.places ?? [];
-    const slugOf = draft.start === 'manual' ? draft.manual.site : places[0];
-    return module ? { module, slug: slugOf ?? '' } : null;
+    if (!built || !picked.length) return null;
+    const m = picked[0];
+    const first = startsOf(m)[0];
+    const name = first?.site ?? '';
+    return { module: m.id, slug: m.sites.find((x) => x.name === name)?.slug ?? '' };
   });
-  const atlasLink = $derived(
-    startSite ? `../atlas/?site=${encodeURIComponent(siteUrl)}&module=${encodeURIComponent(startSite.module)}${startSite.slug ? `#site:${startSite.slug}` : ''}` : ''
-  );
 
   // Step 7: save the campaign on this device and open it in the Companion (by link) or the Atlas.
   let saveError = $state('');
@@ -113,7 +99,7 @@
     const title = String(built.manifest.title);
     try {
       const saved = await saveOnDevice($state.snapshot(built) as Built, root, siteUrl, (rev) =>
-        confirm(`This device already has play for “${title}” (state revision ${rev}): where the party is, the clock and what it has found. Start it again from this campaign's start?\n\nOK starts again; Cancel keeps the play and saves only the campaign.`)
+        confirm(`This device already has play for “${title}” (state revision ${rev}): where the party is, the clock and what it has found. Start it again from scratch (no parties yet)?\n\nOK starts again; Cancel keeps the play and saves only the campaign.`)
       );
       wroteState = saved.wroteState;
       savedAs = saved.link;
@@ -306,6 +292,17 @@
           {#if m.books.length}<br /><span class="small muted">{m.books.map((b) => `${b.id} ${b.title}`).join(' · ')}</span>{/if}
         </span>
       </label>
+      {#if startsOf(m).length}
+        <details class="starts">
+          <summary>Show Player Start Locations</summary>
+          <ul>
+            {#each startsOf(m) as st (st.id)}
+              <li><strong>{st.title ?? st.id}</strong>
+                <span class="small muted">{[st.site, st.date, st.levels ? `levels ${st.levels[0]}–${st.levels[1]}` : '', st.uses?.length ? `plays ${st.uses.join(', ')}` : ''].filter(Boolean).join(' · ')}</span></li>
+            {/each}
+          </ul>
+        </details>
+      {/if}
     {/each}
     <details class="small">
       <summary class="muted">Modules from another site</summary>
@@ -316,43 +313,6 @@
     </details>
   </section>
 
-  {/if}
-
-  {#if root && picked.length}
-  <section>
-    <h2>Start</h2>
-
-      {#each offers as o (o.module.id + '/' + o.start.id)}
-        <label class="opt">
-          <input type="radio" name="start" value={`${o.module.id}/${o.start.id}`} bind:group={draft.start} />
-          <span>
-            <strong>{o.start.title ?? o.start.id}</strong> <span class="small muted">{o.module.title}</span>
-            <br /><span class="small muted">
-              {[o.start.site, o.start.date, o.start.levels ? `levels ${o.start.levels[0]}–${o.start.levels[1]}` : '', o.start.uses?.length ? `plays ${o.start.uses.join(', ')}` : '']
-                .filter(Boolean)
-                .join(' · ')}
-            </span>
-          </span>
-        </label>
-      {/each}
-      <label class="opt">
-        <input type="radio" name="start" value="manual" bind:group={draft.start} />
-        <span><strong>Place the party yourself</strong></span>
-      </label>
-      {#if draft.start === 'manual'}
-        <div class="row">
-          <select bind:value={draft.manual.module}>
-            {#each picked as m (m.id)}<option value={m.id}>{m.title}</option>{/each}
-          </select>
-          <select bind:value={draft.manual.site}>
-            <option value="">No place yet</option>
-            {#each manualModule?.sites ?? [] as s (s.slug)}<option value={s.slug}>{s.name}</option>{/each}
-          </select>
-          <input type="text" bind:value={draft.manual.date} placeholder="3507-05-01" />
-          <input type="number" min="0" max="23" bind:value={draft.manual.hour} />
-        </div>
-      {/if}
-  </section>
   {/if}
 
   {#if built}
@@ -376,7 +336,6 @@
           <li><a href="#module.json" onclick={(e) => (e.preventDefault(), download('module.json', built!.manifest))}>module.json</a></li>
           <li><a href="#campaign.lock.json" onclick={(e) => (e.preventDefault(), download('campaign.lock.json', built!.lock))}>campaign.lock.json</a></li>
           <li><a href="#state.json" onclick={(e) => (e.preventDefault(), download('state.json', built!.state))}>state.json</a></li>
-          {#if atlasLink}<li><a href={atlasLink}>Look at the start in the Atlas</a></li>{/if}
         </ul>
       </details>
       {/if}

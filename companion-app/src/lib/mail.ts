@@ -33,8 +33,9 @@ export function answer(list: MailItem[], id: string, a: MailItem['answer']): Mai
 }
 
 // A player's join request: the seat's character, every part of it, plus the player's name for the referee.
-export function joinRequest(campaign: string, character: { id: string }, sheet: object, name: string, now = new Date()): Envelope {
-  return envelope({ campaign, kind: 'join', from: { role: 'player', character: character.id, ...(name ? { name } : {}) }, to: 'referee', body: { character: sheet } }, now);
+// party: the party the player's invitation is to, so the referee's Approve puts the character in it.
+export function joinRequest(campaign: string, character: { id: string }, sheet: object, name: string, party?: string, now = new Date()): Envelope {
+  return envelope({ campaign, kind: 'join', from: { role: 'player', character: character.id, ...(name ? { name } : {}) }, to: 'referee', body: { character: sheet, ...(party ? { party } : {}) } }, now);
 }
 
 export function sendBack(request: Envelope, note: string, now = new Date()): Envelope {
