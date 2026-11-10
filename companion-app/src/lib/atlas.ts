@@ -20,14 +20,14 @@ export interface AtlasKnowledge { type: 'hexmarch-atlas'; event: 'knowledge'; mo
 export interface AtlasInvite { type: 'hexmarch-atlas'; event: 'invite'; module: string; party: string }
 export type AtlasMessage = AtlasView | AtlasParty | AtlasNewParty | AtlasActive | AtlasInvite | AtlasKnowledge;
 
-// The Atlas ships with the app (<app>/atlas/) and loads the module from its own site (?site=<base>).
+// The Atlas ships beside the app (<site>/atlas/, the Companion being <site>/companion/) and loads the module from its own site (?site=<base>).
 export function atlasUrl(base: string, id: string, app: string = appAtlas()): string {
   return `${app}?module=${encodeURIComponent(id)}&site=${encodeURIComponent(base)}`;
 }
 
 function appAtlas(): string {
   const root = typeof location === 'undefined' ? 'https://example.invalid/' : location.href;
-  return new URL(`${import.meta.env.BASE_URL}atlas/`, root).href;
+  return new URL(`${import.meta.env.BASE_URL}../atlas/`, root).href;
 }
 
 export const isAtlasAddress = (h: unknown): h is string => typeof h === 'string' && ADDR.test(h);
