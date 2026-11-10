@@ -378,9 +378,9 @@
       {#if !record}
         <p class="small muted">Save the campaign on this device first (above). Players can't join until it is published.</p>
       {:else}
-        <label class="opt"><input type="radio" name="store" value="github" bind:group={storeKind} /><span><strong>GitHub</strong> (preferred) <span class="small muted">a public repository of yours</span></span></label>
-        <label class="opt"><input type="radio" name="store" value="apps-script" bind:group={storeKind} /><span><strong>Google Drive</strong> <span class="small muted">through your own Apps Script, set up once</span></span></label>
-        <label class="opt"><input type="radio" name="store" value="manual" bind:group={storeKind} /><span><strong>Upload by hand</strong> <span class="small muted">to any web folder; Publish hands you the two files</span></span></label>
+        <label class="opt"><input type="radio" name="store" value="github" bind:group={storeKind} /><span><button type="button" class="tip" data-tip="GitHub is a free, open-source repository that anyone can use. It is unaffiliated with Hexmarch, so your files will always be yours. Hexmarch will provide step-by-step instructions for setting up your campaign."><strong>GitHub</strong></button> (preferred)</span></label>
+        <label class="opt"><input type="radio" name="store" value="apps-script" bind:group={storeKind} /><span><button type="button" class="tip" data-tip="Google Drive is a popular file storage service that comes with any GMail account. Hexmarch will walk you through setting up an Apps Script, which will give Hexmarch limited access to the files on your Drive that Hexmarch will use to share your campaign with players and co-referees."><strong>Google Drive</strong></button></span></label>
+        <label class="opt"><input type="radio" name="store" value="manual" bind:group={storeKind} /><span><button type="button" class="tip" data-tip="If you have your own website or server, Hexmarch can simply hand you the campaign files and let you place them somewhere that your players and co-referees can access them."><strong>My Own Host</strong></button></span></label>
         {#if storeKind === 'apps-script'}
           <details class="small" open={!scriptUrl}>
             <summary>Set up your script (once, about two minutes)</summary>

@@ -33,7 +33,7 @@ label.field { display: block; margin: 8px 0; }
 ul.test { margin: 6px 0 0; padding-left: 1.2em; } ul.test .ok { color: var(--ink); } ul.test .ok::marker { content: "✓ "; } ul.test .bad::marker { content: "✗ "; }
 /* Tooltips (Heph 2026-11-10: explanations move into tooltips). Hover on a computer, tap on a phone (focus). */
 .tip { position: relative; cursor: help; text-decoration: underline dotted; text-underline-offset: 3px; outline: none; }
-.tip::after { content: attr(data-tip); position: absolute; left: 0; top: calc(100% + 6px); z-index: 10; width: max-content; max-width: min(320px, 80vw); padding: 8px 10px; border-radius: 6px; background: var(--ink); color: var(--card); font-size: .85rem; font-weight: normal; line-height: 1.4; white-space: normal; text-decoration: none; box-shadow: 0 2px 8px rgb(0 0 0 / .25); opacity: 0; visibility: hidden; transition: opacity .12s; pointer-events: none; }
+.tip::after { content: attr(data-tip); position: absolute; left: 0; top: calc(100% + 6px); z-index: 10; width: max-content; max-width: min(320px, 70vw); padding: 8px 10px; border-radius: 6px; background: var(--ink); color: var(--card); font-size: .85rem; font-weight: normal; line-height: 1.4; white-space: normal; text-decoration: none; box-shadow: 0 2px 8px rgb(0 0 0 / .25); opacity: 0; visibility: hidden; transition: opacity .12s; pointer-events: none; }
 button.tip { all: unset; position: relative; cursor: help; text-decoration: underline dotted; text-underline-offset: 3px; }
 button.tip:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
 .tip:hover::after, .tip:focus::after, summary:focus .tip::after { opacity: 1; visibility: visible; }
