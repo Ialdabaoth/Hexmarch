@@ -5,7 +5,7 @@ const NOW = new Date('2026-11-09T14:00:00Z');
 
 describe('requests between player and referee', () => {
   it('sends a character to join, and the referee sends it back with a note', () => {
-    const join = joinRequest('kells-1422', { id: 'holly' }, { id: 'holly', flavor: { name: 'Holly' } }, 'Ann', NOW);
+    const join = joinRequest('kells-1422', { id: 'holly' }, { id: 'holly', flavor: { name: 'Holly' } }, 'Ann', undefined, NOW);
     expect(join).toMatchObject({ campaign: 'kells-1422', kind: 'join', to: 'referee', from: { role: 'player', character: 'holly', name: 'Ann' } });
     expect(mailFileName(join, 'Holly Ó Briain')).toBe('kells-1422-join-holly-briain.json');
     const back = sendBack(join, 'Pick a second language', NOW);
@@ -14,7 +14,7 @@ describe('requests between player and referee', () => {
   });
 
   it('keeps each message once, and records the answer', () => {
-    const join = joinRequest('k', { id: 'a' }, {}, '', NOW);
+    const join = joinRequest('k', { id: 'a' }, {}, '', undefined, NOW);
     let list = addMail([], { envelope: join, box: 'in' });
     expect(addMail(list, { envelope: join, box: 'in' })).toBe(list);
     list = answer(list, join.id, { kind: 'approved', at: NOW.toISOString() });

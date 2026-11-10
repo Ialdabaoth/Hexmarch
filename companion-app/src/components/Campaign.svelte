@@ -68,12 +68,18 @@
   {:else if app.party.length}
     <ul class="tree">
       <li>
-        <strong>Party</strong> <span class="small muted">· active{app.state.party ? ` · hex ${app.state.party.label}` : ''}</span>
+        <strong>{app.currentParty?.name ?? 'Party'}</strong> <span class="small muted">· active{app.currentParty?.at ? ` · hex ${app.currentParty.at.label}` : ''}</span>
         <ul>
           {#each app.party as c (c.id)}
             <li>
               <button class="link" onclick={() => open(c.id)}>{c.name}</button>
               <span class="small muted">{className(c)} {c.level}</span>
+              {#if app.state.parties.length > 1}
+                <select class="small" value={app.state.characters.find((x) => x.id === c.id)?.party ?? app.state.active}
+                  onchange={(e) => app.moveToParty(c.id, (e.target as HTMLSelectElement).value)} aria-label="Move {c.name} to another party">
+                  {#each app.state.parties as x (x.id)}<option value={x.id}>{x.name}</option>{/each}
+                </select>
+              {/if}
               {#if c.data.followers.length}
                 <ul>
                   {#each c.data.followers as f (f.id)}

@@ -105,21 +105,57 @@ async function failure(res: Response, what: string): Promise<PublishError> {
   return new PublishError(`${what}: GitHub said ${res.status}${detail ? ` (${detail})` : ''}.`);
 }
 
+const ghHeaders = (token: string) => ({ Authorization: `Bearer ${token.trim()}`, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' });
+
+// Before writing, checks in plain words that the repository is there, public, and has the branch (Heph 2026-11-10:
+// the GitHub setup has to work for someone who has never used GitHub). A brand-new repository has no commits and so
+// no branch yet; `empty` tells githubPut to let GitHub make the default branch with the first file.
+export async function checkGithub(store: GithubStore, token: string, f: typeof fetch = fetch): Promise<{ empty: boolean }> {
+  const headers = ghHeaders(token);
+  const base = `https://api.github.com/repos/${store.owner}/${store.repo}`;
+  const name = `${store.owner}/${store.repo}`;
+  let repo: Response;
+  try {
+    repo = await f(base, { headers, cache: 'no-store' });
+  } catch {
+    throw new PublishError("Couldn't reach GitHub. Check your connection and try again.");
+  }
+  if (repo.status === 401) throw new PublishError('GitHub refused the key. Make a new one (it may have expired) and paste it again.');
+  if (repo.status === 404 || repo.status === 403)
+    throw new PublishError(`GitHub doesn't know the repository ${name}, or your key can't see it. Check your username and the repository name, and that you picked this repository when you made the key.`);
+  if (!repo.ok) throw await failure(repo, 'Checking the repository');
+  const info = (await repo.json()) as { private?: boolean; default_branch?: string };
+  if (info.private) throw new PublishError(`The repository ${name} is private, so players can't read it. On GitHub, open it, then Settings › Change visibility › Make public.`);
+  const branch = await f(`${base}/branches/${encodeURIComponent(store.branch)}`, { headers, cache: 'no-store' });
+  if (branch.ok) return { empty: false };
+  if (branch.status !== 404) throw await failure(branch, 'Checking the branch');
+  const commits = await f(`${base}/commits?per_page=1`, { headers, cache: 'no-store' });
+  if (commits.status === 409 && store.branch === (info.default_branch ?? 'main')) return { empty: true };
+  throw new PublishError(`The repository ${name} has no branch called ${store.branch}. Leave Branch as ${info.default_branch ?? 'main'} unless you know you need another.`);
+}
+
 // Writes both files in one commit's worth of calls (one call per file: the Contents API).
 async function githubPut(store: GithubStore, token: string, files: Record<FileName, unknown>, message: string, f: typeof fetch): Promise<void> {
-  const headers = { Authorization: `Bearer ${token.trim()}`, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' };
+  const headers = ghHeaders(token);
+  let { empty } = await checkGithub(store, token, f);
   for (const name of FILES) {
     const path = `${store.dir ? store.dir + '/' : ''}${name}`;
     const api = `https://api.github.com/repos/${store.owner}/${store.repo}/contents/${path}`;
-    const had = await f(`${api}?ref=${encodeURIComponent(store.branch)}`, { headers, cache: 'no-store' });
-    if (!had.ok && had.status !== 404) throw await failure(had, `Reading ${name}`);
-    const sha = had.ok ? ((await had.json()) as { sha?: string }).sha : undefined;
+    let sha: string | undefined;
+    if (!empty) {
+      const had = await f(`${api}?ref=${encodeURIComponent(store.branch)}`, { headers, cache: 'no-store' });
+      if (!had.ok && had.status !== 404) throw await failure(had, `Reading ${name}`);
+      sha = had.ok ? ((await had.json()) as { sha?: string }).sha : undefined;
+    }
     const res = await f(api, {
       method: 'PUT',
       headers: { ...headers, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message, content: b64(fileText(files[name])), branch: store.branch, ...(sha ? { sha } : {}) })
+      body: JSON.stringify({ message, content: b64(fileText(files[name])), ...(empty ? {} : { branch: store.branch }), ...(sha ? { sha } : {}) })
     });
+    if (res.status === 403 || res.status === 404)
+      throw new PublishError(`Your key can't save to ${store.owner}/${store.repo}. Make a new key with Contents set to Read and write for this repository.`);
     if (!res.ok) throw await failure(res, `Writing ${name}`);
+    empty = false;
   }
 }
 
@@ -148,7 +184,7 @@ async function appsScriptPut(store: AppsScriptStore, key: string, files: Record<
 // Puts both files where players read them. Returns false for the Manual adapter, whose files the referee uploads.
 export async function upload(store: Store, secret: string, files: Record<FileName, unknown>, message = 'Publish campaign', f: typeof fetch = fetch): Promise<boolean> {
   if (store.kind === 'manual') return false;
-  if (!secret.trim()) throw new PublishError(store.kind === 'github' ? 'Paste your GitHub token first.' : "Paste your script's key first.");
+  if (!secret.trim()) throw new PublishError(store.kind === 'github' ? 'Paste your GitHub key first.' : "Paste your script's key first.");
   if (store.kind === 'github') await githubPut(store, secret, files, message, f);
   else await appsScriptPut(store, secret, files, f);
   return true;

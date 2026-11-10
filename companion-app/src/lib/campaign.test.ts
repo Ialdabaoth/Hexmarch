@@ -139,6 +139,7 @@ describe('campaigns made in Scribe', () => {
     expect(c.campaign.equipment.length).toBeGreaterThan(0);
     expect(c.scribe?.site).toBe('https://example.org/data/');
     expect(isScribeLink(c.url)).toBe(true);
+    expect(fromScribe('scribe:x', { ...saved, lock: { modules: [{ id: 'isle-of-mists' }] } }).lock).toEqual({ modules: [{ id: 'isle-of-mists' }] });
   });
 
   it('refuses what it cannot read', () => {
