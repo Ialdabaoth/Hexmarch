@@ -22,6 +22,7 @@ import { inviteDone, keepInvite, pendingInvite, updateForInvite } from './update
 import { readShared, withoutShared } from './share';
 import { publishParts } from '../../../engine/publish';
 import { envelope as mailEnvelope, messageLink, readMessageHash, type Envelope } from '../../../engine/mail';
+import { handOff, takeHandOffs } from '../../../engine/handoff';
 import { readState as readStateFile } from './state';
 import { get as idbGet, set as idbSet } from 'idb-keyval';
 import { addInvitation, bindCharacter, invitationLabel, loadInvitations, readInvite, saveInvitations, withRefereeInvitations, type Invite, type Mode, type Invitation } from './invitations';
@@ -178,14 +179,17 @@ class AppState {
     await this.loadState();
     await this.checkCanUpdate();
     this.loaded = true;
+    await this.followCurrent();
+    await this.readCampaignModules();
     // The Atlas in another tab of this site saves party moves into the same file (Atlas 0.5.11): read it again on coming back.
-    if (typeof document !== 'undefined') document.addEventListener('visibilitychange', () => { if (!document.hidden) void this.refreshState(); });
+    if (typeof document !== 'undefined') document.addEventListener('visibilitychange', () => { if (!document.hidden) void this.followCurrent().then(() => this.refreshState()); });
     if (await this.cacheInlinePortraits(this.sheets)) await this.persist();
     if (this.settings.dice3d) preloadDice();
     await this.openShared();
     await this.openAsked();
     await this.openMessage();
     this.listenForFiles();
+    if (typeof window !== 'undefined' && window.top === window) takeHandOffs('./', siteRoot());
     void this.refreshCampaign();
   }
 
@@ -608,7 +612,15 @@ class AppState {
   // Referee mode: hands the play to Scribe, which publishes it and comes back here with a 'published' message
   // (Heph 2026-11-10: Scribe is the only publisher). `invite`: the party whose invitation to show on return.
   async sendToScribe(invite?: string) {
-    location.href = await this.scribeLink(invite);
+    await this.goTo(await this.scribeLink(invite), 'Scribe');
+  }
+
+  // A link for another app opens there, never in this window (Heph 2026-11-10; engine/handoff.ts): an open window of
+  // that app takes it, or a new window opens; when the browser blocks that, the link waits as a button (App.svelte).
+  handoff = $state<{ url: string; app: string; taken: boolean } | null>(null);
+  async goTo(url: string, appName: string) {
+    const r = await handOff(url, siteRoot());
+    this.handoff = r === 'opened' ? null : { url, app: appName, taken: r === 'taken' };
   }
 
   // Scribe -> Companion, after a publish this device asked for: {ok, revision, at} or {ok: false, error, firstPublish?}.
@@ -833,7 +845,7 @@ class AppState {
     const here = location.href.replace(/[?#].*$/, '');
     const e = mailEnvelope({ campaign: id, kind: 'update', from: { role: 'referee' }, to: 'referee', body: { ...JSON.parse(JSON.stringify(parts)), back: here } });
     await idbSet(`publish-asked:${id}`, { id: e.id, ...(invite ? { invite } : {}) });
-    return messageLink(new URL('scribe/', here).href, e);
+    return messageLink(new URL('scribe/', siteRoot()).href, e);
   }
 
   // The referee may have changed the campaign's files; pick that up quietly.
@@ -1013,6 +1025,54 @@ class AppState {
     this.settings = { ...this.settings, ...patch };
     await saveSettings(this.settings).catch((e) => console.warn("Could not save", e));
     if (this.loaded && this.campaignId !== was) await this.loadState();
+    if ('campaign' in patch && this.campaignId !== was) {
+      await this.markCurrent();
+      await this.readCampaignModules();
+    }
+  }
+
+  // The campaign the device is on, shared with the Launcher and the other apps (IndexedDB "hexmarch-current":
+  // {campaign: id or null, at}). Written whenever this app switches campaign; read on start and on coming back, when
+  // the Launcher (or another app) switched more recently. Links in the address still win: they are opened after.
+  private currentAt = '';
+  private async markCurrent() {
+    this.currentAt = new Date().toISOString();
+    await idbSet('hexmarch-current', { campaign: this.campaignId || null, at: this.currentAt }).catch((e) => console.warn('Could not save', e));
+  }
+  private async followCurrent() {
+    let cur: { campaign?: unknown; at?: unknown } | undefined;
+    try {
+      cur = (await idbGet('hexmarch-current')) as typeof cur;
+    } catch {
+      return;
+    }
+    if (!cur || typeof cur.at !== 'string' || cur.at <= this.currentAt) return;
+    this.currentAt = cur.at;
+    const id = typeof cur.campaign === 'string' ? cur.campaign : null;
+    if (id === (this.campaignId || null)) return;
+    try {
+      if (id === null) return void (await this.leaveCampaign());
+      // a seat this device holds for it, the referee's first; else a campaign Scribe saved here, as referee
+      const seats = this.invitations.filter((x) => this.campaigns[x.url]?.campaign.id === id);
+      const seat = seats.find((x) => x.role === 'referee') ?? seats[0];
+      if (seat) await this.chooseInvitation(seat.id);
+      else if (await idbGet(`scribe-campaign:${id}`)) await this.useCampaign(`scribe:${id}`, 'referee');
+    } catch (e) {
+      console.warn('Campaign from the Launcher not opened', e);
+    }
+  }
+
+  // Heph 2026-11-10: with no campaign, every module cached on the device can be picked; with one, its lockfile is
+  // the filter. null: no filter.
+  campaignModuleIds = $state<string[] | null>(null);
+  get campaignModules(): SavedModule[] {
+    const ids = this.campaignModuleIds;
+    return ids ? this.modules.filter((m) => ids.includes(m.id)) : this.modules;
+  }
+  private async readCampaignModules() {
+    const lock = this.campaign ? ((await this.campaignLock().catch(() => null)) as { modules?: { id?: unknown }[] } | null) : null;
+    const ids = Array.isArray(lock?.modules) ? lock.modules.map((m) => m?.id).filter((x): x is string => typeof x === 'string') : [];
+    this.campaignModuleIds = ids.length ? ids : null;
   }
 
   get diceColors() {
@@ -1055,6 +1115,11 @@ class AppState {
     clearTimeout(this.toastTimer);
     this.toastTimer = setTimeout(() => (this.toast = ''), 3000);
   }
+}
+
+// The folder holding the apps (<site>/companion/, atlas/, scribe/) and the Launcher (<site>/).
+export function siteRoot(): string {
+  return new URL(`${import.meta.env.BASE_URL}../`, typeof location === 'undefined' ? 'https://example.invalid/' : location.href).href;
 }
 
 export const app = new AppState();

@@ -16,6 +16,8 @@ const pwa = !process.env.PREVIEW;
 
 export default defineConfig({
   base,
+  // the site workflow builds into <repo>/_site/companion/ (OUT_DIR); the Launcher sits at the site's root
+  build: process.env.OUT_DIR ? { outDir: process.env.OUT_DIR, emptyOutDir: true } : {},
   // rules modules (../modules/e9-core etc.) are imported at build time; let the dev server read them
   server: { fs: { allow: ['.', '../modules', '../engine'] } },
   define: {

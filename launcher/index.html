@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{NAME}} Launcher</title>
+<meta name="description" content="Open the {{NAME}} apps, switch campaigns, and back up or reset what this device keeps.">
+<meta name="theme-color" content="#2b2118">
+<link rel="icon" href="launcher.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="apple-touch-icon.png">
+<style>
+:root { --bg: #f4ecdc; --card: #fffaf0; --ink: #2b2118; --muted: #6b5d4d; --line: #d9ccb4; --gold: #b8892e; --accent: #7a3b1d; --bad: #9b2c1c; color-scheme: light; }
+@media (prefers-color-scheme: dark) { :root { --bg: #1d1712; --card: #28201a; --ink: #f4ecdc; --muted: #b9a990; --line: #4a3d30; --gold: #e8c77a; --accent: #e8a86b; --bad: #f08a76; color-scheme: dark; } }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.5 Georgia, 'Times New Roman', serif; }
+main { max-width: 46rem; margin: 0 auto; padding: 16px 16px 64px; }
+header { display: flex; align-items: center; gap: 12px; margin: 8px 0 20px; }
+header img { width: 48px; height: 48px; }
+h1 { margin: 0; font-size: 1.6rem; } h2 { font-size: 1.15rem; margin: 0 0 .5rem; }
+section { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; margin: 0 0 14px; }
+.apps { display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); gap: 12px; background: none; border: 0; padding: 0; }
+.app { display: flex; align-items: center; gap: 12px; padding: 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: inherit; text-decoration: none; }
+.app:hover, .app:focus-visible { border-color: var(--gold); }
+.app img { width: 52px; height: 52px; flex: none; } .app b { display: block; font-size: 1.15rem; }
+.small { font-size: .875rem; } .muted { color: var(--muted); } .bad { color: var(--bad); }
+button, a.button { font: inherit; color: var(--bg); background: var(--accent); border: 0; border-radius: 6px; padding: 7px 12px; cursor: pointer; text-decoration: none; display: inline-block; margin: 4px 6px 0 0; }
+button.quiet, a.button.quiet { background: transparent; color: var(--accent); border: 1px solid var(--line); }
+button.danger { background: var(--bad); }
+ul.list { list-style: none; margin: 0; padding: 0; } ul.list li { padding: 10px 0; border-top: 1px solid var(--line); } ul.list li:first-child { border-top: 0; }
+li.current { box-shadow: inset 4px 0 0 var(--gold); padding-left: 12px !important; }
+.tip { cursor: help; text-decoration: underline dotted; text-underline-offset: 3px; }
+table { border-collapse: collapse; width: 100%; } td { padding: 3px 6px 3px 0; vertical-align: top; } td:last-child { text-align: right; white-space: nowrap; }
+footer { margin-top: 24px; text-align: center; }
+</style>
+</head>
+<body>
+<main>
+  <header><img src="launcher.svg" alt=""><div><h1>{{NAME}}</h1><div class="small muted">Launcher</div></div></header>
+
+  <section class="apps" aria-label="Apps">
+    <a class="app" href="companion/" data-app="companion"><img src="companion/icon.svg" alt=""><span><b>Companion</b><span class="small muted">Characters, dice and play · {{COMPANION}}</span></span></a>
+    <a class="app" href="atlas/" data-app="atlas"><img src="atlas/icon.svg" alt=""><span><b>Atlas</b><span class="small muted">Maps and parties · {{ATLAS}}</span></span></a>
+    <a class="app" href="scribe/" data-app="scribe"><img src="scribe/icon.svg" alt=""><span><b>Scribe</b><span class="small muted">Campaigns and publishing · {{SCRIBE}}</span></span></a>
+  </section>
+
+  <section>
+    <h2>Campaigns on this device</h2>
+    <ul class="list" id="campaigns"><li class="muted small">Looking…</li></ul>
+    <a class="button" href="scribe/">New Campaign</a>
+  </section>
+
+  <section>
+    <h2><span class="tip" tabindex="0" title="The three apps live on one site, so they share this browser's storage. It is a cache: the campaign's published files and the links between apps are what count.">What this device keeps</span></h2>
+    <table id="stores"><tr><td class="muted small">Looking…</td></tr></table>
+    <button id="export" title="One file with everything the apps keep on this device">Export backup</button>
+    <button id="import" class="quiet" title="Put a backup file's data back on this device; what the file holds replaces the same entries here">Import backup</button>
+    <button id="reset" class="danger" title="Delete everything the apps keep on this device, as if they were freshly installed">Reset this device</button>
+    <p id="status" class="small" role="status"></p>
+  </section>
+
+  <footer class="small muted">{{NAME}} is free and open source. Made for {{NAME}} Companion, Atlas and Scribe.</footer>
+</main>
+<script>
+'use strict';
+// The Launcher (Heph 2026-11-10): the site's front page. The apps sit side by side at companion/, atlas/ and scribe/, each
+// installed as its own app, and share this site's browser storage. The Launcher opens them, lists and picks the campaigns
+// this device holds, and backs up, restores or clears that storage. The storage is a cache: apps still talk by links.
+// "hexmarch-current" (keyval-store) = {campaign: id | null, at}: the campaign picked here, which the Companion and the
+// Atlas open with when their address names none (each app writes it too when it switches campaign itself).
+const CURRENT = 'hexmarch-current';
+let RESET_WAITING = false;  // after a reset an open app may still hold a database; reading it now would make it again
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+const say = (t, bad) => { $('status').textContent = t; $('status').className = 'small' + (bad ? ' bad' : ''); };
+
+// --- IndexedDB, plainly (the apps use idb-keyval: database "keyval-store", store "keyval")
+const req = r => new Promise((ok, no) => { r.onsuccess = () => ok(r.result); r.onerror = () => no(r.error); });
+function openDb(name, version) {
+  return new Promise((ok, no) => { const r = version ? indexedDB.open(name, version) : indexedDB.open(name);
+    // never make an app's database here: only keyval-store is made, with the store idb-keyval itself would make
+    r.onupgradeneeded = () => { if (name === 'keyval-store' && !version) r.result.createObjectStore('keyval'); else if (!version) r.transaction.abort(); };
+    r.onsuccess = () => ok(r.result); r.onerror = () => no(r.error); r.onblocked = () => no(new Error(`${name} is open in another app; close the apps and try again.`)); });
+}
+async function kv(op, key, value) {
+  const db = await openDb('keyval-store');
+  try { const tx = db.transaction('keyval', op === 'get' ? 'readonly' : 'readwrite'), st = tx.objectStore('keyval');
+    return op === 'get' ? await req(st.get(key)) : await req(st.put(value, key)); } finally { db.close(); }
+}
+async function databases() { try { return (await indexedDB.databases()).map(d => d.name).filter(Boolean); } catch (e) { return ['keyval-store', 'hexmarch-portraits']; } }
+async function dumpDb(name) {
+  const db = await openDb(name); const out = {};
+  try { for (const s of db.objectStoreNames) { const st = db.transaction(s).objectStore(s);
+    const [keys, values] = await Promise.all([req(st.getAllKeys()), req(st.getAll())]); out[s] = { keyPath: st.keyPath, auto: st.autoIncrement, rows: keys.map((k, i) => [k, values[i]]) }; } }
+  finally { db.close(); }
+  return out;
+}
+
+// --- Campaigns: Scribe's records (scribe-campaign:<id>) and the Companion's seats (invitations, campaigns)
+async function campaignList() {
+  const db = await openDb('keyval-store'); const found = new Map();
+  try {
+    const st = db.transaction('keyval').objectStore('keyval');
+    const [keys, values] = await Promise.all([req(st.getAllKeys()), req(st.getAll())]);
+    const at = k => values[keys.indexOf(k)];
+    keys.forEach((k, i) => { if (typeof k === 'string' && k.startsWith('scribe-campaign:')) { const r = values[i] || {}, id = k.slice(16);
+      found.set(id, { id, title: r.manifest?.title || r.manifest?.name || id, scribe: true, seats: [], saved: r.saved, published: r.published }); } });
+    const cache = at('campaigns') || {}, seats = Array.isArray(at('invitations')) ? at('invitations') : [];
+    for (const s of seats) { const c = cache[s.url]?.campaign || {}; const id = c.id || (String(s.url).startsWith('scribe:') ? String(s.url).slice(7) : s.url);
+      const e = found.get(id) || { id, title: c.title || c.name || s.name || id, scribe: false, seats: [] }; e.seats.push(s); found.set(id, e); }
+  } finally { db.close(); }
+  return [...found.values()].sort((a, b) => a.title.localeCompare(b.title));
+}
+async function showCampaigns() {
+  let list = [], cur = null;
+  try { list = await campaignList(); cur = (await kv('get', CURRENT))?.campaign ?? null; } catch (e) { $('campaigns').innerHTML = `<li class="bad small">${esc(e.message)}</li>`; return; }
+  const row = c => {
+    const roles = [...new Set(c.seats.map(s => s.role === 'referee' ? 'Referee' : 'Player'))];
+    const what = [c.scribe ? 'made in Scribe here' : '', roles.join(' and '), c.published ? `published (revision ${c.published.revision})` : ''].filter(Boolean).join(' · ');
+    return `<li class="${c.id === cur ? 'current' : ''}"><b>${esc(c.title)}</b>${c.id === cur ? ' <span class="small muted">(picked)</span>' : ''}<br><span class="small muted">${esc(what)}</span><br>`
+      + `<button data-pick="${esc(c.id)}" data-open="companion">Companion</button><button data-pick="${esc(c.id)}" data-open="atlas">Atlas</button>`
+      + (c.scribe ? `<button class="quiet" data-pick="${esc(c.id)}" data-open="scribe">Scribe</button>` : '') + `</li>`;
+  };
+  $('campaigns').innerHTML = (list.length ? list.map(row).join('') : '<li class="muted small">No campaigns on this device yet.</li>')
+    + `<li class="${cur === null ? 'current' : ''}"><b>No campaign</b><br><span class="small muted">The apps offer every module this device has.</span><br>`
+    + `<button class="quiet" data-pick="" data-open="companion">Companion</button><button class="quiet" data-pick="" data-open="atlas">Atlas</button></li>`;
+}
+$('campaigns').addEventListener('click', async e => {
+  const b = e.target.closest('button[data-open]'); if (!b) return;
+  const id = b.dataset.pick || null;
+  try { await kv('put', CURRENT, { campaign: id, at: new Date().toISOString() }); } catch (x) { say(x.message, true); return; }
+  // a campaign Scribe made here opens in the Companion by its link (the referee's seat); the Atlas and Scribe read hexmarch-current
+  location.href = b.dataset.open === 'companion' && id ? `companion/?${new URLSearchParams({ campaign: 'scribe:' + id })}` : `${b.dataset.open}/`;
+});
+
+// --- What the device keeps
+async function showStores() {
+  const rows = [];
+  for (const n of await databases()) { if (RESET_WAITING) break; try { const d = await dumpDb(n); rows.push([`Database “${n}”`, Object.values(d).reduce((t, s) => t + s.rows.length, 0) + ' entries']); } catch (e) { rows.push([n, e.message]); } }
+  rows.push(['Settings (local storage)', localStorage.length + ' entries']);
+  try { rows.push(['Offline copies of the apps', (await caches.keys()).length + ' caches']); } catch (e) {}
+  try { rows.push(['Installed helpers (service workers)', (await navigator.serviceWorker.getRegistrations()).length + '']); } catch (e) {}
+  try { const q = await navigator.storage.estimate(); rows.push(['Space used', (q.usage / 1048576).toFixed(1) + ' MB']); } catch (e) {}
+  $('stores').innerHTML = rows.map(([a, b]) => `<tr><td>${esc(a)}</td><td class="muted">${esc(b)}</td></tr>`).join('');
+}
+
+// --- Backup: every database, every store, every entry; Blobs (portraits) as data: links
+const toData = b => new Promise((ok, no) => { const r = new FileReader(); r.onload = () => ok(r.result); r.onerror = () => no(r.error); r.readAsDataURL(b); });
+async function pack(v) {
+  if (v instanceof Blob) return { $blob: await toData(v), type: v.type };
+  if (v instanceof Date) return { $date: v.toISOString() };
+  if (ArrayBuffer.isView(v) || v instanceof ArrayBuffer) return { $bytes: await toData(new Blob([v])) };
+  if (Array.isArray(v)) return Promise.all(v.map(pack));
+  if (v && typeof v === 'object') { const o = {}; for (const k of Object.keys(v)) o[k] = await pack(v[k]); return o; }
+  return v;
+}
+async function unpack(v) {
+  if (Array.isArray(v)) return Promise.all(v.map(unpack));
+  if (v && typeof v === 'object') {
+    if (typeof v.$blob === 'string') return (await fetch(v.$blob)).blob();
+    if (typeof v.$date === 'string') return new Date(v.$date);
+    if (typeof v.$bytes === 'string') return (await fetch(v.$bytes)).arrayBuffer();
+    const o = {}; for (const k of Object.keys(v)) o[k] = await unpack(v[k]); return o;
+  }
+  return v;
+}
+$('export').addEventListener('click', async () => {
+  try {
+    say('Packing…'); const dbs = {};
+    for (const n of await databases()) dbs[n] = await pack(await dumpDb(n));
+    const ls = {}; for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); ls[k] = localStorage.getItem(k); }
+    const file = { format: 'hexmarch-backup', version: 1, at: new Date().toISOString(), site: location.href, databases: dbs, localStorage: ls };
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(file)], { type: 'application/json' }));
+    a.download = `hexmarch-backup-${file.at.slice(0, 10)}.json`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    say('Backup saved to your downloads.');
+  } catch (e) { say(`Couldn't make the backup: ${e.message || e}`, true); }
+});
+$('import').addEventListener('click', () => {
+  const inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.json,application/json';
+  inp.onchange = async () => {
+    try {
+      const f = JSON.parse(await inp.files[0].text());
+      if (f?.format !== 'hexmarch-backup' || f.version !== 1) throw new Error("that isn't a Hexmarch backup file");
+      for (const [name, stores] of Object.entries(f.databases || {})) {
+        // open the database, adding any store the backup has and this device lacks (or the whole database)
+        const make = v => new Promise((ok, no) => { const r = v ? indexedDB.open(name, v) : indexedDB.open(name);
+          r.onupgradeneeded = () => { for (const s of Object.keys(stores)) if (!r.result.objectStoreNames.contains(s)) r.result.createObjectStore(s, stores[s].keyPath ? { keyPath: stores[s].keyPath, autoIncrement: stores[s].auto } : { autoIncrement: stores[s].auto }); };
+          r.onsuccess = () => ok(r.result); r.onerror = () => no(r.error); r.onblocked = () => no(new Error(`${name} is open in another app; close the apps and try again.`)); });
+        let db = await make(0);
+        if (Object.keys(stores).some(s => !db.objectStoreNames.contains(s))) { const v = db.version + 1; db.close(); db = await make(v); }
+        try { for (const [s, d] of Object.entries(stores)) { const rows = await unpack(d.rows); const tx = db.transaction(s, 'readwrite'), st = tx.objectStore(s);
+          for (const [k, v] of rows) st.keyPath ? st.put(v) : st.put(v, k); await new Promise((ok, no) => { tx.oncomplete = ok; tx.onerror = () => no(tx.error); }); } }
+        finally { db.close(); }
+      }
+      for (const [k, v] of Object.entries(f.localStorage || {})) localStorage.setItem(k, v);
+      say(`Backup from ${String(f.at).slice(0, 10)} restored. Reload any open app.`); refresh();
+    } catch (e) { say(`Couldn't restore: ${e.message || e}`, true); }
+  };
+  inp.click();
+});
+$('reset').addEventListener('click', async () => {
+  if (!confirm(`Delete everything ${location.host} keeps in this browser: the apps' campaigns, characters, invitations, keys, settings and offline copies (and anything other pages on ${location.host} keep)? Export a backup first if you might want it back.`)) return;
+  try {
+    // an open app holds its database open; the delete then waits and finishes by itself once that window closes
+    let waiting = 0; RESET_WAITING = true;
+    for (const n of await databases()) await new Promise((ok, no) => { const r = indexedDB.deleteDatabase(n); r.onsuccess = ok; r.onerror = () => no(r.error); r.onblocked = () => { waiting++; ok(); }; });
+    localStorage.clear(); sessionStorage.clear();
+    try { for (const k of await caches.keys()) await caches.delete(k); } catch (e) {}
+    try { for (const r of await navigator.serviceWorker.getRegistrations()) await r.unregister(); } catch (e) {}
+    say(waiting ? 'Cleared. An app is still open: close every Hexmarch app window and the rest clears by itself.' : 'This device is clear. Close any open app windows; they start fresh next time.');
+    if (!waiting) { RESET_WAITING = false; setTimeout(refresh, 300); }
+  } catch (e) { say(`Couldn't finish: ${e.message || e}`, true); }
+});
+
+function refresh() { showCampaigns(); showStores(); }
+refresh();
+// The Companion used to live here, with an offline helper over the whole site; retire it (sw.js unregisters itself).
+navigator.serviceWorker?.getRegistrations?.().then(rs => rs.forEach(r => { if (new URL(r.scope).pathname === location.pathname.replace(/[^/]*$/, '')) r.unregister(); })).catch(() => {});
+</script>
+</body>
+</html>

@@ -5,7 +5,7 @@
   import { applyUpdate, backUrl, campaignMessage, playFor, publishAgain, publishedMessage, type PublishResult, publishOnDevice, savePlayState, publishSecret, saveOnDevice, savePublishSecret, savedCampaign, testUpload, type SavedCampaign, type UpdateResult } from './lib/device';
   import { applyAtlas, atlasEvent, type State } from './lib/parties';
   import type { UploadCheck, UploadReport } from '../../engine';
-  import { appsScriptCode, appsScriptStore, githubStore, messageLink, newKey, readMessageHash, servicesFor, staticServices, upload, type Services, type StoreKind } from '../../engine';
+  import { appsScriptCode, appsScriptStore, githubStore, handOff, messageLink, takeHandOffs, newKey, readMessageHash, servicesFor, staticServices, upload, type Services, type StoreKind } from '../../engine';
 
   const VERSION = __SCRIBE_VERSION__;
   const params = new URLSearchParams(location.search);
@@ -265,6 +265,17 @@
     return !r || r.ok;
   }
 
+  // Links to another app go to that app, never into this window (Heph 2026-11-10: the Companion opened as a page of
+  // Scribe). engine/handoff.ts: an open window of that app takes it, or a new window opens; when the browser blocks
+  // that (no tap to open it from), the link waits here as a button.
+  const SITE = new URL('../', location.href).href;
+  if (window.top === window) takeHandOffs('./', SITE);
+  let handoff = $state<{ url: string; app: string; taken: boolean } | null>(null);
+  async function go(url: string, app: string) {
+    const r = await handOff(url, SITE);
+    handoff = r === 'opened' ? null : { url, app, taken: r === 'taken' };
+  }
+
   // Update in Scribe (Companion -> Scribe, a link to scribe/#m=...): play to publish from.
   let received = $state<UpdateResult | null>(null);
   let receiveError = $state('');
@@ -285,7 +296,7 @@
       // back (the Companion, or the Atlas on its way to an invitation): return there with a 'published' answer,
       // whatever happened; only on this site.
       const back = backUrl(e.body.back, location.href);
-      if (back) location.href = await messageLink(back, publishedMessage(e.campaign, e.id, result));
+      if (back) await go(await messageLink(back, publishedMessage(e.campaign, e.id, result)), /\/atlas\//.test(back) ? 'the Atlas' : 'the Companion');
     } catch (e) {
       receiveError = `Scribe couldn't read that link: ${(e as Error).message || e}`;
     }
@@ -312,7 +323,7 @@
     const rec = built && (await savedCampaign(String(built.manifest.id)));
     if (!rec || !play) return;
     const state = applyAtlas($state.snapshot(play) as State, { event: 'active', module: '', party }, siteUrl);
-    location.href = await messageLink(new URL('../', location.href).href, campaignMessage(rec, state, { party }));
+    await go(await messageLink(new URL('companion/', SITE).href, campaignMessage(rec, state, { party })), 'the Companion');
   }
 
   // Preview in Atlas (Heph 2026-11-10): the Atlas embedded here, as in the Companion's Campaign › Maps, in a header
@@ -395,6 +406,12 @@
     </section>
   {/if}
   {#if receiveError}<p class="bad">{receiveError}</p>{/if}
+  {#if handoff}
+    <p class="handoff small">
+      {#if handoff.taken}Sent to {handoff.app}, open in another window.{/if}
+      <a class="button" href={handoff.url} target="_blank" rel="noopener" onclick={() => (handoff = null)}>Open {handoff.app}</a>
+    </p>
+  {/if}
 
   <section>
     <h2>Campaign</h2>
@@ -572,5 +589,5 @@
     {/if}
   {/if}
 
-  <footer class="small muted"><a href="../">Companion</a><a href="../atlas/">Atlas</a></footer>
+  <footer class="small muted"><a href="../">Launcher</a><a href="../companion/">Companion</a><a href="../atlas/">Atlas</a></footer>
 </main>

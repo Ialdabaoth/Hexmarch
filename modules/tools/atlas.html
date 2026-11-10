@@ -585,7 +585,8 @@ async function campaignLink(url, id) {
     const l = (c && c.published && c.published.pointer) || (sc && sc.services && sc.services.pointer); if (typeof l === 'string' && /^https:\/\//.test(l)) CLINK = l; } catch (e) {}
 }
 // the Companion that opens an invitation: the one beside this Atlas on the Hexmarch site, else the live one
-const COMPANION = /\/atlas\/(index\.html)?$/.test(location.pathname) ? new URL('../', location.href).href : 'https://ialdabaoth.github.io/Hexmarch/';
+const APPS = /\/atlas\/(index\.html)?$/.test(location.pathname) ? new URL('../', location.href).href : 'https://ialdabaoth.github.io/Hexmarch/';
+const COMPANION = APPS + 'companion/';  // the apps sit side by side: <site>/companion/, atlas/, scribe/; the Launcher is <site>/
 // the handoff to the referee's Companion for one invitation (Companion 0.6.X): a hexmarch-mail/1 'campaign' envelope carrying Scribe's record,
 // the state with its parties, and {invite: {party}}, in the Companion's #m= link (engine/mail.ts messageLink). The Companion adopts the
 // campaign, makes the party active and opens Settings › Invite a player with it picked. Null when this device has no Scribe record.
@@ -616,7 +617,31 @@ async function unpublished() {
 }
 let UNPUB = false;
 async function checkPublished() { const u = await unpublished(); if (u !== UNPUB) { UNPUB = u; if (PBOX) partyBox(); } }
-async function publishLink(back) { return mailLink(COMPANION + 'scribe/', 'update', { state: CS, back }); }
+// Links for another app open there, never in this window (Heph 2026-11-10: the Companion opened as a page of the Atlas;
+// engine/handoff.ts, the same steps): an open window of that app on this device takes it (BroadcastChannel), or a new window
+// opens; when the browser blocks it, the link waits in the party box as a button. A standalone Atlas takes links for /atlas/.
+const HANDOFF = 'hexmarch-handoff';
+let HANDOFF_LINK = null;  // {url, app, taken}
+function appOf(url) { try { const u = new URL(url), s = new URL(APPS); if (u.origin !== s.origin || !u.pathname.startsWith(s.pathname)) return null; const f = u.pathname.slice(s.pathname.length).split('/')[0]; return f ? s.pathname + f + '/' : null; } catch (e) { return null; } }
+async function handOff(url, app) {
+  let taken = false;
+  if (window.BroadcastChannel && appOf(url)) {
+    const ch = new BroadcastChannel(HANDOFF), id = Math.random().toString(36).slice(2);
+    taken = await new Promise(ok => { const t = setTimeout(() => ok(false), 400); ch.onmessage = e => { if (e.data && e.data.type === 'taken' && e.data.id === id) { clearTimeout(t); ok(true); } }; ch.postMessage({ type: 'offer', id, url }); });
+    ch.close();
+  }
+  const w = taken ? null : window.open(url, '_blank');
+  if (w) { try { w.opener = null; } catch (e) {} HANDOFF_LINK = null; } else HANDOFF_LINK = { url, app, taken };
+  PBOX = true; partyBox();
+}
+function handoffLine() { const h = HANDOFF_LINK; return h ? `<br><small>${h.taken ? `Sent to ${esc(h.app)}, open in another window.` : ''}</small> <a href="${esc(h.url)}" target="_blank" rel="noopener" data-handoff>Open ${esc(h.app)}</a>` : ''; }
+if (window.BroadcastChannel && window.top === window && /\/atlas\/(index\.html)?$/.test(location.pathname)) {
+  const ch = new BroadcastChannel(HANDOFF), own = new URL('./', location.href).pathname; let busy = false;
+  ch.onmessage = e => { const d = e.data; if (busy || !d || d.type !== 'offer' || typeof d.url !== 'string' || appOf(d.url) !== own) return;
+    busy = true; ch.postMessage({ type: 'taken', id: d.id }); const same = u => u.origin + u.pathname + u.search, before = same(new URL(location.href));
+    location.assign(d.url); if (same(new URL(d.url, location.href)) === before) location.reload(); };
+}
+async function publishLink(back) { return mailLink(APPS + 'scribe/', 'update', { state: CS, back }); }
 // the Atlas again after publishing; with &invite=<party> it goes on to the Companion's invitation once Scribe says it published
 function backHere(invite) { const u = new URL(location.href); u.hash = ''; u.searchParams.delete('invite'); if (invite) u.searchParams.set('invite', invite); return u.href; }
 let PUBMSG = '';
@@ -628,11 +653,11 @@ async function readPublished() {  // Scribe's 'published' answer: {ok, revision,
   const inv = ASK.get('invite'); if (inv) history.replaceState(null, '', backHere(''));
   if (e.body.ok) {
     UNPUB = false; PUBMSG = `Published for players${e.body.revision ? ` (revision ${e.body.revision})` : ''}.`;
-    if (inv && CS && CS.parties.some(q => q.id === inv)) { const l = await inviteHandoff(inv); if (l) { location.href = l; return; } INVITE = inv; PID = inv; }
+    if (inv && CS && CS.parties.some(q => q.id === inv)) { const l = await inviteHandoff(inv); if (l) { await handOff(l, 'the Companion'); return; } INVITE = inv; PID = inv; }
   } else PUBMSG = e.body.firstPublish ? 'Publish the campaign once in Scribe first, then invite players.' : `Not published: ${e.body.error || 'Scribe could not publish.'}`;
   PBOX = true; partyBox();
 }
-function pubLine() { const m = PUBMSG; return m ? `<br><small>${esc(m)}</small>` : ''; }
+function pubLine() { const m = PUBMSG; return (m ? `<br><small>${esc(m)}</small>` : '') + handoffLine(); }
 function publishLine() { return pubLine() + (UNPUB ? '<br><small>Players don’t have these parties yet.</small> <button data-p="publish" title="Scribe publishes the campaign, then brings you back here">Publish for players</button>' : ''); }
 function inviteFor(party) { const q = new URLSearchParams({ campaign: CLINK, as: 'player', party }); return `${COMPANION}?${q}`; }  // the Companion's inviteLink
 function lockMods(lock) { if (lock && Array.isArray(lock.modules)) CMODS = new Set(lock.modules.map(m => m && m.id).filter(x => typeof x === 'string')); }
@@ -946,13 +971,13 @@ function loadFile() {
     } catch (e) { alert(e.message || 'That file could not be read.'); } };
   inp.click();
 }
-document.getElementById('party').addEventListener('click', e => { const b = e.target.closest('button[data-p]'); if (!b) return; const a = b.dataset.p;
+document.getElementById('party').addEventListener('click', e => { if (e.target.closest('a[data-handoff]')) { HANDOFF_LINK = null; setTimeout(partyBox); return; } const b = e.target.closest('button[data-p]'); if (!b) return; const a = b.dataset.p;
   if (a === 'new' && !LOCK) NEWP = true; else if (a === 'cancelnew') NEWP = false; else if (a === 'create') { createParty(document.getElementById('party')); return; }
   else if (a === 'place' && !LOCK && AP()) { PLACE = true; hoverHint(); } else if (a === 'cancel') { PLACE = false; hoverHint(); } else if (a === 'close') { PBOX = false; NEWP = false; PUBMSG = ''; }
   else if (a === 'go') location.hash = addr(...PARTY.hex); else if (a === 'reset') setParty(PARTY.hex, 0); else if (a === 'remove') setParty(null);
   else if (a === 'invite' && !LOCK && AP()) { if (HOSTINV && parent !== window) { parent.postMessage({ type: 'hexmarch-atlas', event: 'invite', module: MOD.id, party: PID }, '*'); return; }
-    const w = window.open('', '_blank'); inviteHandoff(PID).then(async l => { if (l && w) { w.location.href = UNPUB ? await publishLink(backHere(PID)) : l; return; } if (w) w.close(); INVITE = PID; partyBox(); }); return; }
-  else if (a === 'publish') { publishLink(backHere('')).then(l => { location.href = l; }); return; }
+    inviteHandoff(PID).then(async l => { if (l) { if (UNPUB) await handOff(await publishLink(backHere(PID)), 'Scribe'); else await handOff(l, 'the Companion'); return; } INVITE = PID; partyBox(); }); return; }
+  else if (a === 'publish') { publishLink(backHere('')).then(l => handOff(l, 'Scribe')); return; }
   else if (a === 'copyinv') { const i = document.querySelector('#party input[data-inv]'); if (i) { i.select(); try { navigator.clipboard.writeText(i.value); b.textContent = 'Copied'; } catch (x) { document.execCommand('copy'); } } return; }
   else if (a === 'save') { if (CS) saveFile(); return; } else if (a === 'load') { loadFile(); return; } else if (a === 'who') { loadWhoFile(); return; }
   partyBox(); });
