@@ -543,11 +543,19 @@ async function campaignIdOf(url) {
 async function deviceState() {
   const set = await idbGet('settings'), url = ASK_CAMPAIGN !== null ? ASK_CAMPAIGN : set && typeof set.campaign === 'string' ? set.campaign : '', id = await campaignIdOf(url);
   const raw = await idbGet('state:' + id);
-  if (raw) try {  // the campaign's lockfile: Scribe's record of it on the referee's device, else the snapshot a player's Companion last read
-    const sc = await idbGet('scribe-campaign:' + id), cs = await idbGet('campaigns'), snap = cs && cs[url] && cs[url].published && cs[url].published.snapshot;
-    lockMods((sc && sc.lock) || (snap && snap.lock));
-  } catch (e) {}
+  if (raw && !CMODS) await campaignLock(url, id);
   return raw ? csRead(raw) : null;
+}
+// the campaign's lockfile, for the party creator's starts. Apps talk by links and never rely on each other's storage (WORKFLOWS.md), so
+// besides the shortcuts on this device (Scribe's record, the Companion's copy) the Atlas reads the published campaign itself: the link
+// names the pointer, the pointer the snapshot, and the snapshot holds the lock. The app around the Atlas may also send {lock}.
+async function campaignLock(url, id) {
+  try { const sc = await idbGet('scribe-campaign:' + id), cs = await idbGet('campaigns'), c = cs && cs[url], snap = c && c.published && c.published.snapshot;
+    lockMods((sc && sc.lock) || (c && c.lock) || (snap && snap.lock)); } catch (e) {}
+  if (CMODS || !/^https:\/\//.test(url)) return;
+  try { const p = await (await fetch(url, { cache: 'no-cache' })).json();
+    if (p && p.format === 'hexmarch-campaign-pointer' && typeof p.read === 'string' && /^https:\/\//.test(p.read)) { const sn = await (await fetch(p.read, { cache: 'no-cache' })).json(); if (sn && sn.campaign === p.campaign) lockMods(sn.lock); }
+  } catch (e) {}
 }
 function lockMods(lock) { if (lock && Array.isArray(lock.modules)) CMODS = new Set(lock.modules.map(m => m && m.id).filter(x => typeof x === 'string')); }
 async function loadState() {
