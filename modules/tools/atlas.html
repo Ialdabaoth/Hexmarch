@@ -48,7 +48,7 @@ footer a{color:var(--red)}
 <div id="gridpanel" hidden><label><input type="checkbox" id="edges" checked> Hex edges</label>
 <label class="gr">Outline colour <input type="color" id="gridc" value="#ffffff"></label>
 <label class="gr">Opacity <input type="range" id="grida" min="10" max="100" value="80"></label></div></div>
-<button id="out" title="Zoom out">−</button><button id="in" title="Zoom in">+</button><button id="fit">Fit</button><button id="routebtn" title="Plot a route and estimate the travel time">Route</button><button id="partybtn" title="Show, place or move the party">Party</button><button id="keybtn">Key</button><button id="modbtn" title="Load a different module">Modules</button></div></header>
+<button id="out" title="Zoom out">−</button><button id="in" title="Zoom in">+</button><button id="fit">Fit</button><button id="routebtn" title="Plot a route and estimate the travel time">Route</button><button id="partybtn" title="Show, place or move the party">Party</button><button id="keybtn">Key</button><button id="modbtn" title="Load a different module">Modules</button><button id="hostcomp" title="Open this campaign in the Hexmarch Companion" hidden>Open in the Companion</button></div></header>
 <div id="main"><div id="map"><canvas id="cv"></canvas><div id="route" hidden aria-live="polite"></div><div id="party" hidden aria-live="polite"></div></div><aside id="key"></aside></div>
 <footer><span id="hover">Click a hex to zoom in.</span><span><span id="support"></span>{{APP}} Atlas {{ATLAS}}<span id="modver"></span> · <a href="#" id="creditbtn">Credits</a></span></footer>
 <dialog id="modules"><h2>Load a module</h2><ul id="modlist"></ul><button id="modfile" title="A map file made by atlas_flat.py, such as a private module's. It stays in this browser and is never uploaded">Open a map file…</button> <button id="modclose">Close</button></dialog>
@@ -888,9 +888,12 @@ addEventListener('message', e => { const d = e.data; if (e.source !== parent || 
   if ('characters' in d) { WHO = whoFile(Array.isArray(d.characters) ? d.characters : []); WHO_SRC = 'host'; know(); }
   if (d.lock === true) LOCK = true;
   if (typeof d.as === 'string') setAs(d.as, true);
-  if (d.lock && typeof d.lock === 'object') lockMods(d.lock);  // the campaign's lockfile ({lock}), for the party creator's starts
+  if (d.lock && typeof d.lock === 'object') lockMods(d.lock);
+  // actions the host offers and carries out itself ({hostActions: ['companion']}, Heph 2026-11-10: Scribe answers with the campaign's link); referee view only
+  if (Array.isArray(d.hostActions)) document.getElementById('hostcomp').hidden = LOCK || !d.hostActions.includes('companion');  // the campaign's lockfile ({lock}), for the party creator's starts
   if ('state' in d) { try { CS = csRead(d.state); CS_SRC = 'host'; fromState(); } catch (x) {} }
 });
+document.getElementById('hostcomp').onclick = () => { if (parent !== window) parent.postMessage({ type: 'hexmarch-atlas', event: 'companion', module: MOD ? MOD.id : '', party: PID || null }, '*'); };
 function drawParty() {  // a red pennant planted on the party's hex centre, over everything; the hex itself shaded once it is big enough to see
   for (const o of OTHERS) {  // the referee's view: every other party, a smaller slate pennant with its name
     const [ox, oy] = S(...ft(...o.hex)); if (ox < -80 || oy < -60 || ox > W + 80 || oy > H + 60) continue; const g = 22;
