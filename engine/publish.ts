@@ -79,8 +79,8 @@ export function pointer(campaign: string, title: string, s: Services, now = new 
   };
 }
 
-// The state file as players may see it. Everything in it is shared today (clock, party, revealed = common knowledge,
-// session, characters); a `private` part and any referee audiences are dropped, so later additions stay off the snapshot.
+// The state file as players may see it. Everything in it is shared today (parties with their clocks and places, revealed = common knowledge,
+// characters); a `private` part and any referee audiences are dropped, so later additions stay off the snapshot.
 export function publicState(state: Record<string, unknown>): Record<string, unknown> {
   const { private: _p, referee: _r, ...rest } = state as Record<string, unknown> & { private?: unknown; referee?: unknown };
   const revealed = rest.revealed as Record<string, unknown> | undefined;

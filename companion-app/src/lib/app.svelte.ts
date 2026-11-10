@@ -7,7 +7,8 @@ import {
   unreadableSheets, loadStateFile, saveStateFile, type PartyAt, type Settings
 } from './storage';
 import {
-  StateError, blankState, closeSession, moveParty, openSession, passTime, readState, setStart, withCharacters, withPlayer, withRules, writeState, type CampaignState, type StateRules
+  StateError, addParty, blankState, closeSession, inParty, moveParty, openSession, partyOf, passTime, readParty, readState, setActive, setStart, withCharacters, withPlayer, withRules, writeState,
+  type CampaignState, type StateParty, type StateRules
 } from './state';
 import { loadRepo, type SavedModule } from './modules';
 import {
@@ -51,10 +52,23 @@ class AppState {
   characters: Character[] = $derived(this.sheets.map((s) => new Character(s, this.live[s.id] ?? freshState())));
   // Where this device sits in each campaign it knows: one seat per invitation (lib/invitations.ts).
   invitations = $state<Invitation[]>([]);
-  // The characters on the home screen. Referee mode: everyone but the referee's full-sheet NPCs. Player mode:
-  // your own character only (its followers are on its card).
-  party: Character[] = $derived(
+  // The active campaign's state file: parties (each with its clock, session and place), common knowledge,
+  // who is in which party (lib/state.ts).
+  state = $state<CampaignState>(blankState(''));
+  // Everyone playing in the campaign on this device. Referee mode: everyone but the referee's full-sheet NPCs.
+  // Player mode: your own character only (its followers are on its card).
+  roster: Character[] = $derived(
     this.mode === 'player' ? this.characters.filter((c) => c.id === this.invitation?.character) : this.characters.filter((c) => c.data.owner !== 'referee')
+  );
+  // The characters on the home screen: the roster in the party in use (Heph 2026-11-10: a campaign has parties).
+  // A character the state file doesn't place in a party yet shows in every party until it joins one.
+  party: Character[] = $derived(
+    this.mode === 'player' || !this.state.parties.length
+      ? this.roster
+      : this.roster.filter((c) => {
+          const e = this.state.characters.find((x) => x.id === c.id);
+          return !e || e.party === null || e.party === this.partyId;
+        })
   );
   log = $state<LogEntry[]>([]);
   // Requests sent and received on this device, every campaign (lib/mail.ts).
@@ -77,8 +91,6 @@ class AppState {
   modules = $state<SavedModule[]>([]);
   // Saved characters the app can't read (kept, not shown).
   unreadable = $state(0);
-  // The active campaign's state file: party, clock, reveals, session, characters (lib/state.ts).
-  state = $state<CampaignState>(blankState(''));
   private toastTimer: ReturnType<typeof setTimeout> | undefined;
 
   get campaign(): CampaignCache | null {
@@ -101,6 +113,18 @@ class AppState {
     const inv = this.invitation, c = this.campaign;
     if (!inv || !c) return c ? c.campaign.name : 'My Characters';
     return invitationLabel(inv, c.campaign.name, inv.character ? this.character(inv.character)?.name : undefined);
+  }
+
+  // The party in use: the one the referee last picked (state.active), or in player mode the one this seat's
+  // character is in (the invitation's party until the referee's state file says otherwise).
+  get partyId(): string {
+    if (this.mode !== 'player') return this.state.active;
+    const id = this.invitation?.character;
+    return (id && this.state.characters.find((x) => x.id === id)?.party) || this.invitation?.party || '';
+  }
+
+  get currentParty(): StateParty | null {
+    return partyOf(this.state, this.partyId);
   }
 
   // Player mode: the character this seat plays, once picked.
@@ -270,30 +294,55 @@ class AppState {
     await saveStateFile(next.campaign, writeState(next)).catch((e) => console.warn('Could not save the campaign state', e));
   }
 
-  async setParty(party: PartyAt | null) {
-    await this.saveState(moveParty($state.snapshot(this.state) as CampaignState, party));
+  private get snap(): CampaignState {
+    return $state.snapshot(this.state) as CampaignState;
+  }
+
+  // A party move from the Atlas (its party id), or the party in use.
+  async setParty(at: PartyAt | null, id = this.partyId) {
+    await this.saveState(moveParty(this.snap, id, at));
   }
 
   async passTime(hours: number) {
-    await this.saveState(passTime($state.snapshot(this.state) as CampaignState, hours));
+    await this.saveState(passTime(this.snap, this.partyId, hours));
   }
 
   async setStartDate(start: string) {
-    await this.saveState(setStart($state.snapshot(this.state) as CampaignState, start));
+    await this.saveState(setStart(this.snap, this.partyId, start));
   }
 
   async openSession() {
-    await this.saveState(openSession($state.snapshot(this.state) as CampaignState));
+    await this.saveState(openSession(this.snap, this.partyId));
   }
 
   async closeSession() {
-    await this.saveState(closeSession($state.snapshot(this.state) as CampaignState));
+    await this.saveState(closeSession(this.snap, this.partyId));
   }
 
-  // The state file as it would be shared: the party list brought up to date first.
+  // Referee mode: the party made in the Atlas's party creator; it becomes the one in use.
+  async newParty(p: unknown) {
+    const party = readParty(p);
+    if (!party || this.mode !== 'referee') return;
+    await this.saveState(addParty(this.snap, party));
+    this.notify(`Made the party ${party.name}`);
+  }
+
+  // Referee mode: the party switcher (Home, Campaign › State, or the Atlas).
+  async chooseParty(id: string) {
+    if (this.mode === 'referee') await this.saveState(setActive(this.snap, id));
+  }
+
+  // Referee mode: moves a character to another party (null: none).
+  async moveToParty(character: string, party: string | null) {
+    if (this.mode !== 'referee') return;
+    await this.exportState();
+    await this.saveState(inParty(this.snap, character, party));
+  }
+
+  // The state file as it would be shared: the character list brought up to date first.
   async exportState(): Promise<CampaignState> {
-    const s = withRules($state.snapshot(this.state) as CampaignState, this.stateRules());
-    await this.saveState(withCharacters(s, this.party.map((c) => ({ id: c.id, name: c.name }))));
+    const s = withRules(this.snap, this.stateRules());
+    await this.saveState(withCharacters(s, this.roster.map((c) => ({ id: c.id, name: c.name }))));
     return writeState($state.snapshot(this.state) as CampaignState);
   }
 
@@ -340,11 +389,11 @@ class AppState {
 
   // Opens a campaign by an invitation (its link, as referee unless it says player) and takes that seat. Throws
   // with a message for the player.
-  async useCampaign(url: string, role: Invite['role'] = 'referee', character?: string) {
+  async useCampaign(url: string, role: Invite['role'] = 'referee', character?: string, party?: string) {
     let c = await openCampaignLink(url.trim());
     // the referee opening their own published campaign by its pointer: run it from Scribe's copy on this device
     if (role === 'referee' && !isScribeLink(c.url) && (await idbGet(`scribe-campaign:${c.campaign.id}`))) c = await openCampaignLink(`scribe:${c.campaign.id}`);
-    const seat = await this.takeInvitation({ url: c.url, role, ...(character ? { character } : {}) });
+    const seat = await this.takeInvitation({ url: c.url, role, ...(character ? { character } : {}), ...(role === 'player' && party ? { party } : {}) });
     await this.adoptCampaign(c, seat.id);
     if (seat.role === 'player' && seat.character) await this.claim(seat.character);
     this.notify(`${role === 'player' ? 'Playing in' : 'Running'} ${c.campaign.name}`);
@@ -425,7 +474,8 @@ class AppState {
 
   // Referee mode: every character in the party has met (or heard of) a creature, as a knowledge entry on each sheet.
   async partyKnows(creature: string, name: string, rumour: boolean) {
-    const entry = { creature, name, ...(this.state.session.number ? { session: this.state.session.number } : {}), ...(rumour ? { rumour: true } : {}) };
+    const session = this.currentParty?.session.number ?? 0;
+    const entry = { creature, name, ...(session ? { session } : {}), ...(rumour ? { rumour: true } : {}) };
     await this.addKnowledge(this.party.map((c) => c.id), [entry], []);
     this.notify(`${rumour ? 'The party has heard of' : 'The party has met'} ${name}`);
   }
@@ -457,7 +507,7 @@ class AppState {
   async sendJoin(name: string): Promise<'posted' | 'saved'> {
     const me = this.me, c = this.campaign;
     if (!me || !c || this.mode !== 'player') throw new Error('Pick the character you play first');
-    const e = joinRequest(c.campaign.id, me, exportSheet($state.snapshot(me.data) as typeof me.data), name.trim());
+    const e = joinRequest(c.campaign.id, me, exportSheet($state.snapshot(me.data) as typeof me.data), name.trim(), this.invitation?.party);
     let how: 'posted' | 'saved' = 'saved';
     if (c.published?.post) {
       try {
@@ -501,7 +551,13 @@ class AppState {
     await this.persist();
     await this.exportState();
     const who = m.envelope.from.name;
-    for (const x of imported) if (who) await this.saveState(withPlayer($state.snapshot(this.state) as CampaignState, x.id, who));
+    // the party the invitation was to, else the one in use
+    const asked = m.envelope.body.party;
+    const party = typeof asked === 'string' && partyOf(this.state, asked) ? asked : this.state.active || null;
+    for (const x of imported) {
+      if (who) await this.saveState(withPlayer(this.snap, x.id, who));
+      await this.saveState(inParty(this.snap, x.id, party));
+    }
     await this.keepMail(answer(this.mail, id, { kind: 'approved', at: new Date().toISOString() }));
     this.notify(`${imported.map((x) => x.name).join(', ') || 'The character'} joined the party. Update campaign to tell the player.`);
   }
@@ -665,7 +721,7 @@ class AppState {
     try {
       const here = this.invitation;
       const same = here && here.url === invite.url && here.role === invite.role && (invite.role === 'referee' || !invite.character || here.character === invite.character);
-      if (!same || !this.campaign) await this.useCampaign(invite.url, invite.role, invite.character);
+      if (!same || !this.campaign) await this.useCampaign(invite.url, invite.role, invite.character, invite.party);
       inviteDone();
     } catch (e) {
       if (e instanceof NewerAppError && (await updateForInvite())) {

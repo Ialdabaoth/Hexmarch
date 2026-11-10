@@ -17,7 +17,7 @@
   let problem = $state('');
 
   const keyOf = (m: SavedModule) => `${m.base}${m.id}`;
-  let at = $derived(app.state.party);
+  let at = $derived(app.currentParty?.at ?? null);
   // until one is picked: the module the party is in, else the first with an Atlas map
   let current = $derived(
     app.modules.find((m) => keyOf(m) === chosen) ??
@@ -36,12 +36,8 @@
 
   const post = (msg: object) => frame?.contentWindow?.postMessage({ type: 'hexmarch-atlas', ...msg }, '*');
 
-  function sendParty() {
-    if (here && at) post({ party: { hex: at.hex, hours: at.hours ?? 0 } });
-  }
-
-  // The whole state file (Atlas 0.5.11): the Atlas shows the clock, the session and what the party has found,
-  // and gets it again after every change. An older Atlas ignores it and goes by the party message.
+  // The whole state file (Atlas 0.5.11): every party with its clock, session and place, and `active`; the Atlas
+  // gets it again after every change.
   function sendState() {
     post({ state: writeState($state.snapshot(app.state) as CampaignState) });
   }
@@ -76,7 +72,6 @@
     greeted = false;
     sendCharacters();
     sendState();
-    sendParty();
   }
 
   async function onMessage(e: MessageEvent) {
@@ -93,15 +88,19 @@
         greeted = true;
         sendCharacters();
         sendState();
-        sendParty();
       }
     }
     else if (player) {
-      // the party is the referee's to move
+      // parties are the referee's to make, pick and move
+    } else if (d.event === 'party-new') {
+      await app.newParty(d.party);
+    } else if (d.event === 'active') {
+      await app.chooseParty(d.party);
     } else if (d.hex === null) {
-      if (here) await app.setParty(null);
+      const p = app.state.parties.find((x) => x.id === d.party);
+      if (p?.at && p.at.base === current.base && p.at.module === current.id) await app.setParty(null, d.party);
     } else {
-      await app.setParty({ base: current.base, module: current.id, map: 'atlas', hex: d.hex, label: d.hex.slice(6), hours: d.hours });
+      await app.setParty({ base: current.base, module: current.id, map: 'atlas', hex: d.hex, label: d.hex.slice(6), hours: d.hours }, d.party);
     }
   }
 
