@@ -126,7 +126,7 @@
   </select>
   {#if app.campaign}
     <p class="small muted">
-      {app.mode === 'player' ? 'Player mode: your character, your party and what your character knows.' : 'Referee mode: everything in the campaign.'}
+      {app.mode === 'player' ? 'Player mode: your character, your party and what your character knows.' : app.asCharacter ? `Referee, as ${app.me?.name ?? 'a character'}: what they know and carry, as their player would see it.` : 'Referee mode: everything in the campaign.'}
       Run by {app.campaign.campaign.referee || 'your referee'}. Checked {new Date(app.campaign.fetchedAt).toLocaleDateString()}.
       <button class="link" disabled={busy} onclick={refresh}>Check for changes</button>
       {#if app.invitation}<button class="link" disabled={busy} onclick={() => app.invitation && run(() => app.forgetInvitation(app.invitation!.id))}>Remove from this device</button>{/if}

@@ -20,7 +20,8 @@
   }
 
   // Player mode: your party as the referee's state file lists it, and the NPCs your character has heard of or met.
-  let player = $derived(app.mode === 'player');
+  // a player's view: player mode, or the referee as one character
+  let player = $derived(app.seesAs);
   let me = $derived(app.me);
   let partyNames = $derived(app.state.characters.filter((c) => c.id !== me?.id));
   let known = $derived(me ? knownCreatures(me.data.knowledge) : []);

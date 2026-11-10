@@ -42,7 +42,7 @@
   // A player's Atlas doesn't: there `lock: true` locks the view to the character, and players make no parties.
   async function sendState() {
     post({ state: writeState($state.snapshot(app.state) as CampaignState) });
-    if (app.mode === 'player') return;
+    if (app.seesAs) return;
     const lock = await app.campaignLock();
     if (lock && typeof lock === 'object') post({ lock: $state.snapshot(lock) });
     post({ hostActions: ['invite'] }); // the party builder's Invite a player comes here instead of opening another tab
@@ -56,12 +56,13 @@
   // An older Atlas ignores it.
   // Player mode (Heph 2026-11-09): the Atlas gets only the player's own character and is locked to it, so the map
   // shows what that character knows and nothing else; the referee's view, the fog brush and party moves are gone.
-  let player = $derived(app.mode === 'player');
-  let mine = $derived(player ? app.sheets.filter((s) => s.id === app.invitation?.character) : app.sheets);
+  // a player's view (player mode, or the referee as one character): that character's map only
+  let player = $derived(app.seesAs);
+  let mine = $derived(player ? app.sheets.filter((s) => s.id === app.viewer) : app.sheets);
   function sendCharacters() {
     post({
       characters: mine.map((s) => ({ id: s.id, name: s.name, owner: s.owner, knowledge: $state.snapshot(s.knowledge) })),
-      ...(player ? { as: app.invitation?.character ?? '', lock: true } : {})
+      ...(player ? { as: app.viewer, lock: true } : {})
     });
   }
   $effect(() => {
@@ -70,7 +71,7 @@
     untrack(() => frame && sendCharacters());
   });
   // A player's full-screen map stays locked to their character.
-  let lockQuery = $derived(player ? `${atlas.includes('?') ? '&' : '?'}as=${encodeURIComponent(app.invitation?.character ?? '')}&lock=1` : '');
+  let lockQuery = $derived(player ? `${atlas.includes('?') ? '&' : '?'}as=${encodeURIComponent(app.viewer)}&lock=1` : '');
 
   // The Atlas may still be loading its map when the frame loads, so everything is sent again when it first reports its view.
   let greeted = false;
@@ -85,7 +86,7 @@
     const d = e.data;
     if (d.module !== current.id) return;
     if (d.event === 'knowledge') {
-      await app.addKnowledge(player ? d.ids.filter((id) => id === app.invitation?.character) : d.ids, d.add, d.remove);
+      await app.addKnowledge(player ? d.ids.filter((id) => id === app.viewer) : d.ids, d.add, d.remove);
       return;
     }
     if (d.event === 'view') {

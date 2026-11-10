@@ -39,6 +39,9 @@
 </script>
 
 <main class:printable={app.view.name === 'render'}>
+  {#if app.loaded && app.mode === 'referee' && app.asCharacter}
+    <p class="as-bar no-print small">Referee, as <strong>{app.me?.name ?? 'a character'}</strong> · <button class="link" onclick={() => app.viewAs('')}>All parties</button></p>
+  {/if}
   {#if !app.loaded}
     <p class="muted">Loading…</p>
   {:else if app.view.name === 'list'}
@@ -155,4 +158,6 @@
   .toast.handoff { bottom: calc(120px + env(safe-area-inset-bottom)); border-radius: 12px; display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap; }
   .handoff a { display: inline-block; padding: 0.35rem 0.8rem; border-radius: 6px; background: var(--accent); color: var(--accent-ink); text-decoration: none; }
   .handoff button { color: inherit; }
+  .as-bar { margin: 0 0 0.6rem; padding: 0.35rem 0.6rem; border: 1px dashed var(--accent); border-radius: 8px; }
+  .as-bar .link { background: none; border: 0; padding: 0; min-height: 0; color: var(--accent); text-decoration: underline; font: inherit; }
 </style>
