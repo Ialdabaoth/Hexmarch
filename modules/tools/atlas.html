@@ -495,7 +495,7 @@ function drawRoute() {
 // Moving it along a route adds the travel time, which also passes on the campaign clock.
 let PARTY = null, PLACE = false, PBOX = false;  // PARTY: {hex: [C, R], hours}; PLACE: the next click puts the party there; PBOX: its box is open
 let CS = null, CS_SRC = '';  // the state file and where it came from: 'host', 'device' or 'local'
-let PID = '', NEWP = false, OTHERS = [];  // PID: the party shown; NEWP: the party creator is open; OTHERS: the other parties' markers on this map (referee view)
+let PID = '', NEWP = false, OTHERS = [], CMODS = null;  // CMODS: the campaign's modules (its lockfile), whose starts the party creator offers  // PID: the party shown; NEWP: the party creator is open; OTHERS: the other parties' markers on this map (referee view)
 const ASK_PARTY = new URLSearchParams(location.search).get('party');
 const csDate = v => typeof v === 'string' && /^\d{1,5}-\d{2}-\d{2}$/.test(v);
 const CS_KEY = 'hexmarch-atlas-state', CS_ADDR = /^world:(?:([0-9A-HJ-NPR-Z][0-9]){2}:([0-9A-HJ-NPR-Z][0-9]){2}|-?\d{1,6}\.-?\d{1,6}:-?\d{1,7}\.-?\d{1,7})$/;  // or a fantasy world's numbers (0.5.14)
@@ -541,9 +541,15 @@ async function campaignIdOf(url) {
   const m = url.match(/^scribe:([a-z0-9-]{1,80})$/); return m ? m[1] : url;  // a campaign saved by Scribe that the Companion hasn't opened yet
 }
 async function deviceState() {
-  const set = await idbGet('settings'), url = ASK_CAMPAIGN !== null ? ASK_CAMPAIGN : set && typeof set.campaign === 'string' ? set.campaign : '';
-  const raw = await idbGet('state:' + await campaignIdOf(url)); return raw ? csRead(raw) : null;
+  const set = await idbGet('settings'), url = ASK_CAMPAIGN !== null ? ASK_CAMPAIGN : set && typeof set.campaign === 'string' ? set.campaign : '', id = await campaignIdOf(url);
+  const raw = await idbGet('state:' + id);
+  if (raw) try {  // the campaign's lockfile: Scribe's record of it on the referee's device, else the snapshot a player's Companion last read
+    const sc = await idbGet('scribe-campaign:' + id), cs = await idbGet('campaigns'), snap = cs && cs[url] && cs[url].published && cs[url].published.snapshot;
+    lockMods((sc && sc.lock) || (snap && snap.lock));
+  } catch (e) {}
+  return raw ? csRead(raw) : null;
 }
+function lockMods(lock) { if (lock && Array.isArray(lock.modules)) CMODS = new Set(lock.modules.map(m => m && m.id).filter(x => typeof x === 'string')); }
 async function loadState() {
   if (CS_SRC === 'host') return;
   try { const s = await deviceState(); if (s) { CS = s; CS_SRC = 'device'; } } catch (e) {}
@@ -786,10 +792,12 @@ function startHere() {
   if (parent !== window) parent.postMessage({ type: 'hexmarch-atlas', event: 'party', module: MOD.id, party: PID, hex, hours: 0 }, '*');
 }
 // the party creator (Heph 2026-11-10: "the Party creator belongs in the Referee mode of the Atlas"): a name, one of the campaign's starts
-// (every start of the modules this site lists) or "Place the party yourself", and the party's own clock, which a start sets
+// (every start of the campaign's modules, from its lockfile; every module this site lists when no campaign is loaded) or "Place the party
+// yourself", and the party's own clock, which a start sets
 function newPartyForm() {
-  const opts = MODS.flatMap(m => (m.starts || []).filter(t => t && t.id).map(t => `<option value="${esc(m.id + '|' + t.id)}">${esc((t.title || t.id) + ' · ' + m.title)}</option>`)).join('');
-  const t0 = MODS.flatMap(m => m.starts || [])[0] || {};
+  const ms = CMODS ? MODS.filter(m => CMODS.has(m.id)) : MODS;  // the campaign's modules; with no campaign loaded, every module the site lists
+  const opts = ms.flatMap(m => (m.starts || []).filter(t => t && t.id).map(t => `<option value="${esc(m.id + '|' + t.id)}">${esc((t.title || t.id) + ' · ' + m.title)}</option>`)).join('');
+  const t0 = ms.flatMap(m => m.starts || [])[0] || {};
   return `<b>New party</b><br><label><small>Name</small> <input data-np="name" size="18" placeholder="The party"></label><br>`
     + `<label><small>Start</small> <select data-np="start">${opts}<option value="">Place the party yourself</option></select></label><br>`
     + `<label><small>Date</small> <input data-np="date" size="10" value="${esc(csDate(t0.date) ? t0.date : '3507-05-01')}"></label> <label><small>Hour</small> <input data-np="hour" type="number" min="0" max="23" style="width:3.5em" value="${typeof t0.hour === 'number' ? t0.hour : 8}"></label><br>`
@@ -872,6 +880,7 @@ addEventListener('message', e => { const d = e.data; if (e.source !== parent || 
   if ('characters' in d) { WHO = whoFile(Array.isArray(d.characters) ? d.characters : []); WHO_SRC = 'host'; know(); }
   if (d.lock === true) LOCK = true;
   if (typeof d.as === 'string') setAs(d.as, true);
+  if (d.lock && typeof d.lock === 'object') lockMods(d.lock);  // the campaign's lockfile ({lock}), for the party creator's starts
   if ('state' in d) { try { CS = csRead(d.state); CS_SRC = 'host'; fromState(); } catch (x) {} }
 });
 function drawParty() {  // a red pennant planted on the party's hex centre, over everything; the hex itself shaded once it is big enough to see
