@@ -1,87 +1,72 @@
-# Contributing to E9 and Materia Mundi
+# Contributor Guidelines
 
-E9 is an old-school (B/X-family) fantasy RPG system, and Materia Mundi is its flagship setting. The project ships three things together: books, apps (Hexmarch Companion, Hexmarch Atlas and Hexmarch Scribe, which run any OSR hexcrawl core rules) and modules (adventures and hexcrawls that run in the apps). Heph (GitHub `Ialdabaoth`) owns the game, writes the books and has the final say on canon and prose.
+> The primary goal of a VTT is to retain customers. The secondary goal of a VTT is to help you play your game. Hexmarch is FOSS from top to bottom, in order to eliminate the primary goal and force us to focus on the secondary. It's *YOUR* game.
+
+Hexmarch is three apps for OSR hexcrawl games under any core rules: the **Companion** (`companion-app/`), the **Atlas** and map tools (`modules/tools/`) and **Scribe** (`scribe/`), plus the **Launcher** (`launcher/`), the shared editing engine (`engine/`), the example root rules module (`modules/e9-core/`) and the VTT bridges (`vtt/`). Setting data, adventure modules and format specs live in the data repo, [Ialdabaoth/MateriaMundiRPG](https://github.com/Ialdabaoth/MateriaMundiRPG) (named in `site.json`). Heph (GitHub `Ialdabaoth`) owns the project and has the final say.
+
+These guidelines are written for people and for their AI assistants alike. If you work with Claude or another agent, point it at this file and at [AGENTS.md](AGENTS.md).
+
+## Getting started
+
+1. **Fork** this repo (preferred). Collaborator access is possible on request, but a fork is all you need.
+2. In your fork, set **Settings → Pages → Source** to **GitHub Actions**, then run the **Site (Hexmarch apps)** workflow. Your copy deploys to `https://<you>.github.io/<repo>/`. Every app uses relative paths, so `_site/` works at any address.
+3. Build locally with the commands in [README.md](README.md#build). `scripts/data.sh` clones the data repo for the parts the build needs.
+4. Open PRs from a branch of your fork against `main` here.
 
 ## How work is organised
 
-Every piece of work has one home thread, named by what it is and which version it is in:
+**One contributor, one lane.** Each contributor takes one app (Companion, Atlas, Scribe, Launcher, engine, VTT bridges, icons) or one module, and keeps to it. That keeps PRs from colliding and matches what CI enforces (below).
 
-| Kind | Home | Example |
-| --- | --- | --- |
-| A new idea | a Brainstorm | "Brainstorm hex tile style" |
-| An agreed strategy | a Develop | "Develop artist onboarding" |
-| An app | one home per app, per minor version | "Atlas 0.5.X Development" |
-| A module | one home per module, per minor version | "Module: Hansa 0.2.X Development" |
+**Changes that touch more than one app** go through Heph's cross-app planning ("Plan the Hexmarch MVP across all apps"). Don't open a cross-app PR yourself: open an issue describing it, or push your branch and ask Heph to fold it into the combined PR.
 
-- An idea starts as a Brainstorm. When it turns into work, it moves to a Develop thread or to the app or module it touches, and the Brainstorm closes. It can be reopened for big-picture thinking.
-- Each app and each module has exactly one open home at a time. When the version goes from 0.N.X to 0.N+1.0, the old home closes and a new one opens.
-- Changes go to the home of the app or module they touch, even when the idea started elsewhere. Leave a link back to where it came from.
-- Work that cuts across several apps or modules goes back to a Brainstorm first.
+## Design decisions to know
 
-## Apps and modules
+These are settled. A change that works against one of them needs Heph's OK first (open an issue).
 
-- **Hexmarch Companion** (`companion-app/`): the player and referee PWA. Changelog: `companion-app/CHANGELOG.md`, new entries in `companion-app/changes/`.
-- **Hexmarch Atlas** (`modules/tools/`): the map builder and viewer, live at https://ialdabaoth.github.io/MateriaMundiRPG/atlas/. Changelog: `modules/tools/CHANGELOG.md`, new entries in `modules/tools/changes/`.
-- **Hexmarch Scribe** (`scribe/`): the module and campaign editor, published at `/scribe/`.
-- **Modules** (`modules/<id>/`): Beyond the Pale: The Isle of Mists, 1422 (`isle-of-mists`), Hansa (`hansa`), and the E9, MM and MM-for-E9 core modules.
+- **Apps talk by links.** A message from one app to another is a link with the data after `#` (for example `/scribe/#m=<data>`), so it never reaches a server. It carries changes only and a message id, so opening it twice is safe. Messages over 4096 bytes go in an envelope that points to a public URL. A running number per campaign lets an app spot a gap and reload the snapshot.
+- **Storage is only a cache.** What the browser keeps can be wiped at any time. The campaign's published files are the truth; the apps sharing one browser profile is a shortcut, never a requirement.
+- **Scribe is the only publisher.** The GitHub key never leaves Scribe. Atlas and the Companion send Scribe an update link; Scribe publishes and returns the user. The first publish is always a deliberate button.
+- **Parties.** A campaign has no single start: it has the set of start locations from its modules. The referee creates **parties** in the Atlas (name plus one start, or "place the party yourself"). Each party has its own clock and session numbering, every character belongs to a party, and an invitation names a party. The Atlas builds parties and hands each "Invite a player" to the Companion.
+- **Knowledge belongs to creatures.** What a player sees is "what does this character know?", stored with the creature as dated knowledge entries, not in the campaign state.
+- **Launcher and app scopes.** The site root is the Launcher (the apps, what this device holds, backup and reset). The apps sit beside it at `companion/`, `atlas/` and `scribe/`, each with its own manifest and install scope. A link for another app opens in that app, never inside the current one (`engine/handoff.ts`).
+- **UI rule.** Explanations go in tooltips that also work on tap. Status and errors stay visible on screen.
+- **Cost rule.** Only free or cheap services and tools. Players need nothing but URLs; any accounts are on the referee's side.
 
-The data formats are specified next to the code: `modules/MODULE_FORMAT.md`, `ATLAS_FORMAT.md`, `CREATURES_FORMAT.md`, `ENCOUNTER_FORMAT.md`, `EVENTS_FORMAT.md`, `WORKFLOWS.md`, `BUILDING_A_MODULE.md`, and `companion-app/*_FORMAT.md`. Ideas that aren't agreed yet go in `modules/PROPOSALS.md`, not in the specs.
+## Where we are
 
-Every project goes through five phases in order: product design, Companion integration, Atlas integration, print layout (Affinity Publisher), and release and marketing.
+The apps move together by minor version. Now: **0.6.X Integration**. Next: 0.7.X UX (privacy, encryption, seats), 0.8.X private alpha, 0.9.0 format lock, 0.9.X public beta, then 1.0.0.
 
-## Canon
+- **No migration shims before 0.8.X.** Until then only Heph and the developers use the apps, so formats can change without upgrade code.
+- **Honest table until 0.7.** Privacy work comes in 0.7; until then, assume nobody cheats.
 
-Rules and setting questions are settled by two sources:
+## Content rules
 
-1. The **E9 System Reference Handbook**.
-2. The **Materia Mundi Compendium**.
+The apps are rules-agnostic, but modules and examples carry Heph's setting.
 
-The MM Player's Handbook and the four MM Magic-User Handbooks are canon too, but they should hold nothing that isn't in the Compendium. If you find a difference, report it rather than picking a side.
-
-Everything else (the old Referee's Guide, playtest sheets, older drafts, work-in-progress modules, brainstorm notes) is not canon. Don't cite it. Nothing joins the canon list until Heph approves it.
-
-Link rules to the wiki (https://github.com/Ialdabaoth/MateriaMundiRPG/wiki) where you can, or cite the Compendium by page. The wiki is the source of truth; don't bulk-edit it.
-
-## Prose belongs to Heph
-
-Heph writes the published prose in his modules and books: room and scene descriptions, creature descriptions, boxed text, players' text and site notes.
-
-- Use his text **word for word**. Splitting a passage across rooms or fields is fine; rewording is not.
-- If a passage has to change (a rules name, a date, a canon fix), show the before and after and wait for his OK.
-- Where he hasn't written anything yet, leave the field empty or mark it `TODO (Heph)`. Don't fill it in.
-- **No LLM-generated descriptive prose** in his modules or books.
-
-Data is fine to write: stats, ids, relations, coordinates, rules mechanics, UI labels.
-
-## House style
-
+- **Never invent lore.** Convert text as written.
+- **Heph's prose is used word for word.** Splitting a passage across fields is fine; rewording is not. Where he hasn't written anything, leave the field empty or mark it `TODO (Heph)`. No AI-generated descriptive prose.
+- Data is fine to write: stats, ids, coordinates, rules mechanics, UI labels.
 - No TSR or other trademarked names in titles or copy.
-- Random tables use only d20 and d6.
-- Local creature names come first, with the MM rules name in brackets the first time per scene.
-- Dates use the MM calendar (MM year = AD + 2085).
+
+For canon, house style and module work, see the data repo's [CONTRIBUTING.md](https://github.com/Ialdabaoth/MateriaMundiRPG/blob/main/CONTRIBUTING.md).
 
 ## Licences and credit
 
-The suite and its modules are **CC BY 4.0** (see [LICENSE.md](LICENSE.md)): anyone may reuse them with credit. Anything AI-assisted that Bakagaijin Productions releases is always CC BY 4.0.
+Everything in this repo is **CC BY 4.0** unless marked otherwise (see [LICENSE.md](LICENSE.md)). Credit line: "E9 / Materia Mundi by Heph (Bakagaijin Productions), CC BY 4.0". Anything AI-assisted that goes into the suite is always CC BY 4.0, with you credited.
 
-- **Your own work** is yours to license, and the terms are agreed when you're invited. Anything that goes into the suite or into one of its modules is released under CC BY 4.0, with you credited.
-- **Purely human work** that the suite uses without changing it (for example an artist's finished piece shown as-is) can be agreed case by case.
-- **Third-party material** keeps its licence: E9 System Reference Handbook data (CC BY-SA 4.0), SRD 5.2 data (CC BY 4.0), C. Martins hex tiles in `modules/assets/tiles` (CC BY-SA 4.0; edits stay CC BY-SA and are credited "Art by C. Martins, edited by …"), and map data sources.
-- Only bring in material you made yourself or that has a licence that allows it. List every outside source under `credits` in the module's `module.json` (shown in the Atlas Credits dialog) with its licence.
+- Your contributions go in under CC BY 4.0. Other terms (for example an artist's finished piece used as-is) are agreed case by case with Heph.
+- Third-party parts keep their licences. Icons: the Atlas icon uses C. Martins' Hex Tiles: Fantasy (CC BY-SA 4.0); the Scribe icon uses Twemoji (CC BY 4.0). Details and credit wording are in [icons/README.md](icons/README.md); other credits are in `companion-app/LICENSE.md` and `modules/tools/LICENSE.md`.
+- Only bring in material you made yourself or that has a licence that allows it, and credit it.
 
 ## Pull requests
 
-- Work on a branch and open a PR against `main`. Heph reviews and approves; GitHub merges it (auto-merge, below).
-- **One open PR per app or module at a time.** Before opening one, look at the open PRs. If one already changes the same app, wait for it to merge, or open yours with `Merge after #N` in the description. A PR that needs another PR's work says `Merge after #N` too.
-- The **merge order** check enforces this: a PR stays yellow while a PR it names in `Merge after #N` is unmerged, or while an older open PR changes the same app (Companion, Atlas, Scribe, engine, e9-core, VTT bridges, icons). It turns green by itself when the predecessor merges. A PR that truly doesn't care can say `Merge order: any` on a line of its own.
-- One PR per change, in the home of the app or module it touches. **Don't edit a version number or a CHANGELOG.md**: add a change note (next section). CI fails a PR that numbers one by hand.
-- Refer to another change by its PR number (`needs #15`), not by a version you expect it to get: the number is only known when it merges.
-- Any edit to the map build tools (`modules/tools/build.py` and friends) redraws every map on the next build, so say so in the PR.
-- If your PR touches prose, include the before/after list.
-
-### Auto-merge
-
-When Heph approves a PR he clicks **Enable auto-merge** (or tells the thread to). GitHub then merges it as soon as the build and the merge order check are green, so PRs land one after another in the right order, with no batch to plan. Every merge restarts the site deploy and cancels the one in flight; the last one finishes with everything in it.
+- **One open PR per app.** Before opening one, look at the open PRs. If one already changes the same app, wait for it to merge, or open yours with `Merge after #N` in the description. A PR that needs another PR's work says `Merge after #N` too.
+- CI runs two checks: the **build**, and **merge order**. Merge order keeps a PR yellow while a PR it names in `Merge after #N` is unmerged, or while an older open PR changes the same app (Companion, Atlas, Scribe, engine, e9-core, VTT bridges, icons). It turns green by itself when the predecessor merges. A PR that truly doesn't care can say `Merge order: any` on a line of its own.
+- **Don't edit a version number or a CHANGELOG.md**: add a change note (next section). CI fails a PR that numbers one by hand.
+- Refer to another change by its PR number (`needs #15`), not by a version you expect it to get.
+- Before you push, merge `main` into your branch if it moved, and run the checks for what you changed: `scripts/data.sh`, then `npm run check && npm test` in `companion-app/` or `scribe/`.
+- Any edit to the map build tools (`modules/tools/build.py` and friends) redraws every map, so say so in the PR. If your PR touches prose, include a before/after list.
+- Heph reviews. When he approves, he enables **auto-merge**, and GitHub merges the PR as soon as both checks are green. Don't merge or enable auto-merge yourself.
 
 ## Versions and change notes
 
@@ -92,8 +77,7 @@ modules/tools/changes/fog-of-war.md      the changelog entry's text, no version 
 companion-app/changes/fog-of-war.md      the same PR's Companion entry
 ```
 
-Name the file for the change; two PRs add two files, so they never collide. When the site builds, `scripts/changes.py stamp` gives each note the next patch number in the order the PRs reached `main` and shows it in the app and in CHANGELOG.md on the site. Every merged PR is still one patch, numbered by the merge, not by hand.
+Name the file for the change; two PRs add two files, so they never collide. When the site builds, `scripts/changes.py stamp` gives each note the next patch number in the order the PRs reached `main` and shows it in the app and in CHANGELOG.md on the site.
 
 - `python3 -I scripts/changes.py list` shows each app's version now and which note got which number.
-- `python3 -I scripts/changes.py release <app>` folds the notes into CHANGELOG.md for good and writes the version; `minor <app>` does that and starts the next minor (0.5.x to 0.6.0), when a sprint closes. That is its own PR, and the only kind that edits versions.
-- A module declaring the app version it needs uses the number `list` shows once the PR has merged.
+- `python3 -I scripts/changes.py release <app>` folds the notes into CHANGELOG.md and writes the version; `minor <app>` does that and starts the next minor. That is its own PR, and the only kind that edits versions.

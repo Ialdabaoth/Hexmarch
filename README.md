@@ -4,6 +4,8 @@ The Hexmarch apps, for OSR hexcrawl games under any core rules: the **Hexmarch C
 
 All setting data (Materia Mundi rules in mm-core, the adventure modules, the format specs, `hexmarch.json`, `links.json`) lives in the data repo named in [`site.json`](site.json), [Ialdabaoth/MateriaMundiRPG](https://github.com/Ialdabaoth/MateriaMundiRPG). The apps load modules from its site by link.
 
+Want to help? Read the [Contributor Guidelines](CONTRIBUTING.md).
+
 ## Build
 
 ```sh
