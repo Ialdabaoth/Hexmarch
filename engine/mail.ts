@@ -6,8 +6,8 @@
 //   campaign   Scribe -> Companion: a campaign's definition (Scribe's record) and the referee's seat
 //   update     Companion -> Scribe: what play changed (state, each party member's knowledge, receipts); body.back,
 //              when there, is where Scribe returns with a 'published' answer (Heph 2026-11-10: Scribe is the only
-//              publisher); body.return, a page Scribe opens as it is once publishing worked (the Atlas: itself, or the
-//              Companion's invite link). Both only on Scribe's own site. Parts left out (knowledge, receipts) are unchanged.
+//              publisher), only on Scribe's own site. Parts left out (knowledge, receipts: the Atlas sends only state)
+//              are unchanged.
 //   published  Scribe -> Companion: the answer to an update (re = its id): {ok:true, revision, at} or {ok:false, error,
 //              firstPublish?} (firstPublish: the referee must press Publish in Scribe once first)
 // Approval needs no envelope of its own: the request's id appears in the next snapshot's `receipts`, and the
