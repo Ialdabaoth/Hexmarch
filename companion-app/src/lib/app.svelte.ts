@@ -178,8 +178,10 @@ class AppState {
     await this.loadState();
     await this.checkCanUpdate();
     this.loaded = true;
+    await this.followCurrent();
+    await this.readCampaignModules();
     // The Atlas in another tab of this site saves party moves into the same file (Atlas 0.5.11): read it again on coming back.
-    if (typeof document !== 'undefined') document.addEventListener('visibilitychange', () => { if (!document.hidden) void this.refreshState(); });
+    if (typeof document !== 'undefined') document.addEventListener('visibilitychange', () => { if (!document.hidden) void this.followCurrent().then(() => this.refreshState()); });
     if (await this.cacheInlinePortraits(this.sheets)) await this.persist();
     if (this.settings.dice3d) preloadDice();
     await this.openShared();
@@ -1013,6 +1015,54 @@ class AppState {
     this.settings = { ...this.settings, ...patch };
     await saveSettings(this.settings).catch((e) => console.warn("Could not save", e));
     if (this.loaded && this.campaignId !== was) await this.loadState();
+    if ('campaign' in patch && this.campaignId !== was) {
+      await this.markCurrent();
+      await this.readCampaignModules();
+    }
+  }
+
+  // The campaign the device is on, shared with the Launcher and the other apps (IndexedDB "hexmarch-current":
+  // {campaign: id or null, at}). Written whenever this app switches campaign; read on start and on coming back, when
+  // the Launcher (or another app) switched more recently. Links in the address still win: they are opened after.
+  private currentAt = '';
+  private async markCurrent() {
+    this.currentAt = new Date().toISOString();
+    await idbSet('hexmarch-current', { campaign: this.campaignId || null, at: this.currentAt }).catch((e) => console.warn('Could not save', e));
+  }
+  private async followCurrent() {
+    let cur: { campaign?: unknown; at?: unknown } | undefined;
+    try {
+      cur = (await idbGet('hexmarch-current')) as typeof cur;
+    } catch {
+      return;
+    }
+    if (!cur || typeof cur.at !== 'string' || cur.at <= this.currentAt) return;
+    this.currentAt = cur.at;
+    const id = typeof cur.campaign === 'string' ? cur.campaign : null;
+    if (id === (this.campaignId || null)) return;
+    try {
+      if (id === null) return void (await this.leaveCampaign());
+      // a seat this device holds for it, the referee's first; else a campaign Scribe saved here, as referee
+      const seats = this.invitations.filter((x) => this.campaigns[x.url]?.campaign.id === id);
+      const seat = seats.find((x) => x.role === 'referee') ?? seats[0];
+      if (seat) await this.chooseInvitation(seat.id);
+      else if (await idbGet(`scribe-campaign:${id}`)) await this.useCampaign(`scribe:${id}`, 'referee');
+    } catch (e) {
+      console.warn('Campaign from the Launcher not opened', e);
+    }
+  }
+
+  // Heph 2026-11-10: with no campaign, every module cached on the device can be picked; with one, its lockfile is
+  // the filter. null: no filter.
+  campaignModuleIds = $state<string[] | null>(null);
+  get campaignModules(): SavedModule[] {
+    const ids = this.campaignModuleIds;
+    return ids ? this.modules.filter((m) => ids.includes(m.id)) : this.modules;
+  }
+  private async readCampaignModules() {
+    const lock = this.campaign ? ((await this.campaignLock().catch(() => null)) as { modules?: { id?: unknown }[] } | null) : null;
+    const ids = Array.isArray(lock?.modules) ? lock.modules.map((m) => m?.id).filter((x): x is string => typeof x === 'string') : [];
+    this.campaignModuleIds = ids.length ? ids : null;
   }
 
   get diceColors() {
