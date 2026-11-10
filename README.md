@@ -8,7 +8,7 @@ All setting data (Materia Mundi rules in mm-core, the adventure modules, the for
 
 ```sh
 scripts/data.sh            # copies mm-core and links.json from the data repo (git-ignored)
-(cd companion-app && npm ci && npm test && BASE_PATH=/Hexmarch/companion/ OUT_DIR=../_site/companion npm run build)
+(cd companion-app && npm ci && npm test && OUT_DIR=../_site/companion npm run build)
 python3 -I modules/tools/atlas_app.py _site
 (cd scribe && npm ci && npm run build && python3 -I scribe_app.py ../_site)
 python3 -I launcher/launcher.py _site
