@@ -299,6 +299,8 @@
   function sendAtlas() {
     if (play) postAtlas({ state: $state.snapshot(play) });
     if (built) postAtlas({ lock: $state.snapshot(built.lock) });
+    // the party builder's Invite button sends {event:'invite'} only when its host offers it
+    postAtlas({ hostActions: ['invite'], ...(record?.services?.pointer ? { campaign: record.services.pointer } : {}) });
   }
   // The Atlas may still be loading its map when the frame loads, so both go again when it first reports its view.
   let greeted = false;
