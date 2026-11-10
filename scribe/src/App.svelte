@@ -127,9 +127,9 @@
   let record = $state<SavedCampaign | null>(null);
   let folder = $state('');
   let postUrl = $state('');
-  // Where Publish puts the files (Scribe 0.6: adapters). Google Drive through the referee's own Apps Script,
-  // their own GitHub repo, or by hand as before.
-  let storeKind = $state<StoreKind>('apps-script');
+  // Where Publish puts the files (Scribe 0.6: adapters): the referee's own GitHub repo (preferred, Heph 2026-11-10),
+  // Google Drive through their own Apps Script, or by hand as before.
+  let storeKind = $state<StoreKind>('github');
   let scriptUrl = $state('');
   let ghRepo = $state('');
   let ghDir = $state('');
@@ -378,8 +378,8 @@
       {#if !record}
         <p class="small muted">Save the campaign on this device first (above). Players can't join until it is published.</p>
       {:else}
+        <label class="opt"><input type="radio" name="store" value="github" bind:group={storeKind} /><span><strong>GitHub</strong> (preferred) <span class="small muted">a public repository of yours</span></span></label>
         <label class="opt"><input type="radio" name="store" value="apps-script" bind:group={storeKind} /><span><strong>Google Drive</strong> <span class="small muted">through your own Apps Script, set up once</span></span></label>
-        <label class="opt"><input type="radio" name="store" value="github" bind:group={storeKind} /><span><strong>GitHub</strong> <span class="small muted">a public repository of yours</span></span></label>
         <label class="opt"><input type="radio" name="store" value="manual" bind:group={storeKind} /><span><strong>Upload by hand</strong> <span class="small muted">to any web folder; Publish hands you the two files</span></span></label>
         {#if storeKind === 'apps-script'}
           <details class="small" open={!scriptUrl}>
