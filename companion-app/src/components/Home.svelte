@@ -44,7 +44,7 @@
   }
 
   // Player mode shows only the character this seat plays.
-  let active = $derived(app.mode === 'player' ? app.me : (app.characters.find((c) => c.id === app.settings.activeId) ?? app.party[0]));
+  let active = $derived(app.seesAs ? app.me : (app.characters.find((c) => c.id === app.settings.activeId) ?? app.party[0]));
   // Player mode before a character is picked: the ones on this device that could play.
   let choices = $derived(app.mode === 'player' && !app.me ? app.characters.filter((c) => c.data.owner !== 'referee') : []);
   let view = $derived(active ? sheetView(active.data, active.state) : undefined);

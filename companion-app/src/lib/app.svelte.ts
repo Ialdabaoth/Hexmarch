@@ -59,13 +59,14 @@ class AppState {
   state = $state<CampaignState>(blankState(''));
   // Everyone playing in the campaign on this device. Referee mode: everyone but the referee's full-sheet NPCs.
   // Player mode: your own character only (its followers are on its card).
+  // Referee, as a character (Heph 2026-11-10): the referee sees one character the way its player would, NPCs included.
   roster: Character[] = $derived(
-    this.mode === 'player' ? this.characters.filter((c) => c.id === this.invitation?.character) : this.characters.filter((c) => c.data.owner !== 'referee')
+    this.seesAs ? this.characters.filter((c) => c.id === this.viewer) : this.characters.filter((c) => c.data.owner !== 'referee')
   );
   // The characters on the home screen: the roster in the party in use (Heph 2026-11-10: a campaign has parties).
   // A character the state file doesn't place in a party yet shows in every party until it joins one.
   party: Character[] = $derived(
-    this.mode === 'player' || !this.state.parties.length
+    this.seesAs || !this.state.parties.length
       ? this.roster
       : this.roster.filter((c) => {
           const e = this.state.characters.find((x) => x.id === c.id);
@@ -113,6 +114,7 @@ class AppState {
   // outside a campaign. The installed app shows it after its own name: "⬢ Companion - Kells 1422 · Playing Holly".
   get title(): string {
     const inv = this.invitation, c = this.campaign;
+    if (c && this.mode === 'referee' && this.asCharacter) return `${c.campaign.name} · Referee, as ${this.character(this.asCharacter)?.name ?? 'a character'}`;
     if (!inv || !c) return c ? c.campaign.name : 'My Characters';
     return invitationLabel(inv, c.campaign.name, inv.character ? this.character(inv.character)?.name : undefined);
   }
@@ -120,9 +122,27 @@ class AppState {
   // The party in use: the one the referee last picked (state.active), or in player mode the one this seat's
   // character is in (the invitation's party until the referee's state file says otherwise).
   get partyId(): string {
-    if (this.mode !== 'player') return this.state.active;
-    const id = this.invitation?.character;
-    return (id && this.state.characters.find((x) => x.id === id)?.party) || this.invitation?.party || '';
+    if (!this.seesAs) return this.state.active;
+    const id = this.viewer;
+    return (id && this.state.characters.find((x) => x.id === id)?.party) || (this.mode === 'player' ? this.invitation?.party : '') || '';
+  }
+
+  // Referee mode, as one character (Heph 2026-11-10: "NPCs may not have a seat but will still need referee
+  // management"): the referee sees that character as its player would (sheet, followers, what it knows on the map),
+  // with no seat; '' is the referee's own view of every party. The Launcher's character pick sets it.
+  asCharacter = $state('');
+  // Whose eyes the app looks through: the seat's character in player mode, the character the referee is being.
+  get viewer(): string {
+    return this.mode === 'player' ? (this.invitation?.character ?? '') : this.asCharacter;
+  }
+  // A player's view: player mode, or the referee as a character.
+  get seesAs(): boolean {
+    return this.mode === 'player' || !!this.asCharacter;
+  }
+  async viewAs(id: string) {
+    if (this.mode !== 'referee') return;
+    this.asCharacter = id && this.character(id) ? id : '';
+    await this.markCurrent();
   }
 
   get currentParty(): StateParty | null {
@@ -131,7 +151,7 @@ class AppState {
 
   // Player mode: the character this seat plays, once picked.
   get me(): Character | undefined {
-    const id = this.mode === 'player' ? this.invitation?.character : undefined;
+    const id = this.viewer;
     return id ? this.character(id) : undefined;
   }
 
@@ -416,6 +436,7 @@ class AppState {
   // Switches to a seat taken before (the campaign switcher), fetching its campaign again when possible.
   async chooseInvitation(id: string) {
     const seat = this.invitations.find((s) => s.id === id);
+    this.asCharacter = '';
     if (!seat) return this.leaveCampaign();
     try {
       await this.adoptCampaign(await openCampaignLink(seat.url), seat.id);
@@ -437,6 +458,7 @@ class AppState {
   }
 
   async leaveCampaign() {
+    this.asCharacter = '';
     await this.updateSettings({ campaign: '', invitation: '' });
     activateCampaign(null);
     this.equipmentChanged();
@@ -1037,10 +1059,14 @@ class AppState {
   private currentAt = '';
   private async markCurrent() {
     this.currentAt = new Date().toISOString();
-    await idbSet('hexmarch-current', { campaign: this.campaignId || null, at: this.currentAt }).catch((e) => console.warn('Could not save', e));
+    const pick =
+      this.mode === 'player' ? { seat: this.invitation?.id } : this.asCharacter ? { character: this.asCharacter } : this.state.active ? { party: this.state.active } : {};
+    await idbSet('hexmarch-current', { campaign: this.campaignId || null, ...(this.campaignId ? pick : {}), at: this.currentAt }).catch((e) => console.warn('Could not save', e));
   }
+  // The Launcher's pick: {campaign, seat?, party?, character?, at}. seat: that player seat; party: referee mode with
+  // that party active; character: referee mode as that character; none of them: referee mode, every party.
   private async followCurrent() {
-    let cur: { campaign?: unknown; at?: unknown } | undefined;
+    let cur: { campaign?: unknown; seat?: unknown; party?: unknown; character?: unknown; at?: unknown } | undefined;
     try {
       cur = (await idbGet('hexmarch-current')) as typeof cur;
     } catch {
@@ -1048,15 +1074,32 @@ class AppState {
     }
     if (!cur || typeof cur.at !== 'string' || cur.at <= this.currentAt) return;
     this.currentAt = cur.at;
-    const id = typeof cur.campaign === 'string' ? cur.campaign : null;
-    if (id === (this.campaignId || null)) return;
+    const str = (v: unknown) => (typeof v === 'string' && v ? v : '');
+    const id = str(cur.campaign) || null;
+    const seatId = str(cur.seat), party = str(cur.party), character = str(cur.character);
     try {
-      if (id === null) return void (await this.leaveCampaign());
-      // a seat this device holds for it, the referee's first; else a campaign Scribe saved here, as referee
+      if (id === null) {
+        this.asCharacter = '';
+        if (this.campaignId) await this.leaveCampaign();
+        return;
+      }
       const seats = this.invitations.filter((x) => this.campaigns[x.url]?.campaign.id === id);
-      const seat = seats.find((x) => x.role === 'referee') ?? seats[0];
-      if (seat) await this.chooseInvitation(seat.id);
-      else if (await idbGet(`scribe-campaign:${id}`)) await this.useCampaign(`scribe:${id}`, 'referee');
+      const asked = seatId ? seats.find((x) => x.id === seatId && x.role === 'player') : undefined;
+      if (asked) {
+        this.asCharacter = '';
+        if (this.settings.invitation !== asked.id || this.campaignId !== id) await this.chooseInvitation(asked.id);
+        return;
+      }
+      // referee mode: this device's referee seat for it, else the campaign Scribe saved here
+      if (this.campaignId !== id || this.mode !== 'referee') {
+        const ref = seats.find((x) => x.role === 'referee');
+        if (ref) await this.chooseInvitation(ref.id);
+        else if (await idbGet(`scribe-campaign:${id}`)) await this.useCampaign(`scribe:${id}`, 'referee');
+        else if (seats[0]) return void (await this.chooseInvitation(seats[0].id));
+        else return;
+      }
+      this.asCharacter = character && this.character(character) ? character : '';
+      if (!this.asCharacter && party && partyOf(this.state, party)) await this.chooseParty(party);
     } catch (e) {
       console.warn('Campaign from the Launcher not opened', e);
     }
