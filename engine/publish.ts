@@ -125,7 +125,7 @@ export function snapshot(
 // Reading them back (a player's Companion): anything missing or newer is refused with a message for the reader.
 export function readPointer(d: unknown): Pointer {
   const p = d as Partial<Pointer> | null;
-  if (!p || typeof p !== 'object' || p.format !== POINTER_FORMAT) throw new PublishError("That link isn't an E9 campaign.");
+  if (!p || typeof p !== 'object' || p.format !== POINTER_FORMAT) throw new PublishError("That link isn't a Hexmarch campaign.");
   if (typeof p.version !== 'number' || p.version > 1) throw new PublishError('That campaign was published by a newer app. Update the app to open it.');
   if (typeof p.campaign !== 'string' || !p.campaign || typeof p.read !== 'string' || !https(p.read)) throw new PublishError('That campaign link has no snapshot address.');
   return { format: POINTER_FORMAT, version: 1, campaign: p.campaign, title: typeof p.title === 'string' ? p.title : p.campaign, read: p.read, post: typeof p.post === 'string' ? p.post : '', adapters: { store: p.adapters?.store ?? 'static', mail: p.adapters?.mail ?? 'manual' }, updated: typeof p.updated === 'string' ? p.updated : '' };
@@ -133,7 +133,7 @@ export function readPointer(d: unknown): Pointer {
 
 export function readSnapshot(d: unknown, campaign: string): Snapshot {
   const s = d as Partial<Snapshot> | null;
-  if (!s || typeof s !== 'object' || s.format !== SNAPSHOT_FORMAT) throw new PublishError("That isn't an E9 campaign snapshot.");
+  if (!s || typeof s !== 'object' || s.format !== SNAPSHOT_FORMAT) throw new PublishError("That isn't a Hexmarch campaign snapshot.");
   if (typeof s.version !== 'number' || s.version > 1) throw new PublishError('That snapshot was published by a newer app. Update the app to read it.');
   if (s.campaign !== campaign) throw new PublishError(`That snapshot belongs to another campaign (${s.campaign}).`);
   if (!s.module || typeof s.module !== 'object' || !s.state || typeof s.state !== 'object') throw new PublishError('That snapshot has no campaign in it.');
