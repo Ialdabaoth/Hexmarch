@@ -51,8 +51,8 @@ jobs:
           npm test
           npm run build
         env:
-          # the apps sit side by side under the Launcher: /<repo>/companion/, atlas/, scribe/ (Heph 2026-11-10)
-          BASE_PATH: /${{ github.event.repository.name }}/companion/
+          # the apps sit side by side under the Launcher: <site>/companion/, atlas/, scribe/ (Heph 2026-11-10);
+          # the Companion is built with relative paths, so it works at any address
           OUT_DIR: ../_site/companion
       - uses: actions/setup-python@v5
         with:

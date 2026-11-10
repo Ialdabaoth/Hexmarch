@@ -99,8 +99,9 @@ npm run check    # type check
 npm run build    # production build in dist/
 ```
 
-Set `BASE_PATH` when the app is served from a subpath, e.g. `BASE_PATH=/MateriaMundiRPG/ npm run build`
-for GitHub Pages.
+The build uses relative paths, so `dist/` works at any address (a site root, `/Hexmarch/companion/` on GitHub
+Pages, or any other folder) with no settings. It expects the Launcher, the Atlas and Scribe beside it, one folder up
+(`../atlas/`, `../scribe/`).
 
 ## Versioning
 

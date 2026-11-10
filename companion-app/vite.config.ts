@@ -9,8 +9,9 @@ const readJson = (path: string) => (existsSync(path) ? JSON.parse(readFileSync(p
 const site = readJson(new URL('../site.json', import.meta.url).pathname);
 const links = readJson(new URL('../links.json', import.meta.url).pathname);
 
-// GitHub Pages serves the app from /<repo>/, so the workflow sets BASE_PATH.
-const base = process.env.BASE_PATH ?? '/';
+// Relative base (as Scribe): the build works wherever it is hosted (/<repo>/companion/ on GitHub Pages, or any
+// other address) with no BASE_PATH. Its pages and service worker resolve everything against the page's own address.
+const base = './';
 // PREVIEW=1 builds a plain web page (no service worker) for hosts that can't run one.
 const pwa = !process.env.PREVIEW;
 

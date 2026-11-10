@@ -1,0 +1,1 @@
+The Companion is built with relative paths, like Scribe: the built app, its install manifest and its service worker work at any address (a site root, `/Hexmarch/companion/`, or any other folder) with no `BASE_PATH`. Tested served at two different paths, installing the service worker and working offline at both.
