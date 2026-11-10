@@ -38,8 +38,13 @@
 
   // The whole state file (Atlas 0.5.11): every party with its clock, session and place, and `active`; the Atlas
   // gets it again after every change.
-  function sendState() {
+  // The referee's Atlas also gets the campaign's lockfile ({lock}), whose modules' starts its party creator offers.
+  // A player's Atlas doesn't: there `lock: true` locks the view to the character, and players make no parties.
+  async function sendState() {
     post({ state: writeState($state.snapshot(app.state) as CampaignState) });
+    if (app.mode === 'player') return;
+    const lock = await app.campaignLock();
+    if (lock && typeof lock === 'object') post({ lock: $state.snapshot(lock) });
   }
   $effect(() => {
     void app.state.revision;
