@@ -55,6 +55,17 @@
   // to a party) and, optionally, the character they play.
   let inviteFor = $state('');
   let inviteTo = $state('');
+  // Handed here by the Atlas's party builder: that party's invitation, open and in view.
+  let inviteOpen = $state(false);
+  let inviteBox = $state<HTMLDetailsElement>();
+  $effect(() => {
+    const v = app.view;
+    if (v.name !== 'settings' || !v.invite) return;
+    inviteTo = v.invite;
+    inviteOpen = true;
+    app.view = { name: 'settings' };
+    queueMicrotask(() => inviteBox?.scrollIntoView({ block: 'start' }));
+  });
   let toParty = $derived(app.state.parties.some((p) => p.id === inviteTo) ? inviteTo : app.state.active);
   let invite = $derived(
     app.campaign
@@ -133,7 +144,7 @@
       </p>
     {/if}
     {#if app.mode === 'referee'}
-      <details>
+      <details bind:open={inviteOpen} bind:this={inviteBox}>
         <summary class="small">Invite a player</summary>
         {#if isScribeLink(app.settings.campaign) && !app.campaign.published}
           <p class="small muted">This campaign is kept only on this device, where Scribe saved it, so a player can't open it yet. Invitations open once the campaign is published.</p>

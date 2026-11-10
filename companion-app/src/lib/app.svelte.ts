@@ -38,7 +38,8 @@ export type View =
   | { name: 'campaign' }
   | { name: 'rules' }
   | { name: 'inbox' }
-  | { name: 'settings' }
+  // invite: the party whose invitation to show (the Atlas's party builder hands the referee here, one invite at a time)
+  | { name: 'settings'; invite?: string }
   | { name: 'equipment' }
   | { name: 'render'; id: string; mode: RenderMode };
 
@@ -793,6 +794,13 @@ class AppState {
       await this.checkCampaign();
       await this.refreshState();
     } else await this.useCampaign(`scribe:${rec.id}`, 'referee');
+    // From the Atlas's party builder (Heph 2026-11-10: Scribe sets up the campaign, the Atlas builds the party and
+    // hands to the Companion per invite): body.invite.party, the party to invite to, whose invitation opens straight away.
+    const party = (e.body.invite as { party?: unknown } | undefined)?.party;
+    if (typeof party === 'string' && this.state.parties.some((p) => p.id === party)) {
+      await this.chooseParty(party);
+      this.view = { name: 'settings', invite: party };
+    }
   }
 
   // Companion -> Scribe: what play changed, for Scribe's Publish (the same parts Update campaign publishes).
