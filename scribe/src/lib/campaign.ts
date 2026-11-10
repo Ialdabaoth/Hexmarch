@@ -1,27 +1,15 @@
-// Steps 1–3 of the campaign view (SCRIBE.md section 1): from a root, some modules and a start to the
-// campaign module, its lockfile and its first state file (STATE_FORMAT.md).
+// Steps 1–3 of the campaign view (SCRIBE.md section 1): from a root and some modules to the campaign module, its
+// lockfile and its first state file (STATE_FORMAT.md). A campaign has no start of its own (Heph 2026-11-10): its
+// start positions are every start of its modules, and each party picks one when the Atlas's Referee mode makes it.
 
 import { lockfile, memoryRegistry, readManifest, resolve, slug, type Lockfile, type Problem, type Start } from '../../../engine';
 import type { RootChoice } from './rules';
 import type { SiteModule } from './data';
 
-export interface StartChoice {
-  module: string;
-  id: string;
-}
-
-export interface ManualStart {
-  date: string; // YYYY-MM-DD in the setting's years
-  hour: number;
-  module: string;
-  site: string; // place slug, or ''
-}
-
 export interface Choices {
   title: string;
   root: RootChoice;
   modules: string[];
-  start: StartChoice | ManualStart | null;
 }
 
 export interface Built {
@@ -45,15 +33,6 @@ export function startsOf(m: SiteModule | undefined): Start[] {
 export async function buildCampaign(c: Choices, site: SiteModule[], rules: unknown[], now = new Date()): Promise<Built> {
   const id = campaignId(c.title);
   const picked = c.modules.map((m) => site.find((s) => s.id === m)).filter((m): m is SiteModule => !!m);
-  const start = c.start && 'id' in c.start ? startsOf(site.find((s) => s.id === c.start!.module)).find((s) => s.id === (c.start as StartChoice).id) : undefined;
-  const startModule = c.start?.module ?? picked[0]?.id ?? '';
-
-  // a start that plays only some parts of its module leaves the rest out (SCRIBE.md section 2, "uses")
-  const exclude: string[] = [];
-  if (start?.uses?.length) {
-    const m = site.find((s) => s.id === startModule);
-    for (const b of m?.books ?? []) if (!start.uses.includes(b.id)) exclude.push(`${startModule}/book/${slug(b.id)}`);
-  }
 
   const manifest: Record<string, unknown> = {
     id,
@@ -63,8 +42,6 @@ export async function buildCampaign(c: Choices, site: SiteModule[], rules: unkno
     license: 'LicenseRef-Private',
     requires: { [c.root.module]: caret(c.root.version), ...Object.fromEntries(picked.map((m) => [m.id, caret(m.version)])) },
     ...(c.root.option ? { option: c.root.option } : {}),
-    ...(exclude.length ? { exclude } : {}),
-    ...(start ? { start: { module: startModule, id: start.id } } : {}),
     created: now.toISOString().slice(0, 10)
   };
 
@@ -72,11 +49,6 @@ export async function buildCampaign(c: Choices, site: SiteModule[], rules: unkno
   const resolution = await resolve(top, memoryRegistry([...rules, ...picked.map((m) => m.raw)]));
   const lock = await lockfile(top, resolution);
 
-  const manual = c.start && !('id' in c.start) ? c.start : null;
-  const date = start?.date ?? manual?.date ?? '';
-  const hour = start?.hour ?? manual?.hour ?? 8;
-  const sitePlace = start?.site ? slug(start.site) : manual?.site ?? '';
-  const places = [...new Set([...(start?.revealed?.places ?? []).map(slug), ...(sitePlace ? [sitePlace] : [])])];
   const state = {
     format: 'hexmarch-campaign-state',
     version: 1,
@@ -84,11 +56,10 @@ export async function buildCampaign(c: Choices, site: SiteModule[], rules: unkno
     revision: 1,
     updated: now.toISOString(),
     rules: { ruleset: c.root.ruleset, module: c.root.module, option: c.root.option, version: c.root.version },
-    clock: { start: date || '3507-05-01', hours: hour },
-    // the party is placed on its hex when the campaign is first opened in the Atlas (the start names the site)
-    party: null,
-    revealed: startModule ? { [startModule]: { hexes: start?.revealed?.hexes ?? [], places } } : {},
-    session: { number: 0, open: false },
+    // parties, each with its own start, clock and sessions, are made after the build in the Atlas's Referee mode
+    parties: [],
+    active: '',
+    revealed: {},
     characters: []
   };
   return { manifest, lock, state, problems: resolution.problems };

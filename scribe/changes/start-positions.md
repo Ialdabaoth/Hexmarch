@@ -1,0 +1,1 @@
+A campaign no longer has one start (Heph 2026-11-10). Its start positions are every start of its modules, listed under each module in "Show Player Start Locations", and the Start panel is gone. A new campaign's state has no parties; parties, each with its own start, clock and sessions, are made in the Atlas's Referee mode (STATE_FORMAT.md, data PR #172).
