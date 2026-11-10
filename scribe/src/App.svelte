@@ -378,21 +378,7 @@
         <p class="small muted">Save the campaign on this device first (above). Players can't join until it is published.</p>
       {:else}
         <label class="opt"><input type="radio" name="store" value="github" bind:group={storeKind} /><span><button type="button" class="tip" data-tip="GitHub is a free, open-source repository that anyone can use. It is unaffiliated with Hexmarch, so your files will always be yours. Hexmarch will provide step-by-step instructions for setting up your campaign."><strong>GitHub</strong></button> (preferred)</span></label>
-        <label class="opt"><input type="radio" name="store" value="apps-script" bind:group={storeKind} /><span><button type="button" class="tip" data-tip="Google Drive is a popular file storage service that comes with any GMail account. Hexmarch will walk you through setting up an Apps Script, which will give Hexmarch limited access to the files on your Drive that Hexmarch will use to share your campaign with players and co-referees."><strong>Google Drive</strong></button></span></label>
-        <label class="opt"><input type="radio" name="store" value="manual" bind:group={storeKind} /><span><button type="button" class="tip" data-tip="If you have your own website or server, Hexmarch can simply hand you the campaign files and let you place them somewhere that your players and co-referees can access them."><strong>My Own Host</strong></button></span></label>
-        {#if storeKind === 'apps-script'}
-          <details class="small" open={!scriptUrl}>
-            <summary>Set up your script (once, about two minutes)</summary>
-            <ol>
-              <li>Open <a href="https://script.new" target="_blank" rel="noopener">script.new</a> signed in to Google, and name the project “Hexmarch publisher”.</li>
-              <li><button class="quiet" onclick={copyScript}>Copy the script</button>{#if copied} Copied, with your key already in it.{/if} Replace everything in <code>Code.gs</code> with it, and save.</li>
-              <li>Deploy › New deployment › type <strong>Web app</strong>. Execute as <strong>Me</strong>, Who has access <strong>Anyone</strong>. Deploy, and allow it to use your Drive (Google warns because the script is your own and unverified: Advanced › Go to Hexmarch publisher).</li>
-              <li>Paste the Web app URL below. Your files go to the Drive folder “Hexmarch campaigns”.</li>
-            </ol>
-          </details>
-          <label class="field">Web app URL <input type="url" bind:value={scriptUrl} placeholder="https://script.google.com/macros/s/…/exec" /></label>
-          <label class="field">Key (the KEY line in your script) <input type="password" bind:value={secret} autocomplete="off" /></label>
-        {:else if storeKind === 'github'}
+        {#if storeKind === 'github'}
           <ol class="small gh">
             <li>
               Make a free <a href="https://github.com/signup" target="_blank" rel="noopener">GitHub account</a>, if you don't have one.
@@ -421,7 +407,23 @@
               <label class="field">Branch <input type="text" bind:value={ghBranch} autocapitalize="off" /></label>
             </div>
           </details>
-        {:else}
+        {/if}
+        <label class="opt"><input type="radio" name="store" value="apps-script" bind:group={storeKind} /><span><button type="button" class="tip" data-tip="Google Drive is a popular file storage service that comes with any GMail account. Hexmarch will walk you through setting up an Apps Script, which will give Hexmarch limited access to the files on your Drive that Hexmarch will use to share your campaign with players and co-referees."><strong>Google Drive</strong></button></span></label>
+        {#if storeKind === 'apps-script'}
+          <details class="small" open={!scriptUrl}>
+            <summary>Set up your script (once, about two minutes)</summary>
+            <ol>
+              <li>Open <a href="https://script.new" target="_blank" rel="noopener">script.new</a> signed in to Google, and name the project “Hexmarch publisher”.</li>
+              <li><button class="quiet" onclick={copyScript}>Copy the script</button>{#if copied} Copied, with your key already in it.{/if} Replace everything in <code>Code.gs</code> with it, and save.</li>
+              <li>Deploy › New deployment › type <strong>Web app</strong>. Execute as <strong>Me</strong>, Who has access <strong>Anyone</strong>. Deploy, and allow it to use your Drive (Google warns because the script is your own and unverified: Advanced › Go to Hexmarch publisher).</li>
+              <li>Paste the Web app URL below. Your files go to the Drive folder “Hexmarch campaigns”.</li>
+            </ol>
+          </details>
+          <label class="field">Web app URL <input type="url" bind:value={scriptUrl} placeholder="https://script.google.com/macros/s/…/exec" /></label>
+          <label class="field">Key (the KEY line in your script) <input type="password" bind:value={secret} autocomplete="off" /></label>
+        {/if}
+        <label class="opt"><input type="radio" name="store" value="manual" bind:group={storeKind} /><span><button type="button" class="tip" data-tip="If you have your own website or server, Hexmarch can simply hand you the campaign files and let you place them somewhere that your players and co-referees can access them."><strong>My Own Host</strong></button></span></label>
+        {#if storeKind === 'manual'}
           <label class="field">Folder you upload to <input type="url" bind:value={folder} placeholder="https://you.github.io/kells-1422/" /></label>
         {/if}
         <button disabled={!storeReady || !record.published || testing} onclick={runTest}>{testing ? 'Verifying…' : 'Verify Campaign Files'}</button>
