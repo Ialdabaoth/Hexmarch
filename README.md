@@ -8,10 +8,13 @@ All setting data (Materia Mundi rules in mm-core, the adventure modules, the for
 
 ```sh
 scripts/data.sh            # copies mm-core and links.json from the data repo (git-ignored)
-cd companion-app && npm ci && npm test && npm run build
-python3 -I modules/tools/atlas_app.py companion-app/dist
-python3 -I scribe/scribe_app.py companion-app/dist
+(cd companion-app && npm ci && npm test && BASE_PATH=/Hexmarch/companion/ OUT_DIR=../_site/companion npm run build)
+python3 -I modules/tools/atlas_app.py _site
+(cd scribe && npm ci && npm run build && python3 -I scribe_app.py ../_site)
+python3 -I launcher/launcher.py _site
 ```
+
+The site (`_site/`) is the **Launcher** at its root (`launcher/`: the apps, the campaigns on this device, backup and reset of what the apps keep in the browser) with the apps beside it: `companion/`, `atlas/`, `scribe/`. Each installs as its own app. A link for another app opens in that app, never inside the current one (`engine/handoff.ts`).
 
 The data repo builds its module pages with `modules/tools/build.py` from this repo.
 

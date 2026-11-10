@@ -51,12 +51,14 @@ jobs:
           npm test
           npm run build
         env:
-          BASE_PATH: /${{ github.event.repository.name }}/
+          # the apps sit side by side under the Launcher: /<repo>/companion/, atlas/, scribe/ (Heph 2026-11-10)
+          BASE_PATH: /${{ github.event.repository.name }}/companion/
+          OUT_DIR: ../_site/companion
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
       - name: Atlas
-        run: python3 -I modules/tools/atlas_app.py companion-app/dist
+        run: python3 -I modules/tools/atlas_app.py _site
       - name: Scribe
         working-directory: scribe
         run: |
@@ -64,11 +66,13 @@ jobs:
           npm run check
           npm test
           npm run build
-          python3 -I scribe_app.py ../companion-app/dist
+          python3 -I scribe_app.py ../_site
+      - name: Launcher
+        run: python3 -I launcher/launcher.py _site
       - uses: actions/upload-pages-artifact@v3
         if: github.event_name != 'pull_request'
         with:
-          path: companion-app/dist
+          path: _site
 
   deploy:
     if: github.event_name != 'pull_request'

@@ -22,6 +22,7 @@ import { inviteDone, keepInvite, pendingInvite, updateForInvite } from './update
 import { readShared, withoutShared } from './share';
 import { publishParts } from '../../../engine/publish';
 import { envelope as mailEnvelope, messageLink, readMessageHash, type Envelope } from '../../../engine/mail';
+import { handOff, takeHandOffs } from '../../../engine/handoff';
 import { readState as readStateFile } from './state';
 import { get as idbGet, set as idbSet } from 'idb-keyval';
 import { addInvitation, bindCharacter, invitationLabel, loadInvitations, readInvite, saveInvitations, withRefereeInvitations, type Invite, type Mode, type Invitation } from './invitations';
@@ -186,6 +187,7 @@ class AppState {
     await this.openAsked();
     await this.openMessage();
     this.listenForFiles();
+    if (typeof window !== 'undefined' && window.top === window) takeHandOffs('./', siteRoot());
     void this.refreshCampaign();
   }
 
@@ -608,7 +610,15 @@ class AppState {
   // Referee mode: hands the play to Scribe, which publishes it and comes back here with a 'published' message
   // (Heph 2026-11-10: Scribe is the only publisher). `invite`: the party whose invitation to show on return.
   async sendToScribe(invite?: string) {
-    location.href = await this.scribeLink(invite);
+    await this.goTo(await this.scribeLink(invite), 'Scribe');
+  }
+
+  // A link for another app opens there, never in this window (Heph 2026-11-10; engine/handoff.ts): an open window of
+  // that app takes it, or a new window opens; when the browser blocks that, the link waits as a button (App.svelte).
+  handoff = $state<{ url: string; app: string; taken: boolean } | null>(null);
+  async goTo(url: string, appName: string) {
+    const r = await handOff(url, siteRoot());
+    this.handoff = r === 'opened' ? null : { url, app: appName, taken: r === 'taken' };
   }
 
   // Scribe -> Companion, after a publish this device asked for: {ok, revision, at} or {ok: false, error, firstPublish?}.
@@ -833,7 +843,7 @@ class AppState {
     const here = location.href.replace(/[?#].*$/, '');
     const e = mailEnvelope({ campaign: id, kind: 'update', from: { role: 'referee' }, to: 'referee', body: { ...JSON.parse(JSON.stringify(parts)), back: here } });
     await idbSet(`publish-asked:${id}`, { id: e.id, ...(invite ? { invite } : {}) });
-    return messageLink(new URL('scribe/', here).href, e);
+    return messageLink(new URL('scribe/', siteRoot()).href, e);
   }
 
   // The referee may have changed the campaign's files; pick that up quietly.
@@ -1055,6 +1065,11 @@ class AppState {
     clearTimeout(this.toastTimer);
     this.toastTimer = setTimeout(() => (this.toast = ''), 3000);
   }
+}
+
+// The folder holding the apps (<site>/companion/, atlas/, scribe/) and the Launcher (<site>/).
+export function siteRoot(): string {
+  return new URL(`${import.meta.env.BASE_URL}../`, typeof location === 'undefined' ? 'https://example.invalid/' : location.href).href;
 }
 
 export const app = new AppState();

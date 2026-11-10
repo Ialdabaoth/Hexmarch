@@ -9,3 +9,4 @@ export * from './sites';
 export * from './publish';
 export * from './mail';
 export * from './adapters';
+export * from './handoff';

@@ -74,6 +74,13 @@
 <RollResult />
 <HoldMenu />
 
+{#if app.handoff}
+  <div class="toast handoff no-print" role="status">
+    {#if app.handoff.taken}Sent to {app.handoff.app}, open in another window.{/if}
+    <a class="button-like" href={app.handoff.url} target="_blank" rel="noopener" onclick={() => (app.handoff = null)}>Open {app.handoff.app}</a>
+    <button class="link" onclick={() => (app.handoff = null)} aria-label="Close">✕</button>
+  </div>
+{/if}
 {#if app.toast}
   <div class="toast no-print" role="status">{app.toast}</div>
 {/if}
@@ -145,4 +152,7 @@
     z-index: 30;
     max-width: calc(100% - 32px);
   }
+  .toast.handoff { bottom: calc(120px + env(safe-area-inset-bottom)); border-radius: 12px; display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap; }
+  .handoff a { display: inline-block; padding: 0.35rem 0.8rem; border-radius: 6px; background: var(--accent); color: var(--accent-ink); text-decoration: none; }
+  .handoff button { color: inherit; }
 </style>
