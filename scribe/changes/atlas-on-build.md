@@ -1,0 +1,1 @@
+The Atlas appears, under its own foldable "Atlas" header, as soon as you build the campaign (Heph 2026-11-10); the "Preview My Campaign" heading and the "Preview in Atlas" button are gone. Building opens it even if you folded it last time.
