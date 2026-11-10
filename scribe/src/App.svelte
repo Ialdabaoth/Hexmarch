@@ -392,9 +392,8 @@
             </li>
             <li>
               Make a <button type="button" class="tip" data-tip="The key stays on this device and never goes into your campaign or its links. It can only touch this one repository.">key</button>
-              so Scribe can save there: <a href={tokenLink} target="_blank" rel="noopener">open the key page</a>. Name the key, choose
-              <strong>Only select repositories</strong> and pick your repository, then <strong>Add permissions</strong> › <strong>Contents</strong> ›
-              <strong>Read and write</strong>. Press <strong>Generate token</strong>, then copy it.
+              so Scribe can save there: <a href={tokenLink} target="_blank" rel="noopener">open the key page</a>. Check that your
+              repository is picked and <strong>Contents</strong> says <strong>Read and write</strong>, then press <strong>Generate token</strong> and copy it.
             </li>
             <li>Paste the key here, then press Publish (below).
               <label class="field">Key <input type="password" bind:value={secret} autocomplete="off" /></label>
