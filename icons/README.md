@@ -4,7 +4,7 @@ One look for every app: a dark rounded square (`#2b2118`) with the gold hexagon 
 
 | App | Icon | Inside the hexagon |
 | --- | --- | --- |
-| Companion | `companion.svg` | the die (the triangle face) |
+| Companion | `companion.svg` | the Launcher's die with Heph's pixel-art witch over it (`companion-portrait.png`, embedded in the SVG; Heph 2026-11-10; source and licence: ask Heph) |
 | Launcher | `launcher.svg` | the die (the triangle face): the Companion's icon until 2026-11-10, now the Launcher's (Heph); the Companion gets this icon with a picture over it |
 | Atlas | `atlas.svg` | a heavy woods hex (the map's own forest tile) |
 | Scribe | `scribe.svg` | 📜 with 🪶 over it (Twemoji) |
