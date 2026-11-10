@@ -542,8 +542,24 @@ async function campaignIdOf(url) {
   if (c && c.campaign && typeof c.campaign.id === 'string') return c.campaign.id;
   const m = url.match(/^scribe:([a-z0-9-]{1,80})$/); return m ? m[1] : url;  // a campaign saved by Scribe that the Companion hasn't opened yet
 }
+// The campaign this Atlas shows: a ?campaign= link, else the one picked last in the Launcher or an app ("hexmarch-current" = {campaign: id | null};
+// null is "No campaign"), else the Companion's. Its lockfile filters the module picker (Heph 2026-11-10: a campaign acts as a filter).
+let CUR = null;
+async function currentCampaign() {
+  if (CUR) return CUR;
+  if (ASK_CAMPAIGN !== null) return CUR = { url: ASK_CAMPAIGN, id: await campaignIdOf(ASK_CAMPAIGN) };
+  let cur = null; try { cur = await idbGet('hexmarch-current'); } catch (e) {}
+  if (cur && 'campaign' in cur) {
+    const id = typeof cur.campaign === 'string' ? cur.campaign : ''; if (!id) return CUR = { url: '', id: '' };
+    let cs = null; try { cs = await idbGet('campaigns'); } catch (e) {}
+    const url = Object.keys(cs || {}).find(u => cs[u] && cs[u].campaign && cs[u].campaign.id === id) || 'scribe:' + id;
+    return CUR = { url, id };
+  }
+  let set = null; try { set = await idbGet('settings'); } catch (e) {}
+  const url = set && typeof set.campaign === 'string' ? set.campaign : ''; return CUR = { url, id: await campaignIdOf(url) };
+}
 async function deviceState() {
-  const set = await idbGet('settings'), url = ASK_CAMPAIGN !== null ? ASK_CAMPAIGN : set && typeof set.campaign === 'string' ? set.campaign : '', id = await campaignIdOf(url);
+  const { url, id } = await currentCampaign(); if (!id) return null;
   const raw = await idbGet('state:' + id);
   if (raw && !CMODS) await campaignLock(url, id);
   if (raw) { CID = id; await campaignLink(url, id); }
@@ -1266,13 +1282,24 @@ async function forgetFile(id) {
   MODS = MODS.filter(m => m.id !== id); if (MOD && MOD.id === id) { store.set('hexmarch-atlas-module', ''); const u = new URL(location.href); u.searchParams.delete('module'); u.hash = ''; location.href = u.href; } else modList();
 }
 document.getElementById('modfile').onclick = openFile;
+// Every module this device knows (Heph 2026-11-10): the site's, the module repositories the Companion has added, the sites of the campaigns
+// Scribe keeps, and map files opened here. With a campaign picked, only its lockfile's modules.
+async function knownSites() {
+  const sites = [SITE.href], more = [];
+  try { for (const m of (await idbGet('modules')) || []) if (m && typeof m.base === 'string' && typeof m.id === 'string') more.push({ id: m.id, path: m.path || m.id + '/', site: m.base }); } catch (e) {}
+  try { const { id } = await currentCampaign(), rec = id && await idbGet('scribe-campaign:' + id); if (rec && typeof rec.site === 'string' && /^https?:\/\//.test(rec.site)) sites.push(rec.site.replace(/\/?$/, '/')); } catch (e) {}
+  const out = [];
+  for (const st of [...new Set(sites)]) { try { const repo = await (await fetch(new URL('hexmarch.json', st))).json(); for (const m of repo.modules || []) if (m && m.id && m.path) out.push({ id: m.id, path: m.path, site: st }); } catch (e) {} }
+  return out.concat(more).filter((m, k, a) => a.findIndex(o => o.id === m.id) === k);
+}
 async function loadModules() {
   const local = await fileMods();
-  let repo = {}; try { repo = await (await fetch(new URL('hexmarch.json', SITE))).json(); } catch (e) {}
-  MODS = (await Promise.all((repo.modules || []).filter(m => !local.some(l => l.id === m.id)).map(async m => {
-    const base = new URL(m.path.replace(/\/?$/, '/'), SITE).href, r = { id: m.id, path: m.path, title: m.id, version: '', base, ok: false };
+  try { const { url, id } = await currentCampaign(); if (id && !CMODS) await campaignLock(url, id); } catch (e) {}
+  MODS = (await Promise.all((await knownSites()).filter(m => !local.some(l => l.id === m.id)).map(async m => {
+    const base = new URL(m.path.replace(/\/?$/, '/'), m.site).href, r = { id: m.id, path: m.path, title: m.id, version: '', base, ok: false };
     try { const j = await (await fetch(base + 'module.json')).json(); Object.assign(r, { title: j.title || m.id, version: j.version || '', credits: j.credits || [], languages: j.languages, starts: Array.isArray(j.starts) ? j.starts : [], ok: !!j.atlas_map }); } catch (e) {}
     return r; }))).concat(local);
+  if (CMODS && MODS.some(m => CMODS.has(m.id))) MODS = MODS.filter(m => CMODS.has(m.id));  // the campaign as a filter
   const want = new URLSearchParams(location.search).get('module') || store.get('hexmarch-atlas-module');
   MOD = MODS.find(m => m.id === want && m.ok) || MODS.find(m => m.ok);
 }
