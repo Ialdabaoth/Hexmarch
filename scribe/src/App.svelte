@@ -357,25 +357,21 @@
 
   {#if built}
     <section>
-      <h2>Your campaign</h2>
+      <h2><button type="button" class="tip" data-tip="The campaign stays on this device: the Companion, the Atlas and Scribe share it here. The Atlas puts the party at the start the first time it opens.">Your campaign</button></h2>
       {#if built.problems.length}
         <p class="bad">Scribe can't settle the modules yet:</p>
         <ul class="problems">{#each built.problems as p}<li>{describeProblem(p)}</li>{/each}</ul>
       {:else}
         <p class="small muted">{built.lock.modules.map((m) => `${m.id} ${m.version}`).join(' · ')}</p>
       {/if}
-      <h3><button type="button" class="tip" data-tip="The campaign stays on this device: the Companion, the Atlas and Scribe share it here. The Atlas puts the party at the start the first time it opens.">Play it</button></h3>
       <button disabled={!!built.problems.length || building} onclick={build}>{building ? 'Building…' : 'Build Campaign'}</button>
       {#if saveError}<p class="bad">{saveError}</p>{/if}
       {#if isBuilt}
         <p class="small muted">Built on this device, with your Referee invitation in the Companion.</p>
-        <div class="row">
-          <button onclick={() => openIn('companion')}>Open in the Companion</button>
-          {#if startSite}<button onclick={() => openIn('atlas')}>Open the start in the Atlas</button>{/if}
-        </div>
       {:else if record}
         <p class="small muted">The campaign has changed since you built it. Build it again to open or publish it.</p>
       {/if}
+      {#if isBuilt}
       <details class="files">
         <summary><span class="tip" data-tip="Keep these three files together to back up the campaign or move it to another device.">Campaign Files</span></summary>
         <ul>
@@ -385,6 +381,17 @@
           {#if atlasLink}<li><a href={atlasLink}>Look at the start in the Atlas</a></li>{/if}
         </ul>
       </details>
+      {/if}
+    </section>
+  {/if}
+
+  {#if built && isBuilt}
+    <section>
+      <h2>Preview My Campaign</h2>
+      <div class="row">
+        <button onclick={() => openIn('companion')}>Preview in Companion</button>
+        {#if startSite}<button onclick={() => openIn('atlas')}>Preview in Atlas</button>{/if}
+      </div>
     </section>
   {/if}
 
