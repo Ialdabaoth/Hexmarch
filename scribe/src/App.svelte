@@ -269,7 +269,7 @@
   <section>
     <h2>Campaign</h2>
     <input type="text" bind:value={draft.title} placeholder="Kells, 1422" />
-    <h3><button type="button" class="tip" data-tip="A campaign plays one set of core rules (its root). Everything else is added on top.">Core Rules</button></h3>
+    <h3><button type="button" class="tip" data-tip="A campaign plays one set of core rules. Everything else is added on top.">Core Rules</button></h3>
     {#each ROOTS as r (rootKey(r))}
       <label class="opt">
         <input type="radio" name="root" value={rootKey(r)} bind:group={draft.root} />
