@@ -159,7 +159,7 @@ export async function publishOnDevice(
   deliver?: (files: { pointer: Pointer; snapshot: Snapshot }) => Promise<unknown>
 ): Promise<{ pointer: Pointer; snapshot: Snapshot; record: SavedCampaign }> {
   const rec = await savedCampaign(id);
-  if (!rec) throw new Error('Save the campaign on this device first (step 7).');
+  if (!rec) throw new Error('Save the campaign on this device first.');
   // the same parts the Companion's Update campaign publishes: state, each party member's knowledge, receipts
   const { state, knowledge, receipts } = await playFor(id);
   const snap = snapshot(
