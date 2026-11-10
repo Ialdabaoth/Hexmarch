@@ -4,12 +4,17 @@
 //   join       player -> referee: a seat's character, asking to join (WORKFLOWS.md "Joining")
 //   sent-back  referee -> player: a request returned with a note; the seat stays open
 //   campaign   Scribe -> Companion: a campaign's definition (Scribe's record) and the referee's seat
-//   update     Companion -> Scribe: what play changed (state, each party member's knowledge, receipts)
+//   update     Companion -> Scribe: what play changed (state, each party member's knowledge, receipts); body.back,
+//              when there, is where Scribe returns with a 'published' answer (Heph 2026-11-10: Scribe is the only
+//              publisher), only on Scribe's own site. Parts left out (knowledge, receipts: the Atlas sends only state)
+//              are unchanged.
+//   published  Scribe -> Companion: the answer to an update (re = its id): {ok:true, revision, at} or {ok:false, error,
+//              firstPublish?} (firstPublish: the referee must press Publish in Scribe once first)
 // Approval needs no envelope of its own: the request's id appears in the next snapshot's `receipts`, and the
 // character in its state's `characters`.
 
 export const MAIL_FORMAT = 'hexmarch-mail';
-export const MAIL_KINDS = ['join', 'sent-back', 'campaign', 'update'] as const;
+export const MAIL_KINDS = ['join', 'sent-back', 'campaign', 'update', 'published'] as const;
 export type MailKind = (typeof MAIL_KINDS)[number];
 
 export interface Envelope {

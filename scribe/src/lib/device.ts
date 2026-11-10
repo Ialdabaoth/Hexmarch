@@ -9,7 +9,7 @@
 
 import type { Built } from './campaign';
 import type { RootChoice } from './rules';
-import { checkUpload, envelope, pointer, publishParts, snapshot, type Envelope, type UploadReport, type Pointer, type Services, type Snapshot } from '../../../engine';
+import { checkUpload, envelope, pointer, publishParts, snapshot, upload, type Envelope, type UploadReport, type Pointer, type Services, type Snapshot } from '../../../engine';
 
 export const SCRIBE_FORMAT = 'hexmarch-scribe-campaign';
 
@@ -97,8 +97,9 @@ export async function saveOnDevice(built: Built, root: RootChoice, site: string,
 //   campaign  Scribe -> Companion: {record, state?}, the saved record (with services and published once it has
 //             them) and, when Scribe has just written it, the state file to start play from
 //   update    Companion -> Scribe: {state, knowledge, receipts}, the parts Publish needs, as the Companion has them
-export function campaignMessage(record: SavedCampaign, state?: unknown, now = new Date()): Envelope {
-  return envelope({ campaign: record.id, kind: 'campaign', from: { role: 'referee' }, to: 'referee', body: { record, ...(state ? { state } : {}) } }, now);
+// `invite` (from the Atlas's party builder): the Companion opens Invite a player for that party.
+export function campaignMessage(record: SavedCampaign, state?: unknown, invite?: { party: string }, now = new Date()): Envelope {
+  return envelope({ campaign: record.id, kind: 'campaign', from: { role: 'referee' }, to: 'referee', body: { record, ...(state ? { state } : {}), ...(invite ? { invite } : {}) } }, now);
 }
 
 export interface Play {
@@ -122,7 +123,15 @@ export async function applyUpdate(e: Envelope): Promise<UpdateResult> {
   if (applied.includes(e.id)) return { ...base, status: 'repeat' };
   const had = (await idbGet(`play:${e.campaign}`)) as Play | undefined;
   const newer = !had || revisionOf(b.state) >= revisionOf(had.state);
-  if (newer) await idbSet(`play:${e.campaign}`, { state: b.state, knowledge: b.knowledge ?? {}, receipts: Array.isArray(b.receipts) ? b.receipts : [], at: e.sent });
+  // A part the update leaves out is unchanged (the Atlas sends only the state), not empty.
+  const kept = newer && (!b.knowledge || !Array.isArray(b.receipts)) ? await playFor(e.campaign) : null;
+  if (newer)
+    await idbSet(`play:${e.campaign}`, {
+      state: b.state,
+      knowledge: b.knowledge ?? kept?.knowledge ?? {},
+      receipts: Array.isArray(b.receipts) ? b.receipts : kept?.receipts ?? [],
+      at: e.sent
+    });
   await idbSet('applied', [...applied, e.id].slice(-500));
   return { ...base, status: newer ? 'applied' : 'older' };
 }
@@ -190,3 +199,47 @@ export async function publishSecret(id: string): Promise<string> {
   return typeof v === 'string' ? v : '';
 }
 export const savePublishSecret = (id: string, secret: string) => idbSet(secretKey(id), secret.trim());
+
+// The embedded Atlas (Preview in Atlas) moves parties on Scribe's own copy of the play state: it is kept as
+// play:<id>, with the knowledge and receipts Publish would send, so Publish sees it even across browser profiles.
+export async function savePlayState(id: string, state: Record<string, unknown>, now = new Date()): Promise<void> {
+  const p = await playFor(id);
+  await idbSet(`play:${id}`, { ...p, state, at: now.toISOString() });
+}
+
+// Publishing again without the page (Heph 2026-11-10: Scribe is the only publisher; after the first, deliberate
+// Publish, what players need is published by itself): for an Update link from the Companion and for parties changed
+// in the embedded Atlas. Uses the campaign's own adapter and the key kept on this device; never My Own Host, which
+// can't upload. The answer is what Scribe shows, and what goes back to the Companion as a 'published' message.
+export type PublishResult = { ok: true; revision: number; at: string } | { ok: false; error: string; firstPublish?: true };
+export async function publishAgain(id: string, now = new Date(), f: typeof fetch = fetch): Promise<PublishResult> {
+  const rec = await savedCampaign(id);
+  if (!rec) return { ok: false, error: "Scribe on this device doesn't have this campaign. Build it in Scribe first." };
+  if (!rec.published || !rec.services) return { ok: false, firstPublish: true, error: 'Publish the campaign once in Scribe first.' };
+  const store = rec.services.store;
+  if (!store || store.kind === 'manual') return { ok: false, error: 'This campaign lives on your own host, so publish it from Scribe and upload the files by hand.' };
+  const secret = await publishSecret(id);
+  try {
+    const out = await publishOnDevice(id, rec.services, now, (x) =>
+      upload(store, secret, { 'campaign.json': x.pointer, 'snapshot.json': x.snapshot }, `Publish ${String(rec.manifest.title ?? id)}, revision ${x.snapshot.revision}`, f)
+    );
+    return { ok: true, revision: out.record.published!.revision, at: out.record.published!.at };
+  } catch (e) {
+    return { ok: false, error: (e as Error).message || String(e) };
+  }
+}
+
+export function publishedMessage(id: string, re: string, result: PublishResult, now = new Date()): Envelope {
+  return envelope({ campaign: id, kind: 'published', from: { role: 'referee' }, to: 'referee', re, body: { ...result } }, now);
+}
+
+// Where to return after an Update link: only an address on Scribe's own site (the apps share one), never elsewhere.
+export function backUrl(back: unknown, here: string): string | null {
+  if (typeof back !== 'string') return null;
+  try {
+    const u = new URL(back, here);
+    return u.origin === new URL(here).origin ? u.href : null;
+  } catch {
+    return null;
+  }
+}

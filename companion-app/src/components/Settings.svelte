@@ -55,6 +55,17 @@
   // to a party) and, optionally, the character they play.
   let inviteFor = $state('');
   let inviteTo = $state('');
+  // Handed here by the Atlas's party builder: that party's invitation, open and in view.
+  let inviteOpen = $state(false);
+  let inviteBox = $state<HTMLDetailsElement>();
+  $effect(() => {
+    const v = app.view;
+    if (v.name !== 'settings' || !v.invite) return;
+    inviteTo = v.invite;
+    inviteOpen = true;
+    app.view = { name: 'settings' };
+    queueMicrotask(() => inviteBox?.scrollIntoView({ block: 'start' }));
+  });
   let toParty = $derived(app.state.parties.some((p) => p.id === inviteTo) ? inviteTo : app.state.active);
   let invite = $derived(
     app.campaign
@@ -122,18 +133,12 @@
     </p>
     {#if app.mode === 'referee' && app.canUpdate}
       <p class="small muted">
-        Published{app.campaign.published ? ` (update ${app.campaign.published.revision})` : ''}. <button class="link" disabled={busy} onclick={() => run(() => app.updateCampaign())}>Update campaign</button>
-        saves the campaign as players will see it now (the clock, the party, what each character knows, and the requests you answered) as two files to upload in place of the old ones.
-      </p>
-    {/if}
-    {#if app.mode === 'referee' && isScribeLink(app.settings.campaign)}
-      <p class="small muted">
-        <button class="link" disabled={busy} onclick={() => run(async () => { location.href = await app.scribeLink(); })}>Send play to Scribe</button>
-        opens Scribe with the clock, the party, what each character knows and the requests you answered, so its Publish includes them.
+        {#if app.needsPublish}Changes players haven't seen yet.{:else}Published{app.campaign.published ? ` (update ${app.campaign.published.revision})` : ''}, up to date.{/if}
+        <button class="link" disabled={busy} onclick={() => run(() => app.sendToScribe())}>Send to Scribe to publish</button>
       </p>
     {/if}
     {#if app.mode === 'referee'}
-      <details>
+      <details bind:open={inviteOpen} bind:this={inviteBox}>
         <summary class="small">Invite a player</summary>
         {#if isScribeLink(app.settings.campaign) && !app.campaign.published}
           <p class="small muted">This campaign is kept only on this device, where Scribe saved it, so a player can't open it yet. Invitations open once the campaign is published.</p>
@@ -149,8 +154,13 @@
           <option value="">They pick or make a character</option>
           {#each app.characters.filter((c) => c.data.owner !== 'referee') as c (c.id)}<option value={c.id}>To play {c.name}</option>{/each}
         </select>
-        <input readonly value={invite} aria-label="Invitation link" onfocus={(e) => (e.target as HTMLInputElement).select()} />
-        <button onclick={copyInvite}>Copy link</button>
+        {#if app.needsPublish}
+          <p class="small muted">Not published yet: the player wouldn't find {app.state.parties.find((p) => p.id === toParty)?.name ?? 'the party'} or your latest changes.</p>
+          {#if app.canUpdate}<button class="primary" disabled={busy} onclick={() => run(() => app.sendToScribe(toParty))}>Send to Scribe to publish</button>{/if}
+        {:else}
+          <input readonly value={invite} aria-label="Invitation link" onfocus={(e) => (e.target as HTMLInputElement).select()} />
+          <button onclick={copyInvite}>Copy link</button>
+        {/if}
         {/if}
         {/if}
       </details>

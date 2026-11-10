@@ -1,0 +1,1 @@
+The Atlas in Campaign › Maps folds away: tap its "Atlas" header to fold or unfold it. It starts open and this device remembers the choice. Folded, the map stays loaded, so the party and its messages keep working.

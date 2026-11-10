@@ -29,9 +29,10 @@ describe('apps talk by links', () => {
   const now = new Date('2026-11-09T16:30:00Z');
   it('hands the Companion the record, and the state only when Scribe wrote it', () => {
     const rec = { id: 'kells-1422', manifest: { title: 'Kells 1422' } } as unknown as SavedCampaign;
-    const m = campaignMessage(rec, { revision: 1 }, now);
+    const m = campaignMessage(rec, { revision: 1 }, undefined, now);
     expect(m).toMatchObject({ format: 'hexmarch-mail', kind: 'campaign', campaign: 'kells-1422', from: { role: 'referee' }, to: 'referee', body: { record: rec, state: { revision: 1 } } });
-    expect(campaignMessage(rec, undefined, now).body).toEqual({ record: rec });
+    expect(campaignMessage(rec, undefined, undefined, now).body).toEqual({ record: rec });
+    expect(campaignMessage(rec, undefined, { party: 'red-hand' }, now).body).toEqual({ record: rec, invite: { party: 'red-hand' } });
   });
   it('publishes the play the Companion sent, unless this device holds newer', async () => {
     const sent = { state: { revision: 5, characters: [] }, knowledge: { holly: [] }, receipts: ['j1'], at: '' };
@@ -40,5 +41,16 @@ describe('apps talk by links', () => {
     expect(await playFor('k', get(keys(4)))).toEqual({ state: sent.state, knowledge: sent.knowledge, receipts: ['j1'] });
     expect((await playFor('k', get(keys(6)))).state).toEqual({ revision: 6, characters: [] });
     expect((await playFor('k', get({ 'state:k': { revision: 2 } }))).state).toEqual({ revision: 2 });
+  });
+});
+
+describe('back address after an Update link', () => {
+  it('returns only to the same site', async () => {
+    const { backUrl } = await import('./device');
+    const here = 'https://ialdabaoth.github.io/Hexmarch/scribe/#m=x';
+    expect(backUrl('https://ialdabaoth.github.io/Hexmarch/?tab=inbox', here)).toBe('https://ialdabaoth.github.io/Hexmarch/?tab=inbox');
+    expect(backUrl('../', here)).toBe('https://ialdabaoth.github.io/Hexmarch/');
+    expect(backUrl('https://evil.example/', here)).toBeNull();
+    expect(backUrl(undefined, here)).toBeNull();
   });
 });

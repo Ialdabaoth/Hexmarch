@@ -2,7 +2,8 @@
   import { ROOTS, RULES_MANIFESTS, type RootChoice } from './lib/rules';
   import { loadSite, type SiteModule } from './lib/data';
   import { buildCampaign, describeProblem, startsOf, type Built, type Choices } from './lib/campaign';
-  import { applyUpdate, campaignLink, campaignMessage, publishOnDevice, publishSecret, saveOnDevice, savePublishSecret, savedCampaign, testUpload, type SavedCampaign, type UpdateResult } from './lib/device';
+  import { applyUpdate, backUrl, campaignMessage, playFor, publishAgain, publishedMessage, type PublishResult, publishOnDevice, savePlayState, publishSecret, saveOnDevice, savePublishSecret, savedCampaign, testUpload, type SavedCampaign, type UpdateResult } from './lib/device';
+  import { applyAtlas, atlasEvent, type State } from './lib/parties';
   import type { UploadCheck, UploadReport } from '../../engine';
   import { appsScriptCode, appsScriptStore, githubStore, messageLink, newKey, readMessageHash, servicesFor, staticServices, upload, type Services, type StoreKind } from '../../engine';
 
@@ -232,6 +233,38 @@
     unreadable: "can't be read: it isn't JSON, or the host doesn't let other sites read it"
   };
 
+  // Auto-publish (Heph 2026-11-10: Scribe is the only publisher, and the referee shouldn't bounce back and forth). The
+  // first publish stays the Publish button; after it, parties made, moved or picked in the embedded Atlas are published
+  // a few seconds later, and an invitation waits for any publish still pending, so the player joins a campaign that
+  // already has their party.
+  const AUTO_DELAY = 3000;
+  let autoTimer: ReturnType<typeof setTimeout> | undefined;
+  let autoRun: Promise<PublishResult> | null = null;
+  let autoStatus = $state<'publishing' | PublishResult | null>(null);
+  function schedulePublish() {
+    if (!record?.published) return;
+    clearTimeout(autoTimer);
+    autoTimer = setTimeout(() => void publishNow(), AUTO_DELAY);
+  }
+  async function runPublish(id: string): Promise<PublishResult> {
+    autoStatus = 'publishing';
+    const r = await publishAgain(id);
+    autoStatus = r;
+    if (id === campaignKey) record = await savedCampaign(id);
+    return r;
+  }
+  // Runs a pending auto-publish now, or waits for one under way; false when that publish failed.
+  async function publishNow(): Promise<boolean> {
+    if (autoTimer !== undefined) {
+      clearTimeout(autoTimer);
+      autoTimer = undefined;
+      const before = autoRun;
+      autoRun = (async () => (await before, runPublish(campaignKey)))().finally(() => (autoRun = null));
+    }
+    const r = autoRun ? await autoRun : null;
+    return !r || r.ok;
+  }
+
   // Update in Scribe (Companion -> Scribe, a link to scribe/#m=...): play to publish from.
   let received = $state<UpdateResult | null>(null);
   let receiveError = $state('');
@@ -241,6 +274,18 @@
       if (!e) return;
       received = await applyUpdate(e);
       history.replaceState(null, '', location.pathname + location.search);
+      // Scribe is the only publisher: an Update from the Companion is published straight away (after the first
+      // Publish), then the Companion gets the answer at its back address.
+      const rec = await savedCampaign(e.campaign);
+      const result: PublishResult =
+        received.status === 'applied' ? await runPublish(e.campaign)
+        : rec?.published ? { ok: true, revision: rec.published.revision, at: rec.published.at }
+        : { ok: false, firstPublish: true, error: 'Publish the campaign once in Scribe first.' };
+      autoStatus = result;
+      // back (the Companion, or the Atlas on its way to an invitation): return there with a 'published' answer,
+      // whatever happened; only on this site.
+      const back = backUrl(e.body.back, location.href);
+      if (back) location.href = await messageLink(back, publishedMessage(e.campaign, e.id, result));
     } catch (e) {
       receiveError = `Scribe couldn't read that link: ${(e as Error).message || e}`;
     }
@@ -251,18 +296,85 @@
   const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
   const isBuilt = $derived(!!built && !!record && same(record.manifest, $state.snapshot(built.manifest)) && same(record.lock, $state.snapshot(built.lock)));
 
-  async function openIn(app: 'companion' | 'atlas') {
-    if (!isBuilt || !built) return;
-    const link = campaignLink(String(built.manifest.id));
-    const c = encodeURIComponent(link);
-    if (app === 'companion') {
-      // Apps talk by links: the Companion gets the campaign, and the state to start from when Scribe just wrote it
-      const rec = await savedCampaign(String(built!.manifest.id));
-      if (rec) location.href = await messageLink(new URL('../', location.href).href, campaignMessage(rec, wroteState ? $state.snapshot(built!.state) : undefined));
+  async function previewAtlas() {
+    if (!isBuilt || !built || !startSite) return;
+    play = (await playFor(campaignKey)).state as State;
+    atlasShown = true;
+    setAtlasOpen(true);
+  }
+
+  // An invitation, from the embedded Atlas's party builder (Heph 2026-11-10: Scribe sets up the campaign and hands it to
+  // the Atlas; the Atlas builds the party; the party builder hands to the Companion per invite, so there is no Preview
+  // in Companion button). Apps talk by links: the Companion gets the campaign, Scribe's play state with that party
+  // active, and `invite: {party}` so it opens Invite a player for that party.
+  async function invite(party: string) {
+    if (!(await publishNow())) return; // shown above the Atlas; the player would join a campaign without their party
+    const rec = built && (await savedCampaign(String(built.manifest.id)));
+    if (!rec || !play) return;
+    const state = applyAtlas($state.snapshot(play) as State, { event: 'active', module: '', party }, siteUrl);
+    location.href = await messageLink(new URL('../', location.href).href, campaignMessage(rec, state, { party }));
+  }
+
+  // Preview in Atlas (Heph 2026-11-10): the Atlas embedded here, as in the Companion's Campaign › Maps, in a header
+  // that folds (open or closed is remembered on this device). Scribe is its host: it hands the Atlas the play state
+  // and the lockfile (whose starts the party creator offers) and applies the parties made, moved or picked there to
+  // its own copy, which Publish reads. A folded Atlas stays loaded, so its messages keep coming.
+  const ATLAS_OPEN = 'hexmarch-scribe-atlas-open';
+  let atlasShown = $state(false);
+  let atlasOpen = $state(true);
+  try {
+    atlasOpen = localStorage.getItem(ATLAS_OPEN) !== '0';
+  } catch {
+    // storage blocked: start open
+  }
+  function setAtlasOpen(open: boolean) {
+    atlasOpen = open;
+    try {
+      localStorage.setItem(ATLAS_OPEN, open ? '1' : '0');
+    } catch {
+      // not kept
     }
-    else if (startSite) location.href = `../atlas/?site=${encodeURIComponent(siteUrl)}&module=${encodeURIComponent(startSite.module)}&campaign=${c}${startSite.slug ? `&place=site:${startSite.slug}#site:${startSite.slug}` : ''}`;
+  }
+  let play = $state<State | null>(null);
+  let frame = $state<HTMLIFrameElement>();
+  const atlasSrc = $derived(
+    startSite ? `../atlas/?module=${encodeURIComponent(startSite.module)}&site=${encodeURIComponent(siteUrl)}${startSite.slug ? `#site:${startSite.slug}` : ''}` : ''
+  );
+  const postAtlas = (msg: object) => frame?.contentWindow?.postMessage({ type: 'hexmarch-atlas', ...msg }, '*');
+  function sendAtlas() {
+    if (play) postAtlas({ state: $state.snapshot(play) });
+    if (built) postAtlas({ lock: $state.snapshot(built.lock) });
+    // the party builder's Invite button sends {event:'invite'} only when its host offers it
+    postAtlas({ hostActions: ['invite'], ...(record?.services?.pointer ? { campaign: record.services.pointer } : {}) });
+  }
+  // The Atlas may still be loading its map when the frame loads, so both go again when it first reports its view.
+  let greeted = false;
+  function onAtlasLoad() {
+    greeted = false;
+    sendAtlas();
+  }
+  async function onAtlasMessage(e: MessageEvent) {
+    if (!frame || e.source !== frame.contentWindow || !play) return;
+    const ev = atlasEvent(e.data);
+    if (!ev) return;
+    if (ev.event === 'invite') return invite(ev.party);
+    if (ev.event === 'view') {
+      if (!greeted) {
+        greeted = true;
+        sendAtlas();
+      }
+      return;
+    }
+    const next = applyAtlas($state.snapshot(play) as State, ev, siteUrl);
+    if (next.revision === play.revision) return;
+    play = next;
+    await savePlayState(campaignKey, next);
+    postAtlas({ state: next });
+    schedulePublish();
   }
 </script>
+
+<svelte:window onmessage={onAtlasMessage} />
 
 <main>
   <header>
@@ -275,7 +387,8 @@
 
   {#if received}
     <section class="small">
-      {#if received.status === 'applied'}Received play for “{received.title ?? received.campaign}” from the Companion (state revision {received.revision}). Publish again to share it.
+      {#if received.status === 'applied'}Received play for “{received.title ?? received.campaign}” from the Companion (state revision {received.revision}).
+        {#if autoStatus === 'publishing'} Publishing…{:else if autoStatus?.ok} Published (revision {autoStatus.revision}).{:else if autoStatus} {autoStatus.error}{/if}
       {:else if received.status === 'older'}That link holds older play for “{received.title ?? received.campaign}” (revision {received.revision}) than Scribe already has, so Scribe kept what it has.
       {:else}Scribe already has the play in that link.{/if}
       {#if !received.title} Scribe hasn't saved this campaign on this device; open it in Scribe to publish.{/if}
@@ -365,9 +478,17 @@
     <section>
       <h2>Preview My Campaign</h2>
       <div class="row">
-        <button onclick={() => openIn('companion')}>Preview in Companion</button>
-        {#if startSite}<button onclick={() => openIn('atlas')}>Preview in Atlas</button>{/if}
+        {#if startSite && !atlasShown}<button onclick={previewAtlas}>Preview in Atlas</button>{/if}
       </div>
+      {#if atlasShown && atlasSrc}
+        {#if autoStatus === 'publishing'}<p class="small muted">Publishing…</p>
+        {:else if autoStatus?.ok}<p class="small muted">Published (revision {autoStatus.revision}).</p>
+        {:else if autoStatus}<p class="bad">{autoStatus.error}</p>{/if}
+        <details class="atlas" open={atlasOpen} ontoggle={(e) => setAtlasOpen((e.currentTarget as HTMLDetailsElement).open)}>
+          <summary>Atlas <span class="small muted">{picked[0]?.title}</span></summary>
+          <div class="frame"><iframe bind:this={frame} src={atlasSrc} title="Atlas preview" onload={onAtlasLoad}></iframe></div>
+        </details>
+      {/if}
     </section>
   {/if}
 
