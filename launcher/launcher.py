@@ -24,4 +24,14 @@ shutil.copy(os.path.join(HERE, 'sw.js'), os.path.join(site, 'sw.js'))
 # Heph 2026-11-10: the die that was the Companion's icon is now the Launcher's (icons/launcher.svg)
 shutil.copy(os.path.join(REPO, 'icons', 'launcher.svg'), os.path.join(site, 'launcher.svg'))
 shutil.copy(os.path.join(REPO, 'icons', 'png', 'launcher-180.png'), os.path.join(site, 'apple-touch-icon.png'))
+for n in (192, 512): shutil.copy(os.path.join(REPO, 'icons', 'png', f'launcher-{n}.png'), os.path.join(site, f'launcher-{n}.png'))
+# Installable too (Heph 2026-11-11), as "⬢ Hexmarch". Its scope is the page itself, not the folder: a scope of the whole
+# site would cover companion/, atlas/ and scribe/, and phones would then call those "already installed" (the Companion
+# had that scope before it moved).
+json.dump({'name': f'⬢ {NAME}', 'short_name': NAME, 'description': 'Hexcrawl Campaign Manager: open the apps, switch campaigns, back up or reset this device.',
+           'id': './index.html', 'start_url': './index.html', 'scope': './index.html', 'display': 'standalone',
+           'launch_handler': {'client_mode': ['navigate-existing', 'auto']}, 'theme_color': '#2b2118', 'background_color': '#f4ecdc',
+           'icons': [{'src': 'launcher-192.png', 'sizes': '192x192', 'type': 'image/png'}, {'src': 'launcher-512.png', 'sizes': '512x512', 'type': 'image/png'},
+                     {'src': 'launcher-512.png', 'sizes': '512x512', 'type': 'image/png', 'purpose': 'maskable'}]},
+          open(os.path.join(site, 'manifest.webmanifest'), 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
 print(f'{NAME} Launcher -> {site}/index.html ({", ".join(f"{k.title()} {v}" for k, v in versions.items())})')

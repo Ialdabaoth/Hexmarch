@@ -6,7 +6,7 @@
 <title>{{NAME}}: Hexcrawl Campaign Manager</title>
 <meta name="description" content="Open the {{NAME}} apps, switch campaigns, and back up or reset what this device keeps.">
 <meta name="theme-color" content="#2b2118">
-<link rel="icon" href="launcher.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="launcher.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="apple-touch-icon.png"><link rel="manifest" href="manifest.webmanifest">
 <style>
 :root { --bg: #f4ecdc; --card: #fffaf0; --ink: #2b2118; --muted: #6b5d4d; --line: #d9ccb4; --gold: #b8892e; --accent: #7a3b1d; --bad: #9b2c1c; color-scheme: light; }
 @media (prefers-color-scheme: dark) { :root { --bg: #1d1712; --card: #28201a; --ink: #f4ecdc; --muted: #b9a990; --line: #4a3d30; --gold: #e8c77a; --accent: #e8a86b; --bad: #f08a76; color-scheme: dark; } }
@@ -37,15 +37,15 @@ footer { margin-top: 24px; text-align: center; }
   <header><img src="launcher.svg" alt=""><div><h1>{{NAME}}</h1><div class="small muted">Hexcrawl Campaign Manager</div></div></header>
 
   <section class="apps" aria-label="Apps">
-    <a class="app" href="companion/" data-app="companion"><img src="companion/icon.svg" alt=""><span><b>Companion</b><span class="small muted">Characters, dice and play · {{COMPANION}}</span></span></a>
-    <a class="app" href="atlas/" data-app="atlas"><img src="atlas/icon.svg" alt=""><span><b>Atlas</b><span class="small muted">Maps and parties · {{ATLAS}}</span></span></a>
-    <a class="app" href="scribe/" data-app="scribe"><img src="scribe/icon.svg" alt=""><span><b>Scribe</b><span class="small muted">Campaigns and publishing · {{SCRIBE}}</span></span></a>
+    <a class="app" href="companion/" data-app="companion" target="_blank" rel="noopener"><img src="companion/icon.svg" alt=""><span><b>Companion</b><span class="small muted">Characters, dice and play · {{COMPANION}}</span></span></a>
+    <a class="app" href="atlas/" data-app="atlas" target="_blank" rel="noopener"><img src="atlas/icon.svg" alt=""><span><b>Atlas</b><span class="small muted">Maps and parties · {{ATLAS}}</span></span></a>
+    <a class="app" href="scribe/" data-app="scribe" target="_blank" rel="noopener"><img src="scribe/icon.svg" alt=""><span><b>Scribe</b><span class="small muted">Campaigns and publishing · {{SCRIBE}}</span></span></a>
   </section>
 
   <section>
     <h2>Campaigns on this device</h2>
     <ul class="list" id="campaigns"><li class="muted small">Looking…</li></ul>
-    <a class="button" href="scribe/">New Campaign</a>
+    <a class="button" href="scribe/" target="_blank" rel="noopener">New Campaign</a>
   </section>
 
   <section>
@@ -160,7 +160,9 @@ $('campaigns').addEventListener('click', async e => {
   const q = new URLSearchParams();
   if (app === 'atlas' && pick.party) q.set('party', pick.party);
   if (app === 'atlas' && pick.character) q.set('as', pick.character);
-  location.href = `${app}/${q.size ? '?' + q : ''}`;
+  // a new window, so an installed app takes it (never this page turning into the app)
+  const url = `${app}/${q.size ? '?' + q : ''}`;
+  if (!window.open(url, '_blank')) location.href = url;
 });
 
 // --- What the device keeps

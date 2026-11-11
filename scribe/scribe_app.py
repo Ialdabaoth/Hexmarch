@@ -23,7 +23,7 @@ shutil.copy(os.path.join(ICONS, 'png', 'scribe-180.png'), os.path.join(out, 'app
 for n in (192, 512): shutil.copy(os.path.join(ICONS, 'png', f'scribe-{n}.png'), os.path.join(out, f'icon-{n}.png'))
 # name "⬢ Scribe", short_name plain "Scribe" (Heph 2026-11-08; the same pattern as the Atlas and the Companion)
 json.dump({'name': '⬢ Scribe', 'short_name': 'Scribe', 'description': f'The {NAME} module and campaign editor.',
-           'start_url': './', 'scope': './', 'display': 'standalone', 'launch_handler': {'client_mode': ['navigate-existing', 'auto']}, 'theme_color': '#2b2118', 'background_color': '#f4ecdc',
+           'id': './', 'start_url': './', 'scope': './', 'display': 'standalone', 'launch_handler': {'client_mode': ['navigate-existing', 'auto']}, 'theme_color': '#2b2118', 'background_color': '#f4ecdc',
            'icons': [{'src': 'icon-192.png', 'sizes': '192x192', 'type': 'image/png'}, {'src': 'icon-512.png', 'sizes': '512x512', 'type': 'image/png'},
                      {'src': 'icon-512.png', 'sizes': '512x512', 'type': 'image/png', 'purpose': 'maskable'}]},
           open(os.path.join(out, 'manifest.webmanifest'), 'w'), ensure_ascii=False, indent=1)
