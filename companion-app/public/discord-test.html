@@ -24,7 +24,7 @@
 <main>
   <h1>Discord browser test</h1>
   <p class="muted">Answers WORKFLOWS "Still open" 1 and 7: can a web page read a Discord channel, post as a bot, and hold the live
-  gateway? Everything runs in this browser tab and talks only to Discord. Nothing is saved or sent anywhere else. Use a
+  gateway? And can one web page send a web push that wakes another device's app? (Test web push needs no Discord details.) Everything runs in this browser tab and talks only to Discord. Nothing is saved or sent anywhere else. Use a
   test channel and a test bot, and reset the bot's token afterwards.</p>
 
   <label for="hook">Channel webhook URL</label>
@@ -36,6 +36,7 @@
   <label for="channel">Channel id</label>
   <input id="channel" placeholder="right-click the channel › Copy Channel ID (needs Developer Mode)" autocomplete="off" />
   <button id="run">Run the tests</button>
+  <button id="push" title="Asks to show notifications, subscribes this browser to web push, then sends it a push from this page, as a player's Companion would send one to the referee's device.">Test web push</button>
 
   <ol id="out"></ol>
   <p class="muted">When it finishes, copy the results (or screenshot them) back to the Companion thread.</p>
@@ -134,6 +135,48 @@ $('run').onclick = async () => {
     }));
   } else row('Bot tests')(false, 'no bot token or channel id given');
 
+  const li = document.createElement('li');
+  li.innerHTML = `<pre>${[...$('out').querySelectorAll('li')].map((x) => x.textContent).join('\n')}\nBrowser: ${navigator.userAgent}</pre>`;
+  $('out').append(li);
+};
+
+// Web push without a server: a player's app would send the referee's device a push straight from the browser. The
+// page makes a throwaway signing key (VAPID), subscribes this browser, and posts an empty push to the push service.
+const b64u = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+const utf8 = (s) => new TextEncoder().encode(s);
+$('push').onclick = async () => {
+  $('out').textContent = '';
+  let reg, sub, key, pub, heard = false;
+  navigator.serviceWorker && navigator.serviceWorker.addEventListener('message', (e) => { if (e.data && e.data.hexmarchPushTest) heard = true; });
+  if (!(await attempt('This browser can show notifications', async () => {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) throw new Error('no web push here (on iPhone, add the page to the home screen first)');
+    const p = await Notification.requestPermission();
+    if (p !== 'granted') throw new Error(`permission ${p}`);
+  }))) return;
+  if (!(await attempt('Subscribe to web push', async () => {
+    reg = await navigator.serviceWorker.register('./push-test-sw.js', { scope: './push-test/' });
+    await new Promise((r) => { const w = reg.installing || reg.waiting; if (!w || reg.active) return r(); w.addEventListener('statechange', () => w.state === 'activated' && r()); });
+    key = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign']);
+    pub = await crypto.subtle.exportKey('raw', key.publicKey);
+    const old = await reg.pushManager.getSubscription();
+    if (old) await old.unsubscribe();
+    sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: pub });
+    return new URL(sub.endpoint).host;
+  }))) return;
+  await attempt('Send a push from this page (no server)', async () => {
+    const aud = new URL(sub.endpoint).origin;
+    const head = b64u(utf8(JSON.stringify({ typ: 'JWT', alg: 'ES256' })));
+    const body = b64u(utf8(JSON.stringify({ aud, exp: Math.floor(Date.now() / 1000) + 3600, sub: 'mailto:test@example.invalid' })));
+    const sig = await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, key.privateKey, utf8(`${head}.${body}`));
+    const res = await call(sub.endpoint, { method: 'POST', headers: { TTL: '60', Urgency: 'high', Authorization: `vapid t=${head}.${body}.${b64u(sig)}, k=${b64u(pub)}` } });
+    if (!res.ok) throw new Error(`the push service said ${res.status}`);
+    return `the push service said ${res.status}`;
+  });
+  await attempt('The push arrived and woke the service worker', () => new Promise((resolve, reject) => {
+    let n = 0;
+    const t = setInterval(() => { if (heard) { clearInterval(t); resolve('a notification should be showing'); } else if (++n > 30) { clearInterval(t); reject(new Error('nothing within 30 s')); } }, 1000);
+  }));
+  try { await sub.unsubscribe(); } catch {}
   const li = document.createElement('li');
   li.innerHTML = `<pre>${[...$('out').querySelectorAll('li')].map((x) => x.textContent).join('\n')}\nBrowser: ${navigator.userAgent}</pre>`;
   $('out').append(li);

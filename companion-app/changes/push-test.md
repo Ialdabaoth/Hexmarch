@@ -1,0 +1,1 @@
+The Discord browser test page also checks web push without a server: it subscribes the browser, sends it a push straight from the page with a throwaway signing key, and reports whether the push service accepted it and the device woke up.
