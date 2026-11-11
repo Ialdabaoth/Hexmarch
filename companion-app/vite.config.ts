@@ -46,6 +46,7 @@ export default defineConfig({
         theme_color: '#2b2118',
         background_color: '#f4ecdc',
         display: 'standalone',
+        id: './',
         start_url: '.',
         scope: '.',
         // Links and files from other apps open in the installed Companion (lib/share.ts; WORKFLOWS.md "Apps talk by links")

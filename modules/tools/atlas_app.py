@@ -34,7 +34,7 @@ if os.path.isdir(ICONS):
 # manifest, whose scope covers the whole site, and installed the Companion. Scope and start are the Atlas's folder, so
 # the two install as separate apps (the app id defaults to the start URL)
 json.dump({'name': '⬢ Atlas', 'short_name': 'Atlas', 'description': f'{APP} Atlas: hex maps for OSR hexcrawl modules, from the whole region down to the 100-ft hex.',
-           'start_url': './', 'scope': './', 'display': 'standalone', 'launch_handler': {'client_mode': ['navigate-existing', 'auto']}, 'theme_color': '#2b2418', 'background_color': '#f4efe1',
+           'id': './', 'start_url': './', 'scope': './', 'display': 'standalone', 'launch_handler': {'client_mode': ['navigate-existing', 'auto']}, 'theme_color': '#2b2418', 'background_color': '#f4efe1',
            'icons': [{'src': 'icon-192.png', 'sizes': '192x192', 'type': 'image/png'}, {'src': 'icon-512.png', 'sizes': '512x512', 'type': 'image/png'},
                      {'src': 'icon-512.png', 'sizes': '512x512', 'type': 'image/png', 'purpose': 'maskable'}]},
           open(site + '/atlas/manifest.webmanifest', 'w'), ensure_ascii=False, indent=1)
