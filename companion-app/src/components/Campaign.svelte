@@ -22,6 +22,19 @@
   // Player mode: your party as the referee's state file lists it, and the NPCs your character has heard of or met.
   // a player's view: player mode, or the referee as one character
   let player = $derived(app.seesAs);
+  // Referee mode: a description or handout to the campaign's Discord channel
+  let tableText = $state(''), tableImage = $state(''), telling = $state(false);
+  async function tell() {
+    telling = true;
+    try {
+      await app.tellTable(tableText, tableImage);
+      tableText = '';
+      tableImage = '';
+    } catch (e) {
+      app.notify(`Couldn't post to Discord: ${(e as Error).message}`);
+    }
+    telling = false;
+  }
   let me = $derived(app.me);
   let partyNames = $derived(app.state.characters.filter((c) => c.id !== me?.id));
   let known = $derived(me ? knownCreatures(me.data.knowledge) : []);
@@ -102,6 +115,16 @@
   <summary><h2>State</h2></summary>
   <CampaignState readonly={player} />
 </details>
+
+{#if !player && app.campaign && app.canPost}
+  <details class="section">
+    <summary><h2>Tell the table</h2></summary>
+    <p class="small muted" style="margin-top:0" title="Posts to the campaign's Discord channel: a description, or a handout with a picture (an https link).">A description or handout, to the campaign's Discord channel.</p>
+    <textarea bind:value={tableText} rows="4" aria-label="What to tell the table" style="width:100%"></textarea>
+    <input bind:value={tableImage} type="url" placeholder="Picture link (optional)" aria-label="Picture link" autocomplete="off" />
+    <button class="primary" disabled={!tableText.trim() || telling} onclick={tell}>{telling ? 'Posting…' : 'Post to Discord'}</button>
+  </details>
+{/if}
 
 {#if !player}
   <details class="section" open>

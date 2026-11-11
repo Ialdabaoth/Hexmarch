@@ -1,7 +1,7 @@
 import { Character, freshState, type LiveState } from './character';
 import { importFile, mergeKnowledge, readKnowledge, type KnowledgeEntry, type SheetData } from './sheet';
 import type { LogEntry } from './checks';
-import { postToDiscord, isWebhookUrl } from './discord';
+import { editPost, postMessage, postToDiscord, isWebhookUrl, tableMessage } from './discord';
 import {
   DEFAULT_SETTINGS, loadLive, loadLog, loadModuleList, loadSettings, loadSheets, saveLive, saveLog, saveModuleList, saveSettings, saveSheets,
   unreadableSheets, loadStateFile, saveStateFile, type PartyAt, type Settings
@@ -16,12 +16,12 @@ import {
   saveLocal, type CampaignCache
 } from './campaign';
 import { CORE_RULES } from '../rules/core-modules';
-import { addMail, answer, joinRequest, loadMail, mailFileName, post, readMailFile, saveMail, sendBack, type MailItem } from './mail';
+import { addMail, answer, joinLine, joinRequest, loadMail, mailFileName, post, readMailFile, saveMail, sendBack, type MailItem } from './mail';
 import { downloadJson } from './storage';
 import { inviteDone, keepInvite, pendingInvite, updateForInvite } from './update';
 import { readShared, withoutShared } from './share';
 import { publishParts } from '../../../engine/publish';
-import { envelope as mailEnvelope, messageLink, readMessageHash, type Envelope } from '../../../engine/mail';
+import { envelope as mailEnvelope, messageLink, readMessageHash, requestStatus, type Envelope } from '../../../engine/mail';
 import { handOff, takeHandOffs } from '../../../engine/handoff';
 import { readState as readStateFile } from './state';
 import { get as idbGet, set as idbSet } from 'idb-keyval';
@@ -515,6 +515,7 @@ class AppState {
     activateCampaign(c);
     await this.checkCanUpdate();
     await this.takeSnapshotState(c);
+    void this.markDiscordPosts();
     await this.rereadSheets();
     this.equipmentChanged();
     void this.syncArt().catch((e) => console.warn('Campaign art not read', e));
@@ -536,9 +537,11 @@ class AppState {
     if (!me || !c || this.mode !== 'player') throw new Error('Pick the character you play first');
     const e = joinRequest(c.campaign.id, me, exportSheet($state.snapshot(me.data) as typeof me.data), name.trim(), this.invitation?.party);
     let how: 'posted' | 'saved' = 'saved';
+    let discord: MailItem['discord'];
     if (c.published?.post) {
       try {
-        await post(c.published.post, e);
+        const id = await post(c.published.post, e, joinLine(name.trim(), me.name, 'sent'), me.name);
+        if (id) discord = { id, shows: 'sent' };
         how = 'posted';
       } catch (err) {
         console.warn('Request not posted; saving it as a file', err);
@@ -547,7 +550,7 @@ class AppState {
     if (how === 'saved') downloadJson(mailFileName(e, me.name), e);
     // a note the referee sent back is answered by sending again
     let list = this.mail.map((m) => (m.box === 'in' && m.envelope.kind === 'sent-back' && m.envelope.to === me.id && !m.answer ? { ...m, answer: { kind: 'approved' as const, at: e.sent } } : m));
-    list = addMail(list, { envelope: e, box: 'out' });
+    list = addMail(list, { envelope: e, box: 'out', ...(discord ? { discord } : {}) });
     await this.keepMail(list);
     this.notify(how === 'posted' ? `Sent ${me.name} to the referee` : `Saved ${me.name}'s request. Send that file to your referee.`);
     return how;
@@ -565,6 +568,7 @@ class AppState {
       mail = addMail(mail, { envelope: e, box: 'in' });
     }
     await this.keepMail(mail);
+    void this.markDiscordPosts();
     return list.length;
   }
 
@@ -1122,8 +1126,51 @@ class AppState {
     return { body: this.settings.diceColor, ink: this.settings.diceInk };
   }
 
+  // Where rolls go: this device's own webhook (Settings › Discord), else the campaign's channel when its post URL is a
+  // Discord webhook (Scribe's "Where players send requests"), so players post to the table with nothing to paste.
+  get rollWebhook(): string {
+    if (isWebhookUrl(this.settings.webhookUrl)) return this.settings.webhookUrl;
+    const p = this.campaign?.published?.post ?? '';
+    return isWebhookUrl(p) ? p : '';
+  }
+  get campaignWebhook(): string {
+    const p = this.campaign?.published?.post ?? '';
+    return isWebhookUrl(p) ? p : '';
+  }
   get canPost(): boolean {
-    return isWebhookUrl(this.settings.webhookUrl);
+    return !!this.rollWebhook;
+  }
+
+  // Referee mode: a description or handout to the campaign's channel.
+  async tellTable(text: string, image = '') {
+    const url = this.campaignWebhook || this.rollWebhook;
+    if (!url || !text.trim()) return;
+    await postMessage(url, tableMessage(this.campaign?.campaign.name ?? `${__SUITE_NAME__} Companion`, text.trim(), image.trim()));
+    this.notify('Posted to Discord');
+  }
+
+  // Player mode: each request this device posted to the campaign's Discord channel shows where it stands, by
+  // editing its own post when the snapshot (receipts, the character in the state) or a reply moves it on.
+  private async markDiscordPosts() {
+    const c = this.campaign, url = this.campaignWebhook;
+    if (!c || !url || this.mode !== 'player') return;
+    const snap = c.published?.snapshot ?? null;
+    let list = this.mail, changed = false;
+    for (const m of this.mail) {
+      if (m.box !== 'out' || m.envelope.kind !== 'join' || !m.discord || m.envelope.campaign !== c.campaign.id) continue;
+      const back = this.mail.some((x) => x.box === 'in' && x.envelope.re === m.envelope.id);
+      const status = requestStatus(m.envelope, snap as Parameters<typeof requestStatus>[1], back);
+      if (status === m.discord.shows || status === 'sent') continue;
+      const character = this.character(m.envelope.from.character ?? '')?.name ?? '';
+      try {
+        await editPost(url, m.discord.id, joinLine(m.envelope.from.name ?? '', character, status));
+        list = list.map((x) => (x === m ? { ...x, discord: { ...m.discord!, shows: status } } : x));
+        changed = true;
+      } catch (e) {
+        console.warn('Discord post not updated', e);
+      }
+    }
+    if (changed) await this.keepMail(list);
   }
 
   // The result shows once the dice have landed, so the dice don't give it away.
@@ -1141,7 +1188,7 @@ class AppState {
 
   async post(entry: LogEntry) {
     try {
-      await postToDiscord(this.settings.webhookUrl, entry);
+      await postToDiscord(this.rollWebhook, entry);
       this.notify('Posted to Discord');
     } catch (e) {
       this.notify(`Couldn't post to Discord: ${(e as Error).message}`);

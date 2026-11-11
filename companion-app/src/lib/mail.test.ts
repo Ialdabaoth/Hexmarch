@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest';
-import { addMail, answer, joinRequest, mailFileName, readMailFile, sendBack } from './mail';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { addMail, answer, joinLine, joinRequest, mailFileName, post, readMailFile, sendBack } from './mail';
+import { editPost } from './discord';
 
 const NOW = new Date('2026-11-09T14:00:00Z');
 
@@ -19,5 +20,43 @@ describe('requests between player and referee', () => {
     expect(addMail(list, { envelope: join, box: 'in' })).toBe(list);
     list = answer(list, join.id, { kind: 'approved', at: NOW.toISOString() });
     expect(list[0].answer?.kind).toBe('approved');
+  });
+});
+
+describe('a Discord channel as the mailbox', () => {
+  afterEach(() => vi.unstubAllGlobals());
+  const hook = 'https://discord.com/api/webhooks/123/abc-DEF';
+
+  it('posts a readable line with the request attached, and keeps the post id', async () => {
+    const calls: { url: string; init: RequestInit }[] = [];
+    vi.stubGlobal('fetch', async (url: string, init: RequestInit) => {
+      calls.push({ url, init });
+      return new Response(JSON.stringify({ id: '999' }), { status: 200 });
+    });
+    const join = joinRequest('kells-1422', { id: 'holly' }, { id: 'holly' }, 'Dana', 'p-kells', NOW);
+    expect(await post(hook, join, joinLine('Dana', 'Holly', 'sent'), 'Holly')).toBe('999');
+    expect(calls[0].url).toBe(`${hook}?wait=true`);
+    const fd = calls[0].init.body as FormData;
+    expect(JSON.parse(String(fd.get('payload_json'))).content).toBe('⏳ Dana asks to join with Holly (waiting for the referee)');
+    const file = fd.get('files[0]') as File;
+    expect(file.name).toBe('kells-1422-join-holly.json');
+    expect(JSON.parse(await file.text()).id).toBe(join.id);
+  });
+
+  it('edits its own post as the request moves on', async () => {
+    const calls: { url: string; init: RequestInit }[] = [];
+    vi.stubGlobal('fetch', async (url: string, init: RequestInit) => (calls.push({ url, init }), new Response('{}', { status: 200 })));
+    await editPost(hook, '999', joinLine('Dana', 'Holly', 'live'));
+    expect([calls[0].url, calls[0].init.method]).toEqual([`${hook}/messages/999`, 'PATCH']);
+    expect(JSON.parse(String(calls[0].init.body)).content).toBe('✅ Dana joined with Holly');
+    expect(joinLine('', '', 'sent-back')).toBe('↩️ A player asks to join with a character: sent back with a note');
+  });
+
+  it('still posts plain JSON to any other mailbox', async () => {
+    let body = '';
+    vi.stubGlobal('fetch', async (_u: string, init: RequestInit) => ((body = String(init.body)), new Response('ok', { status: 200 })));
+    const join = joinRequest('kells-1422', { id: 'holly' }, { id: 'holly' }, 'Dana', undefined, NOW);
+    expect(await post('https://script.google.com/macros/s/x/exec', join)).toBeUndefined();
+    expect(JSON.parse(body).id).toBe(join.id);
   });
 });
