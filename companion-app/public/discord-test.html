@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Discord browser test</title>
+<style>
+  :root { --bg: #f4ecdc; --ink: #2b2118; --line: #c9b99a; --ok: #3f8f4f; --bad: #a33b2b; --muted: #6b5a45; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #1d1712; --ink: #efe4cf; --line: #5a4a38; --muted: #b3a284; } }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.45 system-ui, sans-serif; }
+  main { max-width: 44rem; margin: 0 auto; padding: 1rem; }
+  label { display: block; margin: 0.6rem 0 0.2rem; font-weight: 600; }
+  input { width: 100%; box-sizing: border-box; padding: 0.5rem; font: inherit; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: inherit; }
+  button { margin-top: 1rem; padding: 0.6rem 1rem; font: inherit; border-radius: 8px; border: 1px solid var(--line); cursor: pointer; }
+  small, .muted { color: var(--muted); }
+  ol { padding-left: 1.2rem; }
+  li { margin: 0.5rem 0; }
+  .ok { color: var(--ok); font-weight: 600; }
+  .bad { color: var(--bad); font-weight: 600; }
+  pre { white-space: pre-wrap; word-break: break-all; font-size: 0.85rem; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Discord browser test</h1>
+  <p class="muted">Answers WORKFLOWS "Still open" 1 and 7: can a web page read a Discord channel, post as a bot, and hold the live
+  gateway? Everything runs in this browser tab and talks only to Discord. Nothing is saved or sent anywhere else. Use a
+  test channel and a test bot, and reset the bot's token afterwards.</p>
+
+  <label for="hook">Channel webhook URL</label>
+  <input id="hook" placeholder="https://discord.com/api/webhooks/…" autocomplete="off" />
+  <label for="token">Bot token</label>
+  <input id="token" type="password" placeholder="from the Developer Portal › your app › Bot › Reset Token" autocomplete="off" />
+  <small>The bot needs to be in the server, with View Channel, Send Messages and Read Message History on the channel, and
+  Message Content Intent switched on (Developer Portal › Bot).</small>
+  <label for="channel">Channel id</label>
+  <input id="channel" placeholder="right-click the channel › Copy Channel ID (needs Developer Mode)" autocomplete="off" />
+  <button id="run">Run the tests</button>
+
+  <ol id="out"></ol>
+  <p class="muted">When it finishes, copy the results (or screenshot them) back to the Companion thread.</p>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+const API = 'https://discord.com/api/v10';
+function row(name) {
+  const li = document.createElement('li');
+  li.innerHTML = `<span>${name}</span>: <span class="muted">running…</span>`;
+  $('out').append(li);
+  return (ok, detail) => { li.lastChild.className = ok ? 'ok' : 'bad'; li.lastChild.textContent = (ok ? 'works' : 'fails') + (detail ? ` (${detail})` : ''); };
+}
+async function attempt(name, fn) {
+  const done = row(name);
+  try { const d = await fn(); done(true, d); return true; }
+  catch (e) { done(false, e && e.message ? e.message : String(e)); return false; }
+}
+async function expectOk(res) {
+  if (!res.ok) { let t = ''; try { t = (await res.text()).slice(0, 160); } catch {} throw new Error(`HTTP ${res.status} ${t}`); }
+  return res;
+}
+// A fetch the browser blocks for CORS throws a TypeError with no status: say so plainly.
+async function call(url, init) {
+  try { return await fetch(url, init); }
+  catch (e) { throw new Error('blocked by the browser (no CORS permission) or network: ' + e.message); }
+}
+
+$('run').onclick = async () => {
+  $('out').textContent = '';
+  const hook = $('hook').value.trim().replace(/\?.*$/, ''), token = $('token').value.trim(), channel = $('channel').value.trim();
+  const bot = { Authorization: `Bot ${token}` };
+  let posted = null, attachmentUrl = '';
+
+  if (hook) {
+    await attempt('Webhook: post and get the message id back (?wait=true)', async () => {
+      const r = await expectOk(await call(`${hook}?wait=true`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: 'Hexmarch test: pending referee', allowed_mentions: { parse: [] } }) }));
+      posted = await r.json();
+      return `message ${posted.id}`;
+    });
+    if (posted) await attempt('Webhook: edit that post (pending → approved)', async () => {
+      await expectOk(await call(`${hook}/messages/${posted.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: 'Hexmarch test: approved' }) }));
+    });
+    await attempt('Webhook: post a JSON file (a join request envelope)', async () => {
+      const fd = new FormData();
+      fd.append('payload_json', JSON.stringify({ content: 'Hexmarch test: a request file', allowed_mentions: { parse: [] } }));
+      fd.append('files[0]', new Blob([JSON.stringify({ format: 'hexmarch-mail', version: 1, id: 'test-' + Date.now(), campaign: 'test', kind: 'join', body: {} })], { type: 'application/json' }), 'hexmarch-mail.json');
+      const r = await expectOk(await call(`${hook}?wait=true`, { method: 'POST', body: fd }));
+      const m = await r.json();
+      attachmentUrl = m.attachments && m.attachments[0] ? m.attachments[0].url : '';
+      return attachmentUrl ? 'attached' : 'posted, but no attachment came back';
+    });
+    if (attachmentUrl) await attempt('Read the attached file back (Discord CDN)', async () => {
+      const r = await expectOk(await call(attachmentUrl));
+      const j = await r.json();
+      return `kind ${j.kind}`;
+    });
+  } else row('Webhook tests')(false, 'no webhook URL given');
+
+  if (token && channel) {
+    await attempt('Bot: read the channel\'s messages (REST)', async () => {
+      const r = await expectOk(await call(`${API}/channels/${channel}/messages?limit=5`, { headers: bot }));
+      const list = await r.json();
+      return `${list.length} messages read`;
+    });
+    await attempt('Bot: post a message (REST)', async () => {
+      await expectOk(await call(`${API}/channels/${channel}/messages`, { method: 'POST', headers: { ...bot, 'Content-Type': 'application/json' }, body: JSON.stringify({ content: 'Hexmarch test: posted by the bot from a browser', allowed_mentions: { parse: [] } }) }));
+    });
+    await attempt('Bot: create a scheduled event (REST, needs the server id)', async () => {
+      const ch = await (await expectOk(await call(`${API}/channels/${channel}`, { headers: bot }))).json();
+      const start = new Date(Date.now() + 86400000).toISOString(), end = new Date(Date.now() + 90000000).toISOString();
+      const r = await expectOk(await call(`${API}/guilds/${ch.guild_id}/scheduled-events`, { method: 'POST', headers: { ...bot, 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'Hexmarch test session', privacy_level: 2, entity_type: 3, scheduled_start_time: start, scheduled_end_time: end, entity_metadata: { location: 'Hexmarch test' } }) }));
+      const ev = await r.json();
+      await call(`${API}/guilds/${ch.guild_id}/scheduled-events/${ev.id}`, { method: 'DELETE', headers: bot }).catch(() => {});
+      return 'made and removed again';
+    });
+    await attempt('Bot: live gateway (WebSocket), hear a new message', () => new Promise((resolve, reject) => {
+      let ws, beat, heard = false;
+      const stop = (fn, v) => { clearInterval(beat); try { ws.close(); } catch {} fn(v); };
+      const timer = setTimeout(() => stop(heard ? resolve : reject, heard ? 'connected' : new Error('connected, but heard no message within 20 s')), 20000);
+      try { ws = new WebSocket('wss://gateway.discord.gg/?v=10&encoding=json'); } catch (e) { clearTimeout(timer); return reject(e); }
+      ws.onerror = () => { clearTimeout(timer); stop(reject, new Error('the WebSocket was refused')); };
+      ws.onmessage = (ev) => {
+        const m = JSON.parse(ev.data);
+        if (m.op === 10) {
+          beat = setInterval(() => ws.send(JSON.stringify({ op: 1, d: null })), m.d.heartbeat_interval);
+          // GUILDS | GUILD_MESSAGES | MESSAGE_CONTENT
+          ws.send(JSON.stringify({ op: 2, d: { token, intents: (1 << 0) | (1 << 9) | (1 << 15), properties: { os: 'browser', browser: 'hexmarch-test', device: 'hexmarch-test' } } }));
+        } else if (m.t === 'READY') {
+          if (hook) call(`${hook}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: 'Hexmarch test: gateway ping' }) }).catch(() => {});
+        } else if (m.t === 'MESSAGE_CREATE' && m.d.channel_id === channel) {
+          heard = true; clearTimeout(timer); stop(resolve, 'READY, and heard a new message live');
+        } else if (m.op === 9) { clearTimeout(timer); stop(reject, new Error('Discord refused the token or intents (op 9)')); }
+      };
+      ws.onclose = (ev) => { if (!heard && ev.code >= 4000) { clearTimeout(timer); stop(reject, new Error(`closed by Discord, code ${ev.code}${ev.code === 4014 ? ': switch on Message Content Intent' : ev.code === 4004 ? ': token refused' : ''}`)); } };
+    }));
+  } else row('Bot tests')(false, 'no bot token or channel id given');
+
+  const li = document.createElement('li');
+  li.innerHTML = `<pre>${[...$('out').querySelectorAll('li')].map((x) => x.textContent).join('\n')}\nBrowser: ${navigator.userAgent}</pre>`;
+  $('out').append(li);
+};
+</script>
+</body>
+</html>
