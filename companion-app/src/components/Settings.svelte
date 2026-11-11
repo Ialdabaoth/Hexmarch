@@ -186,6 +186,9 @@
     In Discord, open your channel's settings, then Integrations, Webhooks, New Webhook, and Copy Webhook URL. Paste it here.
     Anyone with this link can post to that channel, so keep it to your group.
   </p>
+  {#if app.campaignWebhook && !isWebhookUrl(app.settings.webhookUrl)}
+    <p class="small" title="The campaign's own channel, from its published campaign. A webhook saved here goes first.">Rolls go to {app.campaign?.campaign.name}'s channel.</p>
+  {/if}
   <label for="hook">Webhook URL</label>
   <input id="hook" bind:value={url} placeholder="https://discord.com/api/webhooks/…" autocapitalize="off" autocomplete="off" />
   {#if !valid}<p class="small failure">That doesn't look like a Discord webhook URL.</p>{/if}

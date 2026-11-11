@@ -5,6 +5,7 @@
 
 import { get, set } from 'idb-keyval';
 import { envelope, readEnvelope, type Envelope } from '../../../engine/mail';
+import { isWebhookUrl, postMail } from './discord';
 
 export interface MailItem {
   envelope: Envelope;
@@ -12,6 +13,8 @@ export interface MailItem {
   box: 'in' | 'out';
   // The referee's answer to a request: approved (in the next publish) or sent back with a note.
   answer?: { kind: 'approved' | 'sent-back'; note?: string; at: string };
+  // Sent to a Discord channel: the post's id, and the status its text last showed (the witness post).
+  discord?: { id: string; shows?: string };
 }
 
 export async function loadMail(): Promise<MailItem[]> {
@@ -52,7 +55,16 @@ export const mailFileName = (e: Envelope, who: string) =>
 
 // One POST to the campaign's post URL. text/plain keeps the browser from asking the host first (no CORS
 // preflight), which an Apps Script web app can't answer. Throws when it can't be sent.
-export async function post(url: string, e: Envelope): Promise<void> {
+// A Discord webhook as the post URL posts a readable line with the envelope attached; returns that post's id.
+export async function post(url: string, e: Envelope, line = '', name = ''): Promise<string | undefined> {
+  if (isWebhookUrl(url)) return postMail(url, { name: mailFileName(e, name), data: e }, line || `A ${e.kind} message for the referee`);
   const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(e) });
   if (!res.ok) throw new Error(`The referee's mailbox answered ${res.status}`);
+  return undefined;
+}
+
+// The text of a join request's post in the channel, for each status it can reach (Sent, Received, Approved, Sent back).
+export function joinLine(player: string, character: string, status: 'sent' | 'received' | 'live' | 'sent-back'): string {
+  const who = `${player || 'A player'} asks to join with ${character || 'a character'}`;
+  return status === 'live' ? `✅ ${player || 'A player'} joined with ${character || 'a character'}` : status === 'sent-back' ? `↩️ ${who}: sent back with a note` : `⏳ ${who} (waiting for the referee)`;
 }
