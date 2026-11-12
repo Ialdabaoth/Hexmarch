@@ -57,6 +57,7 @@ export class PublishError extends Error {}
 export function readPing(s: unknown): string | null {
   const t = typeof s === 'string' ? s.trim() : '';
   if (!t) return '';
+  if (t === '@here') return '@here'; // everyone in the channel who is online (never @everyone)
   const m = /^<?@?(!|&)?(\d{15,21})>?$/.exec(t);
   return m ? `<@${m[1] === '&' ? '&' : ''}${m[2]}>` : null;
 }

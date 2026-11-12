@@ -112,6 +112,7 @@ describe('who Discord notifies', () => {
     expect(readPing(`<@!${id}>`)).toBe(`<@${id}>`);
     expect(readPing(`@&${id}`)).toBe(`<@&${id}>`);
     expect(readPing(`<@&${id}>`)).toBe(`<@&${id}>`);
+    expect(readPing('@here')).toBe('@here');
     expect(readPing('@everyone')).toBeNull();
   });
   it('travels in the pointer', () => {
