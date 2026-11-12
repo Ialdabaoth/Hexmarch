@@ -39,7 +39,11 @@
   <button id="push" title="Asks to show notifications, subscribes this browser to web push, then sends it a push from this page, as a player's Companion would send one to the referee's device.">Test web push</button>
 
   <ol id="out"></ol>
-  <p class="muted">When it finishes, copy the results (or screenshot them) back to the Companion thread.</p>
+  <div id="sum" hidden>
+    <p class="muted">When it finishes, copy this (it holds only this run) back to the Companion thread.</p>
+    <pre id="sumtext"></pre>
+    <button id="copy">Copy results</button>
+  </div>
 </main>
 <script>
 const $ = (id) => document.getElementById(id);
@@ -55,6 +59,12 @@ async function attempt(name, fn) {
   try { const d = await fn(); done(true, d); return true; }
   catch (e) { done(false, e && e.message ? e.message : String(e)); return false; }
 }
+// One summary of this run only, so a copy never carries earlier runs.
+function summarise() {
+  $('sumtext').textContent = `${[...$('out').children].map((x, i) => `${i + 1}. ${x.textContent}`).join('\n')}\nBrowser: ${navigator.userAgent}`;
+  $('sum').hidden = false;
+}
+$('copy').onclick = () => navigator.clipboard.writeText($('sumtext').textContent).then(() => { $('copy').textContent = 'Copied'; setTimeout(() => { $('copy').textContent = 'Copy results'; }, 1500); });
 async function expectOk(res) {
   if (!res.ok) { let t = ''; try { t = (await res.text()).slice(0, 160); } catch {} throw new Error(`HTTP ${res.status} ${t}`); }
   return res;
@@ -66,7 +76,7 @@ async function call(url, init) {
 }
 
 $('run').onclick = async () => {
-  $('out').textContent = '';
+  $('out').textContent = ''; $('sum').hidden = true;
   const hook = $('hook').value.trim().replace(/\?.*$/, ''), token = $('token').value.trim(), channel = $('channel').value.trim();
   const bot = { Authorization: `Bot ${token}` };
   let posted = null, attachmentUrl = '';
@@ -114,30 +124,48 @@ $('run').onclick = async () => {
       return 'made and removed again';
     });
     await attempt('Bot: live gateway (WebSocket), hear a new message', () => new Promise((resolve, reject) => {
-      let ws, beat, heard = false;
-      const stop = (fn, v) => { clearInterval(beat); try { ws.close(); } catch {} fn(v); };
-      const timer = setTimeout(() => stop(heard ? resolve : reject, heard ? 'connected' : new Error('connected, but heard no message within 20 s')), 20000);
-      try { ws = new WebSocket('wss://gateway.discord.gg/?v=10&encoding=json'); } catch (e) { clearTimeout(timer); return reject(e); }
-      ws.onerror = () => { clearTimeout(timer); stop(reject, new Error('the WebSocket was refused')); };
+      // Stages, so a failure says how far it got. Discord sends the bot's servers lazily (GUILD_CREATE after READY),
+      // so the ping is posted only once the channel's server has arrived, and anyone may type in the channel too.
+      let ws, beat, pinged = false, finished = false;
+      const stages = [];
+      const stage = (s) => { stages.push(s); gw.textContent = `${stages.join(' → ')}`; };
+      const gw = document.createElement('div'); gw.className = 'muted';
+      $('out').lastChild.append(gw);
+      const end = (ok, v) => { if (finished) return; finished = true; clearTimeout(timer); clearInterval(beat); try { ws.close(); } catch {} gw.remove(); ok ? resolve(v) : reject(new Error(v)); };
+      const ping = () => {
+        if (pinged || !hook) return;
+        pinged = true;
+        call(hook, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: 'Hexmarch test: gateway ping', allowed_mentions: { parse: [] } }) }).catch(() => {});
+        stage('ping posted');
+      };
+      const timer = setTimeout(() => end(false, `heard no message within 45 s; got as far as: ${stages.join(' → ') || 'nothing'}`), 45000);
+      stage('connecting (type something in the channel now too)');
+      try { ws = new WebSocket('wss://gateway.discord.gg/?v=10&encoding=json'); } catch (e) { return end(false, e.message); }
+      ws.onerror = () => end(false, 'the WebSocket was refused');
       ws.onmessage = (ev) => {
         const m = JSON.parse(ev.data);
         if (m.op === 10) {
+          stage('connected');
           beat = setInterval(() => ws.send(JSON.stringify({ op: 1, d: null })), m.d.heartbeat_interval);
           // GUILDS | GUILD_MESSAGES | MESSAGE_CONTENT
           ws.send(JSON.stringify({ op: 2, d: { token, intents: (1 << 0) | (1 << 9) | (1 << 15), properties: { os: 'browser', browser: 'hexmarch-test', device: 'hexmarch-test' } } }));
         } else if (m.t === 'READY') {
-          if (hook) call(`${hook}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: 'Hexmarch test: gateway ping' }) }).catch(() => {});
-        } else if (m.t === 'MESSAGE_CREATE' && m.d.channel_id === channel) {
-          heard = true; clearTimeout(timer); stop(resolve, 'READY, and heard a new message live');
-        } else if (m.op === 9) { clearTimeout(timer); stop(reject, new Error('Discord refused the token or intents (op 9)')); }
+          stage(`READY (bot is in ${m.d.guilds.length} server${m.d.guilds.length === 1 ? '' : 's'})`);
+          if (!m.d.guilds.length) end(false, 'READY, but the bot is in no server: invite it first');
+        } else if (m.t === 'GUILD_CREATE') {
+          const seen = (m.d.channels || []).some((c) => c.id === channel) || (m.d.threads || []).some((c) => c.id === channel);
+          if (seen) { stage(`server "${m.d.name}" has the channel`); ping(); }
+          else stage(`server "${m.d.name}" (not this channel)`);
+        } else if (m.t === 'MESSAGE_CREATE') {
+          if (m.d.channel_id === channel) end(true, `${stages.join(' → ')} → heard "${(m.d.content || '(no text: Message Content Intent off?)').slice(0, 40)}"`);
+          else stage('heard a message in another channel');
+        } else if (m.op === 9) end(false, 'Discord refused the token or intents (op 9)');
       };
-      ws.onclose = (ev) => { if (!heard && ev.code >= 4000) { clearTimeout(timer); stop(reject, new Error(`closed by Discord, code ${ev.code}${ev.code === 4014 ? ': switch on Message Content Intent' : ev.code === 4004 ? ': token refused' : ''}`)); } };
+      ws.onclose = (ev) => end(false, `closed by Discord, code ${ev.code}${ev.code === 4014 ? ': switch on Message Content Intent (Developer Portal › Bot)' : ev.code === 4004 ? ': token refused' : ''}; got as far as: ${stages.join(' → ')}`);
     }));
   } else row('Bot tests')(false, 'no bot token or channel id given');
 
-  const li = document.createElement('li');
-  li.innerHTML = `<pre>${[...$('out').querySelectorAll('li')].map((x) => x.textContent).join('\n')}\nBrowser: ${navigator.userAgent}</pre>`;
-  $('out').append(li);
+  summarise();
 };
 
 // Web push without a server: a player's app would send the referee's device a push straight from the browser. The
@@ -145,14 +173,14 @@ $('run').onclick = async () => {
 const b64u = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 const utf8 = (s) => new TextEncoder().encode(s);
 $('push').onclick = async () => {
-  $('out').textContent = '';
+  $('out').textContent = ''; $('sum').hidden = true;
   let reg, sub, key, pub, heard = false;
   navigator.serviceWorker && navigator.serviceWorker.addEventListener('message', (e) => { if (e.data && e.data.hexmarchPushTest) heard = true; });
   if (!(await attempt('This browser can show notifications', async () => {
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) throw new Error('no web push here (on iPhone, add the page to the home screen first)');
     const p = await Notification.requestPermission();
     if (p !== 'granted') throw new Error(`permission ${p}`);
-  }))) return;
+  }))) return summarise();
   if (!(await attempt('Subscribe to web push', async () => {
     reg = await navigator.serviceWorker.register('./push-test-sw.js', { scope: './push-test/' });
     await new Promise((r) => { const w = reg.installing || reg.waiting; if (!w || reg.active) return r(); w.addEventListener('statechange', () => w.state === 'activated' && r()); });
@@ -162,7 +190,7 @@ $('push').onclick = async () => {
     if (old) await old.unsubscribe();
     sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: pub });
     return new URL(sub.endpoint).host;
-  }))) return;
+  }))) return summarise();
   await attempt('Send a push from this page (no server)', async () => {
     const aud = new URL(sub.endpoint).origin;
     const head = b64u(utf8(JSON.stringify({ typ: 'JWT', alg: 'ES256' })));
@@ -177,9 +205,7 @@ $('push').onclick = async () => {
     const t = setInterval(() => { if (heard) { clearInterval(t); resolve('a notification should be showing'); } else if (++n > 30) { clearInterval(t); reject(new Error('nothing within 30 s')); } }, 1000);
   }));
   try { await sub.unsubscribe(); } catch {}
-  const li = document.createElement('li');
-  li.innerHTML = `<pre>${[...$('out').querySelectorAll('li')].map((x) => x.textContent).join('\n')}\nBrowser: ${navigator.userAgent}</pre>`;
-  $('out').append(li);
+  summarise();
 };
 </script>
 </body>
