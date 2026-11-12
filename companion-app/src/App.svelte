@@ -29,6 +29,12 @@
     { name: 'settings', label: '⚙️', aria: 'Settings' }
   ] as const);
 
+  // Referee mode: hold the campaign channel's live reader while the app is open (lib/gateway.ts).
+  $effect(() => {
+    void [app.loaded, app.mode, app.campaignWebhook, app.discordBot];
+    void app.listenDiscord();
+  });
+
   // The window's title follows the campaign in use; a printout sets its own while it is open.
   $effect(() => {
     if (app.loaded && app.view.name !== 'render') document.title = app.title;

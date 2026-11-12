@@ -87,6 +87,12 @@
   let url = $state(app.settings.webhookUrl);
   let valid = $derived(!url.trim() || isWebhookUrl(url));
 
+  let bot = $state(app.discordBot);
+  async function saveBot() {
+    await app.setDiscordBot(bot);
+    app.notify(bot.trim() ? 'Bot saved' : 'Bot removed');
+  }
+
   async function saveUrl() {
     if (!valid) return;
     await app.updateSettings({ webhookUrl: url.trim() });
@@ -201,6 +207,23 @@
       onchange={(e) => app.updateSettings({ autoPost: (e.target as HTMLInputElement).checked })} />
     Post every roll to Discord automatically
   </label>
+  {#if app.mode === 'referee' && app.campaignWebhook}
+    <label for="bot" title="While this app is open, your own Discord bot reads {app.campaign?.campaign.name}'s channel, so a player's join request lands in the Inbox by itself. Make the bot in the Discord Developer Portal, switch on Message Content Intent, and invite it to the server. The token stays on this device.">Referee's bot token ⓘ</label>
+    <input id="bot" type="password" bind:value={bot} placeholder="Developer Portal › your app › Bot › Reset Token" autocapitalize="off" autocomplete="off" />
+    <div class="row" style="margin-top:0.5rem">
+      <button class="primary" onclick={saveBot} disabled={bot.trim() === app.discordBot}>Save</button>
+      {#if app.discordBot}<button onclick={() => { bot = ''; saveBot(); }}>Remove</button>{/if}
+    </div>
+    {#if app.discordStatus.state === 'listening'}
+      <p class="small success">Listening to the campaign channel{app.discordStatus.server ? ` on ${app.discordStatus.server}` : ''}.</p>
+    {:else if app.discordStatus.state === 'connecting'}
+      <p class="small muted">Connecting to Discord…</p>
+    {:else if app.discordStatus.state === 'no-channel'}
+      <p class="small failure">The bot is connected but can't see the campaign channel. Invite it to that server, or give it View Channel there.</p>
+    {:else if app.discordStatus.state === 'failed'}
+      <p class="small failure">Not listening: {app.discordStatus.reason}.</p>
+    {/if}
+  {/if}
 </section>
 
 <section class="card" style="margin-top:0.75rem">
