@@ -178,8 +178,11 @@ $('push').onclick = async () => {
   navigator.serviceWorker && navigator.serviceWorker.addEventListener('message', (e) => { if (e.data && e.data.hexmarchPushTest) heard = true; });
   if (!(await attempt('This browser can show notifications', async () => {
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) throw new Error('no web push here (on iPhone, add the page to the home screen first)');
+    const where = matchMedia('(display-mode: standalone)').matches ? 'inside the installed app' : 'in a browser tab';
+    const before = Notification.permission;
     const p = await Notification.requestPermission();
-    if (p !== 'granted') throw new Error(`permission ${p}`);
+    if (p !== 'granted') throw new Error(`permission ${p} (was ${before} before asking; ${where})`);
+    return `${before === 'granted' ? 'already allowed' : 'allowed just now'}, ${where}`;
   }))) return summarise();
   if (!(await attempt('Subscribe to web push', async () => {
     reg = await navigator.serviceWorker.register('./push-test-sw.js', { scope: './push-test/' });
