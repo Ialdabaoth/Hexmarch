@@ -18,6 +18,7 @@ import {
 import { CORE_RULES } from '../rules/core-modules';
 import { addMail, answer, joinLine, joinRequest, loadMail, mailFileName, post, readMailFile, saveMail, sendBack, type MailItem } from './mail';
 import { downloadJson } from './storage';
+import { Gateway, mailAttachments, webhookChannel, type DiscordPost, type GatewayStatus } from './gateway';
 import { inviteDone, keepInvite, pendingInvite, updateForInvite } from './update';
 import { readShared, withoutShared } from './share';
 import { publishParts } from '../../../engine/publish';
@@ -1147,6 +1148,60 @@ class AppState {
     if (!url || !text.trim()) return;
     await postMessage(url, tableMessage(this.campaign?.campaign.name ?? `${__SUITE_NAME__} Companion`, text.trim(), image.trim()));
     this.notify('Posted to Discord');
+  }
+
+  // Referee mode: the campaign channel read live through the referee's own bot (lib/gateway.ts) while the app is
+  // open. A join request posted there lands in the Inbox as if its file had been opened.
+  discordStatus = $state<GatewayStatus>({ state: 'off' });
+  private gateway: Gateway | null = null;
+  private gatewayKey = '';
+  get discordBot(): string {
+    return this.settings.discordBots?.[this.settings.campaign] ?? '';
+  }
+  async setDiscordBot(token: string) {
+    if (!this.settings.campaign) return;
+    const bots = { ...(this.settings.discordBots ?? {}) };
+    if (token.trim()) bots[this.settings.campaign] = token.trim();
+    else delete bots[this.settings.campaign];
+    await this.updateSettings({ discordBots: bots });
+    await this.listenDiscord();
+  }
+  // Starts, swaps or stops the live reader to match the campaign, mode and bot in use; safe to call often.
+  async listenDiscord() {
+    const token = this.loaded && this.mode === 'referee' ? this.discordBot : '', hook = this.campaignWebhook;
+    const key = token && hook ? `${hook} ${token}` : '';
+    if (key === this.gatewayKey) return;
+    this.gateway?.stop();
+    this.gateway = null;
+    this.gatewayKey = key;
+    if (!key) { this.discordStatus = { state: 'off' }; return; }
+    this.discordStatus = { state: 'connecting' };
+    let channel: string;
+    try {
+      channel = await webhookChannel(hook);
+    } catch (e) {
+      if (this.gatewayKey === key) this.discordStatus = { state: 'failed', reason: `couldn't read the campaign's webhook (${e instanceof Error ? e.message : e})` };
+      return;
+    }
+    if (this.gatewayKey !== key) return;
+    this.gateway = new Gateway(token, channel, (p) => void this.hearPost(p), (st) => { if (this.gatewayKey === key) this.discordStatus = st; });
+    this.gateway.start();
+  }
+  private async hearPost(p: DiscordPost) {
+    for (const url of mailAttachments(p)) {
+      try {
+        const res = await fetch(url);
+        if (!res.ok) continue;
+        const list = readMailFile(await res.json()).filter((e) => e.campaign === this.campaignId && e.kind === 'join');
+        let mail = this.mail;
+        for (const e of list) mail = addMail(mail, { envelope: e, box: 'in' });
+        if (mail === this.mail) continue;
+        await this.keepMail(mail);
+        this.notify(`${list[0].from.name || 'A player'} asks to join (heard on Discord)`);
+      } catch (e) {
+        console.warn('A Discord post with a file could not be read as mail', e);
+      }
+    }
   }
 
   // Player mode: each request this device posted to the campaign's Discord channel shows where it stands, by

@@ -23,6 +23,8 @@ export interface Settings {
   campaign: string;
   // The invitation in use in that campaign (lib/invitations.ts): the referee's or a player's; '' for "This device".
   invitation: string;
+  // Referee: the bot token that reads each campaign's Discord channel live, by campaign link. Stays on this device.
+  discordBots: Record<string, string>;
 }
 
 // Where the party stands on a module's Atlas map: the module (its site and id) and the 100-ft
@@ -38,7 +40,7 @@ export interface PartyAt {
   hours?: number;
 }
 
-export const DEFAULT_SETTINGS: Settings = { webhookUrl: '', autoPost: false, activeId: '', rules: 'mm', dice3d: !prefersReducedMotion(), diceColor: DEFAULT_DICE_COLOR, diceInk: DEFAULT_DICE_INK, campaign: '', invitation: '' };
+export const DEFAULT_SETTINGS: Settings = { webhookUrl: '', autoPost: false, activeId: '', rules: 'mm', dice3d: !prefersReducedMotion(), diceColor: DEFAULT_DICE_COLOR, diceInk: DEFAULT_DICE_INK, campaign: '', invitation: '', discordBots: {} };
 
 // Saved sheets go through the same checks as imported files, so a sheet the
 // app can't read is skipped instead of breaking the whole list. Skipped sheets
