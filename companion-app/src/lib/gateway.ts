@@ -31,13 +31,34 @@ export type GatewayStatus =
   | { state: 'no-channel' }
   | { state: 'failed'; reason: string };
 
-// A webhook knows its own channel: GET on the webhook URL (no bot needed) returns it.
-export async function webhookChannel(url: string, f: typeof fetch = fetch): Promise<string> {
+// A webhook knows its own channel and server: GET on the webhook URL (no bot needed) returns them.
+export async function webhookInfo(url: string, f: typeof fetch = fetch): Promise<{ channel: string; guild: string }> {
   const res = await f(url.trim());
   if (!res.ok) throw new Error(`Discord said ${res.status}`);
-  const w = (await res.json()) as { channel_id?: string };
+  const w = (await res.json()) as { channel_id?: string; guild_id?: string };
   if (!w.channel_id) throw new Error("Discord didn't say which channel the webhook posts to");
-  return w.channel_id;
+  return { channel: w.channel_id, guild: w.guild_id ?? '' };
+}
+
+// A bot token's first part is its application id in base64, so the referee never copies that id separately.
+export function botAppId(token: string): string {
+  const head = token.trim().split('.')[0] ?? '';
+  try {
+    const id = atob(head.replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(head.length / 4) * 4, '='));
+    return /^\d{15,21}$/.test(id) ? id : '';
+  } catch {
+    return '';
+  }
+}
+
+// What the reader needs and nothing more: View Channel (1024) + Read Message History (65536).
+export const BOT_PERMISSIONS = 1024 + 65536;
+
+// Discord's "add this bot to a server" page, filled in: the campaign's server picked when the webhook says which.
+export function inviteLink(appId: string, guild = ''): string {
+  const q = new URLSearchParams({ client_id: appId, scope: 'bot', permissions: String(BOT_PERMISSIONS) });
+  if (guild) { q.set('guild_id', guild); q.set('disable_guild_select', 'true'); }
+  return `https://discord.com/oauth2/authorize?${q}`;
 }
 
 // The message files on a post: JSON attachments (the app names them <campaign>-<kind>-<who>.json).

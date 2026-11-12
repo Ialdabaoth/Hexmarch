@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { Gateway, mailAttachments, webhookChannel, type DiscordPost, type GatewayStatus } from './gateway';
+import { Gateway, botAppId, inviteLink, mailAttachments, webhookInfo, type DiscordPost, type GatewayStatus } from './gateway';
 
 function fakeSocket() {
   const sent: any[] = [];
@@ -80,6 +80,16 @@ describe('Discord gateway reader', () => {
       { url: 'https://cdn/p.png', filename: 'map.png', content_type: 'image/png' }
     ] })).toEqual(['https://cdn/x.json']);
     const f = vi.fn(async () => new Response(JSON.stringify({ channel_id: '222' }))) as unknown as typeof fetch;
-    expect(await webhookChannel('https://discord.com/api/webhooks/1/abc', f)).toBe('222');
+    expect(await webhookInfo('https://discord.com/api/webhooks/1/abc', f)).toEqual({ channel: '222', guild: '' });
+  });
+});
+
+describe('setting up the bot', () => {
+  it('reads the application id from a token and builds the invite for the campaign server', () => {
+    const token = `${btoa('123456789012345678').replace(/=+$/, '')}.Gx1abc.secretpart`;
+    expect(botAppId(token)).toBe('123456789012345678');
+    expect(botAppId('nonsense')).toBe('');
+    const u = new URL(inviteLink('123456789012345678', '999888777666555444'));
+    expect(Object.fromEntries(u.searchParams)).toEqual({ client_id: '123456789012345678', scope: 'bot', permissions: '66560', guild_id: '999888777666555444', disable_guild_select: 'true' });
   });
 });
