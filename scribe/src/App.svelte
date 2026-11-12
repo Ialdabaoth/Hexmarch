@@ -574,7 +574,10 @@
             <li class={test.snapshot === 'matches' ? 'ok' : 'bad'}><code>snapshot.json</code> {SAYS[test.snapshot]}{test.found !== undefined && test.snapshot !== 'matches' ? ` (revision ${test.found} there, ${record.published?.revision} published)` : ''}</li>
           </ul>
         {/if}
-        <label class="field">Where players send requests (optional for now) <input type="url" bind:value={postUrl} placeholder="https://script.google.com/…/exec" /></label>
+        <div class="field">
+          <button type="button" class="tip" data-tip="A Discord channel can be your campaign's mailbox: join requests and everyone's rolls are posted there. In Discord, open the channel's settings › Integrations › Webhooks › New Webhook › Copy Webhook URL, and paste it here. Your Apps Script's web app address works too.">Where players send requests</button> (optional for now)
+          <input type="url" bind:value={postUrl} placeholder="Discord webhook or https://script.google.com/…/exec" aria-label="Where players send requests" />
+        </div>
       {/if}
     </section>
     {#if record}

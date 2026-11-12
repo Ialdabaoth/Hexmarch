@@ -1,0 +1,1 @@
+"Where players send requests" says, in its tooltip, that a Discord channel webhook works there (channel settings › Integrations › Webhooks › New Webhook › Copy Webhook URL), for the Companion's Discord mailbox (Heph 2026-11-11).
