@@ -1,0 +1,1 @@
+Services: when players send requests to a Discord webhook, a new optional field names who Discord notifies of them, a user id or @& and a role id (a mention copied from Discord works too). It is published in campaign.json as `ping`, and players' Companions mention only that user or role.

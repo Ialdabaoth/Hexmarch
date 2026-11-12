@@ -35,9 +35,15 @@ export async function postToDiscord(url: string, entry: LogEntry): Promise<void>
 // through a webhook, so they need no Discord account). A request posts as a line people can read plus the envelope
 // as a file, which the referee's app (or the referee, by hand) opens. ?wait=true returns the message, whose id
 // lets the sender edit the post later (the witness post: "waiting" -> "joined" or "sent back").
-export async function postMail(url: string, file: { name: string; data: unknown }, content: string): Promise<string> {
+// ping: a mention ('<@id>', '<@&id>' or '@here') put in front, so Discord notifies that person, role or the channel; nobody else is pinged.
+export async function postMail(url: string, file: { name: string; data: unknown }, content: string, ping = ''): Promise<string> {
   const fd = new FormData();
-  fd.append('payload_json', JSON.stringify({ content: content.slice(0, 2000), allowed_mentions: { parse: [] } }));
+  const who = /^<@(&?)(\d+)>$/.exec(ping), here = ping === '@here';
+  // @here is allowed through 'everyone' (Discord's switch for both @here and @everyone; only @here is ever written)
+  const allowed = here ? { parse: ['everyone'] } : who ? (who[1] ? { parse: [], roles: [who[2]] } : { parse: [], users: [who[2]] }) : { parse: [] };
+  // with 'everyone' allowed, a name such as "@everyone" in the text would ping the whole server: break those up
+  const text = here ? content.replace(/@(everyone|here)/g, '@\u200b$1') : content;
+  fd.append('payload_json', JSON.stringify({ content: `${who || here ? ping + ' ' : ''}${text}`.slice(0, 2000), allowed_mentions: allowed }));
   fd.append('files[0]', new Blob([JSON.stringify(file.data)], { type: 'application/json' }), file.name);
   const res = await fetch(`${url.trim()}?wait=true`, { method: 'POST', body: fd });
   if (!res.ok) throw new Error(`Discord said ${res.status}`);

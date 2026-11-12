@@ -56,8 +56,8 @@ export const mailFileName = (e: Envelope, who: string) =>
 // One POST to the campaign's post URL. text/plain keeps the browser from asking the host first (no CORS
 // preflight), which an Apps Script web app can't answer. Throws when it can't be sent.
 // A Discord webhook as the post URL posts a readable line with the envelope attached; returns that post's id.
-export async function post(url: string, e: Envelope, line = '', name = ''): Promise<string | undefined> {
-  if (isWebhookUrl(url)) return postMail(url, { name: mailFileName(e, name), data: e }, line || `A ${e.kind} message for the referee`);
+export async function post(url: string, e: Envelope, line = '', name = '', ping = ''): Promise<string | undefined> {
+  if (isWebhookUrl(url)) return postMail(url, { name: mailFileName(e, name), data: e }, line || `A ${e.kind} message for the referee`, ping);
   const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(e) });
   if (!res.ok) throw new Error(`The referee's mailbox answered ${res.status}`);
   return undefined;

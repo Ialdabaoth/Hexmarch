@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { PublishError, checkUpload, pointer, privateParts, publicState, publishParts, readPointer, readSnapshot, snapshot, staticServices } from './publish';
+import { PublishError, checkUpload, readPing, pointer, privateParts, publicState, publishParts, readPointer, readSnapshot, snapshot, staticServices } from './publish';
 
 const now = new Date('2026-11-09T13:00:00Z');
 const kells = {
@@ -101,5 +101,24 @@ describe('testing the upload', () => {
     expect(await checkUpload(s, expected, host({ [s.pointer]: '<html>', [s.read]: 500 }))).toEqual({ pointer: 'unreadable', snapshot: 'unreadable' });
     const blocked = (async () => { throw new TypeError('Failed to fetch'); }) as unknown as typeof fetch;
     expect(await checkUpload(s, expected, blocked)).toEqual({ pointer: 'unreadable', snapshot: 'unreadable' });
+  });
+});
+
+describe('who Discord notifies', () => {
+  it('reads ids and copied mentions, and refuses anything else', () => {
+    const id = '123456789012345678';
+    expect(readPing('')).toBe('');
+    expect(readPing(id)).toBe(`<@${id}>`);
+    expect(readPing(`<@!${id}>`)).toBe(`<@${id}>`);
+    expect(readPing(`@&${id}`)).toBe(`<@&${id}>`);
+    expect(readPing(`<@&${id}>`)).toBe(`<@&${id}>`);
+    expect(readPing('@here')).toBe('@here');
+    expect(readPing('@everyone')).toBeNull();
+  });
+  it('travels in the pointer', () => {
+    const sv = { ...staticServices('https://example.org/c/'), ping: '<@&123456789012345678>' };
+    const p = pointer('c', 'C', sv, new Date('2026-11-12T00:00:00Z'));
+    expect(readPointer(JSON.parse(JSON.stringify(p))).ping).toBe('<@&123456789012345678>');
+    expect(readPointer({ ...p, ping: '@everyone' }).ping).toBeUndefined();
   });
 });

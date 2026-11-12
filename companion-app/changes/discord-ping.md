@@ -1,0 +1,1 @@
+A player's join request posted to the campaign's Discord channel now mentions whoever the referee named in Scribe (a user or a role), and only them, so the Discord app on the referee's phone notifies them even when no Hexmarch app is open.
