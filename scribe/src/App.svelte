@@ -6,7 +6,7 @@
   import { applyUpdate, backUrl, campaignMessage, playFor, publishAgain, publishedMessage, type PublishResult, publishOnDevice, savePlayState, publishSecret, saveOnDevice, savePublishSecret, savedCampaign, testUpload, type SavedCampaign, type UpdateResult } from './lib/device';
   import { applyAtlas, atlasEvent, type State } from './lib/parties';
   import type { UploadCheck, UploadReport } from '../../engine';
-  import { appsScriptCode, appsScriptStore, githubStore, handOff, messageLink, takeHandOffs, newKey, readMessageHash, servicesFor, staticServices, upload, type Services, type StoreKind } from '../../engine';
+  import { appsScriptCode, appsScriptStore, githubStore, handOff, messageLink, takeHandOffs, newKey, readMessageHash, readPing, servicesFor, staticServices, upload, type Services, type StoreKind } from '../../engine';
 
   const VERSION = __SCRIBE_VERSION__;
   const params = new URLSearchParams(location.search);
@@ -123,6 +123,9 @@
   let record = $state<SavedCampaign | null>(null);
   let folder = $state('');
   let postUrl = $state('');
+  // Who a player's request posted to Discord mentions, so the Discord app on their phone notifies them.
+  let ping = $state('');
+  const pingOk = $derived(readPing(ping) !== null);
   // Where Publish puts the files (Scribe 0.6: adapters): the referee's own GitHub repo (preferred, Heph 2026-11-10),
   // Google Drive through their own Apps Script, or by hand as before.
   let storeKind = $state<StoreKind>('github');
@@ -152,8 +155,10 @@
   let scriptKey = $state(newKey()); // only for a script not set up yet
   let copied = $state(false);
   function services(): Services {
-    if (storeKind === 'manual') return staticServices(folder, postUrl);
-    return servicesFor(storeKind === 'github' ? githubStore(ghRepo, ghDir, ghBranch) : appsScriptStore(scriptUrl), postUrl);
+    const sv = storeKind === 'manual' ? staticServices(folder, postUrl) : servicesFor(storeKind === 'github' ? githubStore(ghRepo, ghDir, ghBranch) : appsScriptStore(scriptUrl), postUrl);
+    const who = readPing(ping);
+    if (who === null) throw new Error("That isn't a Discord user or role id. Right-click the person or role in Discord, then Copy User ID or Copy Role ID.");
+    return who ? { ...sv, ping: who } : sv;
   }
   const storeReady = $derived(storeKind === 'manual' ? !!folder : storeKind === 'github' ? !!ghRepo && !!secret : !!scriptUrl && !!secret);
   async function copyScript() {
@@ -177,6 +182,7 @@
       if (r?.services && !folder) {
         folder = r.services.folder;
         postUrl = r.services.post;
+        ping = r.services.ping ?? '';
         const st = r.services.store;
         storeKind = st?.kind ?? 'manual';
         if (st?.kind === 'apps-script') scriptUrl = st.url;
@@ -575,6 +581,11 @@
           </ul>
         {/if}
         <label class="field">Where players send requests (optional for now) <input type="url" bind:value={postUrl} placeholder="https://script.google.com/…/exec" /></label>
+        {#if /^https:\/\/(?:ptb\.|canary\.)?discord(?:app)?\.com\/api\/webhooks\//.test(postUrl.trim())}
+          <label class="field"><button type="button" class="tip" data-tip="A player's join request posted to the channel mentions this Discord user or role, so the Discord app on their phone notifies them even when no Hexmarch app is open. Paste a user id, or @& followed by a role id. To copy one, switch on Developer Mode (Discord Settings › Advanced), then right-click the person or role.">Who Discord notifies of requests (optional)</button>
+            <input bind:value={ping} placeholder="your user id, or @&role id" autocomplete="off" /></label>
+          {#if !pingOk}<p class="bad small">That isn't a Discord user or role id.</p>{/if}
+        {/if}
       {/if}
     </section>
     {#if record}

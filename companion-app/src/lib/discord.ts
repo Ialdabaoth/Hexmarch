@@ -35,9 +35,12 @@ export async function postToDiscord(url: string, entry: LogEntry): Promise<void>
 // through a webhook, so they need no Discord account). A request posts as a line people can read plus the envelope
 // as a file, which the referee's app (or the referee, by hand) opens. ?wait=true returns the message, whose id
 // lets the sender edit the post later (the witness post: "waiting" -> "joined" or "sent back").
-export async function postMail(url: string, file: { name: string; data: unknown }, content: string): Promise<string> {
+// ping: a mention ('<@id>' or '<@&id>') put in front, so Discord notifies that person or role; nobody else is pinged.
+export async function postMail(url: string, file: { name: string; data: unknown }, content: string, ping = ''): Promise<string> {
   const fd = new FormData();
-  fd.append('payload_json', JSON.stringify({ content: content.slice(0, 2000), allowed_mentions: { parse: [] } }));
+  const who = /^<@(&?)(\d+)>$/.exec(ping);
+  const allowed = who ? (who[1] ? { parse: [], roles: [who[2]] } : { parse: [], users: [who[2]] }) : { parse: [] };
+  fd.append('payload_json', JSON.stringify({ content: `${who ? ping + ' ' : ''}${content}`.slice(0, 2000), allowed_mentions: allowed }));
   fd.append('files[0]', new Blob([JSON.stringify(file.data)], { type: 'application/json' }), file.name);
   const res = await fetch(`${url.trim()}?wait=true`, { method: 'POST', body: fd });
   if (!res.ok) throw new Error(`Discord said ${res.status}`);

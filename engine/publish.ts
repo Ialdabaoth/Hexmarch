@@ -14,6 +14,9 @@ export interface Services {
   // Where players read the snapshot, and where they send requests ('' until the referee has one).
   read: string;
   post: string;
+  // Who a request posted to a Discord channel mentions, so Discord itself notifies them (Heph 2026-11-12: "Discord
+  // doing the waking"): '<@user id>' or '<@&role id>', or none.
+  ping?: string;
   // The pointer's own address: what invite links name.
   pointer: string;
   // Where Publish puts the files (adapters.ts); none means the referee uploads them into `folder` by hand.
@@ -27,6 +30,7 @@ export interface Pointer {
   title: string;
   read: string;
   post: string;
+  ping?: string;
   adapters: { store: string; mail: string };
   updated: string;
 }
@@ -47,6 +51,15 @@ export interface Snapshot {
 }
 
 export class PublishError extends Error {}
+
+// A Discord mention from what the referee typed: a user id, a role id written @&id, or a mention copied from
+// Discord (<@id>, <@!id>, <@&id>). '' for nothing; null when it isn't one.
+export function readPing(s: unknown): string | null {
+  const t = typeof s === 'string' ? s.trim() : '';
+  if (!t) return '';
+  const m = /^<?@?(!|&)?(\d{15,21})>?$/.exec(t);
+  return m ? `<@${m[1] === '&' ? '&' : ''}${m[2]}>` : null;
+}
 
 const https = (s: string) => {
   try {
@@ -74,6 +87,7 @@ export function pointer(campaign: string, title: string, s: Services, now = new 
     title,
     read: s.read,
     post: s.post,
+    ...(s.ping ? { ping: s.ping } : {}),
     adapters: { store: s.store && s.store.kind !== 'manual' ? s.store.kind : 'static', mail: s.post ? 'post' : 'manual' },
     updated: now.toISOString()
   };
@@ -128,7 +142,7 @@ export function readPointer(d: unknown): Pointer {
   if (!p || typeof p !== 'object' || p.format !== POINTER_FORMAT) throw new PublishError("That link isn't a Hexmarch campaign.");
   if (typeof p.version !== 'number' || p.version > 1) throw new PublishError('That campaign was published by a newer app. Update the app to open it.');
   if (typeof p.campaign !== 'string' || !p.campaign || typeof p.read !== 'string' || !https(p.read)) throw new PublishError('That campaign link has no snapshot address.');
-  return { format: POINTER_FORMAT, version: 1, campaign: p.campaign, title: typeof p.title === 'string' ? p.title : p.campaign, read: p.read, post: typeof p.post === 'string' ? p.post : '', adapters: { store: p.adapters?.store ?? 'static', mail: p.adapters?.mail ?? 'manual' }, updated: typeof p.updated === 'string' ? p.updated : '' };
+  return { format: POINTER_FORMAT, version: 1, campaign: p.campaign, title: typeof p.title === 'string' ? p.title : p.campaign, read: p.read, post: typeof p.post === 'string' ? p.post : '', ...(readPing(p.ping) ? { ping: readPing(p.ping) as string } : {}), adapters: { store: p.adapters?.store ?? 'static', mail: p.adapters?.mail ?? 'manual' }, updated: typeof p.updated === 'string' ? p.updated : '' };
 }
 
 export function readSnapshot(d: unknown, campaign: string): Snapshot {

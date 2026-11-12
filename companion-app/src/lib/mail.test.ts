@@ -43,6 +43,16 @@ describe('a Discord channel as the mailbox', () => {
     expect(JSON.parse(await file.text()).id).toBe(join.id);
   });
 
+  it('mentions only the campaign\'s ping, so Discord notifies the referee', async () => {
+    const bodies: string[] = [];
+    vi.stubGlobal('fetch', async (_u: string, init: RequestInit) => (bodies.push(String((init.body as FormData).get('payload_json'))), new Response('{"id":"1"}')));
+    const join = joinRequest('kells-1422', { id: 'holly' }, { id: 'holly' }, 'Dana', undefined, NOW);
+    await post(hook, join, 'line', 'Holly', '<@&123456789012345678>');
+    await post(hook, join, 'line', 'Holly', '<@123456789012345678>');
+    expect(JSON.parse(bodies[0])).toMatchObject({ content: '<@&123456789012345678> line', allowed_mentions: { parse: [], roles: ['123456789012345678'] } });
+    expect(JSON.parse(bodies[1]).allowed_mentions).toEqual({ parse: [], users: ['123456789012345678'] });
+  });
+
   it('edits its own post as the request moves on', async () => {
     const calls: { url: string; init: RequestInit }[] = [];
     vi.stubGlobal('fetch', async (url: string, init: RequestInit) => (calls.push({ url, init }), new Response('{}', { status: 200 })));

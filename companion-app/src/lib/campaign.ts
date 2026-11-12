@@ -43,7 +43,7 @@ export interface CampaignCache {
   lock?: unknown;
   // A campaign its referee has published (data repo modules/SCRIBE.md section 5): the pointer invitations name,
   // where players read the snapshot and send requests, and, on a player's device, the snapshot as last read.
-  published?: { pointer: string; read: string; post: string; revision: number; at?: string; snapshot?: Pick<Snapshot, 'state' | 'private' | 'receipts'> & Partial<Pick<Snapshot, 'module' | 'lock'>> };
+  published?: { pointer: string; read: string; post: string; ping?: string; revision: number; at?: string; snapshot?: Pick<Snapshot, 'state' | 'private' | 'receipts'> & Partial<Pick<Snapshot, 'module' | 'lock'>> };
 }
 
 export class CampaignError extends Error {}
@@ -190,7 +190,7 @@ export async function publishedCampaign(url: string, data: unknown): Promise<Cam
       format: 'hexmarch-scribe-campaign', version: 1, id: p.campaign, site: snap.site, ruleset: snap.ruleset,
       manifest: { ...snap.module, title: p.title }, lock: snap.lock, saved: snap.published
     });
-    return { ...c, published: { pointer: url, read: p.read, post: p.post, revision: snap.revision, snapshot: { state: snap.state, private: snap.private, receipts: snap.receipts, module: snap.module, lock: snap.lock } } };
+    return { ...c, published: { pointer: url, read: p.read, post: p.post, ...(p.ping ? { ping: p.ping } : {}), revision: snap.revision, snapshot: { state: snap.state, private: snap.private, receipts: snap.receipts, module: snap.module, lock: snap.lock } } };
   } catch (e) {
     if (e instanceof PublishError) throw /newer app/.test(e.message) ? new NewerAppError(e.message) : new CampaignError(e.message);
     throw e;
