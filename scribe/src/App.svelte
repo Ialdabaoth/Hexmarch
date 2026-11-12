@@ -5,6 +5,7 @@
   import { buildCampaign, describeProblem, startsOf, type Built, type Choices } from './lib/campaign';
   import { applyUpdate, backUrl, campaignMessage, playFor, publishAgain, publishedMessage, type PublishResult, publishOnDevice, savePlayState, publishSecret, saveOnDevice, savePublishSecret, savedCampaign, testUpload, type SavedCampaign, type UpdateResult } from './lib/device';
   import { applyAtlas, atlasEvent, type State } from './lib/parties';
+  import { isWebhook, pingChoice, pingFrom, testPost, type PingKind } from './lib/discord';
   import type { UploadCheck, UploadReport } from '../../engine';
   import { appsScriptCode, appsScriptStore, githubStore, handOff, messageLink, takeHandOffs, newKey, readMessageHash, servicesFor, staticServices, upload, type Services, type StoreKind } from '../../engine';
 
@@ -123,6 +124,26 @@
   let record = $state<SavedCampaign | null>(null);
   let folder = $state('');
   let postUrl = $state('');
+  // Where players send requests (Heph 2026-11-12: Discord setup must flow through smoothly for a first-timer): a
+  // Discord channel webhook, an Apps Script web app, or none yet. A Discord post mentions the campaign's ping, so
+  // Discord itself notifies the referee (or a role, or @here).
+  let postKind = $state<'discord' | 'script' | 'none'>('discord');
+  let pingKind = $state<PingKind>('me');
+  let pingPasted = $state('');
+  const ping = $derived(postKind === 'discord' ? pingFrom(pingKind, pingPasted) : '');
+  let testingDiscord = $state(false);
+  let discordTest = $state<'sent' | string>('');
+  async function sendDiscordTest() {
+    testingDiscord = true;
+    discordTest = '';
+    try {
+      await testPost(postUrl, ping ?? '', String(built?.manifest.title ?? 'your campaign'));
+      discordTest = 'sent';
+    } catch (e) {
+      discordTest = (e as Error).message;
+    }
+    testingDiscord = false;
+  }
   // Where Publish puts the files (Scribe 0.6: adapters): the referee's own GitHub repo (preferred, Heph 2026-11-10),
   // Google Drive through their own Apps Script, or by hand as before.
   let storeKind = $state<StoreKind>('github');
@@ -152,8 +173,11 @@
   let scriptKey = $state(newKey()); // only for a script not set up yet
   let copied = $state(false);
   function services(): Services {
-    if (storeKind === 'manual') return staticServices(folder, postUrl);
-    return servicesFor(storeKind === 'github' ? githubStore(ghRepo, ghDir, ghBranch) : appsScriptStore(scriptUrl), postUrl);
+    const post = postKind === 'none' ? '' : postUrl;
+    if (postKind === 'discord' && post.trim() && !isWebhook(post)) throw new Error("That isn't a whole Discord webhook address. Copy it again with Copy Webhook URL.");
+    const sv = storeKind === 'manual' ? staticServices(folder, post) : servicesFor(storeKind === 'github' ? githubStore(ghRepo, ghDir, ghBranch) : appsScriptStore(scriptUrl), post);
+    if (ping === null) throw new Error("That isn't a Discord user or role ID. With Developer Mode on, right-click or long-press the person or role and Copy User ID or Copy Role ID.");
+    return ping && post ? { ...sv, ping } : sv;
   }
   const storeReady = $derived(storeKind === 'manual' ? !!folder : storeKind === 'github' ? !!ghRepo && !!secret : !!scriptUrl && !!secret);
   async function copyScript() {
@@ -177,6 +201,8 @@
       if (r?.services && !folder) {
         folder = r.services.folder;
         postUrl = r.services.post;
+        ({ kind: pingKind, pasted: pingPasted } = pingChoice(r.services.ping));
+        postKind = !postUrl ? (r.published ? 'none' : 'discord') : isWebhook(postUrl) ? 'discord' : 'script';
         const st = r.services.store;
         storeKind = st?.kind ?? 'manual';
         if (st?.kind === 'apps-script') scriptUrl = st.url;
@@ -574,10 +600,45 @@
             <li class={test.snapshot === 'matches' ? 'ok' : 'bad'}><code>snapshot.json</code> {SAYS[test.snapshot]}{test.found !== undefined && test.snapshot !== 'matches' ? ` (revision ${test.found} there, ${record.published?.revision} published)` : ''}</li>
           </ul>
         {/if}
-        <div class="field">
-          <button type="button" class="tip" data-tip="A Discord channel can be your campaign's mailbox: join requests and everyone's rolls are posted there. In Discord, open the channel's settings › Integrations › Webhooks › New Webhook › Copy Webhook URL, and paste it here. Your Apps Script's web app address works too.">Where players send requests</button> (optional for now)
-          <input type="url" bind:value={postUrl} placeholder="Discord webhook or https://script.google.com/…/exec" aria-label="Where players send requests" />
-        </div>
+        <div class="field"><button type="button" class="tip" data-tip="Players send their join requests here, and everyone's rolls are posted here too.">Where players send requests</button> (optional for now)</div>
+        <label class="opt"><input type="radio" name="post" value="discord" bind:group={postKind} /><span><strong>Discord</strong> (preferred)</span></label>
+        {#if postKind === 'discord'}
+          <ol class="small gh">
+            <li>
+              In your Discord server, open <strong>Server Settings</strong> › <strong>Integrations</strong> › <strong>Webhooks</strong> › <strong>New Webhook</strong>.
+              Pick the <button type="button" class="tip" data-tip="Requests and rolls are posted in this channel. A channel only you and your players can see works well.">channel</button>
+              for requests, then press <strong>Copy Webhook URL</strong>.
+              <label class="field">Paste it here <input type="url" bind:value={postUrl} placeholder="https://discord.com/api/webhooks/…" autocomplete="off" /></label>
+              {#if postUrl.trim() && !isWebhook(postUrl)}<p class="bad small">That isn't a whole Discord webhook address. Copy it again with Copy Webhook URL.</p>{/if}
+            </li>
+            <li>
+              Choose who Discord <button type="button" class="tip" data-tip="Each request mentions them, so the Discord app on their phone notifies them even when no Hexmarch app is open.">pings</button> when a request arrives:
+              <div class="choices">
+                <label><input type="radio" name="ping" value="me" bind:group={pingKind} /> Me</label>
+                <label><input type="radio" name="ping" value="role" bind:group={pingKind} /> A role</label>
+                <label><input type="radio" name="ping" value="here" bind:group={pingKind} /> Everyone in the channel (@here)</label>
+                <label><input type="radio" name="ping" value="none" bind:group={pingKind} /> Nobody</label>
+              </div>
+              {#if pingKind === 'me'}
+                <div class="field"><button type="button" class="tip" data-tip="In Discord, switch on Developer Mode (User Settings › Advanced). Then right-click or long-press your name and choose Copy User ID. A mention like <@123…> works too.">Your Discord user ID</button>
+                  <input type="text" bind:value={pingPasted} placeholder="123456789012345678" autocomplete="off" inputmode="numeric" aria-label="Your Discord user ID" /></div>
+              {:else if pingKind === 'role'}
+                <div class="field"><button type="button" class="tip" data-tip="In Discord, switch on Developer Mode (User Settings › Advanced). Then open Server Settings › Roles, right-click or long-press the role and choose Copy Role ID. A mention like <@&123…> works too.">Role ID</button>
+                  <input type="text" bind:value={pingPasted} placeholder="123456789012345678" autocomplete="off" inputmode="numeric" aria-label="Role ID" /></div>
+              {/if}
+              {#if ping === null && pingPasted.trim()}<p class="bad small">That isn't a Discord {pingKind === 'role' ? 'role' : 'user'} ID: it is a long number, 17 to 20 digits.</p>{/if}
+            </li>
+            <li>
+              <button disabled={!isWebhook(postUrl) || ping === null || testingDiscord} onclick={sendDiscordTest}>{testingDiscord ? 'Sending…' : 'Send a test post'}</button>
+              {#if discordTest === 'sent'}<span class="ok">Sent. Check the channel{ping ? ' and your notifications' : ''}.</span>{:else if discordTest}<p class="bad small">{discordTest}</p>{/if}
+            </li>
+          </ol>
+        {/if}
+        <label class="opt"><input type="radio" name="post" value="script" bind:group={postKind} /><span><strong>Google Apps Script</strong></span></label>
+        {#if postKind === 'script'}
+          <label class="field">Web app URL <input type="url" bind:value={postUrl} placeholder="https://script.google.com/…/exec" /></label>
+        {/if}
+        <label class="opt"><input type="radio" name="post" value="none" bind:group={postKind} /><span><strong>Not yet</strong></span></label>
       {/if}
     </section>
     {#if record}

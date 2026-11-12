@@ -541,7 +541,7 @@ class AppState {
     let discord: MailItem['discord'];
     if (c.published?.post) {
       try {
-        const id = await post(c.published.post, e, joinLine(name.trim(), me.name, 'sent'), me.name);
+        const id = await post(c.published.post, e, joinLine(name.trim(), me.name, 'sent'), me.name, c.published.ping ?? '');
         if (id) discord = { id, shows: 'sent' };
         how = 'posted';
       } catch (err) {
