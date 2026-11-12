@@ -1,0 +1,1 @@
+Discord test page: the live gateway test now waits for the bot's server to arrive before posting its ping, waits 45 seconds, accepts any message typed in the channel, and shows how far it got (connected, READY, server has the channel, ping posted, heard). The results summary now holds only the latest run and has a Copy results button.
