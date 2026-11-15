@@ -5,7 +5,7 @@
   "e9mm",
   "mm"
  ],
- "_comment": "E9's generic procedures (EVENTS_FORMAT.md section 7). sight-range answers by the hex's view grade, move times a hex by the party's speed; terrain traits (ATLAS_FORMAT.md) replace travel multipliers. mm uses this file until mm-core has its own. The rolls along the way belong to the E9 thread.",
+ "_comment": "E9's generic procedures (EVENTS_FORMAT.md section 7). sight-range answers by the hex's view grade, move times a hex by the party's speed; terrain traits (ATLAS_FORMAT.md) replace travel multipliers. mm uses this file until mm-core has its own. The rolls along the way (footing, lost, forced-march) and their clock triggers belong to the E9 thread.",
  "procedures": {
   "sight-range": {
    "params": [
@@ -362,7 +362,8 @@
      "vs": "{traverse}",
      "combine": "all",
      "as": "r",
-     "label": "Footing: Agility vs traverse"
+     "label": "Footing: Agility vs traverse",
+     "ease": "maneuver"
     },
     {
      "branch": "r",
@@ -376,8 +377,118 @@
      ]
     }
    ]
+  },
+  "lost": {
+   "params": [
+    "orient",
+    "to"
+   ],
+   "about": "Rolls along the way (movement.md): each shift, everyone on Navigate rolls Survival at the hex's orient grade, in secret. If nobody passes, the party is lost and the walk halts.",
+   "steps": [
+    {
+     "each": "navigate",
+     "roll": "survival",
+     "vs": "{orient}",
+     "combine": "any",
+     "as": "r",
+     "secret": true,
+     "label": "Lost? Survival vs orient"
+    },
+    {
+     "branch": "r",
+     "fail": [
+      {
+       "text": "Lost: nobody on Navigate kept the way ({orient})."
+      },
+      {
+       "effect": "halt"
+      }
+     ]
+    }
+   ]
+  },
+  "march-grade": {
+   "params": [
+    "road"
+   ],
+   "about": "The Forced March roll's grade by road class (rules.json movement.roads): Roman and local roads easy, trails and open ground normal.",
+   "steps": [
+    {
+     "result": {
+      "by": "road",
+      "of": {
+       "roman": "easy",
+       "local": "easy",
+       "trail": "normal"
+      },
+      "else": "normal"
+     }
+    }
+   ]
+  },
+  "forced-march": {
+   "params": [
+    "road",
+    "to"
+   ],
+   "about": "Rolls along the way (movement.md): each hour of Forced March, every marcher rolls Agility at the road's grade; each one who fails takes 1d6 damage.",
+   "steps": [
+    {
+     "call": "march-grade",
+     "with": {
+      "road": "{road}"
+     },
+     "as": "g"
+    },
+    {
+     "each": "forced-march",
+     "roll": "agility",
+     "vs": "{g}",
+     "combine": "each",
+     "as": "r",
+     "label": "Forced March: Agility vs road"
+    },
+    {
+     "effect": "damage",
+     "for": "r.failed",
+     "amount": "1d6"
+    }
+   ]
   }
  },
+ "triggers": [
+  {
+   "id": "lost-shift",
+   "name": "Lost? (each shift)",
+   "on": "clock",
+   "every": {
+    "n": 4,
+    "unit": "hour"
+   },
+   "while": "walking",
+   "auto": true,
+   "run": {
+    "call": "lost"
+   }
+  },
+  {
+   "id": "forced-march-hour",
+   "name": "Forced March hour",
+   "on": "clock",
+   "every": {
+    "n": 1,
+    "unit": "hour"
+   },
+   "while": "walking",
+   "if": {
+    "mode": "forced-march"
+   },
+   "auto": true,
+   "run": {
+    "call": "forced-march"
+   }
+  }
+ ],
  "aliases": {
   "survival": "e9-check",
   "agility": "e9-check",

@@ -115,3 +115,25 @@ test('e9 talent checks by grade, and footing (e9-core movement.md, rolls along t
   assert.strictEqual(e.effects[0].effect, 'halt');
   assert.deepStrictEqual(P.rollsOf(l, 'navigate'), ['Footing: Agility vs traverse']);
 });
+
+test('e9 lost (each shift) and forced march (each hour), with their clock triggers', () => {
+  const l = P.load('e9', [E9], null);
+  assert.deepStrictEqual(l.report, []);
+  const party = [{ id: 'a', name: 'Ann', modes: ['navigate'] }, { id: 'b', name: 'Bo', modes: ['navigate', 'forced-march'] }, { id: 'c', name: 'Cy', modes: ['forced-march'] }];
+  const lost = (orient, ...xs) => P.run(l, 'lost', { party, vars: { orient }, rng: seq(...xs) });
+  let e = lost('normal', 0.5, 0.7);                               // Ann 4 fails, Bo 5 passes: anyone on Navigate is enough
+  assert.deepStrictEqual(e.effects, []);
+  assert.ok(e.rolls.filter(r => r.who).every(r => r.secret));
+  e = lost('normal', 0.5, 0.0);                                   // both fail
+  assert.deepStrictEqual(e.text, ['Lost: nobody on Navigate kept the way (normal).']);
+  assert.strictEqual(e.effects[0].effect, 'halt');
+  assert.deepStrictEqual(lost('automatic').effects, []);
+  const march = (road, ...xs) => P.run(l, 'forced-march', { party, vars: { road }, rng: seq(...xs) });
+  e = march(undefined, 0.7, 0.5);                                 // off-road is normal: Bo 5 passes, Cy 4 fails
+  assert.deepStrictEqual(e.effects.map(f => [f.target, f.effect]), [['Cy', 'damage']]);
+  e = march('roman', 0.5, 0.0, 0.0, 0.9);                         // easy on a Roman road: Bo 4 then 1 fails, Cy 1 then 6 passes
+  assert.deepStrictEqual(e.effects.map(f => [f.target, f.effect]), [['Bo', 'damage']]);
+  e = march('trail', 0.9, 0.9);
+  assert.deepStrictEqual(e.effects, []);
+  assert.deepStrictEqual(E9.triggers.map(t => [t.id, t.every.n, t.run.call]), [['lost-shift', 4, 'lost'], ['forced-march-hour', 1, 'forced-march']]);
+});
