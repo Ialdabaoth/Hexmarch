@@ -221,7 +221,7 @@
     <button onclick={test} disabled={!app.canPost}>Send test</button>
   </div>
   <label class="check small" style="margin-top:0.75rem">
-    <input type="checkbox" checked={app.settings.autoPost} disabled={!app.canPost}
+    <input type="checkbox" checked={app.autoPosting} disabled={!app.canPost}
       onchange={(e) => app.updateSettings({ autoPost: (e.target as HTMLInputElement).checked })} />
     Post every roll to Discord automatically
   </label>

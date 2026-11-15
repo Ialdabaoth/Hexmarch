@@ -1139,6 +1139,10 @@ class AppState {
     const p = this.campaign?.published?.post ?? '';
     return isWebhookUrl(p) ? p : '';
   }
+  // Rolls post by themselves unless the player said otherwise; with no choice made, on when the campaign has a channel.
+  get autoPosting(): boolean {
+    return this.settings.autoPost ?? !!this.campaignWebhook;
+  }
   get canPost(): boolean {
     return !!this.rollWebhook;
   }
@@ -1250,7 +1254,7 @@ class AppState {
     this.lastRoll = entry;
     this.log.unshift(entry);
     await saveLog(this.log).catch((e) => console.warn("Could not save", e));
-    if (this.settings.autoPost && this.canPost) await this.post(entry);
+    if (this.autoPosting && this.canPost) await this.post(entry);
   }
 
   async post(entry: LogEntry) {

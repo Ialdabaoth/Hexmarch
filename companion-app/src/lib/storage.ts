@@ -9,7 +9,8 @@ import type { Creature } from '../bestiary/creature';
 
 export interface Settings {
   webhookUrl: string;
-  autoPost: boolean;
+  // Post every roll to Discord. Unset: on whenever the campaign has a Discord channel (Heph 2026-11-15).
+  autoPost?: boolean;
   // The character shown on the home screen.
   activeId: string;
   // Rules picked last time in the character builder.
@@ -40,7 +41,7 @@ export interface PartyAt {
   hours?: number;
 }
 
-export const DEFAULT_SETTINGS: Settings = { webhookUrl: '', autoPost: false, activeId: '', rules: 'mm', dice3d: !prefersReducedMotion(), diceColor: DEFAULT_DICE_COLOR, diceInk: DEFAULT_DICE_INK, campaign: '', invitation: '', discordBots: {} };
+export const DEFAULT_SETTINGS: Settings = { webhookUrl: '', activeId: '', rules: 'mm', dice3d: !prefersReducedMotion(), diceColor: DEFAULT_DICE_COLOR, diceInk: DEFAULT_DICE_INK, campaign: '', invitation: '', discordBots: {} };
 
 // Saved sheets go through the same checks as imported files, so a sheet the
 // app can't read is skipped instead of breaking the whole list. Skipped sheets
