@@ -903,8 +903,10 @@ const placeOf = site => site && D && D.pois.find(p => p.id === site || p.name ==
 const slugify = t => t.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 function startHere() {
   const ap = AP(); if (!ap || ap.at || LOCK || CS_SRC === 'host' && parent === window || !D || !ap.start || ap.start.module !== MOD.id) return;
-  const st = startOf(ap.start), p = placeOf(st ? st.site : ap.start.site); if (!p) return;
-  const hex = addr(...p.hex).slice(1); ap.at = { base: MOD.base, module: MOD.id, map: 'atlas', hex, label: hex.slice(6), hours: 0 };
+  // a start's own 100-ft hex ("hex": "world:LLLL:HHHH", Heph 2026-11-15: the road outside the Pale Keep's drawbridge), else its site's hex
+  const st = startOf(ap.start), own = st && typeof st.hex === 'string' && CS_ADDR.test(st.hex.replace(/^#/, '')) ? parse('#' + st.hex.replace(/^#/, '')) : null;
+  const C = own && own.sel ? own.sel : (placeOf(st ? st.site : ap.start.site) || {}).hex; if (!C) return;
+  const hex = addr(...C).slice(1); ap.at = { base: MOD.base, module: MOD.id, map: 'atlas', hex, label: hex.slice(6), hours: 0 };
   CS = { ...CS, revision: CS.revision + 1, updated: new Date().toISOString() }; saveState();
   if (parent !== window) parent.postMessage({ type: 'hexmarch-atlas', event: 'party', module: MOD.id, party: PID, hex, hours: 0 }, '*');
 }
