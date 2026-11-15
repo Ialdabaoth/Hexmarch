@@ -70,3 +70,18 @@ def rules_procedures(repo):
                 p = json.load(open(os.path.join(pdir, f), encoding='utf-8'))
                 if isinstance(p, dict) and p.get('format') == 'hexmarch-procedures/1': out.append(dict(p, source=f'{m}/procedures/{f}'))
     return out
+
+
+def rules_movement(repo):
+    """Each ruleset's movement data (rules.json "movement" of its core rules module), built into the Atlas page: {ruleset: movement}."""
+    out, mods = {}, os.path.join(repo, 'modules')
+    for m in sorted(os.listdir(mods)) if os.path.isdir(mods) else []:
+        d = os.path.join(mods, m)
+        if not m.endswith('-core') or not os.path.exists(os.path.join(d, 'module.json')): continue
+        man = json.load(open(os.path.join(d, 'module.json'), encoding='utf-8'))
+        for rs, f in [(man.get('ruleset'), man.get('rules'))] + [(o.get('ruleset'), o.get('rules')) for o in man.get('options') or [] if isinstance(o, dict)]:
+            p = os.path.join(d, f) if rs and isinstance(f, str) else ''
+            if p and os.path.isfile(p):
+                mv = json.load(open(p, encoding='utf-8')).get('movement')
+                if isinstance(mv, dict): out[rs] = mv
+    return out

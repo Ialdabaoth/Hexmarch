@@ -516,7 +516,8 @@ function csRead(d) {  // as the Companion reads it (lib/state.ts readState): any
   const parties = (Array.isArray(d.parties) ? d.parties : []).flatMap(q => q && typeof q === 'object' && typeof q.id === 'string' && /^[a-z0-9-]{1,40}$/.test(q.id) ? [{ ...q, id: q.id, name: str(q.name, q.id), start: start(q.start),
     clock: { start: csDate(q.clock && q.clock.start) ? q.clock.start : '3507-05-01', hours: num(q.clock && q.clock.hours, 8) },
     session: { number: Math.floor(num(q.session && q.session.number, 0)), open: !!(q.session && q.session.open === true) }, at: marker(q.at),
-    log: Array.isArray(q.log) ? q.log.filter(e => e && typeof e === 'object') : [] }] : []);
+    log: Array.isArray(q.log) ? q.log.filter(e => e && typeof e === 'object') : [],
+    modes: q.modes && typeof q.modes === 'object' ? Object.fromEntries(Object.entries(q.modes).filter(([, v]) => Array.isArray(v)).map(([k, v]) => [k, v.filter(x => typeof x === 'string')])) : {} }] : []);
   return { ...d, format: 'hexmarch-campaign-state', version: 1, campaign: str(d.campaign, ''), revision: Math.floor(num(d.revision, 0)), updated: str(d.updated, new Date().toISOString()),
     parties, active: parties.some(q => q.id === d.active) ? d.active : parties.length ? parties[0].id : '', revealed, characters: Array.isArray(d.characters) ? d.characters : [] };
 }
@@ -937,6 +938,8 @@ async function setActive(id) {
 // this page; a module's events and its own procedures come from its events.json (build.py). The referee queues a manual trigger,
 // then runs, skips or reorders the queue; each run is one entry in the shown party's Events log (parties[].log), on that party's clock.
 const RULEPROCS = {{RULEPROCS}};
+const RULEMOVE = {{RULEMOVE}};  // each ruleset's movement data (rules.json "movement"): modes, slots, how speeds combine
+const movementOf = () => RULEMOVE[rulesetOf()] || null;
 let PLIB = null, PEVENTS = null, PRULESET = '';
 const PQUEUE = new Map();  // party id -> its queued triggers; the queue is the referee's, kept on this page only
 function rulesetOf() { return (CS && CS.rules && typeof CS.rules.ruleset === 'string' && CS.rules.ruleset) || 'e9'; }
@@ -972,6 +975,26 @@ function entryHtml(e, ap) {
     + `${(e.players || []).length ? `<br><small title="What the players are told">Players: ${e.players.map(esc).join(' ')}</small>` : ''}${later.length ? `<br><small title="Apply these by hand for now">To apply: ${later.join('; ')}</small>` : ''}`
     + `${(e.warnings || []).length ? `<br><small class="warn">${e.warnings.map(esc).join('; ')}</small>` : ''}</p>`;
 }
+let MODEEDIT = '';  // the member whose modes are being picked
+function movementLine() {  // the referee picks each member's movement modes for the party shown (parties[].modes)
+  const mv = movementOf(), ap = AP(); if (LOCK || !ap || !mv || !Array.isArray(mv.modes)) return '';
+  const ids = partyIds(); if (!ids.length) return '';
+  const nameOf = id => ((CS && CS.characters.find(c => c.id === id)) || WHO.find(w => w.id === id) || { name: id }).name || id;
+  const byId = new Map(mv.modes.map(m => [m.id, m])), slots = mv.modeSlots || {}, max = Math.max(slots.default || 1, ...((slots.byLevel || []).map(b => b.slots || 0)));
+  const rule = `${slots.default || 1} mode${(slots.default || 1) === 1 ? '' : 's'}${slots.classKind ? `; ${slots.classKind}s ` + (slots.byLevel || []).map(b => `${b.slots} from level ${b.from}`).join(', ') : ''}`;
+  let h = `<hr><b title="${esc(rule)}">Movement</b>`;
+  for (const id of ids) { const have = ((ap.modes || {})[id] || []).filter(x => byId.has(x));
+    h += `<br>${esc(nameOf(id))}: ${have.length ? have.map(x => esc(byId.get(x).name)).join(', ') : '<small>no mode</small>'} <button data-mv="${esc(id)}" title="Pick ${esc(nameOf(id))}’s modes (${esc(rule)})">Modes…</button>`;
+    if (MODEEDIT === id) h += '<br>' + mv.modes.map(m => `<label title="${esc([m.talent && 'talent: ' + m.talent, m.speed !== undefined && m.speed + '×', m.terrain && 'on ' + m.terrain + ' ground', m.scales && m.scales.join('/'), m.classKind && m.classKind + 's only'].filter(Boolean).join(' · '))}"><input type="checkbox" data-mode="${esc(m.id)}" data-who="${esc(id)}"${have.includes(m.id) ? ' checked' : ''}${!have.includes(m.id) && have.length >= max ? ' disabled' : ''}> ${esc(m.name)}</label>`).join(' ');
+  }
+  return h;
+}
+document.getElementById('party').addEventListener('click', e => { const b = e.target.closest('button[data-mv]'); if (!b || LOCK) return; MODEEDIT = MODEEDIT === b.dataset.mv ? '' : b.dataset.mv; partyBox(); });
+document.getElementById('party').addEventListener('change', async e => { const c = e.target.closest('input[data-mode]'); if (!c || LOCK || !AP() || !CS) return;
+  const ap = AP(), who = c.dataset.who, now = new Set((ap.modes || {})[who] || []); if (c.checked) now.add(c.dataset.mode); else now.delete(c.dataset.mode);
+  const modes = { ...(ap.modes || {}), [who]: [...now] };
+  CS = { ...CS, revision: CS.revision + 1, updated: new Date().toISOString(), parties: CS.parties.map(p => p.id === ap.id ? { ...p, modes } : p) };
+  await saveState(); if (parent !== window) parent.postMessage({ type: 'hexmarch-atlas', event: 'modes', module: MOD.id, party: ap.id, modes }, '*'); partyBox(); });
 function eventsLine() {  // the referee's events for the party shown: manual triggers, the queue, and the latest of the log
   const ap = AP(), l = procLib(); if (LOCK || !ap || !l) return '';
   const man = l.triggers.filter(t => t.on === 'manual'), q = queueOf(), log = ap.log || [];
@@ -1012,6 +1035,22 @@ function firedBetween(a, b, lib) {  // the terrain triggers crossing from point 
     if ((t.edge || 'enter') === 'enter' ? enter : leave) out.push(t); }
   return out;
 }
+// the party's speed in one hex, read from the ruleset's movement data (E9: Heph 2026-11-15): each member's chosen modes
+// (parties[].modes) that apply at this scale and on this kind of ground, or the mode the ground requires; a member goes at the
+// slowest of theirs ("combine": "slowest") and the party at its slowest member's ("party": "slowest")
+function partySpeed(kind, scale) {
+  const mv = movementOf(), ap = AP(); if (!mv || !ap) return { speed: 1, modes: '' };
+  const byId = new Map((mv.modes || []).map(m => [m.id, m])), dflt = (mv.default || {}).speed ?? 1, chosen = ap.modes || {};
+  const req = (/^requires\s+(\S+)/.exec(String((mv.terrain || {})[kind] || '')) || [])[1], used = new Set(); let party = Infinity;
+  const fold = (xs, how) => xs.length ? (how === 'fastest' ? Math.max(...xs) : Math.min(...xs)) : dflt;
+  for (const id of partyIds()) {
+    let ms = (chosen[id] || []).map(x => byId.get(x)).filter(m => m && (!m.scales || m.scales.includes(scale)) && (!m.terrain || m.terrain === kind));
+    if (req && byId.has(req)) ms = [byId.get(req)];
+    ms.forEach(m => used.add(m.id));
+    party = fold([party, fold(ms.map(m => m.speed).filter(x => typeof x === 'number'), mv.combine)], mv.party);
+  }
+  return { speed: party === Infinity ? dflt : party, modes: [...used].join(',') };
+}
 function walker(pts, N, out) {  // the map side of a `walk` step: fills out {hours, at, path, queued, stopped, rest}
   const RD = (D.travel || {}).roads || {}, mph = ((D.travel || {}).pace || {}).mi_per_hour || 3;
   return (name, vars, sub, entry, stop) => {
@@ -1021,7 +1060,9 @@ function walker(pts, N, out) {  // the map side of a `walk` step: fills out {hou
       const pace = st.road && RD[st.road] !== undefined ? RD[st.road] : ty && ty.travel !== undefined ? ty.travel : travelOf(st.terrain || 'unknown', st.road);
       if (pace === null) { entry.warnings.push(`no way on foot into ${ty ? ty.name.toLowerCase() : 'that hex'}`); out.stopped = true; out.rest = null; break; }
       const to = addr(...(N === 1 ? [st.i, st.j] : centre(st.i, st.j, N))).slice(1);
-      const e = sub(name, { from: out.at ? addr(...out.at).slice(1) : '', to, terrain: st.terrain || 'unknown', road: st.road || '', mi: +st.mi.toFixed(3), mph, pace: pace ?? 1, party: vars.party });
+      const kind = askP('terrain-kind', { terrain: st.terrain || 'unknown', road: st.road || '', travel: pace ?? 1 }), ground = typeof kind === 'string' ? kind : '', sp = partySpeed(ground, N <= NU ? 'exploration' : 'narration');
+      const e = sub(name, { from: out.at ? addr(...out.at).slice(1) : '', to, terrain: st.terrain || 'unknown', road: st.road || '', mi: +st.mi.toFixed(3), mph, pace: pace ?? 1, party: vars.party,
+        kind: ground, speed: sp.speed, modes: sp.modes });
       entry.rolls.push(...e.rolls); entry.text.push(...e.text); entry.players.push(...e.players); entry.warnings.push(...e.warnings);
       let halt = false;
       for (const f of e.effects) { if (f.effect === 'clock') out.hours += typeof f.hours === 'number' ? f.hours : 0; else if (f.effect === 'halt') halt = true; else if (!['move', 'reveal', 'explore'].includes(f.effect)) entry.effects.push(f); }
@@ -1105,11 +1146,11 @@ function partyBox() {
   if (!ap && LOCK) { box.innerHTML = `<b>Party</b> · your character is in no party yet.<br><button data-p="close">Close</button><hr>${stateLine()}${asLine()}`; return; }
   if (!ap) { box.innerHTML = `<b>No party yet</b><br>${partiesLine()}<button data-p="close">Close</button><hr>${stateLine()}${asLine()}${fogLine()}`; return; }
   if (!PARTY && LOCK) { box.innerHTML = `<b>${nm}</b> · not on this map.<br><button data-p="close">Close</button><hr>${stateLine()}${asLine()}`; return; }
-  if (!PARTY) { box.innerHTML = `<b>${nm}</b> · not on this map.<br><button data-p="place">Place the party</button><button data-p="close">Close</button><br>${partiesLine()}${eventsLine()}<hr>${stateLine()}${asLine()}${fogLine()}`; return; }
+  if (!PARTY) { box.innerHTML = `<b>${nm}</b> · not on this map.<br><button data-p="place">Place the party</button><button data-p="close">Close</button><br>${partiesLine()}${movementLine()}${eventsLine()}<hr>${stateLine()}${asLine()}${fogLine()}`; return; }
   const [C, R] = PARTY.hex, t = T(C, R, 1), h = addr(C, R), lbl = h.slice(7);
   box.innerHTML = `<b>${nm}</b> · at <a href="${h}">${lbl}</a>${t ? ' · ' + esc(TYPES[t - 1].name.toLowerCase()) : ''}<br><small>Travelled ${hm(PARTY.hours)}${PARTY.hours >= day / 2 ? ` (${(PARTY.hours / day).toFixed(1)} days of ${day} h)` : ''}</small><br>`
     + (LOCK ? '<button data-p="go">Go to</button><button data-p="close">Close</button>'
-      : '<button data-p="go">Go to</button><button data-p="place">Move</button><button data-p="reset" title="Set the travel time back to zero (the party’s clock keeps its time)">Reset time</button><button data-p="remove">Remove</button><button data-p="close">Close</button><br>' + partiesLine() + eventsLine())
+      : '<button data-p="go">Go to</button><button data-p="place">Move</button><button data-p="reset" title="Set the travel time back to zero (the party’s clock keeps its time)">Reset time</button><button data-p="remove">Remove</button><button data-p="close">Close</button><br>' + partiesLine() + movementLine() + eventsLine())
     + `<hr>${stateLine()}${asLine()}${fogLine()}`;
 }
 function saveFile() {  // the state file as written: plain JSON, as the Companion saves it (Campaign › State)
