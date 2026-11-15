@@ -34,7 +34,7 @@ Checked against the E9 System Reference Handbook: 5 paces a round (p. 33), half 
 - **How many modes.** A non-Expert takes one mode at a time. An Expert takes 2 at level 1, 3 at level 5 and 4 at level 9. Help is an Expert mode and uses one of the Expert's slots (Heph 2026-11-15): the Expert helps an ally with a roll, and that ally may take one more mode than usual.
 - **Several modes.** The slowest mode sets the character's speed. Extra modes add rolls but don't slow the character further.
 - **The party.** The party moves at its slowest member's speed, or splits into separate parties (separate Atlas markers).
-- **Terrain** is graded, not multiplied (Heph 2026-11-15). Each hex has five traits on the handbook's difficulty steps (automatic, easy, normal, hard, impossible): orient, traverse, hide, investigate and view (ATLAS_FORMAT.md in the data repo, "Terrain traits"). E9's defaults by terrain id are in `rules.json` `terrain`; a module's terrain type, a single hex and the campaign can override them. Traverse sets the speed: automatic, easy and normal are 1x (easy and normal ask for an Agility roll at that difficulty), hard forces Climb/Swim/Maneuver (0.5x), impossible stops travel on foot. Forced March and Dash need automatic traverse (a road or grassland). Navigate rolls Survival at the orient grade, Sneak rolls Stealth at the hide grade, Investigate rolls Alertness at the investigate grade, and the view grade sets how far one sees.
+- **Terrain** is graded, not multiplied (Heph 2026-11-15). Each hex has five traits on the handbook's difficulty steps (automatic, easy, normal, hard, impossible): orient, traverse, hide, investigate and view (ATLAS_FORMAT.md in the data repo, "Terrain traits"). E9's defaults by terrain id are in `rules.json` `terrain`; a module's terrain type, a single hex and the campaign can override them. Traverse sets the speed: automatic, easy and normal are 1x (easy and normal ask for an Agility roll at that difficulty), hard forces Climb/Swim/Maneuver (0.5x), impossible stops travel on foot. Forced March and Dash need automatic traverse (a road or grassland). Every road is 1x (Heph 2026-11-15); road quality makes the Forced March roll easier instead: automatic on a Roman road, easy on a local road, normal on a trail or off the road (`movement.roads`). Navigate rolls Survival at the orient grade, Sneak rolls Stealth at the hide grade, Investigate rolls Alertness at the investigate grade, and the view grade sets how far one sees.
 - **No mode** means 1x and no roll.
 
 ## For the Atlas
@@ -44,7 +44,3 @@ Checked against the E9 System Reference Handbook: 5 paces a round (p. 33), half 
 - `sight-range` answers miles by the hex's `view` grade (`movement.view_mi`).
 - `travel` is retired and answers 1 until the Atlas stops asking.
 - Rolls (Survival at the orient grade each shift, Agility at the traverse grade, Stealth at the hide grade, On Watch Alertness for an encounter) are their own procedures, added in later PRs.
-
-## Open
-
-- Roads: do roads keep a speed bonus by class (Roman, local, trail), or is every road 1x? Asked Heph 2026-11-15.
