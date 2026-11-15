@@ -518,7 +518,8 @@ function csRead(d) {  // as the Companion reads it (lib/state.ts readState): any
     clock: { start: csDate(q.clock && q.clock.start) ? q.clock.start : '3507-05-01', hours: num(q.clock && q.clock.hours, 8) },
     session: { number: Math.floor(num(q.session && q.session.number, 0)), open: !!(q.session && q.session.open === true) }, at: marker(q.at),
     log: Array.isArray(q.log) ? q.log.filter(e => e && typeof e === 'object') : [],
-    modes: q.modes && typeof q.modes === 'object' ? Object.fromEntries(Object.entries(q.modes).filter(([, v]) => Array.isArray(v)).map(([k, v]) => [k, v.filter(x => typeof x === 'string')])) : {} }] : []);
+    modes: q.modes && typeof q.modes === 'object' ? Object.fromEntries(Object.entries(q.modes).filter(([, v]) => Array.isArray(v)).map(([k, v]) => [k, v.filter(x => typeof x === 'string')])) : {},
+    help: q.help && typeof q.help === 'object' ? Object.fromEntries(Object.entries(q.help).filter(([, v]) => v && typeof v === 'object' && typeof v.for === 'string' && typeof v.grant === 'string')) : {} }] : []);
   return { ...d, format: 'hexmarch-campaign-state', version: 1, campaign: str(d.campaign, ''), revision: Math.floor(num(d.revision, 0)), updated: str(d.updated, new Date().toISOString()),
     parties, active: parties.some(q => q.id === d.active) ? d.active : parties.length ? parties[0].id : '', revealed, characters: Array.isArray(d.characters) ? d.characters : [] };
 }
@@ -984,7 +985,7 @@ const UNIT_H = { minute: 1 / 60, hour: 1, day: 24, week: 168 };
 async function runQueued(i) {
   const ap = AP(), q = queueOf(), t = q[i], l = procLib(); if (!ap || !t || !l) return;
   q.splice(i, 1);
-  const e = HexmarchProcedures.run(l, t, { vars: { party: ap.name }, roles: { party: ap.name } });
+  const e = HexmarchProcedures.run(l, t, { party: members(), vars: { party: ap.name }, roles: { party: ap.name } });
   e.at = ap.clock.hours;
   let hours = 0;  // the effects the Atlas applies now: passing time on the party's clock; the rest are listed for the referee
   for (const f of e.effects) if (f.effect === 'clock') { const h = typeof f.hours === 'number' ? f.hours : (+f.n || +f.amount || 0) * (UNIT_H[f.unit] ?? 1); if (h > 0) { hours += h; f.applied = true; } }
@@ -994,27 +995,53 @@ async function runQueued(i) {
   partyBox();
 }
 function entryHtml(e, ap) {
-  const rolls = (e.rolls || []).map(x => `${esc(x.roll)} ${esc(x.total ?? '?')}`).join(', ');
+  const rolls = (e.rolls || []).map(x => `${x.who ? esc(x.who) + ' ' : ''}${esc(x.roll)}${x.vs ? ' vs ' + esc(x.vs) : ''} ${esc(x.total ?? (x.dice || []).join('+'))}${x.pass === true ? ' ✓' : x.pass === false ? ' ✗' : ''}${x.secret ? ' (secret)' : ''}`.trim()).join(', ');
   const later = (e.effects || []).filter(f => !f.applied && f.effect !== 'note').map(f => esc(f.effect + (f.target ? ' · ' + f.target : '') + (f.amount !== undefined ? ' ' + f.amount : '') + (f.condition ? ' ' + f.condition : '')));
   return `<p class="ev"><small>${esc(clockLabel({ start: ap.clock.start, hours: typeof e.at === 'number' ? e.at : ap.clock.hours }))}${rolls ? ' · ' + rolls : ''}</small><br><b>${esc(e.proc || '')}</b> ${(e.text || []).map(esc).join(' ')}`
     + `${(e.players || []).length ? `<br><small title="What the players are told">Players: ${e.players.map(esc).join(' ')}</small>` : ''}${later.length ? `<br><small title="Apply these by hand for now">To apply: ${later.join('; ')}</small>` : ''}`
     + `${(e.warnings || []).length ? `<br><small class="warn">${e.warnings.map(esc).join('; ')}</small>` : ''}</p>`;
 }
 let MODEEDIT = '';  // the member whose modes are being picked
+const memberName = id => ((CS && CS.characters.find(c => c.id === id)) || WHO.find(w => w.id === id) || { name: id }).name || id;
+// Help (E9, Heph 2026-11-15): a member on a mode with "grants" helps one ally, picking one of grants.choose each time: one more
+// mode ({modes: n}), or one of the ally's modes made easier ({easier: n}). Kept per party as parties[].help {helper: {for, grant, mode?}}
+function helpGiven(ap) {  // {member id: {modes: extra slots, ease: {mode: steps}}} from the helpers who are on a Help mode
+  const mv = movementOf(), out = {}, ids = partyIds(); if (!mv || !ap) return out;
+  const helps = new Map((mv.modes || []).filter(m => m.grants).map(m => [m.id, m.grants]));
+  for (const [h, g] of Object.entries(ap.help || {})) {
+    const gr = ((ap.modes || {})[h] || []).map(x => helps.get(x)).find(Boolean); if (!gr || !g || !ids.includes(g.for) || g.for === h) continue;
+    const pick = (gr.choose || []).find(c => g.grant in c) || {}, o = out[g.for] || (out[g.for] = { modes: 0, ease: {} });
+    if (g.grant === 'modes') o.modes += +pick.modes || 1; else if (g.grant === 'easier' && g.mode) o.ease[g.mode] = (o.ease[g.mode] || 0) + (+pick.easier || 1);
+  }
+  return out;
+}
+function members() {  // the shown party's members for the runner's "each" steps: [{id, name, modes, ease}]
+  const ap = AP(); if (!ap) return []; const hg = helpGiven(ap);
+  return partyIds().map(id => ({ id, name: memberName(id), modes: (ap.modes || {})[id] || [], ease: (hg[id] || {}).ease || {} }));
+}
 function movementLine() {  // the referee picks each member's movement modes for the party shown (parties[].modes)
   const mv = movementOf(), ap = AP(); if (LOCK || !ap || !mv || !Array.isArray(mv.modes)) return '';
   const ids = partyIds(); if (!ids.length) return '';
-  const nameOf = id => ((CS && CS.characters.find(c => c.id === id)) || WHO.find(w => w.id === id) || { name: id }).name || id;
+  const nameOf = memberName, hg = helpGiven(ap), helpIds = new Set(mv.modes.filter(m => m.grants).map(m => m.id));
   const byId = new Map(mv.modes.map(m => [m.id, m])), slots = mv.modeSlots || {}, max = Math.max(slots.default || 1, ...((slots.byLevel || []).map(b => b.slots || 0)));
   const rule = `${slots.default || 1} mode${(slots.default || 1) === 1 ? '' : 's'}${slots.classKind ? `; ${slots.classKind}s ` + (slots.byLevel || []).map(b => `${b.slots} from level ${b.from}`).join(', ') : ''}`;
   let h = `<hr><b title="${esc(rule)}">Movement</b>`;
   for (const id of ids) { const have = ((ap.modes || {})[id] || []).filter(x => byId.has(x));
-    h += `<br>${esc(nameOf(id))}: ${have.length ? have.map(x => esc(byId.get(x).name)).join(', ') : '<small>no mode</small>'} <button data-mv="${esc(id)}" title="Pick ${esc(nameOf(id))}’s modes (${esc(rule)})">Modes…</button>`;
-    if (MODEEDIT === id) h += '<br>' + mv.modes.map(m => `<label title="${esc([m.talent && 'talent: ' + m.talent, m.speed !== undefined && m.speed + '×', m.terrain && 'on ' + m.terrain + ' ground', m.scales && m.scales.join('/'), m.classKind && m.classKind + 's only'].filter(Boolean).join(' · '))}"><input type="checkbox" data-mode="${esc(m.id)}" data-who="${esc(id)}"${have.includes(m.id) ? ' checked' : ''}${!have.includes(m.id) && have.length >= max ? ' disabled' : ''}> ${esc(m.name)}</label>`).join(' ');
+    const got = hg[id] || { modes: 0, ease: {} }, cap = max + got.modes, eased = Object.entries(got.ease).map(([m, n]) => `${(byId.get(m) || { name: m }).name} ${n} step${n === 1 ? '' : 's'} easier`);
+    h += `<br>${esc(nameOf(id))}: ${have.length ? have.map(x => esc(byId.get(x).name)).join(', ') : '<small>no mode</small>'}${got.modes || eased.length ? ` <small title="From Help">(${[got.modes && '+' + got.modes + ' mode', ...eased].filter(Boolean).map(esc).join(', ')})</small>` : ''} <button data-mv="${esc(id)}" title="Pick ${esc(nameOf(id))}’s modes (${esc(rule)})">Modes…</button>`;
+    if (have.some(x => helpIds.has(x))) { const cur = (ap.help || {})[id] || {}, val = cur.for ? [cur.for, cur.grant, cur.mode || ''].join('|') : '';
+      const opts = ids.filter(o => o !== id).flatMap(o => [[`${o}|modes|`, `${nameOf(o)}: one more mode`], ...(((ap.modes || {})[o] || []).filter(x => byId.has(x)).map(x => [`${o}|easier|${x}`, `${nameOf(o)}: ${byId.get(x).name} easier`]))]);
+      h += `<br>&nbsp;&nbsp;<small>helps</small> <select data-help="${esc(id)}" title="Help gives one ally one more mode, or makes one of their modes a step easier (never past easy); helps stack"><option value="">nobody yet</option>${opts.map(([v, t]) => `<option value="${esc(v)}"${v === val ? ' selected' : ''}>${esc(t)}</option>`).join('')}</select>`; }
+    if (MODEEDIT === id) h += '<br>' + mv.modes.map(m => `<label title="${esc([m.talent && 'talent: ' + m.talent, m.speed !== undefined && m.speed + '×', m.traverse && 'on ' + m.traverse.join('/') + ' ground', m.scales && m.scales.join('/'), m.classKind && m.classKind + 's only', m.grants && 'helps an ally'].filter(Boolean).join(' · '))}"><input type="checkbox" data-mode="${esc(m.id)}" data-who="${esc(id)}"${have.includes(m.id) ? ' checked' : ''}${!have.includes(m.id) && have.length >= cap ? ' disabled' : ''}> ${esc(m.name)}</label>`).join(' ');
   }
   return h;
 }
 document.getElementById('party').addEventListener('click', e => { const b = e.target.closest('button[data-mv]'); if (!b || LOCK) return; MODEEDIT = MODEEDIT === b.dataset.mv ? '' : b.dataset.mv; partyBox(); });
+document.getElementById('party').addEventListener('change', async e => { const c = e.target.closest('select[data-help]'); if (!c || LOCK || !AP() || !CS) return;
+  const ap = AP(), [f, grant, mode] = c.value.split('|'), help = { ...(ap.help || {}) };
+  if (f) help[c.dataset.help] = { for: f, grant, ...(mode ? { mode } : {}) }; else delete help[c.dataset.help];
+  CS = { ...CS, revision: CS.revision + 1, updated: new Date().toISOString(), parties: CS.parties.map(p => p.id === ap.id ? { ...p, help } : p) };
+  await saveState(); if (parent !== window) parent.postMessage({ type: 'hexmarch-atlas', event: 'help', module: MOD.id, party: ap.id, help }, '*'); partyBox(); });
 document.getElementById('party').addEventListener('change', async e => { const c = e.target.closest('input[data-mode]'); if (!c || LOCK || !AP() || !CS) return;
   const ap = AP(), who = c.dataset.who, now = new Set((ap.modes || {})[who] || []); if (c.checked) now.add(c.dataset.mode); else now.delete(c.dataset.mode);
   const modes = { ...(ap.modes || {}), [who]: [...now] };
@@ -1090,18 +1117,20 @@ function hexVars(terrain, road, mi, x, y, N) {
 function hexHours(v) { const l = procLib();
   if (l && l.procs.move) { const e = HexmarchProcedures.run(l, 'move', { rng: () => .5, vars: v }); return e.effects.reduce((a, f) => a + (f.effect === 'clock' && typeof f.hours === 'number' ? f.hours : 0), 0); }
   return v.mi / (v.mph * v.speed); }
-function walker(pts, N, out) {  // the map side of a `walk` step: fills out {hours, mi, at, path, queued, stopped, rest}
-  return (name, vars, sub, entry, stop) => {
+function walker(pts, N, out, dry) {  // the map side of a `walk` step: fills out {hours, mi, at, path, queued, stopped, rest}. dry: a preview,
+  // so the step's "then" procedures (the rolls along the way) are left out
+  return (name, vars, sub, entry, stop, then) => {
     const steps = routeSteps(pts, N), lib = procLib(); let prev = pts[0];
     Object.assign(out, { hours: 0, mi: 0, at: null, path: [pts[0]], queued: [], stopped: false, rest: null, hexes: 0, total: steps.length, blocked: null });
     for (let k = 0; k < steps.length; k++) { const st = steps[k], c = hexFt(st.i, st.j, N), ty = TYPES.find(x => x.id === st.terrain);
       const v = hexVars(st.terrain, st.road, st.mi, ...c, N);
       if (!v) { entry.warnings.push(`no way on into ${ty ? ty.name.toLowerCase() : 'that hex'}`); out.stopped = true; out.blocked = st.terrain || 'unknown'; out.rest = null; break; }
       const to = addr(...(N === 1 ? [st.i, st.j] : centre(st.i, st.j, N))).slice(1);
-      const e = sub(name, { from: out.at ? addr(...out.at).slice(1) : '', to, party: vars.party, ...v });
-      entry.rolls.push(...e.rolls); entry.text.push(...e.text); entry.players.push(...e.players); entry.warnings.push(...e.warnings);
+      const w = { from: out.at ? addr(...out.at).slice(1) : '', to, party: vars.party, ...v };
       let halt = false;
-      for (const f of e.effects) { if (f.effect === 'clock') out.hours += typeof f.hours === 'number' ? f.hours : 0; else if (f.effect === 'halt') halt = true; else if (!['move', 'reveal', 'explore'].includes(f.effect)) entry.effects.push(f); }
+      for (const e of [sub(name, w), ...(dry ? [] : (then || []).map(p => sub(p, w)))]) {
+        entry.rolls.push(...e.rolls.map(r => ({ ...r, at: to }))); entry.text.push(...e.text); entry.players.push(...e.players); entry.warnings.push(...e.warnings);
+        for (const f of e.effects) { if (f.effect === 'clock') out.hours += typeof f.hours === 'number' ? f.hours : (+f.n || +f.amount || 0) * (UNIT_H[f.unit] ?? 1); else if (f.effect === 'halt') halt = true; else if (!['move', 'reveal', 'explore'].includes(f.effect)) entry.effects.push(f); } }
       out.mi += st.mi; out.at = N === 1 ? [st.i, st.j] : centre(st.i, st.j, N); out.path.push(c); out.hexes++;
       const fired = lib ? firedBetween(prev, c, lib) : []; prev = c;
       for (const t of fired) out.queued.push(Object.assign({}, t, { at: to }));
@@ -1111,13 +1140,13 @@ function walker(pts, N, out) {  // the map side of a `walk` step: fills out {hou
 }
 function estimate(pts, N) {  // a route's time and miles, hex by hex as Navigate would walk it, without rolling or stopping for events
   const out = {}, entry = { rolls: [], text: [], players: [], warnings: [], effects: [] };
-  walker(pts, N, out)('move', { party: (AP() || {}).name || '' }, (name, w) => ({ rolls: [], text: [], players: [], warnings: [], effects: [{ effect: 'clock', hours: hexHours(w) }] }), entry, 'never');
+  walker(pts, N, out, true)('move', { party: (AP() || {}).name || '' }, (name, w) => ({ rolls: [], text: [], players: [], warnings: [], effects: [{ effect: 'clock', hours: hexHours(w) }] }), entry, 'never');
   return out;
 }
 // a dry run for the menu: the time, how far it gets, what it would queue, and the rolls it makes, without rolling for real
 function offerPreview(name, pts, N) {
   const l = procLib(); if (!l) return '';
-  const out = {}; HexmarchProcedures.run(l, name, { rng: () => .5, walk: walker(pts, N, out), vars: { party: (AP() || {}).name || '' } });
+  const out = {}; HexmarchProcedures.run(l, name, { rng: () => .5, walk: walker(pts, N, out, true), party: members(), vars: { party: (AP() || {}).name || '' } });
   const rolls = [...new Set(HexmarchProcedures.rollsOf(l, name))];
   if (out.hexes === undefined) return rolls.length ? 'rolls: ' + rolls.join(', ') : '';
   const what = [...new Set(out.queued.map(t => t.label || t.id))].join(', '), n = x => `${x} hex${x === 1 ? '' : 'es'}`;
@@ -1127,7 +1156,7 @@ function offerPreview(name, pts, N) {
 }
 async function runOffer(name, pts, N) {
   const ap = AP(), l = procLib(); if (!ap || !l || !PARTY) return;
-  const out = {}, e = HexmarchProcedures.run(l, name, { walk: walker(pts, N, out), vars: { party: ap.name }, roles: { party: ap.name } });
+  const out = {}, e = HexmarchProcedures.run(l, name, { walk: walker(pts, N, out), party: members(), vars: { party: ap.name }, roles: { party: ap.name } });
   e.at = ap.clock.hours;
   if (out.hexes !== undefined) {
     const lbl = { [NL]: 'League', [NF]: 'Field', [NU]: 'Furlong', 1: '100-ft' }[N] || '';

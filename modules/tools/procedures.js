@@ -106,20 +106,31 @@
       if (s.walk) {  // once per hex of the route, by the app that knows the map (ctx.walk). "stop": "queued" (the default) stops at the first hex where
         // something joins the queue, "never" goes on to the end; a `halt` effect in the walked procedure stops it there either way
         if (!ctx.walk) { entry.warnings.push(`"${s.walk}" needs a map to walk`); continue; }
-        ctx.walk(s.walk, vars, (name, w) => { const e = newEntry(name); const r = call(lib, name, w, Object.assign({}, ctx, { vars: {} }), e, depth + 1); return Object.assign(e, { result: r }); }, entry, s.stop === 'never' ? 'never' : 'queued');
+        // "then": procedures run in each hex after the walked one, with the same params; the Atlas skips them in a dry run (previews,
+        // estimates), so the walked procedure stays roll-free and the rolls along the way live in these
+        ctx.walk(s.walk, vars, (name, w) => { const e = newEntry(name); const r = call(lib, name, w, Object.assign({}, ctx, { vars: {} }), e, depth + 1); return Object.assign(e, { result: r }); }, entry, s.stop === 'never' ? 'never' : 'queued',
+          (Array.isArray(s.then) ? s.then : s.then ? [s.then] : []).filter(x => typeof x === 'string'));
         say(s, vars, entry); continue;
+      }
+      if (s.each) {  // a roll for every party member in a mode ("*": everyone), each at the `vs` grade eased by the Help they get
+        // (ctx.party [{id, name, modes, ease: {mode: steps}}]); "combine" any (one success), all (every one), or each (per member):
+        // the answer {pass, passed: [names], failed: [names], n} branches, and an effect with "for": "<as>.failed" targets each
+        const everyone = s.each === '*' || s.each === 'everyone', ms = (Array.isArray(ctx.party) ? ctx.party : []).filter(m => isObj(m) && (everyone || (Array.isArray(m.modes) && m.modes.includes(s.each))));
+        const passed = [], failed = [];
+        for (const m of ms) {
+          const vs = ease(value(s.vs, vars), everyone ? 0 : +((m.ease || {})[s.each] || 0), s.floor || 'easy');
+          const r = rollOne(lib, s.roll, vs, m.name || m.id, ctx, entry, depth);
+          if (r) entry.rolls[entry.rolls.length - 1] = Object.assign(entry.rolls[entry.rolls.length - 1], { who: m.name || m.id, ...(vs !== undefined && vs !== '' ? { vs } : {}), ...(s.secret ? { secret: true } : {}) });
+          (r && r.pass === true ? passed : failed).push(m.name || m.id);
+        }
+        const how = s.combine === 'all' || s.combine === 'each' ? s.combine : 'any';
+        const out = { pass: how === 'any' ? passed.length > 0 : failed.length === 0, passed, failed, n: ms.length };
+        if (s.as) vars[s.as] = out; vars.roll = passed.length + '/' + ms.length; say(s, vars, entry); continue;
       }
       if (s.role) { vars.who = vars[s.role] || (ctx.roles && ctx.roles[s.role]) || s.role; say(s, vars, entry); continue; }
       if (s.roll) {
-        const d = dice(value(s.roll, vars), ctx.rng);
-        let r;
-        if (d) { r = d; entry.rolls.push({ roll: String(value(s.roll, vars)), total: d.total, rolls: d.rolls, ...(s.show ? { show: true } : {}) }); }
-        else {  // a ruleset roll (save, attack, check): its own procedure answers {total, pass}
-          const got = call(lib, s.roll, { vs: value(s.vs, vars), who: vars.who }, ctx, entry, depth + 1);
-          r = isObj(got) ? got : got === undefined ? undefined : { total: got };
-          if (r === undefined) entry.warnings.push(`no answer for the ${s.roll} roll; the referee decides`);
-          else entry.rolls.push({ roll: s.roll, ...r });
-        }
+        const r = rollOne(lib, value(s.roll, vars), value(s.vs, vars), vars.who, ctx, entry, depth);
+        if (r && s.show && entry.rolls.length) entry.rolls[entry.rolls.length - 1].show = true;
         if (s.as) vars[s.as] = r;
         vars.roll = r ? r.total : '?'; say(s, vars, entry); continue;
       }
@@ -133,16 +144,40 @@
       }
       if (s.table) { table(lib, value(s.table, vars), vars, ctx, entry, depth + 1); say(s, vars, entry); continue; }
       if (s.call) { const r = call(lib, s.call, args(lib, s.with, vars), ctx, entry, depth + 1); if (s.as) vars[s.as] = r; say(s, vars, entry); continue; }
-      if (s.effect) {  // the fixed list (section 7); the Atlas applies what it can and lists the rest
-        const e = { effect: s.effect };
-        for (const [k, v] of Object.entries(s)) if (!['effect', 'text', 'players', 'show'].includes(k)) e[k] = value(v, vars);
-        if (typeof e.amount === 'string') { const d = dice(e.amount, ctx.rng); if (d) e.amount = d.total; }
-        vars.amount = e.amount; entry.effects.push(e); say(s, vars, entry); continue;
+      if (s.effect) {  // the fixed list (section 7); the Atlas applies what it can and lists the rest. "for": "r.failed" makes one per name
+        const list = s.for ? path(vars, s.for) : [null];
+        for (const name of Array.isArray(list) ? list : []) {
+          if (name !== null) { vars.who = name; vars.target = name; }
+          const e = { effect: s.effect };
+          for (const [k, v] of Object.entries(s)) if (!['effect', 'text', 'players', 'show', 'for'].includes(k)) e[k] = value(v, vars);
+          if (name !== null && e.target === undefined) e.target = name;
+          if (typeof e.amount === 'string') { const d = dice(e.amount, ctx.rng); if (d) e.amount = d.total; }
+          vars.amount = e.amount; entry.effects.push(e); say(s, vars, entry);
+        }
+        continue;
       }
       say(s, vars, entry);  // note, or a step with only text
     }
     return result;
   }
+
+  // dice ("2d6") or a ruleset roll (save, attack, check: its own procedure answers {total, pass}), logged; undefined: no answer
+  function rollOne(lib, roll, vs, who, ctx, entry, depth) {
+    const d = dice(roll, ctx.rng);
+    if (d) { entry.rolls.push({ roll: String(roll), total: d.total, rolls: d.rolls }); return d; }
+    const k = entry.rolls.length, got = call(lib, roll, { vs, who }, ctx, entry, depth + 1), r = isObj(got) ? got : got === undefined ? undefined : { total: got };
+    const inner = entry.rolls.splice(k).map(x => x.total);  // the check's own dice go inside its one log line
+    if (r === undefined) entry.warnings.push(`no answer for the ${roll} roll${who ? ' (' + who + ')' : ''}; the referee decides`);
+    else entry.rolls.push({ roll, ...(inner.length ? { dice: inner } : {}), ...r });
+    return r;
+  }
+  // a grade made n steps easier, never past the floor (E9 Help: never past easy); impossible and automatic stay as they are
+  const GRADES = ['impossible', 'hard', 'normal', 'easy', 'automatic'];
+  function ease(g, n, floor) {
+    const k = GRADES.indexOf(g), f = GRADES.indexOf(floor); if (!n || k < 1 || k >= 4) return g;
+    return GRADES[Math.max(k, Math.min(k + n, f < 0 ? 3 : f))];
+  }
+  const path = (vars, p) => String(p).replace(/^\{|\}$/g, '').split('.').reduce((o, k) => (o == null ? undefined : o[k]), vars);
 
   // {"result": 3} or {"result": {"by": "terrain", "of": {...}, "else": 3}}
   function answer(r, vars) {
@@ -195,6 +230,7 @@
       if (s.table) out.push((lib.tables[s.table] || {}).title || s.table);
       if (s.call) out.push(...rollsOf(lib, s.call, depth + 1, seen));
       if (s.walk) out.push(...rollsOf(lib, s.walk, depth + 1, seen));
+      for (const t of Array.isArray(s.then) ? s.then : s.then ? [s.then] : []) out.push(...rollsOf(lib, t, depth + 1, seen));
       walk(s.pass); walk(s.fail); for (const x of s.ranges || []) walk(x.steps); } };
     walk(f.p.steps); return out;
   }

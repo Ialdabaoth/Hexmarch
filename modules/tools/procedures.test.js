@@ -63,3 +63,36 @@ test('e9 movement: move times a hex by the party speed (e9-core movement.md)', (
   const e = P.run(l, { id: 'm', run: { call: 'move', with: { ...hex, speed: 1 } } }, { rng: () => 0.5 });
   assert.deepStrictEqual(e.rolls, []);  // roll-free, so the Atlas can dry-run it
 });
+
+test('each: a roll for every member in a mode, eased by Help, combined any/all/each', () => {
+  // a talent check: d6 >= 4 passes at normal, >= 3 at easy, >= 5 at hard
+  const R = { format: 'hexmarch-procedures/1', rules: ['t'], procedures: {
+    survival: { params: ['vs', 'who'], steps: [{ roll: 'd6', as: 'd' }, { result: '{d}' }] },
+    check: { params: ['vs', 'who'], steps: [{ roll: 'd6', as: 'd' }, { branch: 'd', ranges: [{ roll: [1, 2], steps: [{ result: { pass: false } }] }, { roll: [3, 6], steps: [{ result: { by: 'vs', of: { easy: { pass: true } }, else: { pass: false } } }] }] }] },
+    lost: { params: ['orient'], steps: [{ each: 'navigate', roll: 'check', vs: '{orient}', combine: 'any', as: 'r', secret: true }, { branch: 'r', pass: [{ text: 'On course.' }], fail: [{ text: 'Lost.' }, { effect: 'halt' }] }] },
+    march: { steps: [{ each: 'forced-march', roll: 'check', vs: 'normal', combine: 'each', as: 'r' }, { effect: 'damage', for: 'r.failed', amount: '1d6' }] },
+    all: { steps: [{ each: '*', roll: 'check', vs: 'easy', combine: 'all', as: 'r' }, { branch: 'r', pass: [{ text: 'All across.' }], fail: [{ text: 'Bogged: {r.failed}.' }] }] } } };
+  const l = P.load('t', [R], null);
+  const party = [{ id: 'a', name: 'Ann', modes: ['navigate'] }, { id: 'b', name: 'Bo', modes: ['navigate', 'forced-march'], ease: { navigate: 1 } }, { id: 'c', name: 'Cy', modes: ['forced-march'] }];
+  // Ann rolls vs normal (fails whatever she rolls here), Bo is helped from normal to easy and passes on 3+
+  let e = P.run(l, 'lost', { party, vars: { orient: 'normal' }, rng: seq(0.9, 0.5) });
+  assert.deepStrictEqual(e.rolls.filter(r => r.who).map(r => [r.who, r.vs, r.pass, r.secret]), [['Ann', 'normal', false, true], ['Bo', 'easy', true, true]]);
+  assert.deepStrictEqual(e.text, ['On course.']);
+  e = P.run(l, 'lost', { party, vars: { orient: 'normal' }, rng: seq(0.9, 0.0) });  // Bo rolls 1
+  assert.deepStrictEqual(e.text, ['Lost.']); assert.strictEqual(e.effects[0].effect, 'halt');
+  e = P.run(l, 'march', { party, rng: seq(0.0, 0.9, 0.5) });  // Bo fails (1), Cy fails at normal; damage per failed member
+  assert.deepStrictEqual(e.effects.map(f => [f.target, f.effect]), [['Bo', 'damage'], ['Cy', 'damage']]);
+  e = P.run(l, 'all', { party, rng: seq(0.9, 0.0, 0.9) });  // Bo rolls 1
+  assert.deepStrictEqual(e.text, ['Bogged: Bo.']);
+  assert.deepStrictEqual(P.rollsOf(l, 'lost'), ['check roll']);
+  e = P.run(l, 'lost', { party: [], rng: seq(0.9) });  // nobody navigating: no success
+  assert.deepStrictEqual(e.text, ['Lost.']);
+});
+
+test('walk passes "then" procedures to the map', () => {
+  const R = { format: 'hexmarch-procedures/1', rules: ['t'], procedures: { go: { steps: [{ walk: 'move', then: ['lost'] }] }, move: { steps: [] }, lost: { steps: [{ roll: 'd6', label: 'lost check' }] } } };
+  const l = P.load('t', [R], null); let got;
+  P.run(l, 'go', { walk: (name, vars, sub, entry, stop, then) => { got = [name, stop, then, sub('lost', {}).rolls.length]; } });
+  assert.deepStrictEqual(got, ['move', 'queued', ['lost'], 1]);
+  assert.deepStrictEqual(P.rollsOf(l, 'go'), ['lost check']);
+});
