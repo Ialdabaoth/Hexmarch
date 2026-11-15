@@ -89,7 +89,9 @@
     const m = picked[0];
     const first = startsOf(m)[0];
     const name = first?.site ?? '';
-    return { module: m.id, slug: m.sites.find((x) => x.name === name)?.slug ?? '' };
+    // a start may name its exact hex (starts[].hex, SCRIBE.md section 2): the Atlas opens there, not on the site
+    const hex = String((first as { hex?: unknown } | undefined)?.hex ?? '').replace(/^#/, '');
+    return { module: m.id, slug: m.sites.find((x) => x.name === name)?.slug ?? '', hex: /^[a-z]+(:[0-9A-Za-z]{4})*$/.test(hex) ? hex : '' };
   });
 
   // Step 7: save the campaign on this device and open it in the Companion (by link) or the Atlas.
@@ -381,7 +383,7 @@
   let play = $state<State | null>(null);
   let frame = $state<HTMLIFrameElement>();
   const atlasSrc = $derived(
-    startSite ? `../atlas/?module=${encodeURIComponent(startSite.module)}&site=${encodeURIComponent(siteUrl)}${startSite.slug ? `#site:${startSite.slug}` : ''}` : ''
+    startSite ? `../atlas/?module=${encodeURIComponent(startSite.module)}&site=${encodeURIComponent(siteUrl)}${startSite.hex ? `#${startSite.hex}` : startSite.slug ? `#site:${startSite.slug}` : ''}` : ''
   );
   const postAtlas = (msg: object) => frame?.contentWindow?.postMessage({ type: 'hexmarch-atlas', ...msg }, '*');
   function sendAtlas() {
