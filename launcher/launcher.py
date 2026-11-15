@@ -28,8 +28,11 @@ for n in (192, 512): shutil.copy(os.path.join(REPO, 'icons', 'png', f'launcher-{
 # Installable too (Heph 2026-11-11), as "⬢ Hexmarch". Its scope is the page itself, not the folder: a scope of the whole
 # site would cover companion/, atlas/ and scribe/, and phones would then call those "already installed" (the Companion
 # had that scope before it moved).
+# No 'id' (Heph 2026-11-15): a manifest id is resolved against the ORIGIN, not the manifest's folder, so 'id': './'
+# gave all three apps the same id (https://ialdabaoth.github.io/) and installing one replaced another. Without an id,
+# the id is the start URL, which is each app's own folder.
 json.dump({'name': f'⬢ {NAME}', 'short_name': NAME, 'description': 'Hexcrawl Campaign Manager: open the apps, switch campaigns, back up or reset this device.',
-           'id': './index.html', 'start_url': './index.html', 'scope': './index.html', 'display': 'standalone',
+           'start_url': './index.html', 'scope': './index.html', 'display': 'standalone',
            'launch_handler': {'client_mode': ['navigate-existing', 'auto']}, 'theme_color': '#2b2118', 'background_color': '#f4ecdc',
            'icons': [{'src': 'launcher-192.png', 'sizes': '192x192', 'type': 'image/png'}, {'src': 'launcher-512.png', 'sizes': '512x512', 'type': 'image/png'},
                      {'src': 'launcher-512.png', 'sizes': '512x512', 'type': 'image/png', 'purpose': 'maskable'}]},

@@ -38,8 +38,11 @@ if os.path.isdir(ICONS):
 # its own install manifest (Heph 2026-11-08, Atlas 0.5.9): without one, installing from /atlas/ found the Companion's
 # manifest, whose scope covers the whole site, and installed the Companion. Scope and start are the Atlas's folder, so
 # the two install as separate apps (the app id defaults to the start URL)
+# No 'id' (Heph 2026-11-15): a manifest id is resolved against the ORIGIN, not the manifest's folder, so 'id': './'
+# gave all three apps the same id (https://ialdabaoth.github.io/) and installing one replaced another. Without an id,
+# the id is the start URL, which is each app's own folder.
 json.dump({'name': '⬢ Atlas', 'short_name': 'Atlas', 'description': f'{APP} Atlas: hex maps for OSR hexcrawl modules, from the whole region down to the 100-ft hex.',
-           'id': './', 'start_url': './', 'scope': './', 'display': 'standalone', 'launch_handler': {'client_mode': ['navigate-existing', 'auto']}, 'theme_color': '#2b2418', 'background_color': '#f4efe1',
+           'start_url': './', 'scope': './', 'display': 'standalone', 'launch_handler': {'client_mode': ['navigate-existing', 'auto']}, 'theme_color': '#2b2418', 'background_color': '#f4efe1',
            'icons': [{'src': 'icon-192.png', 'sizes': '192x192', 'type': 'image/png'}, {'src': 'icon-512.png', 'sizes': '512x512', 'type': 'image/png'},
                      {'src': 'icon-512.png', 'sizes': '512x512', 'type': 'image/png', 'purpose': 'maskable'}]},
           open(site + '/atlas/manifest.webmanifest', 'w'), ensure_ascii=False, indent=1)

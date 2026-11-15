@@ -46,7 +46,7 @@ export default defineConfig({
         theme_color: '#2b2118',
         background_color: '#f4ecdc',
         display: 'standalone',
-        id: './',
+        // no `id` (Heph 2026-11-15): an id resolves against the origin, so './' made every app the same app; the id is the start URL
         start_url: '.',
         scope: '.',
         // Links and files from other apps open in the installed Companion (lib/share.ts; WORKFLOWS.md "Apps talk by links")
