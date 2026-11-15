@@ -1410,7 +1410,7 @@ function emap(id) {
   HexmarchMap.load(id).then(m => {
     if (!m.anchor) { EMJ[id] = false; return; }
     const src = m.surface ? [Object.assign({ at: [0, 0], rotate: 0, opacity: 1 }, m.surface)] : m.layers.filter(L => L.show !== 'referee');  // its above-ground picture, else the battle map
-    const layers = src.map(L => { const im = new Image(); im.onload = redraw; im.src = MOD.base + 'encounter-maps/' + L.src; return Object.assign({}, L, { im }); });
+    const layers = src.map(L => { const im = new Image(); im.onload = redraw; im.src = MOD.base + 'encounter-maps/' + L.src + '?v=' + encodeURIComponent((CA && CA.stamp) || MOD.version || ''); return Object.assign({}, L, { im }); });
     EMJ[id] = { m, layers }; redraw();
   }).catch(() => { EMJ[id] = false; });
   return null;
@@ -1585,7 +1585,7 @@ async function loadModules() {
   try { const { url, id } = await currentCampaign(); if (id && !CMODS) await campaignLock(url, id); } catch (e) {}
   MODS = (await Promise.all((await knownSites()).filter(m => !local.some(l => l.id === m.id)).map(async m => {
     const base = new URL(m.path.replace(/\/?$/, '/'), m.site).href, r = { id: m.id, path: m.path, title: m.id, version: '', base, ok: false };
-    try { const j = await (await fetch(base + 'module.json')).json(); Object.assign(r, { events: typeof j.events === 'string' ? j.events : '', title: j.title || m.id, version: j.version || '', credits: j.credits || [], languages: j.languages, starts: Array.isArray(j.starts) ? j.starts : [], traits: j.traits && typeof j.traits === 'object' ? j.traits : null, ok: !!j.atlas_map }); } catch (e) {}
+    try { const j = await (await fetch(base + 'module.json', { cache: 'no-cache' })).json(); Object.assign(r, { events: typeof j.events === 'string' ? j.events : '', title: j.title || m.id, version: j.version || '', credits: j.credits || [], languages: j.languages, starts: Array.isArray(j.starts) ? j.starts : [], traits: j.traits && typeof j.traits === 'object' ? j.traits : null, ok: !!j.atlas_map }); } catch (e) {}
     return r; }))).concat(local);
   if (CMODS && MODS.some(m => CMODS.has(m.id))) MODS = MODS.filter(m => CMODS.has(m.id));  // the campaign as a filter
   const want = new URLSearchParams(location.search).get('module') || store.get('hexmarch-atlas-module');
@@ -1605,7 +1605,7 @@ async function loadModules() {
   if (FLAT) flatLoad(); else await loadCache();
   let SC = {};
   if (!MOD.local) try { const j = await (await fetch(A + 'creatures.json')).json(); CR = j.creatures || []; SC = j.scenes || {}; } catch (e) { CR = []; }  // a module without creatures has no file
-  if (window.HexmarchMap) Object.assign(HexmarchMap, { base: MOD.base, module: MOD.id, creatures: CR, scenes: SC,
+  if (window.HexmarchMap) Object.assign(HexmarchMap, { base: MOD.base, module: MOD.id, stamp: (CA && CA.stamp) || MOD.version || '', creatures: CR, scenes: SC,
     places: D.pois.filter(p => p.encounter).map(p => ({ get name() { return name(p.name); }, pointers: p.encounter, go: () => { location.hash = addr(...p.hex); } })) });  // ways out lead back to the place's 100-ft hex  // encounter maps sit in the module folder
   smoothRivers(); await loadEvents(); await loadState(); await loadWho(); go();
 })();

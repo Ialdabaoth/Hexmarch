@@ -91,7 +91,7 @@ const FA = Object.fromEntries((D.factions || []).map(f => [f.id, f]));
 const SCENES = Object.entries(D.scenes || {}).map(([id, s]) => ({ id, ...s }));
 const onMap = slug => D.atlas_map ? `<a class="btn" href="${esc(ATLAS + '#site:' + slug)}" title="Open this place in the Atlas">Show on the map</a>` : '';
 const siteName = slug => SITE[slug] ? L(SITE[slug].name) : slug;
-if (window.HexmarchMap) Object.assign(HexmarchMap, { base: '', module: D.id, creatures: D.creatures || [], scenes: D.scenes || {},
+if (window.HexmarchMap) Object.assign(HexmarchMap, { base: '', module: D.id, stamp: D.version || '', creatures: D.creatures || [], scenes: D.scenes || {},
   places: D.sites.filter(s => s.encounter).map(s => ({ get name() { return L(s.name); }, pointers: s.encounter, go: () => { if (D.atlas_map) location.href = ATLAS + '#site:' + s.slug; } })) });
 function crButton(id, extra) {
   const c = CR[id], b = el('button', '', esc(c ? c.name : id) + (extra ? ` <small>${esc(extra)}</small>` : '')); b.type = 'button';
