@@ -386,8 +386,7 @@ function draw() {
       for (const L of f.layers) { if (!L.im.complete || !L.im.naturalWidth) continue; const k = f.g / L.px;
         ctx.save(); ctx.globalAlpha = L.opacity; ctx.translate(x0 + L.at[0] * f.g, y0 + L.at[1] * f.g); ctx.rotate(L.rotate * Math.PI / 180);
         ctx.drawImage(L.im, 0, 0, L.im.naturalWidth * k, L.im.naturalHeight * k); ctx.restore(); }
-      ctx.restore(); ctx.save(); ctx.translate(sx, sy); ctx.rotate(f.rot);
-      ctx.strokeStyle = '#2b2418'; ctx.lineWidth = 2; ctx.strokeRect(x0 * cam.s, y0 * cam.s, w * cam.s, h * cam.s);
+      // no outline (Heph 2026-11-15): the hexmap runs straight into the map's walls
     } else { ctx.fillStyle = 'rgba(179,38,30,.12)'; ctx.fillRect(x0, y0, w, h); ctx.restore(); ctx.save(); ctx.translate(sx, sy); ctx.rotate(f.rot);
       ctx.setLineDash([5, 3]); ctx.strokeStyle = '#7a2e2e'; ctx.lineWidth = 1.5; ctx.strokeRect(x0 * cam.s, y0 * cam.s, w * cam.s, h * cam.s); }
     ctx.restore();
