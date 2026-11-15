@@ -263,7 +263,7 @@
         <li>
           <button onclick={() => app.testDiscord()} disabled={!app.discordBot}>Test the bot</button>
           {#if app.discordStatus.state === 'listening'}
-            <span class="success">Hears the campaign channel{app.discordStatus.server ? ` on ${app.discordStatus.server}` : ''}. You're done.</span>
+            <span class="success">Bot test successful! Your bot is successfully installed and can hear the campaign channel{app.discordStatus.server ? ` on ${app.discordStatus.server}` : ''} while this Companion is open.</span>
           {:else if app.discordStatus.state === 'connecting'}
             <span class="muted">Connecting to Discord…</span>
           {:else if app.discordStatus.state === 'no-channel'}
