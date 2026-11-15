@@ -4,6 +4,8 @@
 // state back. The rules mirror the Companion's lib/state.ts (addParty, setActive, moveParty) and lib/atlas.ts
 // (isAtlasMessage); both could move into the engine later.
 
+import { readPartyDiscord, type PartyDiscord } from '../../../engine';
+
 export type State = Record<string, unknown> & { revision?: number; parties?: Party[]; active?: string };
 export type Party = Record<string, unknown> & { id: string; at?: At | null; clock?: { start: string; hours: number } };
 export interface At { base: string; module: string; map: string; hex: string; label: string; hours?: number }
@@ -18,7 +20,9 @@ export type AtlasEvent =
   | { event: 'active'; module: string; party: string }
   // The Atlas's party builder asks for an invitation to a party (Heph 2026-11-10: Scribe sets up the campaign and
   // hands it to the Atlas, the Atlas builds the party, and the party builder hands to the Companion per invite).
-  | { event: 'invite'; module: string; party: string };
+  | { event: 'invite'; module: string; party: string }
+  // A party's own Discord channel and ping, set in the Atlas's party box (null: back to the campaign's).
+  | { event: 'discord'; module: string; party: string; discord: PartyDiscord | null };
 
 // Only what Scribe uses, checked as the Companion checks it; anything else (knowledge, unknown events) is null.
 export function atlasEvent(d: unknown): AtlasEvent | null {
@@ -32,6 +36,7 @@ export function atlasEvent(d: unknown): AtlasEvent | null {
     return { event: 'party-new', module: m.module, party: m.party as Party };
   if (m.event === 'active' && id(m.party)) return { event: 'active', module: m.module, party: m.party };
   if (m.event === 'invite' && id(m.party)) return { event: 'invite', module: m.module, party: m.party };
+  if (m.event === 'discord' && id(m.party) && (m.discord === null || typeof m.discord === 'object')) return { event: 'discord', module: m.module, party: m.party, discord: readPartyDiscord(m.discord) };
   return null;
 }
 
@@ -43,6 +48,13 @@ export function applyAtlas(s: State, e: AtlasEvent, base: string, now = new Date
   const list = parties(s);
   if (e.event === 'party-new') return list.some((p) => p.id === e.party.id) ? s : bump(s, { parties: [...list, structuredClone(e.party)], active: e.party.id }, now);
   if (e.event === 'active') return e.party === s.active || !list.some((p) => p.id === e.party) ? s : bump(s, { active: e.party }, now);
+  if (e.event === 'discord') {
+    const p = list.find((x) => x.id === e.party);
+    if (!p || JSON.stringify(p.discord ?? null) === JSON.stringify(e.discord)) return s;
+    const { discord: _old, ...rest } = p;
+    const next: Party = e.discord ? { ...rest, id: p.id, discord: e.discord } : { ...rest, id: p.id };
+    return bump(s, { parties: list.map((x) => (x.id === p.id ? next : x)) }, now);
+  }
   if (e.event !== 'party') return s; // view and invite change nothing
   const p = list.find((x) => x.id === e.party);
   if (!p) return s;

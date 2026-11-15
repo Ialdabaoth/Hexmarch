@@ -7,7 +7,7 @@ import {
   unreadableSheets, loadStateFile, saveStateFile, type PartyAt, type Settings
 } from './storage';
 import {
-  StateError, addParty, blankState, closeSession, inParty, moveParty, openSession, partyOf, passTime, readParty, readState, setActive, setStart, withCharacters, withPlayer, withRules, writeState,
+  StateError, addParty, blankState, closeSession, inParty, moveParty, openSession, partyOf, passTime, readParty, readState, setActive, setPartyDiscord, setStart, withCharacters, withPlayer, withRules, writeState,
   type CampaignState, type StateParty, type StateRules
 } from './state';
 import { loadRepo, type SavedModule } from './modules';
@@ -22,7 +22,7 @@ import { downloadJson } from './storage';
 import { BOT_TOKENS, Gateway, botTokens, mailAttachments, webhookInfo, type DiscordPost, type GatewayStatus } from '../../../engine/gateway';
 import { inviteDone, keepInvite, pendingInvite, updateForInvite } from './update';
 import { readShared, withoutShared } from './share';
-import { publishParts } from '../../../engine/publish';
+import { discordChannels, partyChannel, publishParts } from '../../../engine/publish';
 import { envelope as mailEnvelope, messageLink, readMessageHash, requestStatus, type Envelope } from '../../../engine/mail';
 import { handOff, takeHandOffs } from '../../../engine/handoff';
 import { readState as readStateFile } from './state';
@@ -355,6 +355,11 @@ class AppState {
     this.notify(`Made the party ${party.name}`);
   }
 
+  // Referee mode: a party's own Discord channel and ping, from the Atlas's party box (null: the campaign's).
+  async setPartyDiscord(id: string, discord: unknown) {
+    if (this.mode === 'referee') await this.saveState(setPartyDiscord(this.snap, id, discord));
+  }
+
   // Referee mode: the party switcher (Home, Campaign › State, or the Atlas).
   async chooseParty(id: string) {
     if (this.mode === 'referee') await this.saveState(setActive(this.snap, id));
@@ -541,10 +546,11 @@ class AppState {
     const e = joinRequest(c.campaign.id, me, exportSheet($state.snapshot(me.data) as typeof me.data), name.trim(), this.invitation?.party);
     let how: 'posted' | 'saved' = 'saved';
     let discord: MailItem['discord'];
-    if (c.published?.post) {
+    const ch = this.channelOf(this.invitation?.party || this.partyId);
+    if (ch.post) {
       try {
-        const id = await post(c.published.post, e, joinLine(name.trim(), me.name, 'sent'), me.name, c.published.ping ?? '');
-        if (id) discord = { id, shows: 'sent' };
+        const id = await post(ch.post, e, joinLine(name.trim(), me.name, 'sent'), me.name, ch.ping);
+        if (id) discord = { id, shows: 'sent', hook: ch.post };
         how = 'posted';
       } catch (err) {
         console.warn('Request not posted; saving it as a file', err);
@@ -1129,16 +1135,27 @@ class AppState {
     return { body: this.settings.diceColor, ink: this.settings.diceInk };
   }
 
-  // Where rolls go: this device's own webhook (Settings › Discord), else the campaign's channel when its post URL is a
-  // Discord webhook (Scribe's "Where players send requests"), so players post to the table with nothing to paste.
+  // Where a party's requests, rolls and table posts go (Heph 2026-11-15: a campaign default, which any party can
+  // override in the Atlas): the party's own channel and ping, else the campaign's (Scribe's "Where players send
+  // requests"). The post URL may be a Discord webhook or the referee's Apps Script.
+  channelOf(party: string): { post: string; ping: string } {
+    const p = this.campaign?.published;
+    return partyChannel(partyOf(this.state, party), p ? { post: p.post, ping: p.ping } : null);
+  }
+  // Where rolls go: this device's own webhook (Settings › Discord), else the party's Discord channel, so players post
+  // to the table with nothing to paste.
   get rollWebhook(): string {
     if (isWebhookUrl(this.settings.webhookUrl)) return this.settings.webhookUrl;
-    const p = this.campaign?.published?.post ?? '';
+    return this.campaignWebhook;
+  }
+  // The Discord channel of the party in use (its own, else the campaign's).
+  get campaignWebhook(): string {
+    const p = this.channelOf(this.partyId).post;
     return isWebhookUrl(p) ? p : '';
   }
-  get campaignWebhook(): string {
-    const p = this.campaign?.published?.post ?? '';
-    return isWebhookUrl(p) ? p : '';
+  // Referee: every Discord channel requests can arrive in, the campaign's and each party's (the bot hears them all).
+  get discordHooks(): string[] {
+    return discordChannels(this.state.parties, this.campaign?.published?.post ?? '');
   }
   get canPost(): boolean {
     return !!this.rollWebhook;
@@ -1172,24 +1189,24 @@ class AppState {
   }
   // Starts, swaps or stops the live reader to match the campaign, mode and bot in use; safe to call often.
   async listenDiscord() {
-    const token = this.loaded && this.mode === 'referee' ? this.discordBot : '', hook = this.campaignWebhook;
-    const key = token && hook ? `${hook} ${token}` : '';
+    const token = this.loaded && this.mode === 'referee' ? this.discordBot : '', hooks = this.discordHooks;
+    const key = token && hooks.length ? `${hooks.join(' ')} ${token}` : '';
     if (key === this.gatewayKey) return;
     this.gateway?.stop();
     this.gateway = null;
     this.gatewayKey = key;
     if (!key) { this.discordStatus = { state: 'off' }; return; }
     this.discordStatus = { state: 'connecting' };
-    let channel: string;
-    try {
-      const w = await webhookInfo(hook);
-      channel = w.channel;
-    } catch (e) {
-      if (this.gatewayKey === key) this.discordStatus = { state: 'failed', reason: `couldn't read the campaign's webhook (${e instanceof Error ? e.message : e})` };
+    // each webhook knows its channel; one that can't be read (deleted, say) doesn't stop the others
+    const read = await Promise.allSettled(hooks.map((h) => webhookInfo(h)));
+    const channels = read.flatMap((r) => (r.status === 'fulfilled' ? [r.value.channel] : []));
+    if (this.gatewayKey !== key) return;
+    if (!channels.length) {
+      const e = read.find((r) => r.status === 'rejected') as PromiseRejectedResult | undefined;
+      this.discordStatus = { state: 'failed', reason: `couldn't read the campaign's webhook (${e?.reason instanceof Error ? e.reason.message : e?.reason})` };
       return;
     }
-    if (this.gatewayKey !== key) return;
-    this.gateway = new Gateway(token, channel, (p) => void this.hearPost(p), (st) => { if (this.gatewayKey === key) this.discordStatus = st; });
+    this.gateway = new Gateway(token, channels, (p) => void this.hearPost(p), (st) => { if (this.gatewayKey === key) this.discordStatus = st; });
     this.gateway.start();
   }
   // "Test the bot": connect again from scratch, so the status reflects what was just changed in Discord.
@@ -1219,8 +1236,8 @@ class AppState {
   // Player mode: each request this device posted to the campaign's Discord channel shows where it stands, by
   // editing its own post when the snapshot (receipts, the character in the state) or a reply moves it on.
   private async markDiscordPosts() {
-    const c = this.campaign, url = this.campaignWebhook;
-    if (!c || !url || this.mode !== 'player') return;
+    const c = this.campaign;
+    if (!c || this.mode !== 'player') return;
     const snap = c.published?.snapshot ?? null;
     let list = this.mail, changed = false;
     for (const m of this.mail) {
@@ -1230,6 +1247,8 @@ class AppState {
       if (status === m.discord.shows || status === 'sent') continue;
       const character = this.character(m.envelope.from.character ?? '')?.name ?? '';
       try {
+        const url = m.discord.hook ?? this.campaignWebhook;
+        if (!url) continue;
         await editPost(url, m.discord.id, joinLine(m.envelope.from.name ?? '', character, status));
         list = list.map((x) => (x === m ? { ...x, discord: { ...m.discord!, shows: status } } : x));
         changed = true;

@@ -62,6 +62,36 @@ export function readPing(s: unknown): string | null {
   return m ? `<@${m[1] === '&' ? '&' : ''}${m[2]}>` : null;
 }
 
+// Discord per party (Heph 2026-11-15: a campaign default, which any party can override). A party's own channel and ping
+// sit on the party in the state file (parties[].discord, set in the Atlas's party box); what a party leaves out comes
+// from the campaign's (Scribe's "Where players send requests" and who to ping). `ping` '' means nobody, on purpose.
+export interface PartyDiscord {
+  post?: string;
+  ping?: string;
+}
+const DISCORD_WEBHOOK = /^https:\/\/(?:ptb\.|canary\.)?discord(?:app)?\.com\/api\/webhooks\/\d+\/[\w-]+\/?$/;
+export const isDiscordWebhook = (url: unknown) => typeof url === 'string' && DISCORD_WEBHOOK.test(url.trim());
+export function readPartyDiscord(v: unknown): PartyDiscord | null {
+  const o = v as PartyDiscord | null;
+  if (!o || typeof o !== 'object') return null;
+  const out: PartyDiscord = {};
+  if (isDiscordWebhook(o.post)) out.post = o.post!.trim();
+  if (typeof o.ping === 'string') {
+    const p = readPing(o.ping);
+    if (p !== null) out.ping = p;
+  }
+  return 'post' in out || 'ping' in out ? out : null;
+}
+export function partyChannel(party: { discord?: unknown } | null | undefined, campaign: { post?: string; ping?: string } | null | undefined): { post: string; ping: string } {
+  const own = readPartyDiscord(party?.discord);
+  return { post: own?.post ?? campaign?.post ?? '', ping: own?.ping ?? campaign?.ping ?? '' };
+}
+// Every Discord channel a campaign's requests can arrive in: its own and each party's (the referee's bot hears them all).
+export function discordChannels(parties: readonly { discord?: unknown }[], campaignPost: string): string[] {
+  const all = [campaignPost, ...parties.map((p) => readPartyDiscord(p.discord)?.post ?? '')].filter(isDiscordWebhook).map((u) => u.trim());
+  return [...new Set(all)];
+}
+
 const https = (s: string) => {
   try {
     const u = new URL(s);

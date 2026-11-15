@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { PublishError, checkUpload, readPing, pointer, privateParts, publicState, publishParts, readPointer, readSnapshot, snapshot, staticServices } from './publish';
+import { PublishError, checkUpload, discordChannels, partyChannel, readPartyDiscord, readPing, pointer, privateParts, publicState, publishParts, readPointer, readSnapshot, snapshot, staticServices } from './publish';
 
 const now = new Date('2026-11-09T13:00:00Z');
 const kells = {
@@ -120,5 +120,22 @@ describe('who Discord notifies', () => {
     const p = pointer('c', 'C', sv, new Date('2026-11-12T00:00:00Z'));
     expect(readPointer(JSON.parse(JSON.stringify(p))).ping).toBe('<@&123456789012345678>');
     expect(readPointer({ ...p, ping: '@everyone' }).ping).toBeUndefined();
+  });
+});
+
+describe('Discord per party', () => {
+  const A = 'https://discord.com/api/webhooks/111111111111111111/aaa', B = 'https://discord.com/api/webhooks/222222222222222222/bbb';
+  it('uses the party’s own channel and ping, and the campaign’s for what it leaves out', () => {
+    const camp = { post: A, ping: '<@123456789012345678>' };
+    expect(partyChannel({}, camp)).toEqual({ post: A, ping: '<@123456789012345678>' });
+    expect(partyChannel({ discord: { post: B } }, camp)).toEqual({ post: B, ping: '<@123456789012345678>' });
+    expect(partyChannel({ discord: { post: B, ping: '' } }, camp)).toEqual({ post: B, ping: '' });
+    expect(partyChannel({ discord: { post: 'https://example.com/x', ping: '@everyone' } }, camp)).toEqual(camp);
+    expect(readPartyDiscord({ ping: '<@&123456789012345678>' })).toEqual({ ping: '<@&123456789012345678>' });
+    expect(readPartyDiscord({})).toBeNull();
+  });
+  it('lists every channel once', () => {
+    expect(discordChannels([{ discord: { post: B } }, {}, { discord: { post: A } }], A)).toEqual([A, B]);
+    expect(discordChannels([], 'https://script.google.com/x')).toEqual([]);
   });
 });

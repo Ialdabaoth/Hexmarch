@@ -181,7 +181,7 @@
       <input placeholder="Your name, for the referee" bind:value={playerName} aria-label="Your name" />
       <button class:primary={!sentJoin} disabled={sending} onclick={sendJoin}>{sentJoin ? 'Send again' : 'Send to the referee'}</button>
     </div>
-    {#if !app.campaign?.published?.post}<p class="small muted">This campaign has no mailbox yet, so the request is saved as a file. Send that file to your referee however you like.</p>{/if}
+    {#if !app.channelOf(app.invitation?.party || app.partyId).post}<p class="small muted">This campaign has no mailbox yet, so the request is saved as a file. Send that file to your referee however you like.</p>{/if}
   </div>
 {/if}
 

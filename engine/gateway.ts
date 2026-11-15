@@ -74,7 +74,7 @@ type Socket = Pick<WebSocket, 'send' | 'close'> & {
   onerror: (() => void) | null;
 };
 
-// One live connection for one channel. Reconnects after drops (waiting longer each time); stops for good on a
+// One live connection for the campaign's channels (its own and each party's). Reconnects after drops (waiting longer each time); stops for good on a
 // refused token or missing intent.
 export class Gateway {
   private ws: Socket | null = null;
@@ -85,13 +85,16 @@ export class Gateway {
   private stopped = false;
   private seen = false;
 
+  private channels: Set<string>;
   constructor(
     private token: string,
-    private channel: string,
+    channel: string | string[],
     private onPost: (p: DiscordPost) => void,
     private onStatus: (s: GatewayStatus) => void,
     private open: (url: string) => Socket = (u) => new WebSocket(u) as unknown as Socket
-  ) {}
+  ) {
+    this.channels = new Set(Array.isArray(channel) ? channel : [channel]);
+  }
 
   start() {
     this.stopped = false;
@@ -154,10 +157,10 @@ export class Gateway {
       this.tries = 0;
       if (!m.d.guilds?.length) this.fail('the bot is in no server: invite it to the campaign’s server');
     } else if (m.t === 'GUILD_CREATE') {
-      const has = [...(m.d.channels ?? []), ...(m.d.threads ?? [])].some((c: { id: string }) => c.id === this.channel);
+      const has = [...(m.d.channels ?? []), ...(m.d.threads ?? [])].some((c: { id: string }) => this.channels.has(c.id));
       if (has) { this.seen = true; this.onStatus({ state: 'listening', server: m.d.name }); }
       else if (!this.seen) this.onStatus({ state: 'no-channel' });
-    } else if (m.t === 'MESSAGE_CREATE' && m.d.channel_id === this.channel) this.onPost(m.d as DiscordPost);
+    } else if (m.t === 'MESSAGE_CREATE' && this.channels.has(m.d.channel_id)) this.onPost(m.d as DiscordPost);
   }
 }
 
@@ -177,7 +180,7 @@ export function withBotToken(v: unknown, campaign: string, token: string): Recor
 
 // "Test the bot" (Scribe): connects once with the token, waits until Discord says whether the bot can hear the
 // channel, then hangs up. `listening` is the only success.
-export function testBot(token: string, channel: string, wait = 15_000, open?: (url: string) => Socket): Promise<GatewayStatus> {
+export function testBot(token: string, channel: string | string[], wait = 15_000, open?: (url: string) => Socket): Promise<GatewayStatus> {
   return new Promise((done) => {
     let last: GatewayStatus = { state: 'connecting' };
     let g: Gateway | undefined;

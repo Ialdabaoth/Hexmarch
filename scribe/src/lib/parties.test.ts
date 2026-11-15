@@ -34,3 +34,17 @@ describe('Atlas events in Scribe', () => {
     expect(applyAtlas(s1, { event: 'active', module: 'm', party: 'nobody' }, base, now)).toBe(s1);
   });
 });
+
+describe('A party’s own Discord channel', () => {
+  it('is set from the Atlas, and null goes back to the campaign’s', () => {
+    const s0: State = { revision: 3, parties: [party as never], active: 'red-hand' };
+    const hook = 'https://discord.com/api/webhooks/111111111111111111/aaa';
+    const e = atlasEvent({ type: 'hexmarch-atlas', module: 'isle-of-mists', event: 'discord', party: 'red-hand', discord: { post: hook, ping: '@here' } })!;
+    const s1 = applyAtlas(s0, e, 'https://x/');
+    expect(s1.parties![0].discord).toEqual({ post: hook, ping: '@here' });
+    expect(s1.revision).toBe(4);
+    expect(applyAtlas(s1, e, 'https://x/')).toBe(s1);
+    const s2 = applyAtlas(s1, atlasEvent({ type: 'hexmarch-atlas', module: 'isle-of-mists', event: 'discord', party: 'red-hand', discord: null })!, 'https://x/');
+    expect('discord' in s2.parties![0]).toBe(false);
+  });
+});

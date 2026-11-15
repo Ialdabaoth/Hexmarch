@@ -195,6 +195,8 @@
   // Where Publish puts the files (Scribe 0.6: adapters): the referee's own GitHub repo (preferred, Heph 2026-11-10),
   // Google Drive through their own Apps Script, or by hand as before.
   let storeKind = $state<StoreKind>('github');
+  // The tooltip on Where to host explains the choice picked (Heph 2026-11-15: one dropdown instead of radio buttons).
+  const STORE_TIPS: Record<StoreKind, string> = {"github": "GitHub is a free, open-source repository that anyone can use. It is unaffiliated with Hexmarch, so your files will always be yours. Hexmarch will provide step-by-step instructions for setting up your campaign.", "apps-script": "Google Drive is a popular file storage service that comes with any GMail account. Hexmarch will walk you through setting up an Apps Script, which will give Hexmarch limited access to the files on your Drive that Hexmarch will use to share your campaign with players and co-referees.", "manual": "If you have your own website or server, Hexmarch can simply hand you the campaign files and let you place them somewhere that your players and co-referees can access them."};
   let scriptUrl = $state('');
   // Repository = the referee's GitHub username / the repository name (step 2 suggests one from the campaign name).
   let ghUser = $state('');
@@ -591,7 +593,12 @@
       {#if !record}
         <p class="small muted">Save the campaign on this device first (above). Players can't join until it is published.</p>
       {:else}
-        <label class="opt"><input type="radio" name="store" value="github" bind:group={storeKind} /><span><button type="button" class="tip" data-tip="GitHub is a free, open-source repository that anyone can use. It is unaffiliated with Hexmarch, so your files will always be yours. Hexmarch will provide step-by-step instructions for setting up your campaign."><strong>GitHub</strong></button> (preferred)</span></label>
+        <div class="field"><button type="button" class="tip" data-tip={STORE_TIPS[storeKind]}>Where to host</button>
+          <select bind:value={storeKind} aria-label="Where to host">
+            <option value="github">GitHub (preferred)</option>
+            <option value="apps-script">Google Drive</option>
+            <option value="manual">My Own Host</option>
+          </select></div>
         {#if storeKind === 'github'}
           <ol class="small gh">
             <li>
@@ -621,7 +628,6 @@
             </div>
           </details>
         {/if}
-        <label class="opt"><input type="radio" name="store" value="apps-script" bind:group={storeKind} /><span><button type="button" class="tip" data-tip="Google Drive is a popular file storage service that comes with any GMail account. Hexmarch will walk you through setting up an Apps Script, which will give Hexmarch limited access to the files on your Drive that Hexmarch will use to share your campaign with players and co-referees."><strong>Google Drive</strong></button></span></label>
         {#if storeKind === 'apps-script'}
           <details class="small" open={!scriptUrl}>
             <summary>Set up your script (once, about two minutes)</summary>
@@ -635,12 +641,19 @@
           <label class="field">Web app URL <input type="url" bind:value={scriptUrl} placeholder="https://script.google.com/macros/s/…/exec" /></label>
           <label class="field">Key (the KEY line in your script) <input type="password" bind:value={secret} autocomplete="off" /></label>
         {/if}
-        <label class="opt"><input type="radio" name="store" value="manual" bind:group={storeKind} /><span><button type="button" class="tip" data-tip="If you have your own website or server, Hexmarch can simply hand you the campaign files and let you place them somewhere that your players and co-referees can access them."><strong>My Own Host</strong></button></span></label>
         {#if storeKind === 'manual'}
           <label class="field">Folder you upload to <input type="url" bind:value={folder} placeholder="https://you.github.io/kells-1422/" /></label>
         {/if}
+        <div class="field"><button type="button" class="tip" data-tip="Publishing writes what players may see: the campaign, its modules and the shared state (clock, party, what everyone knows), as it stands on this device now, plus each character's knowledge for their player alone and which requests you have answered. It is the same as Update campaign in the Companion, so either one can publish. Nothing only you should see goes in. Invite a player opens in the Companion once it is published.">Publish</button></div>
+        <button disabled={!storeReady || publishing} onclick={publish}>{publishing ? 'Publishing…' : record.published ? 'Publish again' : 'Publish'}</button>
+        {#if publishError}<p class="bad">{publishError}</p>{/if}
+        {#if record.published}
+          <p class="small muted">Published (revision {record.published.revision}, {new Date(record.published.at).toLocaleString()}).
+            {#if justPublished}{#if record.services?.store && record.services.store.kind !== 'manual'}Both files are up; players see them within a few minutes.{:else}Upload <code>campaign.json</code> and <code>snapshot.json</code> into <code>{record.services?.folder}</code>, replacing the old ones.{/if}{/if}
+            Players' invitations name <code>{record.services?.pointer}</code>.</p>
+        {/if}
         <button disabled={!storeReady || !record.published || testing} onclick={runTest}>{testing ? 'Verifying…' : 'Verify Campaign Files'}</button>
-        {#if test === 'none'}<p class="small muted">Publish first (below), then verify.</p>
+        {#if test === 'none'}<p class="small muted">Publish first, then verify.</p>
         {:else if typeof test === 'string'}<p class="bad">{test}</p>
         {:else if test}
           <ul class="small test">
@@ -648,8 +661,19 @@
             <li class={test.snapshot === 'matches' ? 'ok' : 'bad'}><code>snapshot.json</code> {SAYS[test.snapshot]}{test.found !== undefined && test.snapshot !== 'matches' ? ` (revision ${test.found} there, ${record.published?.revision} published)` : ''}</li>
           </ul>
         {/if}
-        <div class="field"><button type="button" class="tip" data-tip="Players send their join requests here, and everyone's rolls are posted here too.">Where players send requests</button> (optional for now)</div>
-        <label class="opt"><input type="radio" name="post" value="discord" bind:group={postKind} /><span><strong>Discord</strong> (preferred)</span></label>
+      {/if}
+    </section>
+    <section>
+      <h2><button type="button" class="tip" data-tip="Where players send their join requests, and where everyone's rolls are posted. This is the campaign's default; any party can have its own channel, set in the Atlas's party box. Changes reach players when you Publish (in Hosting).">Communication</button></h2>
+      {#if !record}
+        <p class="small muted">Save the campaign on this device first (above).</p>
+      {:else}
+        <p class="small muted">Where players send requests (optional for now).</p>
+        <div class="field"><select bind:value={postKind} aria-label="Where players send requests">
+          <option value="discord">Discord (preferred)</option>
+          <option value="script">Google Apps Script</option>
+          <option value="none">Not yet</option>
+        </select></div>
         {#if postKind === 'discord'}
           <ol class="small gh">
             <li>
@@ -712,25 +736,11 @@
             </ol>
           {/if}
         {/if}
-        <label class="opt"><input type="radio" name="post" value="script" bind:group={postKind} /><span><strong>Google Apps Script</strong></span></label>
         {#if postKind === 'script'}
           <label class="field">Web app URL <input type="url" bind:value={postUrl} placeholder="https://script.google.com/…/exec" /></label>
         {/if}
-        <label class="opt"><input type="radio" name="post" value="none" bind:group={postKind} /><span><strong>Not yet</strong></span></label>
       {/if}
     </section>
-    {#if record}
-      <section>
-        <h2><button type="button" class="tip" data-tip="Publishing writes what players may see: the campaign, its modules and the shared state (clock, party, what everyone knows), as it stands on this device now, plus each character's knowledge for their player alone and which requests you have answered. It is the same as Update campaign in the Companion, so either one can publish. Nothing only you should see goes in. Invite a player opens in the Companion once it is published.">Publish</button></h2>
-        <button disabled={!storeReady || publishing} onclick={publish}>{publishing ? 'Publishing…' : record.published ? 'Publish again' : 'Publish'}</button>
-        {#if publishError}<p class="bad">{publishError}</p>{/if}
-        {#if record.published}
-          <p class="small muted">Published (revision {record.published.revision}, {new Date(record.published.at).toLocaleString()}).
-            {#if justPublished}{#if record.services?.store && record.services.store.kind !== 'manual'}Both files are up; players see them within a few minutes.{:else}Upload <code>campaign.json</code> and <code>snapshot.json</code> into <code>{record.services?.folder}</code>, replacing the old ones.{/if}{/if}
-            Players' invitations name <code>{record.services?.pointer}</code>.</p>
-        {/if}
-      </section>
-    {/if}
   {/if}
 
   <footer class="small muted"><a href="../">Launcher</a><a href="../companion/">Companion</a><a href="../atlas/">Atlas</a></footer>

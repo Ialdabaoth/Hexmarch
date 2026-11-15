@@ -4,6 +4,7 @@
 // referee's Update campaign commits it to the campaign repo as campaign/state.json and players read it.
 import { isAtlasAddress } from './atlas';
 import type { PartyAt } from './storage';
+import { readPartyDiscord, type PartyDiscord } from '../../../engine/publish';
 
 export const STATE_FORMAT = 'hexmarch-campaign-state';
 export const STATE_VERSION = 1;
@@ -67,6 +68,8 @@ export interface StateParty {
   session: Session;
   // Where it stands on a module's Atlas map; null until placed.
   at: PartyAt | null;
+  // Its own Discord channel and ping, set in the Atlas (engine partyChannel); left out, it uses the campaign's.
+  discord?: PartyDiscord;
 }
 
 export interface CampaignState {
@@ -134,7 +137,8 @@ export function readParty(v: unknown): StateParty | null {
     start: readStart(o.start),
     clock: { start: typeof o.clock?.start === 'string' && DATE.test(o.clock.start) ? o.clock.start : base.clock.start, hours: hours(o.clock?.hours, base.clock.hours) },
     session: { number: Math.floor(hours(o.session?.number, 0)), open: o.session?.open === true },
-    at: readPartyAt(o.at)
+    at: readPartyAt(o.at),
+    ...(readPartyDiscord(o.discord) ? { discord: readPartyDiscord(o.discord)! } : {})
   };
 }
 
@@ -202,6 +206,16 @@ function withParty(s: CampaignState, id: string, f: (p: StateParty) => StatePart
 export function addParty(s: CampaignState, party: StateParty, now = new Date()): CampaignState {
   if (partyOf(s, party.id)) return s;
   return bump(s, { parties: [...s.parties, party], active: party.id }, now);
+}
+
+// The party's own Discord channel and ping (from the Atlas's party box); null goes back to the campaign's.
+export function setPartyDiscord(s: CampaignState, id: string, discord: unknown, now = new Date()): CampaignState {
+  const d = readPartyDiscord(discord);
+  return withParty(s, id, (p) => {
+    if (JSON.stringify(p.discord ?? null) === JSON.stringify(d)) return p;
+    const { discord: _old, ...rest } = p;
+    return d ? { ...rest, discord: d } : rest;
+  }, now);
 }
 
 export function setActive(s: CampaignState, id: string, now = new Date()): CampaignState {

@@ -103,6 +103,8 @@
       await app.newParty(d.party);
     } else if (d.event === 'active') {
       await app.chooseParty(d.party);
+    } else if (d.event === 'discord') {
+      await app.setPartyDiscord(d.party, d.discord);
     } else if (d.event === 'invite') {
       await app.chooseParty(d.party);
       app.view = { name: 'settings', invite: d.party };

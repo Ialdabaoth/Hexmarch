@@ -1,0 +1,1 @@
+Discord per party: a party's own channel and ping (set in the Atlas) take the place of the campaign's for that party's join requests, rolls and Tell the table; parties without one use the campaign's. The referee's bot hears every party's channel at once. A request's Discord post is edited on the channel it went to.
