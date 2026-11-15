@@ -1121,7 +1121,8 @@ function offerPreview(name, pts, N) {
   const rolls = [...new Set(HexmarchProcedures.rollsOf(l, name))];
   if (out.hexes === undefined) return rolls.length ? 'rolls: ' + rolls.join(', ') : '';
   const what = [...new Set(out.queued.map(t => t.label || t.id))].join(', '), n = x => `${x} hex${x === 1 ? '' : 'es'}`;
-  return (out.stopped ? `${n(out.total)} · stops after ${out.hexes} (${hm(out.hours)})${what ? ' for ' + what : ''}` : `${n(out.hexes)} · ${hm(out.hours)}${what ? ' · then ' + what : ''}`)
+  const wall = out.blocked && !what ? ` before ${((TYPES.find(t => t.id === out.blocked) || { name: 'unmapped ground' }).name).toLowerCase()}: no way on` : '';
+  return (out.stopped ? `${n(out.total)} · stops after ${out.hexes} (${hm(out.hours)})${what ? ' for ' + what : wall}` : `${n(out.hexes)} · ${hm(out.hours)}${what ? ' · then ' + what : ''}`)
     + (rolls.length ? ' · rolls: ' + rolls.join(', ') : '');
 }
 async function runOffer(name, pts, N) {
