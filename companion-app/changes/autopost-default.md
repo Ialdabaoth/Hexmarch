@@ -1,1 +1,1 @@
-In a campaign with a Discord channel, "Post every roll to Discord automatically" now starts on, so players' rolls reach the table without any setup; a player who unticks it keeps that choice.
+Players make no Discord choices (Heph: "a player should be making zero configuration decisions"): in a campaign with a Discord channel, a player's rolls always go to that channel and Settings › Discord just says so. Away from such a campaign, and for the referee, "Post every roll to Discord automatically" now starts on whenever the campaign has a channel, and a choice made there sticks.

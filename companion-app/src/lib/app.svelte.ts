@@ -1131,6 +1131,7 @@ class AppState {
   // Where rolls go: this device's own webhook (Settings › Discord), else the campaign's channel when its post URL is a
   // Discord webhook (Scribe's "Where players send requests"), so players post to the table with nothing to paste.
   get rollWebhook(): string {
+    if (this.mode === 'player' && this.campaignWebhook) return this.campaignWebhook;
     if (isWebhookUrl(this.settings.webhookUrl)) return this.settings.webhookUrl;
     const p = this.campaign?.published?.post ?? '';
     return isWebhookUrl(p) ? p : '';
@@ -1140,7 +1141,10 @@ class AppState {
     return isWebhookUrl(p) ? p : '';
   }
   // Rolls post by themselves unless the player said otherwise; with no choice made, on when the campaign has a channel.
+  // A player in a campaign with a channel makes no choice at all (Heph 2026-11-15: "a player should be making zero
+  // configuration decisions"): every roll goes to the table.
   get autoPosting(): boolean {
+    if (this.mode === 'player' && this.campaignWebhook) return true;
     return this.settings.autoPost ?? !!this.campaignWebhook;
   }
   get canPost(): boolean {
