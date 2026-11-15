@@ -108,7 +108,7 @@ ISLAND = MOD['atlas'].get('land') == 'island'
 if ISLAND: json.dump({'island': dict(world, counties='*', sites=[])}, open(work + '/island.json', 'w'), ensure_ascii=False)
 MJ = {k: v for k, v in MOD.items() if k not in (STEP5_ONLY if PDF else STEP5_ONLY + ('version',))}  # a version bump alone never redraws (the PDFs print it)
 if PDF: MJ['version'] = MOD['version']
-NO_DRAW = ('terrain', 'hex_traits')  # terrain traits (ATLAS_FORMAT.md) go to the manifest, never into a map: changing them redraws nothing
+NO_DRAW = ('terrain', 'hex_traits', 'rivers')  # terrain traits (ATLAS_FORMAT.md) go to the manifest, never into a map: changing them redraws nothing
 MJ['atlas'] = {k: v for k, v in MOD['atlas'].items() if k not in NO_DRAW}
 MJR = dict({k: v for k, v in MJ.items() if k not in ('names', 'site_encounters', 'site_ranks')}, atlas={k: v for k, v in MOD['atlas'].items() if k not in ('roads', 'travel') + NO_DRAW})  # what the region tools never read
 SET = {k: ENV[k] for k in ('HEXDEM', 'HEXSITEICONS', 'HEXDUMP', 'MODTITLE') + (('MODVER', 'MODATLAS') if PDF else ())}
@@ -156,6 +156,7 @@ if 'centroid' in MOD['atlas']:
             if old.startswith('cut-') and os.path.join(CBASE, old) != ST: shutil.rmtree(os.path.join(CBASE, old), ignore_errors=True)
     run(*PY, TOOLS + '/atlas_cache.py', out + '/atlas', *(['--state', ST] if CACHE else []))
     print(f"{MOD['id']}: Atlas tiles cut in {time.time() - t0:.0f} s"); t0 = time.time()
+    run(*PY, TOOLS + '/atlas_rivers.py', os.path.join(mdir, 'module.json'), out + '/atlas')  # module.json atlas.rivers: traced courses spliced in, before the roads cross them
     run(*PY, TOOLS + '/atlas_roads.py', os.path.join(mdir, 'module.json'), out + '/atlas')  # module.json atlas.roads, laid over the Field terrain in the cache
     print(f"{MOD['id']}: Atlas roads laid in {time.time() - t0:.0f} s")
     # the dynamic renderer: atlas/index.html draws every level from map.json + the March PNGs, with the shared tiles

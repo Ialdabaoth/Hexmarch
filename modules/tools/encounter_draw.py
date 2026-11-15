@@ -543,8 +543,7 @@ def render(plan, rng):
     for m in sorted(plan.get('marks', []), key=lambda m: m['t'] in ('num', 'letter', 'label')):
         mark(d, m, P, rng, fonts)
     if SURF: return im, floor
-    # frame, north arrow and scale
-    d.rectangle([0, 0, W - 1, H - 1], outline=INK, width=6)
+    # north arrow and scale (no frame: Heph 2026-11-15, the map runs straight into the hexmap around it)
     # the scale bar sits on the grid: it starts on a grid line and each block is exactly one square
     sx, sy = P, H - P; n = 4 if plan.get('ft', 5) == 5 else 5
     for k in range(n): d.rectangle([sx + k * P, sy - .25 * P, sx + (k + 1) * P, sy], fill=INK if k % 2 == 0 else (244, 236, 214), outline=INK, width=2)

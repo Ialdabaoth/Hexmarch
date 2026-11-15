@@ -11,7 +11,8 @@ or a lake, and the cheap ground (grass before bog and mountain) wins. The path i
 line stays on passable ground, and given a seeded sway (SWAY): no road of 1422 Ireland ran ruler-straight, so each
 wanders gently from side to side, trails most and the great roads least, pinned at its via points and never onto ground
 with no way on foot. Where a road meets a river, a crossing is written: a bridge on a roman road, a ford on the
-others, unless the road says "crossing": "bridge" or "ford". Writes map.json "roads" and "crossings" (points in feet).
+others, unless the road says "crossing": "bridge" or "ford". A road with "traced": true is a traced course instead (Heph
+2026-11-15, like atlas.rivers): its via points are joined as they are, with no search and no sway. Writes map.json "roads" and "crossings" (points in feet).
 Run after atlas_cache.py: it reads cache/f/<march>.png.
 """
 import heapq, json, math, os, sys
@@ -20,6 +21,7 @@ from PIL import Image
 from shapely.geometry import LineString
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from dymaxion import Face
+from atlas_rivers import densify
 
 CW = 100 * math.sqrt(3) / 2
 CLASSES = ('roman', 'local', 'trail')
@@ -183,9 +185,11 @@ def main(modp, adir):
         via = rd.get('via') or []
         if len(via) < 2: sys.exit(f'module.json atlas.roads {rname!r}: via needs at least two points')
         P = [where(v, rname) for v in via]; pts = [P[0]]
-        for k, (a, b) in enumerate(zip(P, P[1:])):
-            seed = int.from_bytes(f'{rname}/{k}'.encode('utf-8'), 'little') % (2 ** 32)
-            pts += sway(straighten(path(a, b, rname)), SWAY[rd['class']], seed)[1:]
+        if rd.get('traced'): pts = densify(P)  # a traced course (Heph 2026-11-15, as atlas.rivers): through the via points, no search and no sway
+        else:
+            for k, (a, b) in enumerate(zip(P, P[1:])):
+                seed = int.from_bytes(f'{rname}/{k}'.encode('utf-8'), 'little') % (2 ** 32)
+                pts += sway(straighten(path(a, b, rname)), SWAY[rd['class']], seed)[1:]
         pts = [[int(round(x)), int(round(y))] for x, y in pts]
         r = {'name': rd['name'], 'class': rd['class'], 'points': pts} if rd.get('name') else {'class': rd['class'], 'points': pts}
         roads.append(r)
