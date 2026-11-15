@@ -39,7 +39,7 @@
 
   // Referee mode: hold the campaign channel's live reader while the app is open (engine/gateway.ts).
   $effect(() => {
-    void [app.loaded, app.mode, app.campaignWebhook, app.discordBot];
+    void [app.loaded, app.mode, app.discordHooks, app.discordBot];
     void app.listenDiscord();
   });
 

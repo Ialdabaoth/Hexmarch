@@ -87,6 +87,9 @@
   let url = $state(app.settings.webhookUrl);
   let valid = $derived(!url.trim() || isWebhookUrl(url));
 
+  // the party in use has a Discord channel of its own (set in the Atlas), not the campaign's
+  const partyOwn = $derived(app.campaignWebhook !== '' && app.campaignWebhook !== (app.campaign?.published?.post ?? '').trim());
+
   async function saveUrl() {
     if (!valid) return;
     await app.updateSettings({ webhookUrl: url.trim() });
@@ -187,7 +190,7 @@
     Anyone with this link can post to that channel, so keep it to your group.
   </p>
   {#if app.campaignWebhook && !isWebhookUrl(app.settings.webhookUrl)}
-    <p class="small" title="The campaign's own channel, from its published campaign. A webhook saved here goes first.">Rolls go to {app.campaign?.campaign.name}'s channel.</p>
+    <p class="small">Rolls go to {partyOwn ? 'your party' : app.campaign?.campaign.name}'s channel. A webhook saved here goes first.</p>
   {/if}
   <label for="hook">Webhook URL</label>
   <input id="hook" bind:value={url} placeholder="https://discord.com/api/webhooks/…" autocapitalize="off" autocomplete="off" />
@@ -201,12 +204,12 @@
       onchange={(e) => app.updateSettings({ autoPost: (e.target as HTMLInputElement).checked })} />
     Post every roll to Discord automatically
   </label>
-  {#if app.mode === 'referee' && app.campaign && !app.campaignWebhook}
+  {#if app.mode === 'referee' && app.campaign && !app.discordHooks.length}
     <p class="small muted bot-line">Referee's bot: in Scribe › Discord, send this campaign's requests to a Discord channel and set up the bot there, then Publish.</p>
   {:else if app.mode === 'referee' && !app.campaign}
     <p class="small muted bot-line">Referee's bot: pick a campaign first (Campaign tab or the Launcher); the bot reads that campaign's channel.</p>
   {/if}
-  {#if app.mode === 'referee' && app.campaignWebhook}
+  {#if app.mode === 'referee' && app.discordHooks.length}
     <!-- The referee's bot is set up in Scribe's Discord steps (Heph 2026-11-15: one Discord setup, in Scribe). -->
     <p class="small bot-line">
       {#if app.discordStatus.state === 'listening'}
