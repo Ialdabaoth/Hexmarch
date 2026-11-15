@@ -137,3 +137,14 @@ test('e9 lost (each shift) and forced march (each hour), with their clock trigge
   assert.deepStrictEqual(e.effects, []);
   assert.deepStrictEqual(E9.triggers.map(t => [t.id, t.every.n, t.run.call]), [['lost-shift', 4, 'lost'], ['forced-march-hour', 1, 'forced-march']]);
 });
+
+test('ruleset triggers load with the procedures, and "ease" picks whose Help counts for everyone', () => {
+  const R = { format: 'hexmarch-procedures/1', rules: ['t'], triggers: [{ id: 'shift', on: 'clock', every: { n: 4, unit: 'hour' }, while: 'walking', auto: true, run: { call: 'footing' } }],
+    procedures: { check: { params: ['vs', 'who'], steps: [{ result: { by: 'vs', of: { easy: { pass: true } }, else: { pass: false } } }] },
+      footing: { steps: [{ each: '*', ease: 'maneuver', roll: 'check', vs: 'normal', combine: 'all', as: 'r' }] } } };
+  const l = P.load('t', [R], { events: { triggers: [{ id: 'shift', on: 'manual', run: { call: 'footing' } }] } });
+  assert.deepStrictEqual(l.triggers.map(t => [t.id, t.on]), [['shift', 'manual']]);  // the module's own id wins
+  const l2 = P.load('t', [R], null); assert.strictEqual(l2.triggers[0].on, 'clock');
+  const e = P.run(l2, 'footing', { party: [{ name: 'Ann', modes: [], ease: { maneuver: 1 } }, { name: 'Bo', modes: [] }] });
+  assert.deepStrictEqual(e.rolls.map(r => [r.who, r.vs, r.pass]), [['Ann', 'easy', true], ['Bo', 'normal', false]]);
+});
