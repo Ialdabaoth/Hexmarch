@@ -38,6 +38,8 @@ footer{display:flex;justify-content:space-between;gap:12px;padding:4px 16px;font
 #route,#party{position:absolute;left:10px;top:10px;z-index:2;max-width:calc(100% - 20px);background:#fffaf0ee;border:1px solid #b8ab8c;border-radius:6px;padding:6px 10px;font-size:13px;box-shadow:0 2px 8px #0002}
 #route[hidden],#party[hidden]{display:none}#route b,#party b{color:var(--red)}#route small,#party small{color:var(--dim)}#route button,#party button{font-size:12px;padding:0 8px;margin:4px 6px 0 0}
 #party{top:auto;bottom:10px}#party a{color:var(--red)}
+#party{max-height:calc(100% - 20px);overflow:auto}
+#hexmenu{position:absolute;z-index:3;background:#fffaf0f4;border:1px solid #b8ab8c;border-radius:6px;padding:4px;font-size:13px;box-shadow:0 2px 8px #0003;max-width:280px}#hexmenu[hidden]{display:none}#hexmenu button{display:block;width:100%;text-align:left;margin:2px 0;padding:3px 8px;font-size:13px}#hexmenu button.def{border-color:var(--red)}#hexmenu small{display:block;color:var(--dim)}#hexmenu .star{float:right;color:var(--dim);cursor:pointer;padding-left:6px}#hexmenu .star.on{color:var(--red)}#party p.ev{margin:4px 0;max-width:420px}#party .warn{color:#8a5a00}#party details.evrep{display:inline}#party details.evrep summary{cursor:pointer;color:#8a5a00;display:inline}#party ol.evq{margin:4px 0;padding-left:20px}
 #party button.on{border-color:var(--red);color:var(--red)}#party hr{border:0;border-top:1px solid #d8cfb8;margin:6px 0}.fd{color:#2e6b34!important;font-weight:bold}
 #routebtn.on,#partybtn.on{border-color:var(--red);color:var(--red)}
 footer a{color:var(--red)}
@@ -49,11 +51,11 @@ footer a{color:var(--red)}
 <label class="gr">Outline colour <input type="color" id="gridc" value="#ffffff"></label>
 <label class="gr">Opacity <input type="range" id="grida" min="10" max="100" value="80"></label></div></div>
 <button id="out" title="Zoom out">−</button><button id="in" title="Zoom in">+</button><button id="fit">Fit</button><button id="routebtn" title="Plot a route and estimate the travel time">Route</button><button id="partybtn" title="Show, place or move the party">Party</button><button id="keybtn">Key</button><button id="modbtn" title="Load a different module">Modules</button></div></header>
-<div id="main"><div id="map"><canvas id="cv"></canvas><div id="route" hidden aria-live="polite"></div><div id="party" hidden aria-live="polite"></div></div><aside id="key"></aside></div>
+<div id="main"><div id="map"><canvas id="cv"></canvas><div id="route" hidden aria-live="polite"></div><div id="party" hidden aria-live="polite"></div><div id="hexmenu" hidden role="menu"></div></div><aside id="key"></aside></div>
 <footer><span id="hover">Click a hex to zoom in.</span><span><span id="support"></span>{{APP}} Atlas {{ATLAS}}<span id="modver"></span> · <a href="#" id="creditbtn">Credits</a></span></footer>
 <dialog id="modules"><h2>Load a module</h2><ul id="modlist"></ul><button id="modfile" title="A map file made by atlas_flat.py, such as a private module's. It stays in this browser and is never uploaded">Open a map file…</button> <button id="modclose">Close</button></dialog>
 <dialog id="credits"><h2>Credits</h2><ul id="creditlist"></ul><button id="creditclose">Close</button></dialog>
-<!--CARD-->
+<!--PROCEDURES--><!--CARD-->
 <script>
 // Scribe's answer to a publish request ('published', #m=…) comes back in the fragment; take it out before the map reads the fragment as a place
 let MAIL_IN = /^#m=/.test(location.hash) ? location.hash.slice(3) : ''; if (MAIL_IN) history.replaceState(null, '', location.pathname + location.search);
@@ -468,11 +470,11 @@ function routeBox() {
   let h = `<b>Route</b> · ${STOPS.length} stop${STOPS.length === 1 ? '' : 's'} · ${r.mi.toFixed(r.mi < 10 ? 1 : 0)} mi`;
   if (STOPS.length > 1) h += r.blocked ? ` · <b>crosses ${esc(TYPES.find(t => t.id === r.blocked).name.toLowerCase())}</b>: no way on foot`
     : ` · ${hm(r.hours)}${r.days >= .5 ? ` · ${r.days.toFixed(1)} days of ${P.hours_per_day || 8} h` : ''}`;
-  h += `<br><small>Terrain read from ${unit}${unknown > .05 ? `; ${unknown.toFixed(1)} mi unmapped, at normal pace` : ''}${onRoad > .05 ? `; ${onRoad.toFixed(onRoad < 10 ? 1 : 0)} mi on roads` : ''}.</small><br>${STOPS.length > 1 && !r.blocked && !LOCK ? `<button data-r="move" title="Put the party at the last stop and add the travel time">Move party here</button>` : ''}<button data-r="undo">Undo</button><button data-r="clear">Clear</button><button data-r="done">Done</button>`;
+  h += `<br><small>Terrain read from ${unit}${unknown > .05 ? `; ${unknown.toFixed(1)} mi unmapped, at normal pace` : ''}${onRoad > .05 ? `; ${onRoad.toFixed(onRoad < 10 ? 1 : 0)} mi on roads` : ''}.</small><br>${STOPS.length > 1 && !r.blocked && !LOCK ? `<button data-r="move" title="${procLib() && procLib().procs.navigate ? 'Navigate along this route, hex by hex' : 'Put the party at the last stop and add the travel time'}">${procLib() && procLib().procs.navigate ? 'Navigate' : 'Move party here'}</button>` : ''}<button data-r="undo">Undo</button><button data-r="clear">Clear</button><button data-r="done">Done</button>`;
   box.innerHTML = h;
 }
 document.getElementById('route').addEventListener('click', e => { const b = e.target.closest('button[data-r]'); if (!b) return;
-  if (b.dataset.r === 'move') { moveParty(); return; }
+  if (b.dataset.r === 'move') { const l = procLib(); if (l && l.procs.navigate && PARTY && AP()) { const pts = STOPS.slice(); pts[0] = ft(...PARTY.hex); runOffer('navigate', pts, LV[V.lvl].draw).then(() => { STOPS = [ft(...PARTY.hex)]; routeBox(); redraw(); }); } else moveParty(); return; }
   if (b.dataset.r === 'undo') STOPS.pop(); else if (b.dataset.r === 'clear') STOPS = []; else setRoute(false); routeBox(); redraw(); });
 function setRoute(on) { ROUTE = on; document.getElementById('routebtn').classList.toggle('on', on); if (on && !STOPS.length && PARTY) STOPS.push(ft(...PARTY.hex)); hoverHint(); routeBox(); redraw(); }  // a route starts where the party stands
 const hoverHint = () => { document.getElementById('hover').textContent = PLACE ? 'Party: click a hex to put the party there.' : ROUTE ? 'Route: click a hex to add a stop.' : 'Click a hex to zoom in.'; };
@@ -513,7 +515,9 @@ function csRead(d) {  // as the Companion reads it (lib/state.ts readState): any
     ...(csDate(t.date) ? { date: t.date } : {}), ...(typeof t.hour === 'number' ? { hour: t.hour } : {}) } : null;  // null (or "place it yourself"): the referee places the party
   const parties = (Array.isArray(d.parties) ? d.parties : []).flatMap(q => q && typeof q === 'object' && typeof q.id === 'string' && /^[a-z0-9-]{1,40}$/.test(q.id) ? [{ ...q, id: q.id, name: str(q.name, q.id), start: start(q.start),
     clock: { start: csDate(q.clock && q.clock.start) ? q.clock.start : '3507-05-01', hours: num(q.clock && q.clock.hours, 8) },
-    session: { number: Math.floor(num(q.session && q.session.number, 0)), open: !!(q.session && q.session.open === true) }, at: marker(q.at) }] : []);
+    session: { number: Math.floor(num(q.session && q.session.number, 0)), open: !!(q.session && q.session.open === true) }, at: marker(q.at),
+    log: Array.isArray(q.log) ? q.log.filter(e => e && typeof e === 'object') : [],
+    modes: q.modes && typeof q.modes === 'object' ? Object.fromEntries(Object.entries(q.modes).filter(([, v]) => Array.isArray(v)).map(([k, v]) => [k, v.filter(x => typeof x === 'string')])) : {} }] : []);
   return { ...d, format: 'hexmarch-campaign-state', version: 1, campaign: str(d.campaign, ''), revision: Math.floor(num(d.revision, 0)), updated: str(d.updated, new Date().toISOString()),
     parties, active: parties.some(q => q.id === d.active) ? d.active : parties.length ? parties[0].id : '', revealed, characters: Array.isArray(d.characters) ? d.characters : [] };
 }
@@ -721,18 +725,18 @@ function know() {
 // Moving the party reveals the hexes in sight along the whole route to each character in the party.
 let FOG = null, PREVIEW = false, BRUSH = '';  // BRUSH: '' or the state a click paints: visited, explored, rumour or hide
 const SHOWN = new Map();
-// how far one sees from a hex, in miles. Line of sight is a Procedure (Heph 2026-11-09): the ruleset's or module's procedures.json
-// "sight-range" (with the terrain; later light and height) gives the miles. Until the Atlas runs procedures, this table stands in
-// (Claude's numbers), and a terrain type's own "sight" overrides it
-const SIGHT = { grass: 3, woods: 1.5, forest: .5, hills: 6, mount: 12, bog: 2, sea: 6, lake: 3, clear: 3, 'mixed-woods': 1.5, grassland: 3, mountains: 12, 'barren-mountains': 12,
-  'scrub-desert': 4, 'sandy-desert': 4, 'rocky-desert': 4, marsh: 2, swamp: 1, 'black-sand': 4, 'deep-ocean': 6, ocean: 6, shallows: 6 };
+// how far one sees from a hex, in miles. Line of sight is a Procedure (Heph 2026-11-09): the ruleset's "sight-range" (with the terrain;
+// later light and height) gives the miles, and a terrain type's own "sight" in the module overrides it
+const SIGHTC = new Map();
+function sightOf(ty) { if (!ty) return 3; if (typeof ty.sight === 'number') return ty.sight;
+  if (!SIGHTC.has(ty.id)) { const v = askP('sight-range', { terrain: ty.id }); SIGHTC.set(ty.id, typeof v === 'number' && v >= 0 ? v : 3); } return SIGHTC.get(ty.id); }
 const lkey = (C, R) => nearest(C, R, NL).join(',');  // the painted-level hex that owns a lattice hex
 const lAddr = k => { const [i, j] = k.split(',').map(Number); return addr(...centre(i, j, NL)).slice(1); };
 function partyIds() {  // the shown party's members (characters[].party); a state without characters: the player characters loaded here
   return CS && CS.characters.length ? CS.characters.filter(c => c && c.id && (!PID || c.party === PID || (CS.parties.length < 2 && !c.party))).map(c => c.id) : WHO.filter(w => w.owner !== 'referee').map(w => w.id);
 }
 function sightFrom(x, y, out) {  // the painted-level hexes whose centre lies within sight (plus half a hex) of a point
-  const [li, lj] = hexAt(x, y, NL), t = T(li, lj, NL), ty = TYPES[t - 1], mi = ty ? (ty.sight ?? SIGHT[ty.id] ?? 3) : 3, R = mi * MILE + NL * 50, n = Math.ceil(R / (NL * 100)) + 1;
+  const [li, lj] = hexAt(x, y, NL), t = T(li, lj, NL), ty = TYPES[t - 1], mi = sightOf(ty), R = mi * MILE + NL * 50, n = Math.ceil(R / (NL * 100)) + 1;
   for (let i = li - n; i <= li + n; i++) for (let j = lj - n - 1; j <= lj + n + 1; j++) { const [cx, cy] = hexFt(i, j, NL); if (Math.hypot(cx - x, cy - y) <= R) out.add(i + ',' + j); }
   return out;
 }
@@ -930,6 +934,197 @@ async function setActive(id) {
   CS = { ...CS, active: id }; await saveState(); if (parent !== window) parent.postMessage({ type: 'hexmarch-atlas', event: 'active', module: MOD.id, party: id }, '*');
   PID = id; fromState(); partyBox(); redraw();
 }
+// Procedures (EVENTS_FORMAT.md; Heph 2026-11-15: "Procedures lives primarily in the Atlas"). The rules modules' procedures are built into
+// this page; a module's events and its own procedures come from its events.json (build.py). The referee queues a manual trigger,
+// then runs, skips or reorders the queue; each run is one entry in the shown party's Events log (parties[].log), on that party's clock.
+const RULEPROCS = {{RULEPROCS}};
+const RULEMOVE = {{RULEMOVE}};  // each ruleset's movement data (rules.json "movement"): modes, slots, how speeds combine
+const movementOf = () => RULEMOVE[rulesetOf()] || null;
+let PLIB = null, PEVENTS = null, PRULESET = '';
+const PQUEUE = new Map();  // party id -> its queued triggers; the queue is the referee's, kept on this page only
+function rulesetOf() { return (CS && CS.rules && typeof CS.rules.ruleset === 'string' && CS.rules.ruleset) || 'e9'; }
+function procLib() {
+  const rs = rulesetOf();
+  if (window.HexmarchProcedures && (!PLIB || PRULESET !== rs)) { PRULESET = rs; PLIB = HexmarchProcedures.load(rs, RULEPROCS, PEVENTS); SIGHTC.clear(); TRAVELC.clear(); }
+  return PLIB;
+}
+function askP(name, w) { const l = procLib(); return l ? HexmarchProcedures.ask(l, name, w) : undefined; }
+async function loadEvents() {
+  PEVENTS = null; PLIB = null;
+  if (MOD && !MOD.local && MOD.events) try { PEVENTS = await (await fetch(new URL(MOD.events, MOD.base), { cache: 'no-cache' })).json(); } catch (e) {}
+  PLIB = null; procLib();
+}
+function queueOf() { if (!PQUEUE.has(PID)) PQUEUE.set(PID, []); return PQUEUE.get(PID); }
+const UNIT_H = { minute: 1 / 60, hour: 1, day: 24, week: 168 };
+async function runQueued(i) {
+  const ap = AP(), q = queueOf(), t = q[i], l = procLib(); if (!ap || !t || !l) return;
+  q.splice(i, 1);
+  const e = HexmarchProcedures.run(l, t, { vars: { party: ap.name }, roles: { party: ap.name } });
+  e.at = ap.clock.hours;
+  let hours = 0;  // the effects the Atlas applies now: passing time on the party's clock; the rest are listed for the referee
+  for (const f of e.effects) if (f.effect === 'clock') { const h = typeof f.hours === 'number' ? f.hours : (+f.n || +f.amount || 0) * (UNIT_H[f.unit] ?? 1); if (h > 0) { hours += h; f.applied = true; } }
+  CS = { ...CS, revision: CS.revision + 1, updated: new Date().toISOString(), parties: CS.parties.map(p => p.id !== ap.id ? p : { ...p, clock: { ...p.clock, hours: p.clock.hours + hours }, log: [...(p.log || []), e] }) };
+  await saveState(); fromState();
+  if (parent !== window) parent.postMessage({ type: 'hexmarch-atlas', event: 'log', module: MOD.id, party: ap.id, entry: e, hours }, '*');
+  partyBox();
+}
+function entryHtml(e, ap) {
+  const rolls = (e.rolls || []).map(x => `${esc(x.roll)} ${esc(x.total ?? '?')}`).join(', ');
+  const later = (e.effects || []).filter(f => !f.applied && f.effect !== 'note').map(f => esc(f.effect + (f.target ? ' · ' + f.target : '') + (f.amount !== undefined ? ' ' + f.amount : '') + (f.condition ? ' ' + f.condition : '')));
+  return `<p class="ev"><small>${esc(clockLabel({ start: ap.clock.start, hours: typeof e.at === 'number' ? e.at : ap.clock.hours }))}${rolls ? ' · ' + rolls : ''}</small><br><b>${esc(e.proc || '')}</b> ${(e.text || []).map(esc).join(' ')}`
+    + `${(e.players || []).length ? `<br><small title="What the players are told">Players: ${e.players.map(esc).join(' ')}</small>` : ''}${later.length ? `<br><small title="Apply these by hand for now">To apply: ${later.join('; ')}</small>` : ''}`
+    + `${(e.warnings || []).length ? `<br><small class="warn">${e.warnings.map(esc).join('; ')}</small>` : ''}</p>`;
+}
+let MODEEDIT = '';  // the member whose modes are being picked
+function movementLine() {  // the referee picks each member's movement modes for the party shown (parties[].modes)
+  const mv = movementOf(), ap = AP(); if (LOCK || !ap || !mv || !Array.isArray(mv.modes)) return '';
+  const ids = partyIds(); if (!ids.length) return '';
+  const nameOf = id => ((CS && CS.characters.find(c => c.id === id)) || WHO.find(w => w.id === id) || { name: id }).name || id;
+  const byId = new Map(mv.modes.map(m => [m.id, m])), slots = mv.modeSlots || {}, max = Math.max(slots.default || 1, ...((slots.byLevel || []).map(b => b.slots || 0)));
+  const rule = `${slots.default || 1} mode${(slots.default || 1) === 1 ? '' : 's'}${slots.classKind ? `; ${slots.classKind}s ` + (slots.byLevel || []).map(b => `${b.slots} from level ${b.from}`).join(', ') : ''}`;
+  let h = `<hr><b title="${esc(rule)}">Movement</b>`;
+  for (const id of ids) { const have = ((ap.modes || {})[id] || []).filter(x => byId.has(x));
+    h += `<br>${esc(nameOf(id))}: ${have.length ? have.map(x => esc(byId.get(x).name)).join(', ') : '<small>no mode</small>'} <button data-mv="${esc(id)}" title="Pick ${esc(nameOf(id))}’s modes (${esc(rule)})">Modes…</button>`;
+    if (MODEEDIT === id) h += '<br>' + mv.modes.map(m => `<label title="${esc([m.talent && 'talent: ' + m.talent, m.speed !== undefined && m.speed + '×', m.terrain && 'on ' + m.terrain + ' ground', m.scales && m.scales.join('/'), m.classKind && m.classKind + 's only'].filter(Boolean).join(' · '))}"><input type="checkbox" data-mode="${esc(m.id)}" data-who="${esc(id)}"${have.includes(m.id) ? ' checked' : ''}${!have.includes(m.id) && have.length >= max ? ' disabled' : ''}> ${esc(m.name)}</label>`).join(' ');
+  }
+  return h;
+}
+document.getElementById('party').addEventListener('click', e => { const b = e.target.closest('button[data-mv]'); if (!b || LOCK) return; MODEEDIT = MODEEDIT === b.dataset.mv ? '' : b.dataset.mv; partyBox(); });
+document.getElementById('party').addEventListener('change', async e => { const c = e.target.closest('input[data-mode]'); if (!c || LOCK || !AP() || !CS) return;
+  const ap = AP(), who = c.dataset.who, now = new Set((ap.modes || {})[who] || []); if (c.checked) now.add(c.dataset.mode); else now.delete(c.dataset.mode);
+  const modes = { ...(ap.modes || {}), [who]: [...now] };
+  CS = { ...CS, revision: CS.revision + 1, updated: new Date().toISOString(), parties: CS.parties.map(p => p.id === ap.id ? { ...p, modes } : p) };
+  await saveState(); if (parent !== window) parent.postMessage({ type: 'hexmarch-atlas', event: 'modes', module: MOD.id, party: ap.id, modes }, '*'); partyBox(); });
+function eventsLine() {  // the referee's events for the party shown: manual triggers, the queue, and the latest of the log
+  const ap = AP(), l = procLib(); if (LOCK || !ap || !l) return '';
+  const man = l.triggers.filter(t => t.on === 'manual'), q = queueOf(), log = ap.log || [];
+  let h = '<hr><b>Events</b>' + (NAV && PARTY ? ` <button data-ev="continue" title="${esc(offerPreview(NAV.proc, NAV.pts, NAV.N))}">Continue</button><button data-ev="stopnav" title="Stay here">Stay</button>` : '');
+  if (l.report.length) h += ` <details class="evrep"><summary title="Names the module uses that the ${esc(l.ruleset)} rules don’t provide">⚠ ${l.report.length}</summary><small>${l.report.map(esc).join('<br>')}</small></details>`;
+  h += '<br>' + (man.length ? man.map(t => `<button data-ev="queue" data-id="${esc(t.id)}" title="Add to the queue for ${esc(ap.name)}">${esc(t.label || t.id)}</button>`).join('') : '<small>This module has no manual events yet.</small>');
+  if (q.length) h += '<ol class="evq">' + q.map((t, i) => `<li>${esc(t.label || t.id)} <button data-ev="run" data-i="${i}">Run</button><button data-ev="skip" data-i="${i}">Skip</button>${i ? `<button data-ev="up" data-i="${i}" title="Run this one sooner">↑</button>` : ''}</li>`).join('') + '</ol>';
+  if (log.length) h += log.slice(-5).reverse().map(e => entryHtml(e, ap)).join('') + (log.length > 5 ? `<small>${log.length} entries this session</small>` : '');
+  return h;
+}
+document.getElementById('party').addEventListener('click', e => { const b = e.target.closest('button[data-ev]'); if (!b || LOCK || !AP()) return; const a = b.dataset.ev, q = queueOf(), i = +b.dataset.i;
+  if (a === 'queue') { const t = (procLib() || { triggers: [] }).triggers.find(x => x.id === b.dataset.id); if (t) q.push(t); }
+  else if (a === 'run') { runQueued(i); return; }
+  else if (a === 'continue' && NAV) { const n = NAV; NAV = null; runOffer(n.proc, [ft(...PARTY.hex), ...n.pts.slice(1)], n.N); return; } else if (a === 'stopnav') NAV = null; else if (a === 'skip') q.splice(i, 1); else if (a === 'up' && i > 0) q.splice(i - 1, 0, ...q.splice(i, 1));
+  partyBox(); });
+// Navigate (Heph 2026-11-15): with the party shown, a click on another hex offers the procedures that offer themselves there
+// ("offer": "hex"), the default first; a second click on that hex runs it. A procedure with a `walk` step goes hex by hex along
+// the route (the level shown), running the walked procedure for each and stopping as its `stop` says. The Route tool runs
+// "navigate" along the stops picked by hand.
+let NAV = null, HEXMENU = null;  // NAV: a walk that stopped partway ({pts, proc}), for Continue; HEXMENU: the hex the menu is for
+const LOD_N = () => ({ march: NM, league: NL, field: NF, furlong: NU, '100ft': 1 });
+function routeSteps(pts, N) {  // the level-N hexes along a line of points, after the first: [{i, j, mi, road, terrain, leg}]
+  const out = []; let cur = hexAt(...pts[0], N).join(','), lead = 0;
+  for (let k = 1; k < pts.length; k++) { const [ax, ay] = pts[k - 1], [bx, by] = pts[k], d = Math.hypot(bx - ax, by - ay), n = Math.max(1, Math.ceil(d / (N * 25)));
+    for (let q = 0; q < n; q++) { const f = (q + .5) / n, px = ax + (bx - ax) * f, py = ay + (by - ay) * f, h = hexAt(px, py, N), key = h.join(','), mi = d / n / MILE;
+      if (key !== cur) { cur = key; const t = T(h[0], h[1], N); out.push({ i: h[0], j: h[1], mi: out.length ? 0 : lead, road: undefined, terrain: t ? TYPES[t - 1].id : null, leg: k }); }
+      if (!out.length) { lead += mi; continue; }
+      const o = out[out.length - 1]; o.mi += mi; const rd = roadAt(px, py, Math.max(150, N * 35)); if (rd) o.road = rd['class']; } }
+  return out;
+}
+function terrainAt(x, y, N) { const t = T(...hexAt(x, y, N), N); return t ? TYPES[t - 1].id : null; }
+function firedBetween(a, b, lib) {  // the terrain triggers crossing from point a to point b fires (EVENTS_FORMAT.md section 4)
+  const out = [];
+  for (const t of lib.triggers) { if (t.on !== 'terrain' || !t.terrain) continue;
+    const N = LOD_N()[t.lod || 'league'] || NL, was = terrainAt(...a, N), now = terrainAt(...b, N), moved = hexAt(...a, N).join() !== hexAt(...b, N).join();
+    if (!moved) continue;
+    const enter = now === t.terrain && (t.mode === 'each' || was !== t.terrain), leave = was === t.terrain && now !== t.terrain;
+    if ((t.edge || 'enter') === 'enter' ? enter : leave) out.push(t); }
+  return out;
+}
+// the party's speed in one hex, read from the ruleset's movement data (E9: Heph 2026-11-15): each member's chosen modes
+// (parties[].modes) that apply at this scale and on this kind of ground, or the mode the ground requires; a member goes at the
+// slowest of theirs ("combine": "slowest") and the party at its slowest member's ("party": "slowest")
+function partySpeed(kind, scale) {
+  const mv = movementOf(), ap = AP(); if (!mv || !ap) return { speed: 1, modes: '' };
+  const byId = new Map((mv.modes || []).map(m => [m.id, m])), dflt = (mv.default || {}).speed ?? 1, chosen = ap.modes || {};
+  const req = (/^requires\s+(\S+)/.exec(String((mv.terrain || {})[kind] || '')) || [])[1], used = new Set(); let party = Infinity;
+  const fold = (xs, how) => xs.length ? (how === 'fastest' ? Math.max(...xs) : Math.min(...xs)) : dflt;
+  for (const id of partyIds()) {
+    let ms = (chosen[id] || []).map(x => byId.get(x)).filter(m => m && (!m.scales || m.scales.includes(scale)) && (!m.terrain || m.terrain === kind));
+    if (req && byId.has(req)) ms = [byId.get(req)];
+    ms.forEach(m => used.add(m.id));
+    party = fold([party, fold(ms.map(m => m.speed).filter(x => typeof x === 'number'), mv.combine)], mv.party);
+  }
+  return { speed: party === Infinity ? dflt : party, modes: [...used].join(',') };
+}
+function walker(pts, N, out) {  // the map side of a `walk` step: fills out {hours, at, path, queued, stopped, rest}
+  const RD = (D.travel || {}).roads || {}, mph = ((D.travel || {}).pace || {}).mi_per_hour || 3;
+  return (name, vars, sub, entry, stop) => {
+    const steps = routeSteps(pts, N), lib = procLib(); let prev = pts[0];
+    Object.assign(out, { hours: 0, at: null, path: [pts[0]], queued: [], stopped: false, rest: null, hexes: 0, total: steps.length });
+    for (let k = 0; k < steps.length; k++) { const st = steps[k], c = hexFt(st.i, st.j, N), ty = TYPES.find(x => x.id === st.terrain);
+      const pace = st.road && RD[st.road] !== undefined ? RD[st.road] : ty && ty.travel !== undefined ? ty.travel : travelOf(st.terrain || 'unknown', st.road);
+      if (pace === null) { entry.warnings.push(`no way on foot into ${ty ? ty.name.toLowerCase() : 'that hex'}`); out.stopped = true; out.rest = null; break; }
+      const to = addr(...(N === 1 ? [st.i, st.j] : centre(st.i, st.j, N))).slice(1);
+      const kind = askP('terrain-kind', { terrain: st.terrain || 'unknown', road: st.road || '', travel: pace ?? 1 }), ground = typeof kind === 'string' ? kind : '', sp = partySpeed(ground, N <= NU ? 'exploration' : 'narration');
+      const e = sub(name, { from: out.at ? addr(...out.at).slice(1) : '', to, terrain: st.terrain || 'unknown', road: st.road || '', mi: +st.mi.toFixed(3), mph, pace: pace ?? 1, party: vars.party,
+        kind: ground, speed: sp.speed, modes: sp.modes });
+      entry.rolls.push(...e.rolls); entry.text.push(...e.text); entry.players.push(...e.players); entry.warnings.push(...e.warnings);
+      let halt = false;
+      for (const f of e.effects) { if (f.effect === 'clock') out.hours += typeof f.hours === 'number' ? f.hours : 0; else if (f.effect === 'halt') halt = true; else if (!['move', 'reveal', 'explore'].includes(f.effect)) entry.effects.push(f); }
+      out.at = N === 1 ? [st.i, st.j] : centre(st.i, st.j, N); out.path.push(c); out.hexes++;
+      const fired = lib ? firedBetween(prev, c, lib) : []; prev = c;
+      for (const t of fired) out.queued.push(Object.assign({}, t, { at: to }));
+      if (halt || (stop !== 'never' && fired.length)) { if (k < steps.length - 1) { out.stopped = true; out.rest = [c, ...pts.slice(st.leg)]; } break; }
+    }
+  };
+}
+// a dry run for the menu: the time, how far it gets, what it would queue, and the rolls it makes, without rolling for real
+function offerPreview(name, pts, N) {
+  const l = procLib(); if (!l) return '';
+  const out = {}; HexmarchProcedures.run(l, name, { rng: () => .5, walk: walker(pts, N, out), vars: { party: (AP() || {}).name || '' } });
+  const rolls = [...new Set(HexmarchProcedures.rollsOf(l, name))];
+  if (out.hexes === undefined) return rolls.length ? 'rolls: ' + rolls.join(', ') : '';
+  const what = [...new Set(out.queued.map(t => t.label || t.id))].join(', '), n = x => `${x} hex${x === 1 ? '' : 'es'}`;
+  return (out.stopped ? `${n(out.total)} · stops after ${out.hexes} (${hm(out.hours)})${what ? ' for ' + what : ''}` : `${n(out.hexes)} · ${hm(out.hours)}${what ? ' · then ' + what : ''}`)
+    + (rolls.length ? ' · rolls: ' + rolls.join(', ') : '');
+}
+async function runOffer(name, pts, N) {
+  const ap = AP(), l = procLib(); if (!ap || !l || !PARTY) return;
+  const out = {}, e = HexmarchProcedures.run(l, name, { walk: walker(pts, N, out), vars: { party: ap.name }, roles: { party: ap.name } });
+  e.at = ap.clock.hours;
+  if (out.hexes !== undefined) {
+    const lbl = { [NL]: 'League', [NF]: 'Field', [NU]: 'Furlong', 1: '100-ft' }[N] || '';
+    e.text.unshift(`${ap.name} travels ${out.hexes} ${lbl} hex${out.hexes === 1 ? '' : 'es'} (${hm(out.hours)})${out.stopped ? (out.queued.length ? ', and stops: ' + [...new Set(out.queued.map(t => t.label || t.id))].join(', ') : ', and stops short') : ''}.`);
+    if (out.hours) e.effects.push({ effect: 'clock', hours: +out.hours.toFixed(3), applied: true });
+    NAV = out.rest ? { pts: out.rest, proc: name, N } : null;
+    if (out.at) await setParty(out.at, PARTY.hours + out.hours, false, out.path);
+    for (const t of out.queued) queueOf().push(t);
+  }
+  CS = { ...CS, revision: CS.revision + 1, updated: new Date().toISOString(), parties: CS.parties.map(p => p.id !== ap.id ? p : { ...p, log: [...(p.log || []), e] }) };
+  await saveState();
+  if (parent !== window) parent.postMessage({ type: 'hexmarch-atlas', event: 'log', module: MOD.id, party: ap.id, entry: e, hours: 0 }, '*');
+  PBOX = true; partyBox(); redraw();
+}
+function hexDefault(l) {  // the procedure a second click runs: the campaign's choice (defaults.hex), else the ruleset's
+  const os = HexmarchProcedures.offers(l, 'hex'), want = CS && CS.defaults && CS.defaults.hex;
+  return (os.find(o => o.name === want) || os.find(o => o.default) || os[0] || {}).name || '';
+}
+function hexMenuFor(x, y) {  // true when the click was taken by the menu (or ran its default)
+  const l = procLib(); if (LOCK || !PBOX || !PARTY || !AP() || !l) return false;
+  const os = HexmarchProcedures.offers(l, 'hex'); if (!os.length) return false;
+  const N = LV[V.lvl].draw, [i, j] = hexAt(x, y, N), at = hexAt(...ft(...PARTY.hex), N);
+  if (i === at[0] && j === at[1]) return false;  // the party's own hex zooms as ever
+  const pts = [ft(...PARTY.hex), hexFt(i, j, N)], def = hexDefault(l);
+  if (HEXMENU && HEXMENU.i === i && HEXMENU.j === j && HEXMENU.N === N) { closeHexMenu(); if (def) runOffer(def, pts, N); return true; }
+  HEXMENU = { i, j, N, pts };
+  const m = document.getElementById('hexmenu'), [sx, sy] = S(...pts[1]);
+  m.innerHTML = os.sort((a, b) => (b.name === def) - (a.name === def)).map(o => `<button data-hm="${esc(o.name)}" class="${o.name === def ? 'def' : ''}" title="${esc(o.about)}">${esc(o.label)}<span class="star${o.name === def ? ' on' : ''}" data-def="${esc(o.name)}" title="${o.name === def ? 'What a second click on a hex does' : 'Make this what a second click on a hex does'}">★</span><small>${esc(offerPreview(o.name, pts, N))}</small></button>`).join('')
+    + '<button data-hm="">Zoom in<small>As a click does without the party shown</small></button>';
+  m.hidden = false; m.style.left = Math.min(Math.max(4, sx + 12), W - 290) + 'px'; m.style.top = Math.min(Math.max(4, sy - 10), H - m.offsetHeight - 4) + 'px';
+  return true;
+}
+function closeHexMenu() { HEXMENU = null; document.getElementById('hexmenu').hidden = true; }
+document.getElementById('hexmenu').addEventListener('click', async e => {
+  const st = e.target.closest('[data-def]');
+  if (st) { e.stopPropagation(); if (!CS) return; CS = { ...CS, defaults: { ...(CS.defaults || {}), hex: st.dataset.def }, revision: CS.revision + 1 }; await saveState(); const h = HEXMENU; HEXMENU = null; if (h) hexMenuFor(...h.pts[1]); return; }
+  const b = e.target.closest('button[data-hm]'); if (!b || !HEXMENU) return; const h = HEXMENU; closeHexMenu();
+  if (b.dataset.hm) runOffer(b.dataset.hm, h.pts, h.N); else goDown(...h.pts[1]);
+});
 function partiesLine() {  // the referee's party switcher and creator
   if (LOCK) return '';
   const ps = CS ? CS.parties : [];
@@ -951,11 +1146,11 @@ function partyBox() {
   if (!ap && LOCK) { box.innerHTML = `<b>Party</b> · your character is in no party yet.<br><button data-p="close">Close</button><hr>${stateLine()}${asLine()}`; return; }
   if (!ap) { box.innerHTML = `<b>No party yet</b><br>${partiesLine()}<button data-p="close">Close</button><hr>${stateLine()}${asLine()}${fogLine()}`; return; }
   if (!PARTY && LOCK) { box.innerHTML = `<b>${nm}</b> · not on this map.<br><button data-p="close">Close</button><hr>${stateLine()}${asLine()}`; return; }
-  if (!PARTY) { box.innerHTML = `<b>${nm}</b> · not on this map.<br><button data-p="place">Place the party</button><button data-p="close">Close</button><br>${partiesLine()}<hr>${stateLine()}${asLine()}${fogLine()}`; return; }
+  if (!PARTY) { box.innerHTML = `<b>${nm}</b> · not on this map.<br><button data-p="place">Place the party</button><button data-p="close">Close</button><br>${partiesLine()}${movementLine()}${eventsLine()}<hr>${stateLine()}${asLine()}${fogLine()}`; return; }
   const [C, R] = PARTY.hex, t = T(C, R, 1), h = addr(C, R), lbl = h.slice(7);
   box.innerHTML = `<b>${nm}</b> · at <a href="${h}">${lbl}</a>${t ? ' · ' + esc(TYPES[t - 1].name.toLowerCase()) : ''}<br><small>Travelled ${hm(PARTY.hours)}${PARTY.hours >= day / 2 ? ` (${(PARTY.hours / day).toFixed(1)} days of ${day} h)` : ''}</small><br>`
     + (LOCK ? '<button data-p="go">Go to</button><button data-p="close">Close</button>'
-      : '<button data-p="go">Go to</button><button data-p="place">Move</button><button data-p="reset" title="Set the travel time back to zero (the party’s clock keeps its time)">Reset time</button><button data-p="remove">Remove</button><button data-p="close">Close</button><br>' + partiesLine())
+      : '<button data-p="go">Go to</button><button data-p="place">Move</button><button data-p="reset" title="Set the travel time back to zero (the party’s clock keeps its time)">Reset time</button><button data-p="remove">Remove</button><button data-p="close">Close</button><br>' + partiesLine() + movementLine() + eventsLine())
     + `<hr>${stateLine()}${asLine()}${fogLine()}`;
 }
 function saveFile() {  // the state file as written: plain JSON, as the Companion saves it (Campaign › State)
@@ -1029,10 +1224,13 @@ function drawParty() {  // a red pennant planted on the party's hex centre, over
 // HexmarchAtlas.travel(legs) adds up a route for the path tool to come: legs = [{mi, terrain: id, road?: class}] -> {hours, days, mi}
 const travelNote = t => t.travel === null ? 'no travel on foot' : t.travel === undefined ? '' : (() => { const p = (D.travel || {}).pace || {}, mph = (p.mi_per_hour || 3) / t.travel;
   return `${t.travel === 1 ? 'normal pace' : '×' + t.travel + ' travel time'} · ${+mph.toFixed(1)} mi/h`; })();
+// a terrain the module gives no multiplier: the ruleset's "travel" procedure answers (EVENTS_FORMAT.md section 7), else normal pace
+const TRAVELC = new Map();
+function travelOf(terrain, road) { const k = terrain + '|' + (road || ''); if (!TRAVELC.has(k)) { const v = askP('travel', { terrain, road: road || '' }); TRAVELC.set(k, v === null || typeof v === 'number' ? v : 1); } return TRAVELC.get(k); }
 window.HexmarchAtlas = { travel(legs) {
   const P = (D.travel || {}).pace || {}, mph = P.mi_per_hour || 3, day = P.hours_per_day || 8, RD = (D.travel || {}).roads || {};
   let hours = 0, mi = 0;
-  for (const g of legs) { const t = TYPES.find(x => x.id === g.terrain), k = g.road && RD[g.road] !== undefined ? RD[g.road] : t ? t.travel : 1;
+  for (const g of legs) { const t = TYPES.find(x => x.id === g.terrain), k = g.road && RD[g.road] !== undefined ? RD[g.road] : t && t.travel !== undefined ? t.travel : travelOf(g.terrain, g.road);
     if (k === null) return { hours: Infinity, days: Infinity, mi: mi + g.mi, blocked: g.terrain };  // no travel on foot (sea, lake): boats come later
     hours += g.mi * (k ?? 1) / mph; mi += g.mi; }
   return { hours, days: hours / day, mi };
@@ -1194,7 +1392,7 @@ let drag = null;
 cv.addEventListener('pointerdown', e => { drag = { x: e.clientX, y: e.clientY, cx: cam.x, cy: cam.y, moved: false }; cv.setPointerCapture(e.pointerId); });
 cv.addEventListener('pointermove', e => {
   const b = cv.getBoundingClientRect(), [x, y] = F(e.clientX - b.left, e.clientY - b.top);
-  if (drag) { const dx = e.clientX - drag.x, dy = e.clientY - drag.y; if (Math.hypot(dx, dy) > 5) drag.moved = true;
+  if (drag) { const dx = e.clientX - drag.x, dy = e.clientY - drag.y; if (Math.hypot(dx, dy) > 5) { drag.moved = true; if (HEXMENU) closeHexMenu(); }
     if (drag.moved) { cam.x = drag.cx - dx / cam.s; cam.y = drag.cy - dy / cam.s; redraw(); } return; }
   const N = LV[V.lvl].draw, [i, j] = hexAt(x, y, N), t = T(i, j, N), [C, R] = N === 1 ? [i, j] : centre(i, j, N);
   const mp = mapPoiAt(x, y);
@@ -1202,10 +1400,10 @@ cv.addEventListener('pointermove', e => {
 });
 cv.addEventListener('pointerup', e => {
   if (!drag) return; const moved = drag.moved; drag = null; if (moved) return;
-  const b = cv.getBoundingClientRect(), at = F(e.clientX - b.left, e.clientY - b.top); if (BRUSH) brushAt(...at); else if (PLACE) placeParty(...at); else if (ROUTE) addStop(...at); else goDown(...at);
+  const b = cv.getBoundingClientRect(), at = F(e.clientX - b.left, e.clientY - b.top); if (BRUSH) brushAt(...at); else if (PLACE) placeParty(...at); else if (ROUTE) addStop(...at); else if (!hexMenuFor(...at)) { closeHexMenu(); goDown(...at); }
 });
 cv.addEventListener('wheel', e => { e.preventDefault(); zoom(e.deltaY < 0 ? 1.25 : .8, e); }, { passive: false });
-function zoom(f, e) {
+function zoom(f, e) { if (HEXMENU) closeHexMenu();
   const b = cv.getBoundingClientRect(), px = e ? e.clientX - b.left : W / 2, py = e ? e.clientY - b.top : H / 2, [x, y] = F(px, py);
   cam.s *= f; clampCam(); cam.x = x - (px - W / 2) / cam.s; cam.y = y - (py - H / 2) / cam.s; clampCam(); redraw();
 }
@@ -1297,7 +1495,7 @@ async function loadModules() {
   try { const { url, id } = await currentCampaign(); if (id && !CMODS) await campaignLock(url, id); } catch (e) {}
   MODS = (await Promise.all((await knownSites()).filter(m => !local.some(l => l.id === m.id)).map(async m => {
     const base = new URL(m.path.replace(/\/?$/, '/'), m.site).href, r = { id: m.id, path: m.path, title: m.id, version: '', base, ok: false };
-    try { const j = await (await fetch(base + 'module.json')).json(); Object.assign(r, { title: j.title || m.id, version: j.version || '', credits: j.credits || [], languages: j.languages, starts: Array.isArray(j.starts) ? j.starts : [], ok: !!j.atlas_map }); } catch (e) {}
+    try { const j = await (await fetch(base + 'module.json')).json(); Object.assign(r, { events: typeof j.events === 'string' ? j.events : '', title: j.title || m.id, version: j.version || '', credits: j.credits || [], languages: j.languages, starts: Array.isArray(j.starts) ? j.starts : [], ok: !!j.atlas_map }); } catch (e) {}
     return r; }))).concat(local);
   if (CMODS && MODS.some(m => CMODS.has(m.id))) MODS = MODS.filter(m => CMODS.has(m.id));  // the campaign as a filter
   const want = new URLSearchParams(location.search).get('module') || store.get('hexmarch-atlas-module');
@@ -1319,6 +1517,6 @@ async function loadModules() {
   if (!MOD.local) try { const j = await (await fetch(A + 'creatures.json')).json(); CR = j.creatures || []; SC = j.scenes || {}; } catch (e) { CR = []; }  // a module without creatures has no file
   if (window.HexmarchMap) Object.assign(HexmarchMap, { base: MOD.base, module: MOD.id, creatures: CR, scenes: SC,
     places: D.pois.filter(p => p.encounter).map(p => ({ get name() { return name(p.name); }, pointers: p.encounter, go: () => { location.hash = addr(...p.hex); } })) });  // ways out lead back to the place's 100-ft hex  // encounter maps sit in the module folder
-  smoothRivers(); await loadState(); await loadWho(); go();
+  smoothRivers(); await loadEvents(); await loadState(); await loadWho(); go();
 })();
 </script></body></html>

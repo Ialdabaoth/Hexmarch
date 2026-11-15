@@ -258,6 +258,13 @@ if ENC:
     os.makedirs(out + '/bestiary', exist_ok=True)
     for r, b in BEST.items(): json.dump(b, open(f'{out}/bestiary/{r}.json', 'w'), ensure_ascii=False, indent=1)
     if os.path.isdir(out + '/atlas'): json.dump({'creatures': CREATURES, 'scenes': ENC.get('scenes', {})}, open(out + '/atlas/creatures.json', 'w'), ensure_ascii=False)
+# events and procedures (EVENTS_FORMAT.md): every "events" block merged, and the module's procedures/<ruleset>.json, for the Atlas
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); import events_build
+EVENTS = events_build.gather(mdir)
+if EVENTS:
+    json.dump(EVENTS, open(out + '/events.json', 'w'), ensure_ascii=False, indent=1)
+    for w in EVENTS['report']: print('events:', w)
+elif os.path.exists(out + '/events.json'): os.remove(out + '/events.json')
 # Encounter maps (ENCOUNTER_FORMAT.md): published as they are, one JSON per map plus its pictures
 EMAPS = {}
 edir = os.path.join(mdir, 'encounter-maps')
@@ -286,6 +293,7 @@ M = {'format': 'hexmarch-module/1', 'id': MOD['id'], 'title': MOD['title'], 'sho
      'sites': SITES, 'aliases': ALIASES,
      **({'encounters': 'encounters.json', 'bestiary': {r: f'bestiary/{r}.json' for r in BEST}} if ENC else {}),
      **({'encounter_maps': EMAPS} if EMAPS else {}),
+     **({'events': 'events.json'} if EVENTS else {}),
      **({'atlas_map': 'atlas/map.json'} if os.path.isdir(out + '/atlas') else {}),  # the Hexmarch Atlas app (<site>/atlas/) lists modules that have one
      'semver': MOD['version'],  # the plain version (`version` above is the display stamp); E9 Scribe resolves dependencies with it (Atlas 0.5.13)
      # dependencies and campaign starts, as the module source has them (WORKFLOWS.md "Dependencies", SCRIBE.md "Starts")
