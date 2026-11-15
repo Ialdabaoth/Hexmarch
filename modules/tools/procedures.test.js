@@ -12,10 +12,10 @@ const MOD = { events: {
 
 test('travel and sight-range answer from e9-core', () => {
   const l = P.load('e9', [E9], null);
-  assert.strictEqual(P.ask(l, 'sight-range', { terrain: 'hills' }), 6);
+  assert.strictEqual(P.ask(l, 'sight-range', { view: 'automatic' }), 6);  // by the hex's view grade (terrain traits)
   assert.strictEqual(P.ask(l, 'sight-range', { terrain: 'unknown-type' }), 3);
-  assert.strictEqual(P.ask(l, 'travel', { terrain: 'bog', road: '' }), 1);
-  assert.strictEqual(P.ask(P.load('acks', [E9], null), 'sight-range', { terrain: 'hills' }), undefined);  // not served
+  assert.strictEqual(P.ask(l, 'travel', { terrain: 'bog', road: '' }), 1);  // retired by terrain traits
+  assert.strictEqual(P.ask(P.load('acks', [E9], null), 'sight-range', { view: 'easy' }), undefined);  // not served
 });
 
 test('module procedures, aliases, macros and tables', () => {
@@ -46,8 +46,20 @@ test('arithmetic in templates, walk, offers and previews', () => {
   assert.strictEqual(P.value('bog', {}), 'bog');
   assert.deepStrictEqual(P.offers(l, 'hex').map(o => o.name), ['navigate']);
   const seen = [];
-  const e = P.run(l, 'navigate', { walk: (name, vars, sub, entry, stop) => { seen.push(stop); for (const mi of [3, 1.5]) seen.push(sub(name, { mi, pace: 2, mph: 3, to: 'x' }).effects[0].hours); } });
-  assert.deepStrictEqual(seen, ['queued', 2, 1]);
+  const e = P.run(l, 'navigate', { walk: (name, vars, sub, entry, stop) => { seen.push(stop); for (const mi of [3, 1.5]) seen.push(sub(name, { mi, mph: 3, to: 'x', traverse: 'easy', speed: 1 }).effects[0].hours); } });
+  assert.deepStrictEqual(seen, ['queued', 1, 0.5]);
   assert.deepStrictEqual(e.warnings, []);
   assert.deepStrictEqual(P.rollsOf(l, 'navigate'), []);
+});
+
+test('e9 movement: move times a hex by the party speed (e9-core movement.md)', () => {
+  const l = P.load('e9', [E9], null);
+  const hours = w => P.run(l, { id: 'm', run: { call: 'move', with: w } }, { rng: () => 0.5 }).effects.find(e => e.effect === 'clock').hours;
+  const hex = { mi: 3, mph: 3, to: 'x' };
+  assert.strictEqual(hours({ ...hex, traverse: 'automatic', speed: 1 }), 1);    // a league an hour
+  assert.strictEqual(hours({ ...hex, traverse: 'automatic', speed: 2 }), 0.5);  // forced march
+  assert.strictEqual(hours({ ...hex, traverse: 'easy', speed: 0.5 }), 2);       // sneaking
+  assert.strictEqual(hours({ ...hex, traverse: 'hard', speed: 0.5 }), 2);       // hard ground forces Climb/Swim/Maneuver
+  const e = P.run(l, { id: 'm', run: { call: 'move', with: { ...hex, speed: 1 } } }, { rng: () => 0.5 });
+  assert.deepStrictEqual(e.rolls, []);  // roll-free, so the Atlas can dry-run it
 });
