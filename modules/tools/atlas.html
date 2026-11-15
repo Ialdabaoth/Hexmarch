@@ -38,7 +38,8 @@ footer{display:flex;justify-content:space-between;gap:12px;padding:4px 16px;font
 #route,#party{position:absolute;left:10px;top:10px;z-index:2;max-width:calc(100% - 20px);background:#fffaf0ee;border:1px solid #b8ab8c;border-radius:6px;padding:6px 10px;font-size:13px;box-shadow:0 2px 8px #0002}
 #route[hidden],#party[hidden]{display:none}#route b,#party b{color:var(--red)}#route small,#party small{color:var(--dim)}#route button,#party button{font-size:12px;padding:0 8px;margin:4px 6px 0 0}
 #party{top:auto;bottom:10px}#party a{color:var(--red)}
-#party{max-height:calc(100% - 20px);overflow:auto}#party p.ev{margin:4px 0;max-width:420px}#party .warn{color:#8a5a00}#party details.evrep{display:inline}#party details.evrep summary{cursor:pointer;color:#8a5a00;display:inline}#party ol.evq{margin:4px 0;padding-left:20px}
+#party{max-height:calc(100% - 20px);overflow:auto}
+#hexmenu{position:absolute;z-index:3;background:#fffaf0f4;border:1px solid #b8ab8c;border-radius:6px;padding:4px;font-size:13px;box-shadow:0 2px 8px #0003;max-width:280px}#hexmenu[hidden]{display:none}#hexmenu button{display:block;width:100%;text-align:left;margin:2px 0;padding:3px 8px;font-size:13px}#hexmenu button.def{border-color:var(--red)}#hexmenu small{display:block;color:var(--dim)}#hexmenu .star{float:right;color:var(--dim);cursor:pointer;padding-left:6px}#hexmenu .star.on{color:var(--red)}#party p.ev{margin:4px 0;max-width:420px}#party .warn{color:#8a5a00}#party details.evrep{display:inline}#party details.evrep summary{cursor:pointer;color:#8a5a00;display:inline}#party ol.evq{margin:4px 0;padding-left:20px}
 #party button.on{border-color:var(--red);color:var(--red)}#party hr{border:0;border-top:1px solid #d8cfb8;margin:6px 0}.fd{color:#2e6b34!important;font-weight:bold}
 #routebtn.on,#partybtn.on{border-color:var(--red);color:var(--red)}
 footer a{color:var(--red)}
@@ -50,7 +51,7 @@ footer a{color:var(--red)}
 <label class="gr">Outline colour <input type="color" id="gridc" value="#ffffff"></label>
 <label class="gr">Opacity <input type="range" id="grida" min="10" max="100" value="80"></label></div></div>
 <button id="out" title="Zoom out">−</button><button id="in" title="Zoom in">+</button><button id="fit">Fit</button><button id="routebtn" title="Plot a route and estimate the travel time">Route</button><button id="partybtn" title="Show, place or move the party">Party</button><button id="keybtn">Key</button><button id="modbtn" title="Load a different module">Modules</button></div></header>
-<div id="main"><div id="map"><canvas id="cv"></canvas><div id="route" hidden aria-live="polite"></div><div id="party" hidden aria-live="polite"></div></div><aside id="key"></aside></div>
+<div id="main"><div id="map"><canvas id="cv"></canvas><div id="route" hidden aria-live="polite"></div><div id="party" hidden aria-live="polite"></div><div id="hexmenu" hidden role="menu"></div></div><aside id="key"></aside></div>
 <footer><span id="hover">Click a hex to zoom in.</span><span><span id="support"></span>{{APP}} Atlas {{ATLAS}}<span id="modver"></span> · <a href="#" id="creditbtn">Credits</a></span></footer>
 <dialog id="modules"><h2>Load a module</h2><ul id="modlist"></ul><button id="modfile" title="A map file made by atlas_flat.py, such as a private module's. It stays in this browser and is never uploaded">Open a map file…</button> <button id="modclose">Close</button></dialog>
 <dialog id="credits"><h2>Credits</h2><ul id="creditlist"></ul><button id="creditclose">Close</button></dialog>
@@ -469,11 +470,11 @@ function routeBox() {
   let h = `<b>Route</b> · ${STOPS.length} stop${STOPS.length === 1 ? '' : 's'} · ${r.mi.toFixed(r.mi < 10 ? 1 : 0)} mi`;
   if (STOPS.length > 1) h += r.blocked ? ` · <b>crosses ${esc(TYPES.find(t => t.id === r.blocked).name.toLowerCase())}</b>: no way on foot`
     : ` · ${hm(r.hours)}${r.days >= .5 ? ` · ${r.days.toFixed(1)} days of ${P.hours_per_day || 8} h` : ''}`;
-  h += `<br><small>Terrain read from ${unit}${unknown > .05 ? `; ${unknown.toFixed(1)} mi unmapped, at normal pace` : ''}${onRoad > .05 ? `; ${onRoad.toFixed(onRoad < 10 ? 1 : 0)} mi on roads` : ''}.</small><br>${STOPS.length > 1 && !r.blocked && !LOCK ? `<button data-r="move" title="Put the party at the last stop and add the travel time">Move party here</button>` : ''}<button data-r="undo">Undo</button><button data-r="clear">Clear</button><button data-r="done">Done</button>`;
+  h += `<br><small>Terrain read from ${unit}${unknown > .05 ? `; ${unknown.toFixed(1)} mi unmapped, at normal pace` : ''}${onRoad > .05 ? `; ${onRoad.toFixed(onRoad < 10 ? 1 : 0)} mi on roads` : ''}.</small><br>${STOPS.length > 1 && !r.blocked && !LOCK ? `<button data-r="move" title="${procLib() && procLib().procs.navigate ? 'Navigate along this route, hex by hex' : 'Put the party at the last stop and add the travel time'}">${procLib() && procLib().procs.navigate ? 'Navigate' : 'Move party here'}</button>` : ''}<button data-r="undo">Undo</button><button data-r="clear">Clear</button><button data-r="done">Done</button>`;
   box.innerHTML = h;
 }
 document.getElementById('route').addEventListener('click', e => { const b = e.target.closest('button[data-r]'); if (!b) return;
-  if (b.dataset.r === 'move') { moveParty(); return; }
+  if (b.dataset.r === 'move') { const l = procLib(); if (l && l.procs.navigate && PARTY && AP()) { const pts = STOPS.slice(); pts[0] = ft(...PARTY.hex); runOffer('navigate', pts, LV[V.lvl].draw).then(() => { STOPS = [ft(...PARTY.hex)]; routeBox(); redraw(); }); } else moveParty(); return; }
   if (b.dataset.r === 'undo') STOPS.pop(); else if (b.dataset.r === 'clear') STOPS = []; else setRoute(false); routeBox(); redraw(); });
 function setRoute(on) { ROUTE = on; document.getElementById('routebtn').classList.toggle('on', on); if (on && !STOPS.length && PARTY) STOPS.push(ft(...PARTY.hex)); hoverHint(); routeBox(); redraw(); }  // a route starts where the party stands
 const hoverHint = () => { document.getElementById('hover').textContent = PLACE ? 'Party: click a hex to put the party there.' : ROUTE ? 'Route: click a hex to add a stop.' : 'Click a hex to zoom in.'; };
@@ -974,7 +975,7 @@ function entryHtml(e, ap) {
 function eventsLine() {  // the referee's events for the party shown: manual triggers, the queue, and the latest of the log
   const ap = AP(), l = procLib(); if (LOCK || !ap || !l) return '';
   const man = l.triggers.filter(t => t.on === 'manual'), q = queueOf(), log = ap.log || [];
-  let h = '<hr><b>Events</b>';
+  let h = '<hr><b>Events</b>' + (NAV && PARTY ? ` <button data-ev="continue" title="${esc(offerPreview(NAV.proc, NAV.pts, NAV.N))}">Continue</button><button data-ev="stopnav" title="Stay here">Stay</button>` : '');
   if (l.report.length) h += ` <details class="evrep"><summary title="Names the module uses that the ${esc(l.ruleset)} rules don’t provide">⚠ ${l.report.length}</summary><small>${l.report.map(esc).join('<br>')}</small></details>`;
   h += '<br>' + (man.length ? man.map(t => `<button data-ev="queue" data-id="${esc(t.id)}" title="Add to the queue for ${esc(ap.name)}">${esc(t.label || t.id)}</button>`).join('') : '<small>This module has no manual events yet.</small>');
   if (q.length) h += '<ol class="evq">' + q.map((t, i) => `<li>${esc(t.label || t.id)} <button data-ev="run" data-i="${i}">Run</button><button data-ev="skip" data-i="${i}">Skip</button>${i ? `<button data-ev="up" data-i="${i}" title="Run this one sooner">↑</button>` : ''}</li>`).join('') + '</ol>';
@@ -983,8 +984,106 @@ function eventsLine() {  // the referee's events for the party shown: manual tri
 }
 document.getElementById('party').addEventListener('click', e => { const b = e.target.closest('button[data-ev]'); if (!b || LOCK || !AP()) return; const a = b.dataset.ev, q = queueOf(), i = +b.dataset.i;
   if (a === 'queue') { const t = (procLib() || { triggers: [] }).triggers.find(x => x.id === b.dataset.id); if (t) q.push(t); }
-  else if (a === 'run') { runQueued(i); return; } else if (a === 'skip') q.splice(i, 1); else if (a === 'up' && i > 0) q.splice(i - 1, 0, ...q.splice(i, 1));
+  else if (a === 'run') { runQueued(i); return; }
+  else if (a === 'continue' && NAV) { const n = NAV; NAV = null; runOffer(n.proc, [ft(...PARTY.hex), ...n.pts.slice(1)], n.N); return; } else if (a === 'stopnav') NAV = null; else if (a === 'skip') q.splice(i, 1); else if (a === 'up' && i > 0) q.splice(i - 1, 0, ...q.splice(i, 1));
   partyBox(); });
+// Navigate (Heph 2026-11-15): with the party shown, a click on another hex offers the procedures that offer themselves there
+// ("offer": "hex"), the default first; a second click on that hex runs it. A procedure with a `walk` step goes hex by hex along
+// the route (the level shown), running the walked procedure for each and stopping as its `stop` says. The Route tool runs
+// "navigate" along the stops picked by hand.
+let NAV = null, HEXMENU = null;  // NAV: a walk that stopped partway ({pts, proc}), for Continue; HEXMENU: the hex the menu is for
+const LOD_N = () => ({ march: NM, league: NL, field: NF, furlong: NU, '100ft': 1 });
+function routeSteps(pts, N) {  // the level-N hexes along a line of points, after the first: [{i, j, mi, road, terrain, leg}]
+  const out = []; let cur = hexAt(...pts[0], N).join(','), lead = 0;
+  for (let k = 1; k < pts.length; k++) { const [ax, ay] = pts[k - 1], [bx, by] = pts[k], d = Math.hypot(bx - ax, by - ay), n = Math.max(1, Math.ceil(d / (N * 25)));
+    for (let q = 0; q < n; q++) { const f = (q + .5) / n, px = ax + (bx - ax) * f, py = ay + (by - ay) * f, h = hexAt(px, py, N), key = h.join(','), mi = d / n / MILE;
+      if (key !== cur) { cur = key; const t = T(h[0], h[1], N); out.push({ i: h[0], j: h[1], mi: out.length ? 0 : lead, road: undefined, terrain: t ? TYPES[t - 1].id : null, leg: k }); }
+      if (!out.length) { lead += mi; continue; }
+      const o = out[out.length - 1]; o.mi += mi; const rd = roadAt(px, py, Math.max(150, N * 35)); if (rd) o.road = rd['class']; } }
+  return out;
+}
+function terrainAt(x, y, N) { const t = T(...hexAt(x, y, N), N); return t ? TYPES[t - 1].id : null; }
+function firedBetween(a, b, lib) {  // the terrain triggers crossing from point a to point b fires (EVENTS_FORMAT.md section 4)
+  const out = [];
+  for (const t of lib.triggers) { if (t.on !== 'terrain' || !t.terrain) continue;
+    const N = LOD_N()[t.lod || 'league'] || NL, was = terrainAt(...a, N), now = terrainAt(...b, N), moved = hexAt(...a, N).join() !== hexAt(...b, N).join();
+    if (!moved) continue;
+    const enter = now === t.terrain && (t.mode === 'each' || was !== t.terrain), leave = was === t.terrain && now !== t.terrain;
+    if ((t.edge || 'enter') === 'enter' ? enter : leave) out.push(t); }
+  return out;
+}
+function walker(pts, N, out) {  // the map side of a `walk` step: fills out {hours, at, path, queued, stopped, rest}
+  const RD = (D.travel || {}).roads || {}, mph = ((D.travel || {}).pace || {}).mi_per_hour || 3;
+  return (name, vars, sub, entry, stop) => {
+    const steps = routeSteps(pts, N), lib = procLib(); let prev = pts[0];
+    Object.assign(out, { hours: 0, at: null, path: [pts[0]], queued: [], stopped: false, rest: null, hexes: 0, total: steps.length });
+    for (let k = 0; k < steps.length; k++) { const st = steps[k], c = hexFt(st.i, st.j, N), ty = TYPES.find(x => x.id === st.terrain);
+      const pace = st.road && RD[st.road] !== undefined ? RD[st.road] : ty && ty.travel !== undefined ? ty.travel : travelOf(st.terrain || 'unknown', st.road);
+      if (pace === null) { entry.warnings.push(`no way on foot into ${ty ? ty.name.toLowerCase() : 'that hex'}`); out.stopped = true; out.rest = null; break; }
+      const to = addr(...(N === 1 ? [st.i, st.j] : centre(st.i, st.j, N))).slice(1);
+      const e = sub(name, { from: out.at ? addr(...out.at).slice(1) : '', to, terrain: st.terrain || 'unknown', road: st.road || '', mi: +st.mi.toFixed(3), mph, pace: pace ?? 1, party: vars.party });
+      entry.rolls.push(...e.rolls); entry.text.push(...e.text); entry.players.push(...e.players); entry.warnings.push(...e.warnings);
+      let halt = false;
+      for (const f of e.effects) { if (f.effect === 'clock') out.hours += typeof f.hours === 'number' ? f.hours : 0; else if (f.effect === 'halt') halt = true; else if (!['move', 'reveal', 'explore'].includes(f.effect)) entry.effects.push(f); }
+      out.at = N === 1 ? [st.i, st.j] : centre(st.i, st.j, N); out.path.push(c); out.hexes++;
+      const fired = lib ? firedBetween(prev, c, lib) : []; prev = c;
+      for (const t of fired) out.queued.push(Object.assign({}, t, { at: to }));
+      if (halt || (stop !== 'never' && fired.length)) { if (k < steps.length - 1) { out.stopped = true; out.rest = [c, ...pts.slice(st.leg)]; } break; }
+    }
+  };
+}
+// a dry run for the menu: the time, how far it gets, what it would queue, and the rolls it makes, without rolling for real
+function offerPreview(name, pts, N) {
+  const l = procLib(); if (!l) return '';
+  const out = {}; HexmarchProcedures.run(l, name, { rng: () => .5, walk: walker(pts, N, out), vars: { party: (AP() || {}).name || '' } });
+  const rolls = [...new Set(HexmarchProcedures.rollsOf(l, name))];
+  if (out.hexes === undefined) return rolls.length ? 'rolls: ' + rolls.join(', ') : '';
+  const what = [...new Set(out.queued.map(t => t.label || t.id))].join(', '), n = x => `${x} hex${x === 1 ? '' : 'es'}`;
+  return (out.stopped ? `${n(out.total)} · stops after ${out.hexes} (${hm(out.hours)})${what ? ' for ' + what : ''}` : `${n(out.hexes)} · ${hm(out.hours)}${what ? ' · then ' + what : ''}`)
+    + (rolls.length ? ' · rolls: ' + rolls.join(', ') : '');
+}
+async function runOffer(name, pts, N) {
+  const ap = AP(), l = procLib(); if (!ap || !l || !PARTY) return;
+  const out = {}, e = HexmarchProcedures.run(l, name, { walk: walker(pts, N, out), vars: { party: ap.name }, roles: { party: ap.name } });
+  e.at = ap.clock.hours;
+  if (out.hexes !== undefined) {
+    const lbl = { [NL]: 'League', [NF]: 'Field', [NU]: 'Furlong', 1: '100-ft' }[N] || '';
+    e.text.unshift(`${ap.name} travels ${out.hexes} ${lbl} hex${out.hexes === 1 ? '' : 'es'} (${hm(out.hours)})${out.stopped ? (out.queued.length ? ', and stops: ' + [...new Set(out.queued.map(t => t.label || t.id))].join(', ') : ', and stops short') : ''}.`);
+    if (out.hours) e.effects.push({ effect: 'clock', hours: +out.hours.toFixed(3), applied: true });
+    NAV = out.rest ? { pts: out.rest, proc: name, N } : null;
+    if (out.at) await setParty(out.at, PARTY.hours + out.hours, false, out.path);
+    for (const t of out.queued) queueOf().push(t);
+  }
+  CS = { ...CS, revision: CS.revision + 1, updated: new Date().toISOString(), parties: CS.parties.map(p => p.id !== ap.id ? p : { ...p, log: [...(p.log || []), e] }) };
+  await saveState();
+  if (parent !== window) parent.postMessage({ type: 'hexmarch-atlas', event: 'log', module: MOD.id, party: ap.id, entry: e, hours: 0 }, '*');
+  PBOX = true; partyBox(); redraw();
+}
+function hexDefault(l) {  // the procedure a second click runs: the campaign's choice (defaults.hex), else the ruleset's
+  const os = HexmarchProcedures.offers(l, 'hex'), want = CS && CS.defaults && CS.defaults.hex;
+  return (os.find(o => o.name === want) || os.find(o => o.default) || os[0] || {}).name || '';
+}
+function hexMenuFor(x, y) {  // true when the click was taken by the menu (or ran its default)
+  const l = procLib(); if (LOCK || !PBOX || !PARTY || !AP() || !l) return false;
+  const os = HexmarchProcedures.offers(l, 'hex'); if (!os.length) return false;
+  const N = LV[V.lvl].draw, [i, j] = hexAt(x, y, N), at = hexAt(...ft(...PARTY.hex), N);
+  if (i === at[0] && j === at[1]) return false;  // the party's own hex zooms as ever
+  const pts = [ft(...PARTY.hex), hexFt(i, j, N)], def = hexDefault(l);
+  if (HEXMENU && HEXMENU.i === i && HEXMENU.j === j && HEXMENU.N === N) { closeHexMenu(); if (def) runOffer(def, pts, N); return true; }
+  HEXMENU = { i, j, N, pts };
+  const m = document.getElementById('hexmenu'), [sx, sy] = S(...pts[1]);
+  m.innerHTML = os.sort((a, b) => (b.name === def) - (a.name === def)).map(o => `<button data-hm="${esc(o.name)}" class="${o.name === def ? 'def' : ''}" title="${esc(o.about)}">${esc(o.label)}<span class="star${o.name === def ? ' on' : ''}" data-def="${esc(o.name)}" title="${o.name === def ? 'What a second click on a hex does' : 'Make this what a second click on a hex does'}">★</span><small>${esc(offerPreview(o.name, pts, N))}</small></button>`).join('')
+    + '<button data-hm="">Zoom in<small>As a click does without the party shown</small></button>';
+  m.hidden = false; m.style.left = Math.min(Math.max(4, sx + 12), W - 290) + 'px'; m.style.top = Math.min(Math.max(4, sy - 10), H - m.offsetHeight - 4) + 'px';
+  return true;
+}
+function closeHexMenu() { HEXMENU = null; document.getElementById('hexmenu').hidden = true; }
+document.getElementById('hexmenu').addEventListener('click', async e => {
+  const st = e.target.closest('[data-def]');
+  if (st) { e.stopPropagation(); if (!CS) return; CS = { ...CS, defaults: { ...(CS.defaults || {}), hex: st.dataset.def }, revision: CS.revision + 1 }; await saveState(); const h = HEXMENU; HEXMENU = null; if (h) hexMenuFor(...h.pts[1]); return; }
+  const b = e.target.closest('button[data-hm]'); if (!b || !HEXMENU) return; const h = HEXMENU; closeHexMenu();
+  if (b.dataset.hm) runOffer(b.dataset.hm, h.pts, h.N); else goDown(...h.pts[1]);
+});
 function partiesLine() {  // the referee's party switcher and creator
   if (LOCK) return '';
   const ps = CS ? CS.parties : [];
@@ -1252,7 +1351,7 @@ let drag = null;
 cv.addEventListener('pointerdown', e => { drag = { x: e.clientX, y: e.clientY, cx: cam.x, cy: cam.y, moved: false }; cv.setPointerCapture(e.pointerId); });
 cv.addEventListener('pointermove', e => {
   const b = cv.getBoundingClientRect(), [x, y] = F(e.clientX - b.left, e.clientY - b.top);
-  if (drag) { const dx = e.clientX - drag.x, dy = e.clientY - drag.y; if (Math.hypot(dx, dy) > 5) drag.moved = true;
+  if (drag) { const dx = e.clientX - drag.x, dy = e.clientY - drag.y; if (Math.hypot(dx, dy) > 5) { drag.moved = true; if (HEXMENU) closeHexMenu(); }
     if (drag.moved) { cam.x = drag.cx - dx / cam.s; cam.y = drag.cy - dy / cam.s; redraw(); } return; }
   const N = LV[V.lvl].draw, [i, j] = hexAt(x, y, N), t = T(i, j, N), [C, R] = N === 1 ? [i, j] : centre(i, j, N);
   const mp = mapPoiAt(x, y);
@@ -1260,10 +1359,10 @@ cv.addEventListener('pointermove', e => {
 });
 cv.addEventListener('pointerup', e => {
   if (!drag) return; const moved = drag.moved; drag = null; if (moved) return;
-  const b = cv.getBoundingClientRect(), at = F(e.clientX - b.left, e.clientY - b.top); if (BRUSH) brushAt(...at); else if (PLACE) placeParty(...at); else if (ROUTE) addStop(...at); else goDown(...at);
+  const b = cv.getBoundingClientRect(), at = F(e.clientX - b.left, e.clientY - b.top); if (BRUSH) brushAt(...at); else if (PLACE) placeParty(...at); else if (ROUTE) addStop(...at); else if (!hexMenuFor(...at)) { closeHexMenu(); goDown(...at); }
 });
 cv.addEventListener('wheel', e => { e.preventDefault(); zoom(e.deltaY < 0 ? 1.25 : .8, e); }, { passive: false });
-function zoom(f, e) {
+function zoom(f, e) { if (HEXMENU) closeHexMenu();
   const b = cv.getBoundingClientRect(), px = e ? e.clientX - b.left : W / 2, py = e ? e.clientY - b.top : H / 2, [x, y] = F(px, py);
   cam.s *= f; clampCam(); cam.x = x - (px - W / 2) / cam.s; cam.y = y - (py - H / 2) / cam.s; clampCam(); redraw();
 }

@@ -60,7 +60,16 @@
       return v === undefined ? all : isObj(v) ? String(v.name ?? v.total ?? all) : String(v);
     });
   }
-  const value = (x, vars) => typeof x === 'string' ? fill(x, vars) : x;
+  // a template, then plain arithmetic if that is what it became ("{mi} * {pace} / 3" -> 1.5): numbers, + - * / and brackets only
+  function arith(t) {
+    const tok = t.match(/\d+(?:\.\d+)?|[-+*/()]/g); if (!tok || tok.join('') !== t.replace(/\s+/g, '')) return null;
+    let i = 0;
+    const atom = () => { const x = tok[i++]; if (x === '(') { const v = sum(); if (tok[i++] !== ')') throw 0; return v; } if (x === '-') return -atom(); if (x === undefined || isNaN(+x)) throw 0; return +x; };
+    const prod = () => { let v = atom(); while (tok[i] === '*' || tok[i] === '/') { const o = tok[i++], w = atom(); v = o === '*' ? v * w : v / w; } return v; };
+    const sum = () => { let v = prod(); while (tok[i] === '+' || tok[i] === '-') { const o = tok[i++], w = prod(); v = o === '+' ? v + w : v - w; } return v; };
+    try { const v = sum(); return i === tok.length && isFinite(v) ? v : null; } catch (e) { return null; }
+  }
+  const value = (x, vars) => { if (typeof x !== 'string') return x; const f = fill(x, vars); if (/^-?\d+(\.\d+)?$/.test(f)) return +f; const a = /[-+*/]/.test(f) ? arith(f) : null; return a === null ? f : a; };
 
   // the arguments a call passes: fiction only. A macro name becomes {name, meaning} so templates read either.
   function args(lib, w, vars) {
@@ -93,7 +102,13 @@
     let result;
     for (const s of list) {
       if (!isObj(s)) continue;
-      if ('result' in s) { result = answer(s.result, vars); continue; }
+      if ('result' in s) { result = answerOf(s.result, vars); continue; }
+      if (s.walk) {  // once per hex of the route, by the app that knows the map (ctx.walk). "stop": "queued" (the default) stops at the first hex where
+        // something joins the queue, "never" goes on to the end; a `halt` effect in the walked procedure stops it there either way
+        if (!ctx.walk) { entry.warnings.push(`"${s.walk}" needs a map to walk`); continue; }
+        ctx.walk(s.walk, vars, (name, w) => { const e = newEntry(name); const r = call(lib, name, w, Object.assign({}, ctx, { vars: {} }), e, depth + 1); return Object.assign(e, { result: r }); }, entry, s.stop === 'never' ? 'never' : 'queued');
+        say(s, vars, entry); continue;
+      }
       if (s.role) { vars.who = vars[s.role] || (ctx.roles && ctx.roles[s.role]) || s.role; say(s, vars, entry); continue; }
       if (s.roll) {
         const d = dice(value(s.roll, vars), ctx.rng);
@@ -135,6 +150,7 @@
     if (r.by) { const k = vars[r.by]; return r.of && k != null && k in r.of ? r.of[k] : r.else; }
     return r;
   }
+  function answerOf(r, vars) { return typeof r === 'string' ? value(r, vars) : answer(r, vars); }
 
   // a d20 or d6 table (MODULE_FORMAT.md section 6); a big one is a d6 choosing among d20 sub-tables
   function table(lib, id, vars, ctx, entry, depth) {
@@ -171,6 +187,22 @@
     return e;
   }
 
-  const api = { load, ask, run, dice, fill, DEPTH };
+  // what a procedure will roll, without rolling: each roll step's label (or its dice), through the calls it makes and the tables it uses
+  function rollsOf(lib, name, depth = 0, seen = new Set()) {
+    const f = find(lib, name); if (!f || depth > DEPTH || seen.has(f.name)) return []; seen.add(f.name);
+    const out = [], walk = list => { for (const s of list || []) { if (!isObj(s)) continue;
+      if (s.roll) out.push(s.label || (dice(s.roll, () => 0) ? s.roll : s.roll + ' roll'));
+      if (s.table) out.push((lib.tables[s.table] || {}).title || s.table);
+      if (s.call) out.push(...rollsOf(lib, s.call, depth + 1, seen));
+      if (s.walk) out.push(...rollsOf(lib, s.walk, depth + 1, seen));
+      walk(s.pass); walk(s.fail); for (const x of s.ranges || []) walk(x.steps); } };
+    walk(f.p.steps); return out;
+  }
+  // what a procedure offers where (section 7, "Offers"): [{name, label, about, default}] for a context such as "hex"
+  function offers(lib, where) {
+    return Object.entries(lib.procs).filter(([, p]) => p && p.offer === where).map(([name, p]) => ({ name, label: p.label || name, about: p.about || '', default: p.default === true }));
+  }
+
+  const api = { load, ask, run, dice, fill, value, rollsOf, offers, DEPTH };
   if (typeof module === 'object' && module.exports) module.exports = api; else root.HexmarchProcedures = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

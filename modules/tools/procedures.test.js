@@ -38,3 +38,16 @@ test('the load report lists missing names and macros', () => {
   assert.ok(l.report.some(w => /"ambush" is not a procedure of mm/.test(w)));
   assert.ok(l.report.some(w => /macro threat: "deadly"/.test(w)));
 });
+
+test('arithmetic in templates, walk, offers and previews', () => {
+  const l = P.load('e9', [E9], null);
+  assert.strictEqual(P.value('{mi} * {pace} / {mph}', { mi: 3, pace: 2, mph: 3 }), 2);
+  assert.strictEqual(P.value('(1 + 2) * 3', {}), 9);
+  assert.strictEqual(P.value('bog', {}), 'bog');
+  assert.deepStrictEqual(P.offers(l, 'hex').map(o => o.name), ['navigate']);
+  const seen = [];
+  const e = P.run(l, 'navigate', { walk: (name, vars, sub, entry, stop) => { seen.push(stop); for (const mi of [3, 1.5]) seen.push(sub(name, { mi, pace: 2, mph: 3, to: 'x' }).effects[0].hours); } });
+  assert.deepStrictEqual(seen, ['queued', 2, 1]);
+  assert.deepStrictEqual(e.warnings, []);
+  assert.deepStrictEqual(P.rollsOf(l, 'navigate'), []);
+});
