@@ -12,6 +12,34 @@
       { "from": 9, "threshold": 2 }
     ]
   },
+  "time": { "round": 0.1, "turn": 10, "hour": 60, "shift": 240 },
+  "movement": {
+    "_comment": "Heph 2026-11-15. One speed for every scale: 1x is 5 paces a round = 5 furlongs a turn = 3 miles an hour (5-ft pace, 500-ft furlong, 5000-ft mile). A mode multiplies it. Procedures read this block; see movement.md.",
+    "base": { "paces_per_round": 5, "pace_ft": 5, "furlong_ft": 500, "mph": 3 },
+    "scales": {
+      "encounter": { "step": "round", "unit": "pace" },
+      "exploration": { "step": "turn", "unit": "furlong" },
+      "narration": { "step": "any", "unit": "any" }
+    },
+    "default": { "speed": 1, "roll": null },
+    "modes": [
+      { "id": "watch", "name": "On Watch", "talent": "alertness", "speed": 1 },
+      { "id": "navigate", "name": "Navigate", "talent": "survival", "speed": 1 },
+      { "id": "sneak", "name": "Sneak", "talent": "stealth", "speed": 0.5 },
+      { "id": "maneuver", "name": "Climb/Swim/Maneuver", "talent": "agility", "speed": 0.5, "terrain": "difficult" },
+      { "id": "forced-march", "name": "Forced March", "talent": "agility", "speed": 2, "scales": ["exploration", "narration"], "terrain": "open" },
+      { "id": "dash", "name": "Dash", "talent": "agility", "speed": 4, "scales": ["encounter"], "terrain": "open" },
+      { "id": "investigate", "name": "Investigate", "talent": "alertness", "speed": 0.04, "scales": ["exploration"] },
+      { "id": "help", "name": "Help", "speed": 1, "classKind": "expert", "grants": { "target": "ally", "modes": 1 } }
+    ],
+    "modeSlots": { "default": 1, "classKind": "expert", "byLevel": [ { "from": 1, "slots": 2 }, { "from": 5, "slots": 3 }, { "from": 9, "slots": 4 } ] },
+    "combine": "slowest",
+    "party": "slowest",
+    "terrain": {
+      "difficult": "requires maneuver",
+      "open": ["road", "clear"]
+    }
+  },
   "equipment": ["e9", "mm"],
   "originRoll": {
     "start": "origin",
