@@ -1,7 +1,6 @@
 <script lang="ts">
-  import { app } from '../lib/app.svelte';
+  import { app, siteRoot } from '../lib/app.svelte';
   import { isWebhookUrl } from '../lib/discord';
-  import { botAppId, inviteLink as botInviteLink } from '../lib/gateway';
   import { RULESETS, isPickableRules, settingsRules } from '../rules/rules';
   import { DEFAULT_DICE_COLOR, DEFAULT_DICE_INK, showDice } from '../lib/dice3d';
   import { inviteLink, readInvite, invitationLabel, type Role } from '../lib/invitations';
@@ -87,20 +86,6 @@
 
   let url = $state(app.settings.webhookUrl);
   let valid = $derived(!url.trim() || isWebhookUrl(url));
-
-  let bot = $state(app.discordBot);
-  const appId = $derived(botAppId(bot));
-  // The step the last test points back to.
-  const stuck = $derived.by(() => {
-    const st = app.discordStatus;
-    if (st.state === 'no-channel') return 4;
-    if (st.state !== 'failed') return 0;
-    return /token/.test(st.reason) ? 2 : /Intent/.test(st.reason) ? 3 : /no server/.test(st.reason) ? 4 : 0;
-  });
-  async function saveBot() {
-    await app.setDiscordBot(bot);
-    app.notify(bot.trim() ? 'Bot saved' : 'Bot removed');
-  }
 
   async function saveUrl() {
     if (!valid) return;
@@ -217,46 +202,20 @@
     Post every roll to Discord automatically
   </label>
   {#if app.mode === 'referee' && app.campaignWebhook}
-    <details class="bot-setup" open={app.discordStatus.state !== 'listening'}>
-      <summary title="While this app is open, your own Discord bot reads {app.campaign?.campaign.name}'s channel, so a player's join request lands in the Inbox by itself. Setting it up takes about five minutes, once. The token stays on this device.">Referee's bot ⓘ
-        {#if app.discordStatus.state === 'listening'}<span class="small success"> · hears the campaign channel</span>{/if}</summary>
-      <ol class="small steps">
-        <li>
-          <a href="https://discord.com/developers/applications" target="_blank" rel="noopener">Open the Discord Developer Portal</a> and press <strong>New Application</strong>.
-          <span title="Sign in with your usual Discord account. Any name works, say “{app.campaign?.campaign.name} referee”; players see it if the bot ever posts. Tick the terms box and press Create.">ⓘ</span>
-        </li>
-        <li class:stuck={stuck === 2}>
-          In the menu on the left pick <strong>Bot</strong>, press <strong>Reset Token</strong>, then <strong>Copy</strong>, and paste it here.
-          <span title="Discord shows the token only once; if you lose it, reset it again and paste the new one. Anyone holding it can act as your bot, so it stays on this device and is never published.">ⓘ</span>
-          <input id="bot" type="password" bind:value={bot} placeholder="the bot's token" autocapitalize="off" autocomplete="off" aria-label="Bot token" />
-          <div class="row" style="margin-top:0.25rem">
-            <button class="primary" onclick={saveBot} disabled={bot.trim() === app.discordBot || (!!bot.trim() && !appId)}>Save</button>
-            {#if app.discordBot}<button onclick={() => { bot = ''; saveBot(); }}>Remove</button>{/if}
-          </div>
-          {#if bot.trim() && !appId}<p class="failure">That doesn't look like a bot token. Copy it again from the Bot page.</p>{/if}
-        </li>
-        <li class:stuck={stuck === 3}>
-          {#if appId}<a href="https://discord.com/developers/applications/{appId}/bot" target="_blank" rel="noopener">On that same Bot page</a>{:else}On that same Bot page{/if}, scroll to <strong>Message Content Intent</strong>, switch it on and press <strong>Save Changes</strong>.
-          <span title="Without it Discord hands the bot every post with the text and files left out, so it can't see join requests.">ⓘ</span>
-        </li>
-        <li class:stuck={stuck === 4}>
-          {#if appId}<a href={botInviteLink(appId, app.discordGuild)} target="_blank" rel="noopener">Add the bot to your server</a>{:else}Add the bot to your server (the link appears once the token is saved){/if} and press <strong>Authorize</strong>.
-          <span title="The link already names your bot{app.discordGuild ? ' and the server the campaign channel is on' : ''}, and asks only to see channels and read their messages. You need Manage Server there; if you don't have it, send the link to whoever does.">ⓘ</span>
-        </li>
-        <li>
-          <button onclick={() => app.testDiscord()} disabled={!app.discordBot}>Test the bot</button>
-          {#if app.discordStatus.state === 'listening'}
-            <span class="success">Hears the campaign channel{app.discordStatus.server ? ` on ${app.discordStatus.server}` : ''}. You're done.</span>
-          {:else if app.discordStatus.state === 'connecting'}
-            <span class="muted">Connecting to Discord…</span>
-          {:else if app.discordStatus.state === 'no-channel'}
-            <span class="failure">The bot is in a server but can't see the campaign channel. Do step 4 for the campaign's server, or give the bot View Channel on that channel.</span>
-          {:else if app.discordStatus.state === 'failed'}
-            <span class="failure">Not yet: {app.discordStatus.reason}.{stuck ? ` See step ${stuck}.` : ''}</span>
-          {/if}
-        </li>
-      </ol>
-    </details>
+    <!-- The referee's bot is set up in Scribe's Discord steps (Heph 2026-11-15: one Discord setup, in Scribe). -->
+    <p class="small bot-line">
+      {#if app.discordStatus.state === 'listening'}
+        <span class="success">Bot listening{app.discordStatus.server ? ` on ${app.discordStatus.server}` : ''}.</span>
+      {:else if app.discordStatus.state === 'connecting'}
+        <span class="muted">Bot connecting to Discord…</span>
+      {:else if !app.discordBot}
+        <a href={new URL('scribe/', siteRoot()).href} onclick={(e) => { e.preventDefault(); void app.goTo(new URL('scribe/', siteRoot()).href, 'Scribe'); }}>Set up the bot in Scribe › Discord</a>
+      {:else}
+        <span class="failure">Bot not listening{app.discordStatus.state === 'failed' ? `: ${app.discordStatus.reason}` : app.discordStatus.state === 'no-channel' ? ": it can't see the campaign channel" : ''}.</span>
+        <a href={new URL('scribe/', siteRoot()).href} onclick={(e) => { e.preventDefault(); void app.goTo(new URL('scribe/', siteRoot()).href, 'Scribe'); }}>Fix it in Scribe › Discord</a>
+        <button onclick={() => app.testDiscord()}>Try again</button>
+      {/if}
+    </p>
   {/if}
 </section>
 
@@ -305,10 +264,7 @@
 </section>
 
 <style>
-  .bot-setup { margin-top: 0.75rem; }
-  .steps li { margin: 0.4rem 0; }
-  .steps li.stuck { outline: 2px solid var(--bad); outline-offset: 2px; border-radius: 4px; }
-  .steps span[title] { cursor: help; }
+  .bot-line { margin-top: 0.75rem; display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
   .link { background: none; border: 0; padding: 0; min-height: 0; color: var(--accent); text-decoration: underline; font: inherit; }
   .dice-color { margin-top: 0.75rem; }
   .dice-color label { display: flex; align-items: center; gap: 0.35rem; margin: 0; }

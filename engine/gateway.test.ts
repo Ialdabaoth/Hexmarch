@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { Gateway, botAppId, inviteLink, mailAttachments, webhookInfo, type DiscordPost, type GatewayStatus } from './gateway';
+import { Gateway, botAppId, botTokens, inviteLink, mailAttachments, testBot, webhookInfo, withBotToken, type DiscordPost, type GatewayStatus } from './gateway';
 
 function fakeSocket() {
   const sent: any[] = [];
@@ -91,5 +91,41 @@ describe('setting up the bot', () => {
     expect(botAppId('nonsense')).toBe('');
     const u = new URL(inviteLink('123456789012345678', '999888777666555444'));
     expect(Object.fromEntries(u.searchParams)).toEqual({ client_id: '123456789012345678', scope: 'bot', permissions: '66560', guild_id: '999888777666555444', disable_guild_select: 'true' });
+  });
+});
+
+describe('Bot tokens on this device', () => {
+  it('keeps one token per campaign and drops a removed one', () => {
+    const a = withBotToken(undefined, 'kells', ' t1 ');
+    expect(a).toEqual({ kells: 't1' });
+    const b = withBotToken({ ...a, odd: 5 }, 'hansa', 't2');
+    expect(b).toEqual({ kells: 't1', hansa: 't2' });
+    expect(withBotToken(b, 'kells', '')).toEqual({ hansa: 't2' });
+    expect(botTokens('nope')).toEqual({});
+  });
+});
+
+describe('Test the bot', () => {
+  it('answers listening when the channel is seen, and hangs up', async () => {
+    const ws = fakeSocket();
+    const p = testBot('tok', '222', 15_000, () => ws);
+    ws.recv({ op: 10, d: { heartbeat_interval: 40_000 } });
+    ws.recv({ op: 0, t: 'READY', s: 1, d: { guilds: [{ id: 'g' }] } });
+    ws.recv({ op: 0, t: 'GUILD_CREATE', s: 2, d: { name: 'Kells', channels: [{ id: '222' }] } });
+    expect(await p).toEqual({ state: 'listening', server: 'Kells' });
+    expect(ws.close).toHaveBeenCalled();
+  });
+  it('says what is missing: a refused intent, or a channel it cannot see when time runs out', async () => {
+    vi.useFakeTimers();
+    const ws = fakeSocket();
+    const p = testBot('tok', '222', 15_000, () => ws);
+    ws.onclose?.({ code: 4014 });
+    expect((await p).state).toBe('failed');
+    const ws2 = fakeSocket();
+    const q = testBot('tok', '222', 15_000, () => ws2);
+    ws2.recv({ op: 0, t: 'READY', s: 1, d: { guilds: [{ id: 'g' }] } });
+    ws2.recv({ op: 0, t: 'GUILD_CREATE', s: 2, d: { name: 'Other', channels: [{ id: '9' }] } });
+    vi.advanceTimersByTime(15_000);
+    expect(await q).toEqual({ state: 'no-channel' });
   });
 });

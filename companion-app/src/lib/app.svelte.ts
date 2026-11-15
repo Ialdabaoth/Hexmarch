@@ -19,7 +19,7 @@ import { CORE_RULES } from '../rules/core-modules';
 import { settingsRules } from '../rules/rules';
 import { addMail, answer, joinLine, joinRequest, loadMail, mailFileName, post, readMailFile, saveMail, sendBack, type MailItem } from './mail';
 import { downloadJson } from './storage';
-import { Gateway, mailAttachments, webhookInfo, type DiscordPost, type GatewayStatus } from './gateway';
+import { BOT_TOKENS, Gateway, botTokens, mailAttachments, webhookInfo, type DiscordPost, type GatewayStatus } from '../../../engine/gateway';
 import { inviteDone, keepInvite, pendingInvite, updateForInvite } from './update';
 import { readShared, withoutShared } from './share';
 import { publishParts } from '../../../engine/publish';
@@ -179,6 +179,7 @@ class AppState {
       this.settings = await loadSettings();
       await this.loadEquipment();
       [this.sheets, this.live, this.log] = await Promise.all([loadSheets(), loadLive(), loadLog()]);
+      await this.loadBotTokens();
       this.unreadable = unreadableSheets().length;
     } catch (e) {
       // Private browsing or an embedded preview can block storage; run without saving.
@@ -1151,23 +1152,23 @@ class AppState {
     this.notify('Posted to Discord');
   }
 
-  // Referee mode: the campaign channel read live through the referee's own bot (lib/gateway.ts) while the app is
-  // open. A join request posted there lands in the Inbox as if its file had been opened.
+  // Referee mode: the campaign channel read live through the referee's own bot (engine/gateway.ts) while the app is
+  // open. A join request posted there lands in the Inbox as if its file had been opened. The bot is set up in
+  // Scribe's Discord steps, which keep its token on this device (BOT_TOKENS); this app only reads it.
   discordStatus = $state<GatewayStatus>({ state: 'off' });
-  // The campaign channel's server, from its webhook: the bot's invite link picks it.
-  discordGuild = $state('');
+  private botTokens = $state<Record<string, string>>({});
   private gateway: Gateway | null = null;
   private gatewayKey = '';
   get discordBot(): string {
-    return this.settings.discordBots?.[this.settings.campaign] ?? '';
+    return this.botTokens[this.campaignId] ?? '';
   }
-  async setDiscordBot(token: string) {
-    if (!this.settings.campaign) return;
-    const bots = { ...(this.settings.discordBots ?? {}) };
-    if (token.trim()) bots[this.settings.campaign] = token.trim();
-    else delete bots[this.settings.campaign];
-    await this.updateSettings({ discordBots: bots });
-    await this.listenDiscord();
+  // Read again when this window comes back to the front: Scribe may have saved or changed the bot meanwhile.
+  async loadBotTokens() {
+    try {
+      this.botTokens = botTokens(await idbGet(BOT_TOKENS));
+    } catch {
+      this.botTokens = {};
+    }
   }
   // Starts, swaps or stops the live reader to match the campaign, mode and bot in use; safe to call often.
   async listenDiscord() {
@@ -1183,7 +1184,6 @@ class AppState {
     try {
       const w = await webhookInfo(hook);
       channel = w.channel;
-      this.discordGuild = w.guild;
     } catch (e) {
       if (this.gatewayKey === key) this.discordStatus = { state: 'failed', reason: `couldn't read the campaign's webhook (${e instanceof Error ? e.message : e})` };
       return;
