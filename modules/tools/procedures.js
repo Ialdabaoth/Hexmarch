@@ -23,6 +23,8 @@
     }
     const ev = (mod && mod.events) || {};
     for (const t of Array.isArray(ev.triggers) ? ev.triggers : []) if (isObj(t) && t.id && !t.off) triggers.push(t);
+    // a ruleset's own triggers (its procedures files' "triggers", such as E9's lost check each shift); a module trigger with the same id wins
+    for (const { from, f } of layers) for (const t of Array.isArray(f.triggers) ? f.triggers : []) if (isObj(t) && t.id && !t.off && !triggers.some(x => x.id === t.id)) triggers.push(Object.assign({ from }, t));
     Object.assign(tables, isObj(ev.tables) ? ev.tables : {});
     Object.assign(vocab, isObj(ev.macros) ? ev.macros : {});
     for (const w of (mod && mod.report) || []) report.push(w);
@@ -118,7 +120,7 @@
         const everyone = s.each === '*' || s.each === 'everyone', ms = (Array.isArray(ctx.party) ? ctx.party : []).filter(m => isObj(m) && (everyone || (Array.isArray(m.modes) && m.modes.includes(s.each))));
         const passed = [], failed = [];
         for (const m of ms) {
-          const vs = ease(value(s.vs, vars), everyone ? 0 : +((m.ease || {})[s.each] || 0), s.floor || 'easy');
+          const em = s.ease || (everyone ? '' : s.each), vs = ease(value(s.vs, vars), em ? +((m.ease || {})[em] || 0) : 0, s.floor || 'easy');  // "ease": whose Help counts
           const r = rollOne(lib, s.roll, vs, m.name || m.id, ctx, entry, depth);
           if (r) entry.rolls[entry.rolls.length - 1] = Object.assign(entry.rolls[entry.rolls.length - 1], { who: m.name || m.id, ...(vs !== undefined && vs !== '' ? { vs } : {}), ...(s.secret ? { secret: true } : {}) });
           (r && r.pass === true ? passed : failed).push(m.name || m.id);

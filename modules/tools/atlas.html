@@ -985,10 +985,11 @@ const UNIT_H = { minute: 1 / 60, hour: 1, day: 24, week: 168 };
 async function runQueued(i) {
   const ap = AP(), q = queueOf(), t = q[i], l = procLib(); if (!ap || !t || !l) return;
   q.splice(i, 1);
-  const e = HexmarchProcedures.run(l, t, { party: members(), vars: { party: ap.name }, roles: { party: ap.name } });
+  const e = HexmarchProcedures.run(l, t, { party: members(), vars: { ...(t.vars || {}), party: ap.name }, roles: { party: ap.name } });
   e.at = ap.clock.hours;
   let hours = 0;  // the effects the Atlas applies now: passing time on the party's clock; the rest are listed for the referee
   for (const f of e.effects) if (f.effect === 'clock') { const h = typeof f.hours === 'number' ? f.hours : (+f.n || +f.amount || 0) * (UNIT_H[f.unit] ?? 1); if (h > 0) { hours += h; f.applied = true; } }
+  for (const [ct, n] of hours ? clockFired(l, ap.clock.hours, ap.clock.hours + hours, false) : []) for (let k = 0; k < n; k++) q.push(ct);  // time passed off a walk
   CS = { ...CS, revision: CS.revision + 1, updated: new Date().toISOString(), parties: CS.parties.map(p => p.id !== ap.id ? p : { ...p, clock: { ...p.clock, hours: p.clock.hours + hours }, log: [...(p.log || []), e] }) };
   await saveState(); fromState();
   if (parent !== window) parent.postMessage({ type: 'hexmarch-atlas', event: 'log', module: MOD.id, party: ap.id, entry: e, hours }, '*');
@@ -1023,6 +1024,7 @@ function movementLine() {  // the referee picks each member's movement modes for
   const mv = movementOf(), ap = AP(); if (LOCK || !ap || !mv || !Array.isArray(mv.modes)) return '';
   const ids = partyIds(); if (!ids.length) return '';
   const nameOf = memberName, hg = helpGiven(ap), helpIds = new Set(mv.modes.filter(m => m.grants).map(m => m.id));
+  const forced = Object.values(mv.traverse || {}).map(t => t && t.requires).filter(Boolean);  // a mode the ground can force (E9: maneuver on hard) can be helped too
   const byId = new Map(mv.modes.map(m => [m.id, m])), slots = mv.modeSlots || {}, max = Math.max(slots.default || 1, ...((slots.byLevel || []).map(b => b.slots || 0)));
   const rule = `${slots.default || 1} mode${(slots.default || 1) === 1 ? '' : 's'}${slots.classKind ? `; ${slots.classKind}s ` + (slots.byLevel || []).map(b => `${b.slots} from level ${b.from}`).join(', ') : ''}`;
   let h = `<hr><b title="${esc(rule)}">Movement</b>`;
@@ -1030,7 +1032,7 @@ function movementLine() {  // the referee picks each member's movement modes for
     const got = hg[id] || { modes: 0, ease: {} }, cap = max + got.modes, eased = Object.entries(got.ease).map(([m, n]) => `${(byId.get(m) || { name: m }).name} ${n} step${n === 1 ? '' : 's'} easier`);
     h += `<br>${esc(nameOf(id))}: ${have.length ? have.map(x => esc(byId.get(x).name)).join(', ') : '<small>no mode</small>'}${got.modes || eased.length ? ` <small title="From Help">(${[got.modes && '+' + got.modes + ' mode', ...eased].filter(Boolean).map(esc).join(', ')})</small>` : ''} <button data-mv="${esc(id)}" title="Pick ${esc(nameOf(id))}’s modes (${esc(rule)})">Modes…</button>`;
     if (have.some(x => helpIds.has(x))) { const cur = (ap.help || {})[id] || {}, val = cur.for ? [cur.for, cur.grant, cur.mode || ''].join('|') : '';
-      const opts = ids.filter(o => o !== id).flatMap(o => [[`${o}|modes|`, `${nameOf(o)}: one more mode`], ...(((ap.modes || {})[o] || []).filter(x => byId.has(x)).map(x => [`${o}|easier|${x}`, `${nameOf(o)}: ${byId.get(x).name} easier`]))]);
+      const opts = ids.filter(o => o !== id).flatMap(o => [[`${o}|modes|`, `${nameOf(o)}: one more mode`], ...[...new Set([...((ap.modes || {})[o] || []), ...forced])].filter(x => byId.has(x) && !helpIds.has(x)).map(x => [`${o}|easier|${x}`, `${nameOf(o)}: ${byId.get(x).name} easier`])]);
       h += `<br>&nbsp;&nbsp;<small>helps</small> <select data-help="${esc(id)}" title="Help gives one ally one more mode, or makes one of their modes a step easier (never past easy); helps stack"><option value="">nobody yet</option>${opts.map(([v, t]) => `<option value="${esc(v)}"${v === val ? ' selected' : ''}>${esc(t)}</option>`).join('')}</select>`; }
     if (MODEEDIT === id) h += '<br>' + mv.modes.map(m => `<label title="${esc([m.talent && 'talent: ' + m.talent, m.speed !== undefined && m.speed + '×', m.traverse && 'on ' + m.traverse.join('/') + ' ground', m.scales && m.scales.join('/'), m.classKind && m.classKind + 's only', m.grants && 'helps an ally'].filter(Boolean).join(' · '))}"><input type="checkbox" data-mode="${esc(m.id)}" data-who="${esc(id)}"${have.includes(m.id) ? ' checked' : ''}${!have.includes(m.id) && have.length >= cap ? ' disabled' : ''}> ${esc(m.name)}</label>`).join(' ');
   }
@@ -1120,23 +1122,38 @@ function hexHours(v) { const l = procLib();
 function walker(pts, N, out, dry) {  // the map side of a `walk` step: fills out {hours, mi, at, path, queued, stopped, rest}. dry: a preview,
   // so the step's "then" procedures (the rolls along the way) are left out
   return (name, vars, sub, entry, stop, then) => {
-    const steps = routeSteps(pts, N), lib = procLib(); let prev = pts[0];
+    const steps = routeSteps(pts, N), lib = procLib(), clock0 = ((AP() || {}).clock || {}).hours || 0; let prev = pts[0];
     Object.assign(out, { hours: 0, mi: 0, at: null, path: [pts[0]], queued: [], stopped: false, rest: null, hexes: 0, total: steps.length, blocked: null });
     for (let k = 0; k < steps.length; k++) { const st = steps[k], c = hexFt(st.i, st.j, N), ty = TYPES.find(x => x.id === st.terrain);
       const v = hexVars(st.terrain, st.road, st.mi, ...c, N);
       if (!v) { entry.warnings.push(`no way on into ${ty ? ty.name.toLowerCase() : 'that hex'}`); out.stopped = true; out.blocked = st.terrain || 'unknown'; out.rest = null; break; }
       const to = addr(...(N === 1 ? [st.i, st.j] : centre(st.i, st.j, N))).slice(1);
       const w = { from: out.at ? addr(...out.at).slice(1) : '', to, party: vars.party, ...v };
-      let halt = false;
-      for (const e of [sub(name, w), ...(dry ? [] : (then || []).map(p => sub(p, w)))]) {
-        entry.rolls.push(...e.rolls.map(r => ({ ...r, at: to }))); entry.text.push(...e.text); entry.players.push(...e.players); entry.warnings.push(...e.warnings);
-        for (const f of e.effects) { if (f.effect === 'clock') out.hours += typeof f.hours === 'number' ? f.hours : (+f.n || +f.amount || 0) * (UNIT_H[f.unit] ?? 1); else if (f.effect === 'halt') halt = true; else if (!['move', 'reveal', 'explore'].includes(f.effect)) entry.effects.push(f); } }
+      let halt = false; const h0 = out.hours;
+      const absorb = e => { entry.rolls.push(...e.rolls.map(r => ({ ...r, at: to }))); entry.text.push(...e.text); entry.players.push(...e.players); entry.warnings.push(...e.warnings);
+        for (const f of e.effects) { if (f.effect === 'clock') out.hours += typeof f.hours === 'number' ? f.hours : (+f.n || +f.amount || 0) * (UNIT_H[f.unit] ?? 1); else if (f.effect === 'halt') halt = true; else if (!['move', 'reveal', 'explore'].includes(f.effect)) entry.effects.push(f); } };
+      for (const p of [name, ...(dry ? [] : then || [])]) absorb(sub(p, w));
       out.mi += st.mi; out.at = N === 1 ? [st.i, st.j] : centre(st.i, st.j, N); out.path.push(c); out.hexes++;
       const fired = lib ? firedBetween(prev, c, lib) : []; prev = c;
+      // clock triggers whose boundary this hex's time crosses (each shift, each hour of Forced March): "auto" ones run here like the
+      // `then` procedures (not in a preview), the rest join the queue with the hex's params
+      for (const [t, n] of lib ? clockFired(lib, clock0 + h0, clock0 + out.hours, true) : []) for (let q = 0; q < n; q++)
+        if (t.auto && t.run && t.run.call) { if (!dry) absorb(sub(t.run.call, w)); } else fired.push(Object.assign({}, t, { vars: w }));
       for (const t of fired) out.queued.push(Object.assign({}, t, { at: to }));
       if (halt || (stop !== 'never' && fired.length)) { if (k < steps.length - 1) { out.stopped = true; out.rest = [c, ...pts.slice(st.leg)]; } break; }
     }
   };
+}
+// the clock triggers (EVENTS_FORMAT.md section 4, from the module's events or the ruleset's procedures files) whose boundary the
+// party's clock crosses from a to b hours: [[trigger, times]]. "every": {n, unit}; "while": "walking" fires only on a walk; "if":
+// {"mode": id} only while a member is on that mode. Boundaries count from midnight of the clock's first day (a 4-hour shift: 00, 04, 08...)
+function clockFired(lib, a, b, walking) {
+  const out = [], ms = members();
+  for (const t of lib.triggers) { if (t.on !== 'clock' || !t.every) continue; if (t.while === 'walking' && !walking) continue;
+    if (t.if && t.if.mode && !ms.some(m => m.modes.includes(t.if.mode))) continue;
+    const per = (+t.every.n || 1) * (UNIT_H[t.every.unit] ?? NaN); if (!(per > 0)) continue;
+    const k = Math.floor(b / per + 1e-9) - Math.floor(a / per + 1e-9); if (k > 0) out.push([t, k]); }
+  return out;
 }
 function estimate(pts, N) {  // a route's time and miles, hex by hex as Navigate would walk it, without rolling or stopping for events
   const out = {}, entry = { rolls: [], text: [], players: [], warnings: [], effects: [] };
