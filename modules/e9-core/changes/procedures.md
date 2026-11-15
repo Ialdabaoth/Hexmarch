@@ -1,0 +1,1 @@
+E9's first procedures file, `procedures/e9.json` (EVENTS_FORMAT.md section 7): `travel` and `sight-range`, the questions the Hexmarch Atlas asks. The sight ranges are the Atlas's stand-in numbers until the handbook's are worded in. It also serves e9mm and mm until mm-core has its own.

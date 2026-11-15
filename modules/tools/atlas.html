@@ -38,6 +38,7 @@ footer{display:flex;justify-content:space-between;gap:12px;padding:4px 16px;font
 #route,#party{position:absolute;left:10px;top:10px;z-index:2;max-width:calc(100% - 20px);background:#fffaf0ee;border:1px solid #b8ab8c;border-radius:6px;padding:6px 10px;font-size:13px;box-shadow:0 2px 8px #0002}
 #route[hidden],#party[hidden]{display:none}#route b,#party b{color:var(--red)}#route small,#party small{color:var(--dim)}#route button,#party button{font-size:12px;padding:0 8px;margin:4px 6px 0 0}
 #party{top:auto;bottom:10px}#party a{color:var(--red)}
+#party{max-height:calc(100% - 20px);overflow:auto}#party p.ev{margin:4px 0;max-width:420px}#party .warn{color:#8a5a00}#party details.evrep{display:inline}#party details.evrep summary{cursor:pointer;color:#8a5a00;display:inline}#party ol.evq{margin:4px 0;padding-left:20px}
 #party button.on{border-color:var(--red);color:var(--red)}#party hr{border:0;border-top:1px solid #d8cfb8;margin:6px 0}.fd{color:#2e6b34!important;font-weight:bold}
 #routebtn.on,#partybtn.on{border-color:var(--red);color:var(--red)}
 footer a{color:var(--red)}
@@ -53,7 +54,7 @@ footer a{color:var(--red)}
 <footer><span id="hover">Click a hex to zoom in.</span><span><span id="support"></span>{{APP}} Atlas {{ATLAS}}<span id="modver"></span> · <a href="#" id="creditbtn">Credits</a></span></footer>
 <dialog id="modules"><h2>Load a module</h2><ul id="modlist"></ul><button id="modfile" title="A map file made by atlas_flat.py, such as a private module's. It stays in this browser and is never uploaded">Open a map file…</button> <button id="modclose">Close</button></dialog>
 <dialog id="credits"><h2>Credits</h2><ul id="creditlist"></ul><button id="creditclose">Close</button></dialog>
-<!--CARD-->
+<!--PROCEDURES--><!--CARD-->
 <script>
 // Scribe's answer to a publish request ('published', #m=…) comes back in the fragment; take it out before the map reads the fragment as a place
 let MAIL_IN = /^#m=/.test(location.hash) ? location.hash.slice(3) : ''; if (MAIL_IN) history.replaceState(null, '', location.pathname + location.search);
@@ -513,7 +514,8 @@ function csRead(d) {  // as the Companion reads it (lib/state.ts readState): any
     ...(csDate(t.date) ? { date: t.date } : {}), ...(typeof t.hour === 'number' ? { hour: t.hour } : {}) } : null;  // null (or "place it yourself"): the referee places the party
   const parties = (Array.isArray(d.parties) ? d.parties : []).flatMap(q => q && typeof q === 'object' && typeof q.id === 'string' && /^[a-z0-9-]{1,40}$/.test(q.id) ? [{ ...q, id: q.id, name: str(q.name, q.id), start: start(q.start),
     clock: { start: csDate(q.clock && q.clock.start) ? q.clock.start : '3507-05-01', hours: num(q.clock && q.clock.hours, 8) },
-    session: { number: Math.floor(num(q.session && q.session.number, 0)), open: !!(q.session && q.session.open === true) }, at: marker(q.at) }] : []);
+    session: { number: Math.floor(num(q.session && q.session.number, 0)), open: !!(q.session && q.session.open === true) }, at: marker(q.at),
+    log: Array.isArray(q.log) ? q.log.filter(e => e && typeof e === 'object') : [] }] : []);
   return { ...d, format: 'hexmarch-campaign-state', version: 1, campaign: str(d.campaign, ''), revision: Math.floor(num(d.revision, 0)), updated: str(d.updated, new Date().toISOString()),
     parties, active: parties.some(q => q.id === d.active) ? d.active : parties.length ? parties[0].id : '', revealed, characters: Array.isArray(d.characters) ? d.characters : [] };
 }
@@ -721,18 +723,18 @@ function know() {
 // Moving the party reveals the hexes in sight along the whole route to each character in the party.
 let FOG = null, PREVIEW = false, BRUSH = '';  // BRUSH: '' or the state a click paints: visited, explored, rumour or hide
 const SHOWN = new Map();
-// how far one sees from a hex, in miles. Line of sight is a Procedure (Heph 2026-11-09): the ruleset's or module's procedures.json
-// "sight-range" (with the terrain; later light and height) gives the miles. Until the Atlas runs procedures, this table stands in
-// (Claude's numbers), and a terrain type's own "sight" overrides it
-const SIGHT = { grass: 3, woods: 1.5, forest: .5, hills: 6, mount: 12, bog: 2, sea: 6, lake: 3, clear: 3, 'mixed-woods': 1.5, grassland: 3, mountains: 12, 'barren-mountains': 12,
-  'scrub-desert': 4, 'sandy-desert': 4, 'rocky-desert': 4, marsh: 2, swamp: 1, 'black-sand': 4, 'deep-ocean': 6, ocean: 6, shallows: 6 };
+// how far one sees from a hex, in miles. Line of sight is a Procedure (Heph 2026-11-09): the ruleset's "sight-range" (with the terrain;
+// later light and height) gives the miles, and a terrain type's own "sight" in the module overrides it
+const SIGHTC = new Map();
+function sightOf(ty) { if (!ty) return 3; if (typeof ty.sight === 'number') return ty.sight;
+  if (!SIGHTC.has(ty.id)) { const v = askP('sight-range', { terrain: ty.id }); SIGHTC.set(ty.id, typeof v === 'number' && v >= 0 ? v : 3); } return SIGHTC.get(ty.id); }
 const lkey = (C, R) => nearest(C, R, NL).join(',');  // the painted-level hex that owns a lattice hex
 const lAddr = k => { const [i, j] = k.split(',').map(Number); return addr(...centre(i, j, NL)).slice(1); };
 function partyIds() {  // the shown party's members (characters[].party); a state without characters: the player characters loaded here
   return CS && CS.characters.length ? CS.characters.filter(c => c && c.id && (!PID || c.party === PID || (CS.parties.length < 2 && !c.party))).map(c => c.id) : WHO.filter(w => w.owner !== 'referee').map(w => w.id);
 }
 function sightFrom(x, y, out) {  // the painted-level hexes whose centre lies within sight (plus half a hex) of a point
-  const [li, lj] = hexAt(x, y, NL), t = T(li, lj, NL), ty = TYPES[t - 1], mi = ty ? (ty.sight ?? SIGHT[ty.id] ?? 3) : 3, R = mi * MILE + NL * 50, n = Math.ceil(R / (NL * 100)) + 1;
+  const [li, lj] = hexAt(x, y, NL), t = T(li, lj, NL), ty = TYPES[t - 1], mi = sightOf(ty), R = mi * MILE + NL * 50, n = Math.ceil(R / (NL * 100)) + 1;
   for (let i = li - n; i <= li + n; i++) for (let j = lj - n - 1; j <= lj + n + 1; j++) { const [cx, cy] = hexFt(i, j, NL); if (Math.hypot(cx - x, cy - y) <= R) out.add(i + ',' + j); }
   return out;
 }
@@ -930,6 +932,59 @@ async function setActive(id) {
   CS = { ...CS, active: id }; await saveState(); if (parent !== window) parent.postMessage({ type: 'hexmarch-atlas', event: 'active', module: MOD.id, party: id }, '*');
   PID = id; fromState(); partyBox(); redraw();
 }
+// Procedures (EVENTS_FORMAT.md; Heph 2026-11-15: "Procedures lives primarily in the Atlas"). The rules modules' procedures are built into
+// this page; a module's events and its own procedures come from its events.json (build.py). The referee queues a manual trigger,
+// then runs, skips or reorders the queue; each run is one entry in the shown party's Events log (parties[].log), on that party's clock.
+const RULEPROCS = {{RULEPROCS}};
+let PLIB = null, PEVENTS = null, PRULESET = '';
+const PQUEUE = new Map();  // party id -> its queued triggers; the queue is the referee's, kept on this page only
+function rulesetOf() { return (CS && CS.rules && typeof CS.rules.ruleset === 'string' && CS.rules.ruleset) || 'e9'; }
+function procLib() {
+  const rs = rulesetOf();
+  if (window.HexmarchProcedures && (!PLIB || PRULESET !== rs)) { PRULESET = rs; PLIB = HexmarchProcedures.load(rs, RULEPROCS, PEVENTS); SIGHTC.clear(); TRAVELC.clear(); }
+  return PLIB;
+}
+function askP(name, w) { const l = procLib(); return l ? HexmarchProcedures.ask(l, name, w) : undefined; }
+async function loadEvents() {
+  PEVENTS = null; PLIB = null;
+  if (MOD && !MOD.local && MOD.events) try { PEVENTS = await (await fetch(new URL(MOD.events, MOD.base), { cache: 'no-cache' })).json(); } catch (e) {}
+  PLIB = null; procLib();
+}
+function queueOf() { if (!PQUEUE.has(PID)) PQUEUE.set(PID, []); return PQUEUE.get(PID); }
+const UNIT_H = { minute: 1 / 60, hour: 1, day: 24, week: 168 };
+async function runQueued(i) {
+  const ap = AP(), q = queueOf(), t = q[i], l = procLib(); if (!ap || !t || !l) return;
+  q.splice(i, 1);
+  const e = HexmarchProcedures.run(l, t, { vars: { party: ap.name }, roles: { party: ap.name } });
+  e.at = ap.clock.hours;
+  let hours = 0;  // the effects the Atlas applies now: passing time on the party's clock; the rest are listed for the referee
+  for (const f of e.effects) if (f.effect === 'clock') { const h = typeof f.hours === 'number' ? f.hours : (+f.n || +f.amount || 0) * (UNIT_H[f.unit] ?? 1); if (h > 0) { hours += h; f.applied = true; } }
+  CS = { ...CS, revision: CS.revision + 1, updated: new Date().toISOString(), parties: CS.parties.map(p => p.id !== ap.id ? p : { ...p, clock: { ...p.clock, hours: p.clock.hours + hours }, log: [...(p.log || []), e] }) };
+  await saveState(); fromState();
+  if (parent !== window) parent.postMessage({ type: 'hexmarch-atlas', event: 'log', module: MOD.id, party: ap.id, entry: e, hours }, '*');
+  partyBox();
+}
+function entryHtml(e, ap) {
+  const rolls = (e.rolls || []).map(x => `${esc(x.roll)} ${esc(x.total ?? '?')}`).join(', ');
+  const later = (e.effects || []).filter(f => !f.applied && f.effect !== 'note').map(f => esc(f.effect + (f.target ? ' · ' + f.target : '') + (f.amount !== undefined ? ' ' + f.amount : '') + (f.condition ? ' ' + f.condition : '')));
+  return `<p class="ev"><small>${esc(clockLabel({ start: ap.clock.start, hours: typeof e.at === 'number' ? e.at : ap.clock.hours }))}${rolls ? ' · ' + rolls : ''}</small><br><b>${esc(e.proc || '')}</b> ${(e.text || []).map(esc).join(' ')}`
+    + `${(e.players || []).length ? `<br><small title="What the players are told">Players: ${e.players.map(esc).join(' ')}</small>` : ''}${later.length ? `<br><small title="Apply these by hand for now">To apply: ${later.join('; ')}</small>` : ''}`
+    + `${(e.warnings || []).length ? `<br><small class="warn">${e.warnings.map(esc).join('; ')}</small>` : ''}</p>`;
+}
+function eventsLine() {  // the referee's events for the party shown: manual triggers, the queue, and the latest of the log
+  const ap = AP(), l = procLib(); if (LOCK || !ap || !l) return '';
+  const man = l.triggers.filter(t => t.on === 'manual'), q = queueOf(), log = ap.log || [];
+  let h = '<hr><b>Events</b>';
+  if (l.report.length) h += ` <details class="evrep"><summary title="Names the module uses that the ${esc(l.ruleset)} rules don’t provide">⚠ ${l.report.length}</summary><small>${l.report.map(esc).join('<br>')}</small></details>`;
+  h += '<br>' + (man.length ? man.map(t => `<button data-ev="queue" data-id="${esc(t.id)}" title="Add to the queue for ${esc(ap.name)}">${esc(t.label || t.id)}</button>`).join('') : '<small>This module has no manual events yet.</small>');
+  if (q.length) h += '<ol class="evq">' + q.map((t, i) => `<li>${esc(t.label || t.id)} <button data-ev="run" data-i="${i}">Run</button><button data-ev="skip" data-i="${i}">Skip</button>${i ? `<button data-ev="up" data-i="${i}" title="Run this one sooner">↑</button>` : ''}</li>`).join('') + '</ol>';
+  if (log.length) h += log.slice(-5).reverse().map(e => entryHtml(e, ap)).join('') + (log.length > 5 ? `<small>${log.length} entries this session</small>` : '');
+  return h;
+}
+document.getElementById('party').addEventListener('click', e => { const b = e.target.closest('button[data-ev]'); if (!b || LOCK || !AP()) return; const a = b.dataset.ev, q = queueOf(), i = +b.dataset.i;
+  if (a === 'queue') { const t = (procLib() || { triggers: [] }).triggers.find(x => x.id === b.dataset.id); if (t) q.push(t); }
+  else if (a === 'run') { runQueued(i); return; } else if (a === 'skip') q.splice(i, 1); else if (a === 'up' && i > 0) q.splice(i - 1, 0, ...q.splice(i, 1));
+  partyBox(); });
 function partiesLine() {  // the referee's party switcher and creator
   if (LOCK) return '';
   const ps = CS ? CS.parties : [];
@@ -951,11 +1006,11 @@ function partyBox() {
   if (!ap && LOCK) { box.innerHTML = `<b>Party</b> · your character is in no party yet.<br><button data-p="close">Close</button><hr>${stateLine()}${asLine()}`; return; }
   if (!ap) { box.innerHTML = `<b>No party yet</b><br>${partiesLine()}<button data-p="close">Close</button><hr>${stateLine()}${asLine()}${fogLine()}`; return; }
   if (!PARTY && LOCK) { box.innerHTML = `<b>${nm}</b> · not on this map.<br><button data-p="close">Close</button><hr>${stateLine()}${asLine()}`; return; }
-  if (!PARTY) { box.innerHTML = `<b>${nm}</b> · not on this map.<br><button data-p="place">Place the party</button><button data-p="close">Close</button><br>${partiesLine()}<hr>${stateLine()}${asLine()}${fogLine()}`; return; }
+  if (!PARTY) { box.innerHTML = `<b>${nm}</b> · not on this map.<br><button data-p="place">Place the party</button><button data-p="close">Close</button><br>${partiesLine()}${eventsLine()}<hr>${stateLine()}${asLine()}${fogLine()}`; return; }
   const [C, R] = PARTY.hex, t = T(C, R, 1), h = addr(C, R), lbl = h.slice(7);
   box.innerHTML = `<b>${nm}</b> · at <a href="${h}">${lbl}</a>${t ? ' · ' + esc(TYPES[t - 1].name.toLowerCase()) : ''}<br><small>Travelled ${hm(PARTY.hours)}${PARTY.hours >= day / 2 ? ` (${(PARTY.hours / day).toFixed(1)} days of ${day} h)` : ''}</small><br>`
     + (LOCK ? '<button data-p="go">Go to</button><button data-p="close">Close</button>'
-      : '<button data-p="go">Go to</button><button data-p="place">Move</button><button data-p="reset" title="Set the travel time back to zero (the party’s clock keeps its time)">Reset time</button><button data-p="remove">Remove</button><button data-p="close">Close</button><br>' + partiesLine())
+      : '<button data-p="go">Go to</button><button data-p="place">Move</button><button data-p="reset" title="Set the travel time back to zero (the party’s clock keeps its time)">Reset time</button><button data-p="remove">Remove</button><button data-p="close">Close</button><br>' + partiesLine() + eventsLine())
     + `<hr>${stateLine()}${asLine()}${fogLine()}`;
 }
 function saveFile() {  // the state file as written: plain JSON, as the Companion saves it (Campaign › State)
@@ -1029,10 +1084,13 @@ function drawParty() {  // a red pennant planted on the party's hex centre, over
 // HexmarchAtlas.travel(legs) adds up a route for the path tool to come: legs = [{mi, terrain: id, road?: class}] -> {hours, days, mi}
 const travelNote = t => t.travel === null ? 'no travel on foot' : t.travel === undefined ? '' : (() => { const p = (D.travel || {}).pace || {}, mph = (p.mi_per_hour || 3) / t.travel;
   return `${t.travel === 1 ? 'normal pace' : '×' + t.travel + ' travel time'} · ${+mph.toFixed(1)} mi/h`; })();
+// a terrain the module gives no multiplier: the ruleset's "travel" procedure answers (EVENTS_FORMAT.md section 7), else normal pace
+const TRAVELC = new Map();
+function travelOf(terrain, road) { const k = terrain + '|' + (road || ''); if (!TRAVELC.has(k)) { const v = askP('travel', { terrain, road: road || '' }); TRAVELC.set(k, v === null || typeof v === 'number' ? v : 1); } return TRAVELC.get(k); }
 window.HexmarchAtlas = { travel(legs) {
   const P = (D.travel || {}).pace || {}, mph = P.mi_per_hour || 3, day = P.hours_per_day || 8, RD = (D.travel || {}).roads || {};
   let hours = 0, mi = 0;
-  for (const g of legs) { const t = TYPES.find(x => x.id === g.terrain), k = g.road && RD[g.road] !== undefined ? RD[g.road] : t ? t.travel : 1;
+  for (const g of legs) { const t = TYPES.find(x => x.id === g.terrain), k = g.road && RD[g.road] !== undefined ? RD[g.road] : t && t.travel !== undefined ? t.travel : travelOf(g.terrain, g.road);
     if (k === null) return { hours: Infinity, days: Infinity, mi: mi + g.mi, blocked: g.terrain };  // no travel on foot (sea, lake): boats come later
     hours += g.mi * (k ?? 1) / mph; mi += g.mi; }
   return { hours, days: hours / day, mi };
@@ -1297,7 +1355,7 @@ async function loadModules() {
   try { const { url, id } = await currentCampaign(); if (id && !CMODS) await campaignLock(url, id); } catch (e) {}
   MODS = (await Promise.all((await knownSites()).filter(m => !local.some(l => l.id === m.id)).map(async m => {
     const base = new URL(m.path.replace(/\/?$/, '/'), m.site).href, r = { id: m.id, path: m.path, title: m.id, version: '', base, ok: false };
-    try { const j = await (await fetch(base + 'module.json')).json(); Object.assign(r, { title: j.title || m.id, version: j.version || '', credits: j.credits || [], languages: j.languages, starts: Array.isArray(j.starts) ? j.starts : [], ok: !!j.atlas_map }); } catch (e) {}
+    try { const j = await (await fetch(base + 'module.json')).json(); Object.assign(r, { events: typeof j.events === 'string' ? j.events : '', title: j.title || m.id, version: j.version || '', credits: j.credits || [], languages: j.languages, starts: Array.isArray(j.starts) ? j.starts : [], ok: !!j.atlas_map }); } catch (e) {}
     return r; }))).concat(local);
   if (CMODS && MODS.some(m => CMODS.has(m.id))) MODS = MODS.filter(m => CMODS.has(m.id));  // the campaign as a filter
   const want = new URLSearchParams(location.search).get('module') || store.get('hexmarch-atlas-module');
@@ -1319,6 +1377,6 @@ async function loadModules() {
   if (!MOD.local) try { const j = await (await fetch(A + 'creatures.json')).json(); CR = j.creatures || []; SC = j.scenes || {}; } catch (e) { CR = []; }  // a module without creatures has no file
   if (window.HexmarchMap) Object.assign(HexmarchMap, { base: MOD.base, module: MOD.id, creatures: CR, scenes: SC,
     places: D.pois.filter(p => p.encounter).map(p => ({ get name() { return name(p.name); }, pointers: p.encounter, go: () => { location.hash = addr(...p.hex); } })) });  // ways out lead back to the place's 100-ft hex  // encounter maps sit in the module folder
-  smoothRivers(); await loadState(); await loadWho(); go();
+  smoothRivers(); await loadEvents(); await loadState(); await loadWho(); go();
 })();
 </script></body></html>
