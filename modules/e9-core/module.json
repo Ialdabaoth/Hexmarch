@@ -6,6 +6,7 @@
  "version": "0.1.1",
  "license": "CC-BY-SA-4.0",
  "ruleset": "e9",
+ "private": true,
  "source": "E9 System Reference Handbook (revised, 2026), CC BY-SA 4.0",
  "rules": "rules.json",
  "equipment": "equipment.json",

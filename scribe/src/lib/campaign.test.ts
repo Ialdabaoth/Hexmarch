@@ -16,7 +16,8 @@ const btp = siteModule('modules/isle-of-mists/', {
   sites: [{ slug: 'baile-atha-troim', name: 'Baile Átha Troim' }],
   starts: [{ id: 'arrive-at-the-keep', title: 'Arriving in the Pale', date: '3507-05-01', hour: 8, site: 'Baile Átha Troim', scenes: ['keep-arrival', 'keep-east-gate'], revealed: { places: ['Baile Átha Troim'] }, levels: [1, 3], uses: ['B2'] }]
 });
-const roots = rootChoices(RULES);
+// every root offered, as if none were private; the real manifests may hide some for testing (Heph 2026-11-15)
+const roots = rootChoices(RULES.map(({ private: _, ...m }) => m));
 const mmE9 = roots.find((r) => r.module === 'mm-core' && r.option === 'e9')!;
 
 describe('reading the site', () => {
@@ -27,6 +28,10 @@ describe('reading the site', () => {
   });
   it('offers each rules module and each of its options as a root', () => {
     expect(roots.map((r) => `${r.module}/${r.option}:${r.ruleset}`)).toEqual(['e9-core/:e9', 'mm-core/:mm', 'mm-core/e9:e9mm']);
+  });
+  it('leaves out private modules but keeps their options', () => {
+    const got = rootChoices([{ ...e9core, private: true }, { ...mmcore, private: true }]);
+    expect(got.map((r) => `${r.module}/${r.option}:${r.ruleset}`)).toEqual(['mm-core/e9:e9mm']);
   });
 });
 

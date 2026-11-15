@@ -16,6 +16,7 @@ import {
   saveLocal, type CampaignCache
 } from './campaign';
 import { CORE_RULES } from '../rules/core-modules';
+import { settingsRules } from '../rules/rules';
 import { addMail, answer, joinLine, joinRequest, loadMail, mailFileName, post, readMailFile, saveMail, sendBack, type MailItem } from './mail';
 import { downloadJson } from './storage';
 import { Gateway, mailAttachments, webhookInfo, type DiscordPost, type GatewayStatus } from './gateway';
@@ -309,7 +310,7 @@ class AppState {
 
   // The rules this campaign plays with: the campaign file's ruleset, or the builder's for This device.
   stateRules(): StateRules {
-    const ruleset = this.campaign ? campaignRulesId(this.campaign) : this.settings.rules;
+    const ruleset = this.campaign ? campaignRulesId(this.campaign) : settingsRules(this.settings.rules).id;
     const core = CORE_RULES[ruleset];
     return core ? { ruleset, module: core.module, option: core.option, version: core.version } : { ruleset, module: '', option: '', version: '' };
   }

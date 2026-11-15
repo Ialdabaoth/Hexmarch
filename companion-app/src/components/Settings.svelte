@@ -2,7 +2,7 @@
   import { app } from '../lib/app.svelte';
   import { isWebhookUrl } from '../lib/discord';
   import { botAppId, inviteLink as botInviteLink } from '../lib/gateway';
-  import { DEFAULT_RULES, RULESETS, findRules } from '../rules/rules';
+  import { RULESETS, isPickableRules, settingsRules } from '../rules/rules';
   import { DEFAULT_DICE_COLOR, DEFAULT_DICE_INK, showDice } from '../lib/dice3d';
   import { inviteLink, readInvite, invitationLabel, type Role } from '../lib/invitations';
   import { isScribeLink } from '../lib/campaign';
@@ -125,9 +125,9 @@
 
 <section class="card">
   <h3>Rules</h3>
-  <select aria-label="Rules" value={findRules(app.settings.rules)?.id ?? DEFAULT_RULES}
+  <select aria-label="Rules" value={settingsRules(app.settings.rules).id}
     onchange={(e) => app.updateSettings({ rules: (e.target as HTMLSelectElement).value })}>
-    {#each RULESETS as r (r.id)}<option value={r.id}>{r.name}</option>{/each}
+    {#each RULESETS.filter((r) => isPickableRules(r.id)) as r (r.id)}<option value={r.id}>{r.name}</option>{/each}
   </select>
   <p class="small muted">What the Rules tab shows, and where new characters start.</p>
 </section>

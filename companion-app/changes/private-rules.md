@@ -1,0 +1,1 @@
+For the next few tests, E9 and Materia Mundi are private (Heph 2026-11-15): new characters and the Rules setting offer only Materia Mundi for E9. Sheets and campaigns already made with E9 or Materia Mundi still open. A rules module (or an option inside one) with "private": true in its module.json is not offered; delete that line to offer it again.
