@@ -27,11 +27,11 @@ Checked against the E9 System Reference Handbook: 5 paces a round (p. 33), half 
 | Forced March | Agility | 2x | exploration and narration; road or clear terrain |
 | Dash | Agility | 4x | encounter; road or clear terrain |
 | Investigate | Alertness | 0.04x | exploration |
-| Help | none | 1x | Experts: an ally gets one more mode |
+| Help | none | 1x | Experts: someone gets one more mode, or one of their modes one step easier (never past easy) |
 
 ## Rules
 
-- **How many modes.** A non-Expert takes one mode at a time. An Expert takes 2 at level 1, 3 at level 5 and 4 at level 9. Help is an Expert mode and uses one of the Expert's slots (Heph 2026-11-15): the Expert helps an ally with a roll, and that ally may take one more mode than usual.
+- **How many modes.** A non-Expert takes one mode at a time. An Expert takes 2 at level 1, 3 at level 5 and 4 at level 9. **Help** (Heph 2026-11-15) is an Expert mode and uses one of the Expert's slots. The Expert names anyone in the party, another Expert included, and either gives them one extra mode, or makes one of their modes one step easier. Help stacks: several Helps can ease the same mode down to easy, but never to automatic. The Expert doesn't roll to help and doesn't have to be in the same mode (to be revisited after playtesting).
 - **Several modes.** The slowest mode sets the character's speed. Extra modes add rolls but don't slow the character further.
 - **The party.** The party moves at its slowest member's speed, or splits into separate parties (separate Atlas markers).
 - **Terrain** is graded, not multiplied (Heph 2026-11-15). Each hex has five traits on the handbook's difficulty steps (automatic, easy, normal, hard, impossible): orient, traverse, hide, investigate and view (ATLAS_FORMAT.md in the data repo, "Terrain traits"). E9's defaults by terrain id are in `rules.json` `terrain`; a module's terrain type, a single hex and the campaign can override them. Traverse sets the speed: automatic, easy and normal are 1x (easy and normal ask for an Agility roll at that difficulty), hard forces Climb/Swim/Maneuver (0.5x), impossible stops travel on foot. Forced March and Dash need automatic traverse (a road or grassland). Every road is 1x (Heph 2026-11-15); road quality makes the Forced March roll easier instead: easy on a Roman or local road, normal on a trail or off the road (`movement.roads`). Navigate rolls Survival at the orient grade, Sneak rolls Stealth at the hide grade, Investigate rolls Alertness at the investigate grade, and the view grade sets how far one sees.
@@ -44,3 +44,18 @@ Checked against the E9 System Reference Handbook: 5 paces a round (p. 33), half 
 - `sight-range` answers miles by the hex's `view` grade (`movement.view_mi`).
 - `travel` is retired and answers 1 until the Atlas stops asking.
 - Rolls (Survival at the orient grade each shift, Agility at the traverse grade, Stealth at the hide grade, On Watch Alertness for an encounter) are their own procedures, added in later PRs.
+
+## Rolls along the way (Heph 2026-11-15)
+
+At each trigger the members in a mode roll that mode's talent at the hex's grade for the matching trait, the results are combined, and the procedure forks on the outcome. There are three ways to combine them: **any** (one success is enough), **all** (everyone must succeed) and **each** (every member gets their own outcome).
+
+| Trigger | Who rolls | Combine | Outcome |
+| --- | --- | --- | --- |
+| Start of each shift | everyone on Navigate: Survival vs orient, secretly | any | all fail: lost (the walk halts) |
+| Entering a hex with traverse easy, normal or hard | everyone: Agility vs traverse | all | anyone fails: bogged down (the walk halts in the hex) |
+| Each league or hour of Forced March | each marcher: Agility at the road's grade (`movement.roads`; normal off-road) | each | a failure costs that member 1d6 damage |
+| Each league while sneaking | each sneak: Stealth vs hide | all | all succeed: the party surprises what it meets |
+| An encounter is rolled | everyone On Watch: Alertness | any | all fail and the other side sneaked: surprised |
+| A turn spent investigating | each investigator: Alertness vs investigate | any | found |
+
+These become E9 procedures once the Atlas runner can roll for every member in a mode and combine the results (a request for the Atlas thread).

@@ -1,0 +1,1 @@
+- Help (Heph, 2026-11-15): an Expert's Help gives anyone in the party one extra mode, or makes one of their modes one step easier. Helps stack down to easy, never to automatic. The Expert doesn't roll and doesn't have to share the mode. `movement.md` also lists the rolls along the way and how each combines (any, all or each).
