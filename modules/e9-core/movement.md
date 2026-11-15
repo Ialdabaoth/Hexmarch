@@ -40,7 +40,9 @@ Checked against the E9 System Reference Handbook: 5 paces a round (p. 33), half 
 
 ## For the Atlas
 
-- `travel` answers the time multiplier for a hex. A module's own terrain `travel` value still wins on its map. Under E9, Climb/Swim/Maneuver's 0.5x is the difficult-terrain slowdown, so `move` divides a difficult hex's travel multiplier by 2 before applying the party's speed, and a plain difficult hex costs 2x, not 4x.
-- `move` takes the party's pace as a time multiplier, which is 1 / the party's speed. The party's speed is the slowest member's slowest mode.
-- The Atlas needs each character's chosen modes per party, which it doesn't store yet (a `parties[].modes` field: `{character: [mode ids]}`). Without them, everyone moves at 1x.
-- Rolls: each mode's talent check is rolled when its procedure runs (the navigator's Survival at the start of a shift, On Watch Alertness for an encounter, Agility for a Forced March). These come after this data, in their own PRs.
+The Atlas (Hexmarch #68) stores each member's modes in `parties[].modes` and works out the party's `speed` generically from this data. E9's procedures (`procedures/e9.json`) answer the rest:
+
+- `travel` {terrain, road} answers the hex's time multiplier: 2 on difficult terrain, 1 elsewhere. A module's own terrain `travel` value still wins on its map, and roads use the module's road multipliers.
+- `terrain-kind` {terrain, road} answers `difficult` or `open`. A road makes any hex open.
+- `move` gets `pace` (the travel multiplier), `kind`, `speed` and `modes` for each walked hex, and passes {mi} × pace ÷ (mph × speed × base) hours, where base is 2 on difficult ground and 1 elsewhere. Climb/Swim/Maneuver's 0.5x already is the difficult-terrain slowdown, so the travel multiplier's own 2x is taken out once. A plain difficult hex costs 2x, not 4x, and a module's bog 3 still costs 3x.
+- Rolls: each mode's talent check is rolled when its procedure runs (the navigator's Survival at the start of a shift, On Watch Alertness for an encounter, Agility for a Forced March). These come in their own PRs.
