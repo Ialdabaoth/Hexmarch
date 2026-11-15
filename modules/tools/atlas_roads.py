@@ -21,6 +21,7 @@ from PIL import Image
 from shapely.geometry import LineString
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from dymaxion import Face
+from atlas_rivers import densify
 
 CW = 100 * math.sqrt(3) / 2
 CLASSES = ('roman', 'local', 'trail')
@@ -184,7 +185,7 @@ def main(modp, adir):
         via = rd.get('via') or []
         if len(via) < 2: sys.exit(f'module.json atlas.roads {rname!r}: via needs at least two points')
         P = [where(v, rname) for v in via]; pts = [P[0]]
-        if rd.get('traced'): pts = P  # a traced course (Heph 2026-11-15, as atlas.rivers): the via points as they are, no search and no sway
+        if rd.get('traced'): pts = densify(P)  # a traced course (Heph 2026-11-15, as atlas.rivers): through the via points, no search and no sway
         else:
             for k, (a, b) in enumerate(zip(P, P[1:])):
                 seed = int.from_bytes(f'{rname}/{k}'.encode('utf-8'), 'little') % (2 ** 32)

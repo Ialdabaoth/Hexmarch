@@ -17,6 +17,22 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from dymaxion import Face
 
 RANGE = 3 * 5000  # feet: how far a traced end may lie from the river it splices into
+STEP = 50         # feet between the points of a traced course once filled in
+
+
+def densify(pts, step=STEP):
+    """A traced course, filled in every `step` feet along a Catmull-Rom curve through its points (Isle of Mists 2026-11-15):
+    the Atlas smooths every line with a moving average of +-2 points, which flattens bends between points 100-250 m apart,
+    but barely touches points 50 ft apart. Heph's points stay on the line."""
+    if len(pts) < 2: return [list(p) for p in pts]
+    P = [pts[0]] + list(pts) + [pts[-1]]; out = [list(pts[0])]
+    for k in range(1, len(P) - 2):
+        p0, p1, p2, p3 = P[k - 1], P[k], P[k + 1], P[k + 2]
+        n = max(1, int(math.hypot(p2[0] - p1[0], p2[1] - p1[1]) // step))
+        for s in range(1, n + 1):
+            t = s / n; t2, t3 = t * t, t * t * t
+            out.append([int(round(.5 * (2 * p1[i] + (p2[i] - p0[i]) * t + (2 * p0[i] - 5 * p1[i] + 4 * p2[i] - p3[i]) * t2 + (3 * p1[i] - p0[i] + p3[i] - 3 * p2[i]) * t3))) for i in (0, 1)])
+    return out
 
 
 def main(modp, adir):
@@ -32,7 +48,7 @@ def main(modp, adir):
             sys.exit(f'{label}: "via" is a list of at least two [lat, lon] points')
         cls = t.get('class')
         if cls is not None and cls not in (1, 2, 3, 4, 5): sys.exit(f'{label}: "class" is 1 to 5')
-        pts = [[int(round(c)) for c in face.forward(la, lo)] for la, lo in via]
+        pts = densify([[int(round(c)) for c in face.forward(la, lo)] for la, lo in via])
         def near(p, rv):  # (squared distance, index) of the river point nearest p
             return min(((q[0] - p[0]) ** 2 + (q[1] - p[1]) ** 2, k) for k, q in enumerate(rv['points']))
         best = None
