@@ -216,6 +216,14 @@
       onchange={(e) => app.updateSettings({ autoPost: (e.target as HTMLInputElement).checked })} />
     Post every roll to Discord automatically
   </label>
+  {#if app.mode === 'referee' && app.campaign && !app.campaignWebhook}
+    <p class="small muted bot-setup" title="The bot reads the campaign's own channel: the one its join requests go to. That is the campaign's post URL, set in Scribe, not the webhook above (which only carries this device's rolls).">
+      Referee's bot ⓘ: first make this campaign's requests go to Discord. In Scribe › Services, paste the channel's webhook as
+      “Where players send requests”, then Publish; the bot's setup appears here after that.
+    </p>
+  {:else if app.mode === 'referee' && !app.campaign}
+    <p class="small muted bot-setup">Referee's bot: pick a campaign first (Campaign tab or the Launcher); the bot reads that campaign's channel.</p>
+  {/if}
   {#if app.mode === 'referee' && app.campaignWebhook}
     <details class="bot-setup" open={app.discordStatus.state !== 'listening'}>
       <summary title="While this app is open, your own Discord bot reads {app.campaign?.campaign.name}'s channel, so a player's join request lands in the Inbox by itself. Setting it up takes about five minutes, once. The token stays on this device.">Referee's bot ⓘ
