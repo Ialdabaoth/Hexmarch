@@ -108,7 +108,9 @@ ISLAND = MOD['atlas'].get('land') == 'island'
 if ISLAND: json.dump({'island': dict(world, counties='*', sites=[])}, open(work + '/island.json', 'w'), ensure_ascii=False)
 MJ = {k: v for k, v in MOD.items() if k not in (STEP5_ONLY if PDF else STEP5_ONLY + ('version',))}  # a version bump alone never redraws (the PDFs print it)
 if PDF: MJ['version'] = MOD['version']
-MJR = dict({k: v for k, v in MJ.items() if k not in ('names', 'site_encounters', 'site_ranks')}, atlas={k: v for k, v in MOD['atlas'].items() if k not in ('roads', 'travel')})  # what the region tools never read
+NO_DRAW = ('terrain', 'hex_traits')  # terrain traits (ATLAS_FORMAT.md) go to the manifest, never into a map: changing them redraws nothing
+MJ['atlas'] = {k: v for k, v in MOD['atlas'].items() if k not in NO_DRAW}
+MJR = dict({k: v for k, v in MJ.items() if k not in ('names', 'site_encounters', 'site_ranks')}, atlas={k: v for k, v in MOD['atlas'].items() if k not in ('roads', 'travel') + NO_DRAW})  # what the region tools never read
 SET = {k: ENV[k] for k in ('HEXDEM', 'HEXSITEICONS', 'HEXDUMP', 'MODTITLE') + (('MODVER', 'MODATLAS') if PDF else ())}
 RKEY = key(('pdf', str(PDF).encode()), ('settings', SET), ('module', MJR), ('world', work + '/world.json'), ('island', work + '/island.json' if ISLAND else b'-'),
            ('admin', ENV['HEXADMIN']), ('geo', os.path.join(ROOT, 'geo')), ('assets', os.path.join(ROOT, 'assets')), ('req', os.path.join(ROOT, 'requirements.txt')),
@@ -258,6 +260,16 @@ if ENC:
     os.makedirs(out + '/bestiary', exist_ok=True)
     for r, b in BEST.items(): json.dump(b, open(f'{out}/bestiary/{r}.json', 'w'), ensure_ascii=False, indent=1)
     if os.path.isdir(out + '/atlas'): json.dump({'creatures': CREATURES, 'scenes': ENC.get('scenes', {})}, open(out + '/atlas/creatures.json', 'w'), ensure_ascii=False)
+# terrain traits (Heph 2026-11-15, ATLAS_FORMAT.md): the module's layers over the ruleset's defaults, module.json atlas.terrain
+# ([{id, traits}] or {id: {traits}}) and atlas.hex_traits ({hex address: traits}); the Atlas adds the rules and the campaign's own
+GRADES, TRAITS = ('automatic', 'easy', 'normal', 'hard', 'impossible'), ('orient', 'traverse', 'hide', 'investigate', 'view')
+def _traits(where, t):
+    if not isinstance(t, dict) or any(k not in TRAITS or v not in GRADES for k, v in t.items()):
+        sys.exit(f'module.json {where}: {{trait: grade}}, traits {", ".join(TRAITS)}, grades {", ".join(GRADES)}')
+    return t
+_at = MOD['atlas'].get('terrain') or {}
+TRAIT_T = {e['id']: _traits(f'atlas.terrain {e["id"]} traits', e['traits']) for e in (_at if isinstance(_at, list) else [dict(v, id=k) for k, v in _at.items()]) if isinstance(e, dict) and 'traits' in e}
+TRAIT_H = {k.lstrip('#'): _traits(f'atlas.hex_traits {k}', v) for k, v in (MOD['atlas'].get('hex_traits') or {}).items()}
 # events and procedures (EVENTS_FORMAT.md): every "events" block merged, and the module's procedures/<ruleset>.json, for the Atlas
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); import events_build
 EVENTS = events_build.gather(mdir)
@@ -294,6 +306,7 @@ M = {'format': 'hexmarch-module/1', 'id': MOD['id'], 'title': MOD['title'], 'sho
      **({'encounters': 'encounters.json', 'bestiary': {r: f'bestiary/{r}.json' for r in BEST}} if ENC else {}),
      **({'encounter_maps': EMAPS} if EMAPS else {}),
      **({'events': 'events.json'} if EVENTS else {}),
+     **({'traits': {'terrain': TRAIT_T, 'hexes': TRAIT_H}} if TRAIT_T or TRAIT_H else {}),
      **({'atlas_map': 'atlas/map.json'} if os.path.isdir(out + '/atlas') else {}),  # the Hexmarch Atlas app (<site>/atlas/) lists modules that have one
      'semver': MOD['version'],  # the plain version (`version` above is the display stamp); E9 Scribe resolves dependencies with it (Atlas 0.5.13)
      # dependencies and campaign starts, as the module source has them (WORKFLOWS.md "Dependencies", SCRIBE.md "Starts")

@@ -25,8 +25,8 @@ sys.path.insert(0, TOOLS); import events_build
 # the procedures runner and the rules modules' procedures (EVENTS_FORMAT.md, Heph 2026-11-15: Procedures live in the Atlas)
 PROCS = '<script>' + open(TOOLS + '/procedures.js').read() + '</script>'
 RULEPROCS = json.dumps(events_build.rules_procedures(REPO), ensure_ascii=False).replace('</', '<\\/')
-RULEMOVE = json.dumps(events_build.rules_movement(REPO), ensure_ascii=False).replace('</', '<\\/')
-html = open(TOOLS + '/atlas.html').read().replace('<!--PROCEDURES-->', PROCS).replace('{{RULEPROCS}}', RULEPROCS).replace('{{RULEMOVE}}', RULEMOVE).replace('{{ATLAS}}', ATLAS).replace('<!--CARD-->', CARD).replace('{{PATREON}}', json.dumps(PATREON)).replace('{{DATA}}', json.dumps(DATA)).replace('{{APPJSON}}', json.dumps(APP)).replace('{{APP}}', APP)
+RULEDATA = json.dumps(events_build.rules_data(REPO), ensure_ascii=False).replace('</', '<\\/')
+html = open(TOOLS + '/atlas.html').read().replace('<!--PROCEDURES-->', PROCS).replace('{{RULEPROCS}}', RULEPROCS).replace('{{RULEDATA}}', RULEDATA).replace('{{ATLAS}}', ATLAS).replace('<!--CARD-->', CARD).replace('{{PATREON}}', json.dumps(PATREON)).replace('{{DATA}}', json.dumps(DATA)).replace('{{APPJSON}}', json.dumps(APP)).replace('{{APP}}', APP)
 os.makedirs(site + '/atlas', exist_ok=True)
 open(site + '/atlas/index.html', 'w').write(html)
 ICONS = os.path.join(REPO, 'icons')  # the Atlas's app icon (icons/atlas.svg; PNGs rendered from it)
