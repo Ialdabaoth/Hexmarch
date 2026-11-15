@@ -10,3 +10,4 @@ export * from './publish';
 export * from './mail';
 export * from './adapters';
 export * from './handoff';
+export * from './gateway';

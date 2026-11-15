@@ -3,10 +3,11 @@
   import { ROOTS, RULES_MANIFESTS, type RootChoice } from './lib/rules';
   import { loadSite, type SiteModule } from './lib/data';
   import { buildCampaign, describeProblem, startsOf, type Built, type Choices } from './lib/campaign';
-  import { applyUpdate, backUrl, campaignMessage, playFor, publishAgain, publishedMessage, type PublishResult, publishOnDevice, savePlayState, publishSecret, saveOnDevice, savePublishSecret, savedCampaign, testUpload, type SavedCampaign, type UpdateResult } from './lib/device';
+  import { applyUpdate, backUrl, campaignMessage, idbGet, idbSet, playFor, publishAgain, publishedMessage, type PublishResult, publishOnDevice, savePlayState, publishSecret, saveOnDevice, savePublishSecret, savedCampaign, testUpload, type SavedCampaign, type UpdateResult } from './lib/device';
   import { applyAtlas, atlasEvent, type State } from './lib/parties';
   import { isWebhook, pingChoice, pingFrom, testPost, type PingKind } from './lib/discord';
   import type { UploadCheck, UploadReport } from '../../engine';
+  import { BOT_TOKENS, botAppId, botTokens, inviteLink as botInviteLink, testBot, webhookInfo, withBotToken, type GatewayStatus } from '../../engine';
   import { appsScriptCode, appsScriptStore, githubStore, handOff, messageLink, takeHandOffs, newKey, readMessageHash, servicesFor, staticServices, upload, type Services, type StoreKind } from '../../engine';
 
   const VERSION = __SCRIBE_VERSION__;
@@ -146,6 +147,51 @@
     }
     testingDiscord = false;
   }
+  // The referee's bot (Heph 2026-11-15: one Discord setup, here): it reads the campaign channel live while the
+  // referee's Companion is open, so a join request lands in the Inbox by itself. Its token stays on this device
+  // (engine BOT_TOKENS, which the Companion reads); it is never published and never goes into a link.
+  let bot = $state('');
+  let botSaved = $state('');
+  const appId = $derived(botAppId(bot));
+  let hookGuild = $state('');
+  let hookChannel = $state('');
+  $effect(() => {
+    const url = postKind === 'discord' && isWebhook(postUrl) ? postUrl.trim() : '';
+    hookGuild = hookChannel = '';
+    if (url)
+      webhookInfo(url).then(
+        (w) => { if (postUrl.trim() === url) { hookGuild = w.guild; hookChannel = w.channel; } },
+        () => {}
+      );
+  });
+  $effect(() => {
+    const id = campaignKey;
+    if (!id) return;
+    idbGet(BOT_TOKENS).then((v) => { bot = botSaved = botTokens(v)[id] ?? ''; }, () => {});
+  });
+  async function saveBot(token: string) {
+    if (!campaignKey || (token.trim() && !botAppId(token))) return;
+    await idbSet(BOT_TOKENS, withBotToken(await idbGet(BOT_TOKENS), campaignKey, token));
+    bot = botSaved = token.trim();
+    botTest = null;
+  }
+  let botTest = $state<GatewayStatus | null>(null);
+  async function runBotTest() {
+    botTest = { state: 'connecting' };
+    try {
+      const channel = hookChannel || (await webhookInfo(postUrl)).channel;
+      botTest = await testBot(botSaved, channel);
+    } catch (e) {
+      botTest = { state: 'failed', reason: `couldn't read the webhook (${(e as Error).message})` };
+    }
+  }
+  // The step the last test points back to.
+  const botStuck = $derived.by(() => {
+    const st = botTest;
+    if (st?.state === 'no-channel') return 4;
+    if (st?.state !== 'failed') return 0;
+    return /token/.test(st.reason) ? 2 : /Intent/.test(st.reason) ? 3 : /no server/.test(st.reason) ? 4 : 0;
+  });
   // Where Publish puts the files (Scribe 0.6: adapters): the referee's own GitHub repo (preferred, Heph 2026-11-10),
   // Google Drive through their own Apps Script, or by hand as before.
   let storeKind = $state<StoreKind>('github');
@@ -635,6 +681,36 @@
               {#if discordTest === 'sent'}<span class="ok">Sent. Check the channel{ping ? ' and your notifications' : ''}.</span>{:else if discordTest}<p class="bad small">{discordTest}</p>{/if}
             </li>
           </ol>
+          {#if isWebhook(postUrl) && campaignKey}
+            <div class="field"><button type="button" class="tip" data-tip="While your Companion is open, your own Discord bot reads this channel, so a player's join request lands in your Inbox by itself. Setting it up takes about five minutes, once. The token stays on this device and is never published.">Your bot</button> (optional)</div>
+            <ol class="small gh">
+              <li>
+                <a href="https://discord.com/developers/applications" target="_blank" rel="noopener">Open the Discord Developer Portal</a> and press <button type="button" class="tip" data-tip="Sign in with your usual Discord account. Any name works, say “{built?.manifest.title ?? 'Campaign'} referee”; players see it if the bot ever posts. Tick the terms box and press Create."><strong>New Application</strong></button>.
+              </li>
+              <li class:stuck={botStuck === 2}>
+                In the menu on the left pick <strong>Bot</strong>, press <strong>Reset Token</strong>, then <strong>Copy</strong>, and <button type="button" class="tip" data-tip="Discord shows the token only once; if you lose it, reset it again and paste the new one. Anyone holding it can act as your bot, so it stays on this device and is never published.">paste it here</button>.
+                <input type="password" bind:value={bot} onchange={() => saveBot(bot)} placeholder="the bot's token" autocapitalize="off" autocomplete="off" aria-label="Bot token" />
+                {#if bot.trim() && !appId}<p class="bad small">That doesn't look like a bot token. Copy it again from the Bot page.</p>{/if}
+                {#if botSaved}<button onclick={() => saveBot('')}>Remove the bot</button>{/if}
+              </li>
+              <li class:stuck={botStuck === 3}>
+                {#if appId}<a href="https://discord.com/developers/applications/{appId}/bot" target="_blank" rel="noopener">On that same Bot page</a>{:else}On that same Bot page{/if}, scroll to <button type="button" class="tip" data-tip="Without it Discord hands the bot every post with the text and files left out, so it can't see join requests."><strong>Message Content Intent</strong></button>, switch it on and press <strong>Save Changes</strong>.
+              </li>
+              <li class:stuck={botStuck === 4}>
+                {#if appId}<a href={botInviteLink(appId, hookGuild)} target="_blank" rel="noopener">Add the bot to your server</a>{:else}Add the bot to your server (the link appears once the token is pasted){/if} and press <button type="button" class="tip" data-tip="The link already names your bot{hookGuild ? ' and the server this channel is on' : ''}, and asks only to see channels and read their messages. You need Manage Server there; if you don't have it, send the link to whoever does."><strong>Authorize</strong></button>.
+              </li>
+              <li>
+                <button disabled={!botSaved || botTest?.state === 'connecting'} onclick={runBotTest}>{botTest?.state === 'connecting' ? 'Testing…' : 'Test the bot'}</button>
+                {#if botTest?.state === 'listening'}
+                  <span class="ok">Bot test successful! Your bot is successfully installed and can hear the campaign channel{botTest.server ? ` on ${botTest.server}` : ''} while the Companion is open.</span>
+                {:else if botTest?.state === 'no-channel'}
+                  <p class="bad small">The bot is in a server but can't see this channel. Do step 4 for this channel's server, or give the bot View Channel on the channel.</p>
+                {:else if botTest?.state === 'failed'}
+                  <p class="bad small">Not yet: {botTest.reason}.{botStuck ? ` See step ${botStuck}.` : ''}</p>
+                {/if}
+              </li>
+            </ol>
+          {/if}
         {/if}
         <label class="opt"><input type="radio" name="post" value="script" bind:group={postKind} /><span><strong>Google Apps Script</strong></span></label>
         {#if postKind === 'script'}

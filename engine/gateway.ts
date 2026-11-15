@@ -3,6 +3,8 @@
 // 2026-11-12). So while the referee's Companion is open it holds the gateway with the referee's own bot and hears
 // each new post in the campaign channel; a post with a message file attached is mail. It hears nothing while the
 // app is closed: posts made then need the referee's Apps Script or opening the file by hand.
+// The bot is set up once, in Scribe's Discord steps (Heph 2026-11-15: one Discord setup, in Scribe); Scribe tests it
+// with testBot below, and the Companion holds the live reader.
 
 const GATEWAY = 'wss://gateway.discord.gg/?v=10&encoding=json';
 // GUILDS | GUILD_MESSAGES | MESSAGE_CONTENT
@@ -157,4 +159,39 @@ export class Gateway {
       else if (!this.seen) this.onStatus({ state: 'no-channel' });
     } else if (m.t === 'MESSAGE_CREATE' && m.d.channel_id === this.channel) this.onPost(m.d as DiscordPost);
   }
+}
+
+// The referee's bot tokens, one per campaign: {<campaign id>: token}, kept in this device's keyval-store under this
+// key. Scribe writes it, the Companion reads it. A token is never published and never goes into a link.
+export const BOT_TOKENS = 'hexmarch-discord-bots';
+export function botTokens(v: unknown): Record<string, string> {
+  if (!v || typeof v !== 'object') return {};
+  return Object.fromEntries(Object.entries(v as Record<string, unknown>).filter((e): e is [string, string] => typeof e[1] === 'string' && !!e[1]));
+}
+export function withBotToken(v: unknown, campaign: string, token: string): Record<string, string> {
+  const all = botTokens(v);
+  if (token.trim()) all[campaign] = token.trim();
+  else delete all[campaign];
+  return all;
+}
+
+// "Test the bot" (Scribe): connects once with the token, waits until Discord says whether the bot can hear the
+// channel, then hangs up. `listening` is the only success.
+export function testBot(token: string, channel: string, wait = 15_000, open?: (url: string) => Socket): Promise<GatewayStatus> {
+  return new Promise((done) => {
+    let last: GatewayStatus = { state: 'connecting' };
+    let g: Gateway | undefined;
+    const finish = (s: GatewayStatus) => {
+      clearTimeout(timer);
+      g?.stop();
+      done(s);
+    };
+    const timer = setTimeout(() => finish(last.state === 'no-channel' ? last : { state: 'failed', reason: "Discord didn't answer in time" }), wait);
+    g = new Gateway(token, channel, () => {}, (s) => {
+      if (s.state === 'off') return;
+      last = s;
+      if (s.state === 'listening' || s.state === 'failed') finish(s);
+    }, open);
+    g.start();
+  });
 }

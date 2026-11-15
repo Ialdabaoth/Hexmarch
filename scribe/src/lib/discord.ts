@@ -1,6 +1,7 @@
 // Discord as the campaign's mailbox, set up from Scribe (Heph 2026-11-12: "creating a discord bot" needs a very
-// straightforward flow-through). Only a channel webhook is needed, no bot: players' Companions post requests to it,
-// mentioning the campaign's ping so Discord itself notifies the referee (engine readPing, Hexmarch #64).
+// straightforward flow-through). A channel webhook is all players need: their Companions post requests to it,
+// mentioning the campaign's ping so Discord itself notifies the referee (engine readPing, Hexmarch #64). The referee's
+// own bot, which hears those posts live while the Companion is open, is set up here too (engine/gateway.ts).
 
 const WEBHOOK = /^https:\/\/(?:ptb\.|canary\.)?discord(?:app)?\.com\/api\/webhooks\/\d+\/[\w-]+\/?$/;
 export const isWebhook = (url: string) => WEBHOOK.test(url.trim());
