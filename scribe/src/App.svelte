@@ -500,7 +500,7 @@
 
   {#if built}
     <section>
-      <h2><button type="button" class="tip" data-tip="The campaign stays on this device: the Companion, the Atlas and Scribe share it here. The Atlas puts the party at the start the first time it opens.">Your campaign</button></h2>
+      <h2><button type="button" class="tip" data-tip="This will create the campaign files for a new campaign from the modules you have chosen.">Build</button></h2>
       {#if built.problems.length}
         <p class="bad">Scribe can't settle the modules yet:</p>
         <ul class="problems">{#each built.problems as p}<li>{describeProblem(p)}</li>{/each}</ul>
@@ -541,7 +541,7 @@
 
   {#if built && !built.problems.length && isBuilt}
     <section>
-      <h2><button type="button" class="tip" data-tip="Players read the campaign from a web address you choose. Publish puts the files there for you, free, on an account of yours.">Hosting</button></h2>
+      <h2><button type="button" class="tip">Hosting<span class="tip-body">Once the campaign is built, hosting it is how your players and co-referees find it.  Once you choose where to host your campaign, <b>Publish</b> will push the campaign files there from this device.</span></button></h2>
       {#if !record}
         <p class="small muted">Save the campaign on this device first (above). Players can't join until it is published.</p>
       {:else}
