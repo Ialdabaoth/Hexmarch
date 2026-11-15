@@ -125,7 +125,7 @@ Heph's roadmap step 2: Heph works Scribe to get ACKS, Mystara and other systems 
 
 ### Localization (before 0.8.0; Heph 2026-11-15)
 Every header and tooltip in the Launcher, Companion, Atlas and Scribe comes from a translation catalog, not hard-coded English. One shared message format and loader for all four apps; English is the first catalog; the language follows the browser with an override in each app. Status and error texts follow the same path where practical. Rules, module and lore text is content, not UI, and stays per module.
-Languages, in order (Heph 2026-11-15): English, Japanese, Irish (Gaeilge), German, Dutch, French, Spanish, Italian, Korean, Chinese.
+Languages, in order (Heph 2026-11-15): English, Japanese, Irish (Gaeilge), German, Dutch, French, Spanish, Italian, Korean, Chinese (Simplified).
 
 **0.7 exit test:** an outside person joins by link, plays a B2 session, and cannot read another player's knowledge from any file or link.
 
