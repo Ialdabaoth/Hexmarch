@@ -5,7 +5,7 @@
   import { thresholdCheck } from '../lib/checks';
   import { combine, holdRoll } from '../lib/hold.svelte';
   import { wikiForMonster } from '../lib/wiki';
-  import { ATTITUDES, TALENTS, findRules, rulesFor, type Difficulty } from '../rules/rules';
+  import { ATTITUDES, TALENTS, findRules, rulesFor, settingsRules, type Difficulty } from '../rules/rules';
   import { BESTIARY } from '../bestiary/bestiary';
   import {
     SAVE_KINDS, TemplateError, creatureFollower, damageRollEntry, newCreature, reactionEntry, rollNpcSheet, saveTarget, sheetStats,
@@ -34,7 +34,7 @@
     });
   });
 
-  let rulesId = $derived(app.campaign ? campaignRulesId(app.campaign) : app.settings.rules);
+  let rulesId = $derived(app.campaign ? campaignRulesId(app.campaign) : settingsRules(app.settings.rules).id);
   let rules = $derived(findRules(rulesId) ?? rulesFor('mm'));
 
   // Creatures from the saved modules (Settings › Modules; the campaign's own when one is in use), with stats for the campaign's rules.

@@ -1,13 +1,13 @@
 <script lang="ts">
   import { app } from '../lib/app.svelte';
-  import { DEFAULT_RULES, findRules, rulesFor } from '../rules/rules';
+  import { settingsRules } from '../rules/rules';
   import Classes from './Classes.svelte';
   import Bestiary from './Bestiary.svelte';
   import Panoply from './Panoply.svelte';
 
   // What the game is made of: classes, monsters, gear and magic, and the procedures
   // the Campaign tab runs, for the rules chosen in Settings.
-  let rules = $derived(findRules(app.settings.rules) ?? rulesFor(DEFAULT_RULES));
+  let rules = $derived(settingsRules(app.settings.rules));
 </script>
 
 <h1>Rules</h1>

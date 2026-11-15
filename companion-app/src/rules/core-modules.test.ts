@@ -13,8 +13,17 @@ describe('core rules modules', () => {
       { format: 'hexmarch-module/1', id: 'isle-of-mists', version: '1.0.0', ruleset: 'x' }
     ]);
     expect(got).toEqual({
-      mm: { ruleset: 'mm', module: 'mm-core', option: '', title: 'Materia Mundi', version: '0.1.0' },
-      e9mm: { ruleset: 'e9mm', module: 'mm-core', option: 'e9', title: 'Materia Mundi for E9', version: '0.1.0' }
+      mm: { ruleset: 'mm', module: 'mm-core', option: '', title: 'Materia Mundi', version: '0.1.0', private: false },
+      e9mm: { ruleset: 'e9mm', module: 'mm-core', option: 'e9', title: 'Materia Mundi for E9', version: '0.1.0', private: false }
     });
+  });
+
+  it('marks private modules and options', () => {
+    const got = coreRulesFrom([
+      { format: 'hexmarch-rules/1', id: 'mm-core', version: '0.1.0', ruleset: 'mm', private: true, options: [{ id: 'e9', ruleset: 'e9mm' }, { id: 'x', ruleset: 'xmm', private: true }] }
+    ]);
+    expect(got.mm.private).toBe(true);
+    expect(got.e9mm.private).toBe(false);
+    expect(got.xmm.private).toBe(true);
   });
 });

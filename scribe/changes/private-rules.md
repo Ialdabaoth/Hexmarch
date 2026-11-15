@@ -1,0 +1,1 @@
+For the next few tests, E9 and Materia Mundi are private (Heph 2026-11-15): Core Rules offers only Materia Mundi for E9. A rules module (or an option inside one) with "private": true in its module.json is not offered; delete that line to offer it again.

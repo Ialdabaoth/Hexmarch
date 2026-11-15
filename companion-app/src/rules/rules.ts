@@ -7,6 +7,7 @@
 import mmOptions from '../../../modules/mm-core/rules.json';
 import e9Options from '../../../modules/e9-core/rules.json';
 import e9mmOptions from '../../../modules/mm-core/e9/rules.json';
+import { CORE_RULES } from './core-modules';
 import { catalogFor, type Catalog, type MagicSystem } from '../equipment/equipment';
 
 export type AbilityId = 'con' | 'str' | 'dex' | 'int' | 'wis' | 'cha';
@@ -428,6 +429,21 @@ export function registerRuleset(options: RulesetOptions): Ruleset {
 }
 
 export const DEFAULT_RULES = 'mm';
+
+// The rules the pickers offer: a built-in ruleset whose module doesn't mark it "private" (core-modules.ts),
+// or one a campaign brought. A private ruleset still reads sheets and campaigns that use it.
+export function isPickableRules(id: string): boolean {
+  return BUILT_IN_RULES.has(id) ? !CORE_RULES[id]?.private : RULESETS.some((r) => r.id === id);
+}
+
+// Where the pickers start: DEFAULT_RULES, or the first ruleset offered while that one is private.
+export const START_RULES: string = isPickableRules(DEFAULT_RULES) ? DEFAULT_RULES : (RULESETS.find((r) => isPickableRules(r.id))?.id ?? DEFAULT_RULES);
+
+// The rules chosen in Settings, or START_RULES if that choice is no longer offered.
+export function settingsRules(id: unknown): Ruleset {
+  const r = findRules(id);
+  return r && isPickableRules(r.id) ? r : rulesFor(START_RULES);
+}
 
 // Sheets saved before E9 support say "1e", the Compendium's first edition.
 export function normalizeRulesId(id: unknown): string {

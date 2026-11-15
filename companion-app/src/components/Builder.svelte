@@ -8,17 +8,17 @@
     type Abilities
   } from '../lib/character';
   import {
-    ABILITIES, ABILITY_LABELS, DEFAULT_RULES, RULESETS, TALENTS, hasKind, isBuiltInRules, primesOf, rulesFor,
+    ABILITIES, ABILITY_LABELS, DEFAULT_RULES, RULESETS, TALENTS, hasKind, isBuiltInRules, isPickableRules, primesOf, rulesFor, settingsRules,
     type OriginRollStep,
     type AbilityId, type ClassId, type OriginId, type TalentId
   } from '../rules/rules';
 
   import { campaignRulesId } from '../lib/campaign';
 
-  // A campaign sets the rules; otherwise any of the app's own.
+  // A campaign sets the rules; otherwise any of the app's own that aren't private.
   const campaign = app.campaign;
-  const choices = campaign ? RULESETS.filter((r) => r.id === campaignRulesId(campaign)) : RULESETS.filter((r) => isBuiltInRules(r.id));
-  const startRules = campaign ? choices[0] ?? rulesFor(DEFAULT_RULES) : rulesFor(isBuiltInRules(app.settings.rules) ? app.settings.rules : DEFAULT_RULES);
+  const choices = campaign ? RULESETS.filter((r) => r.id === campaignRulesId(campaign)) : RULESETS.filter((r) => isBuiltInRules(r.id) && isPickableRules(r.id));
+  const startRules = campaign ? choices[0] ?? rulesFor(DEFAULT_RULES) : settingsRules(isBuiltInRules(app.settings.rules) ? app.settings.rules : undefined);
   let rulesId = $state(startRules.id);
   let rules = $derived(rulesFor(rulesId));
   let name = $state('');
