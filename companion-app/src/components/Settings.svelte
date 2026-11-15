@@ -90,6 +90,15 @@
 
   let bot = $state(app.discordBot);
   const appId = $derived(botAppId(bot));
+  // The bot's steps start open until it listens, then stay as the referee leaves them; a new problem opens them again.
+  let botOpen = $state(app.discordStatus.state !== 'listening');
+  let botWas = app.discordStatus.state;
+  $effect(() => {
+    const st = app.discordStatus.state;
+    if (st === botWas) return;
+    botWas = st;
+    if (st === 'failed' || st === 'no-channel') botOpen = true;
+  });
   // The step the last test points back to.
   const stuck = $derived.by(() => {
     const st = app.discordStatus;
@@ -225,7 +234,7 @@
     <p class="small muted bot-setup">Referee's bot: pick a campaign first (Campaign tab or the Launcher); the bot reads that campaign's channel.</p>
   {/if}
   {#if app.mode === 'referee' && app.campaignWebhook}
-    <details class="bot-setup" open={app.discordStatus.state !== 'listening'}>
+    <details class="bot-setup" bind:open={botOpen}>
       <summary title="While this app is open, your own Discord bot reads {app.campaign?.campaign.name}'s channel, so a player's join request lands in the Inbox by itself. Setting it up takes about five minutes, once. The token stays on this device.">Referee's bot ⓘ
         {#if app.discordStatus.state === 'listening'}<span class="small success"> · hears the campaign channel</span>{/if}</summary>
       <ol class="small steps">
