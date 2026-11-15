@@ -37,7 +37,9 @@
     "party": "slowest",
     "terrain": {
       "difficult": "requires maneuver",
-      "open": ["road", "clear"]
+      "open": ["road", "clear"],
+      "_comment": "Heph 2026-11-15: for now mountain, heavy forest, marshland and water are difficult; every other terrain is clear. Ids are the Atlas terrain ids in use.",
+      "difficultTerrain": ["mount", "mountains", "barren-mountains", "forest", "bog", "marsh", "swamp", "lake", "sea", "ocean", "deep-ocean", "shallows"]
     }
   },
   "equipment": ["e9", "mm"],

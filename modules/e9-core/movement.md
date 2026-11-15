@@ -36,14 +36,14 @@ Checked against the E9 System Reference Handbook: 5 paces a round (p. 33), half 
 - **The party.** The party moves at its slowest member's speed, or splits into separate parties (separate Atlas markers).
 - **Difficult terrain** forces Climb/Swim/Maneuver on everyone crossing it, so 0.5x is the most anyone moves there. Forced March and Dash need a road or clear terrain.
 - **No mode** means 1x and no roll.
+- **Which terrain is difficult** (Heph 2026-11-15, for now): mountain, heavy forest, marshland and water. In Atlas ids that's `mount`, `mountains`, `barren-mountains`, `forest`, `bog`, `marsh`, `swamp`, `lake`, `sea`, `ocean`, `deep-ocean` and `shallows` (`movement.terrain.difficultTerrain`). Everything else, woods and hills included, is clear. A road makes any hex open.
 
 ## For the Atlas
 
-- `travel` answers the time multiplier for a hex. Under E9 this is 1 for road or clear terrain and 2 for difficult terrain (Climb/Swim/Maneuver). A module's own terrain `travel` value still wins on its map.
+- `travel` answers the time multiplier for a hex. A module's own terrain `travel` value still wins on its map. Under E9, Climb/Swim/Maneuver's 0.5x is the difficult-terrain slowdown, so `move` divides a difficult hex's travel multiplier by 2 before applying the party's speed, and a plain difficult hex costs 2x, not 4x.
 - `move` takes the party's pace as a time multiplier, which is 1 / the party's speed. The party's speed is the slowest member's slowest mode.
 - The Atlas needs each character's chosen modes per party, which it doesn't store yet (a `parties[].modes` field: `{character: [mode ids]}`). Without them, everyone moves at 1x.
 - Rolls: each mode's talent check is rolled when its procedure runs (the navigator's Survival at the start of a shift, On Watch Alertness for an encounter, Agility for a Forced March). These come after this data, in their own PRs.
 
 ## Open
 
-- Which Atlas terrain types count as difficult. Proposed: any whose travel multiplier is 2 or more, unless the module says otherwise.
