@@ -31,7 +31,7 @@ Checked against the E9 System Reference Handbook: 5 paces a round (p. 33), half 
 
 ## Rules
 
-- **How many modes.** A non-Expert takes one mode at a time. An Expert takes 2 at level 1, 3 at level 5 and 4 at level 9. Help is an Expert mode: the Expert names an ally, and that ally may take one more mode than usual.
+- **How many modes.** A non-Expert takes one mode at a time. An Expert takes 2 at level 1, 3 at level 5 and 4 at level 9. Help is an Expert mode and uses one of the Expert's slots (Heph 2026-11-15): the Expert helps an ally with a roll, and that ally may take one more mode than usual.
 - **Several modes.** The slowest mode sets the character's speed. Extra modes add rolls but don't slow the character further.
 - **The party.** The party moves at its slowest member's speed, or splits into separate parties (separate Atlas markers).
 - **Difficult terrain** forces Climb/Swim/Maneuver on everyone crossing it, so 0.5x is the most anyone moves there. Forced March and Dash need a road or clear terrain.
@@ -46,5 +46,4 @@ Checked against the E9 System Reference Handbook: 5 paces a round (p. 33), half 
 
 ## Open
 
-- Does Help use up one of the Expert's own mode slots? Here it does, because it's listed as a mode.
 - Which Atlas terrain types count as difficult. Proposed: any whose travel multiplier is 2 or more, unless the module says otherwise.
