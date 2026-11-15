@@ -1,0 +1,1 @@
+A start can name its own 100-ft hex (Heph 2026-11-15, Isle of Mists). module.json `starts[]` takes an optional `"hex": "world:LLLL:HHHH"`, the address the Atlas prints; a party created with that start is placed there (Arriving in the Pale: the road outside the Pale Keep's drawbridge) instead of on its site's own hex. `site` still names the place.

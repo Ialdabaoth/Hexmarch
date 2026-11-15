@@ -34,7 +34,7 @@
 <script>
 "use strict";
 // HexmarchMap.open(pointers, title): one pointer opens its map at the pointed area; several show a picker first.
-// The page sets HexmarchMap.base (the module folder, ending in /), HexmarchMap.module (its id), HexmarchMap.creatures (as for HexmarchCard) and HexmarchMap.scenes (encounters.scenes).
+// The page sets HexmarchMap.base (the module folder, ending in /), HexmarchMap.module (its id), HexmarchMap.stamp (the build, so changed pictures load fresh), HexmarchMap.creatures (as for HexmarchCard) and HexmarchMap.scenes (encounters.scenes).
 // HexmarchMap.load(id) gives a map file with its defaults filled in (the one place export and import code should read maps from).
 // HexmarchMap.place(map, where, tokens, taken) -> one [x, y] per token (ENCOUNTER_FORMAT.md 14.1); where is a spawn id, an area id or [x, y, w, h].
 // HexmarchMap.places: the world's places with maps, [{name, pointers, go()}]; a map lists the ones it leads back out to (section 14.3).
@@ -123,7 +123,8 @@ window.HexmarchMap = (() => {
     return out;
   }
   async function load(id) {
-    if (!cache[id]) cache[id] = fetch(api.base + 'encounter-maps/' + encodeURIComponent(id) + '.json').then(r => { if (!r.ok) throw new Error(r.status); return r.json(); }).then(m => normalise(m, id));
+    if (!cache[id]) cache[id] = fetch(api.base + 'encounter-maps/' + encodeURIComponent(id) + '.json', { cache: 'no-cache' })  // a moved anchor shows at once (Pages caches for 10 minutes)
+      .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); }).then(m => normalise(m, id));
     try { return await cache[id]; } catch (err) { delete cache[id]; throw err; }
   }
   const rects = a => Array.isArray(a.squares[0]) ? a.squares : [a.squares];
@@ -146,7 +147,7 @@ window.HexmarchMap = (() => {
     pg.style.width = q(w); pg.style.height = q(h);
     if (m.ground !== 'none' && m.ground !== 'generate') pg.style.background = m.ground;  // a colour (generated ground comes later)
     for (const L of m.layers) {
-      const im = new Image(); im.alt = ''; im.src = api.base + 'encounter-maps/' + L.src;
+      const im = new Image(); im.alt = ''; im.src = api.base + 'encounter-maps/' + L.src + (api.stamp ? '?v=' + encodeURIComponent(api.stamp) : '');
       Object.assign(im.style, { left: q(L.at[0]), top: q(L.at[1]), opacity: L.opacity, transformOrigin: '0 0', transform: L.rotate ? `rotate(${L.rotate}deg)` : '' });
       im.onload = () => { im.style.width = q(im.naturalWidth / L.px); }; pg.append(im);
     }
