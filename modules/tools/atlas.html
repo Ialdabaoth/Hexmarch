@@ -43,6 +43,10 @@ footer{display:flex;justify-content:space-between;gap:12px;padding:4px 16px;font
 #party button.on{border-color:var(--red);color:var(--red)}#party hr{border:0;border-top:1px solid #d8cfb8;margin:6px 0}.fd{color:#2e6b34!important;font-weight:bold}
 #routebtn.on,#partybtn.on{border-color:var(--red);color:var(--red)}
 footer a{color:var(--red)}
+/* a tooltip that also shows on a tap (Heph: explanations in tooltips, never a bare title) */
+#party .tip{all:unset;position:relative;cursor:help;text-decoration:underline dotted;text-underline-offset:3px}#party .tip:focus-visible{outline:2px solid var(--red)}
+#party .tip::after{content:attr(data-tip);position:absolute;left:0;bottom:calc(100% + 4px);z-index:5;width:max-content;max-width:min(280px,70vw);padding:6px 8px;border-radius:5px;background:#2b2118;color:#fffaf0;font-size:12px;font-weight:normal;line-height:1.35;white-space:normal;opacity:0;visibility:hidden;pointer-events:none}
+#party .tip:hover::after,#party .tip:focus::after{opacity:1;visibility:visible}
 </style></head><body>
 <header><h1 id="crumbs"></h1>
 <div class="ctl"><select id="lang" aria-label="Language" hidden></select>
@@ -617,7 +621,7 @@ async function unpublished() {
   const st = pub && pub.snapshot && pub.snapshot.state;
   if (!st) return true;
   const key = x => x && typeof x === 'object' ? (Array.isArray(x) ? x.map(key) : Object.keys(x).sort().filter(k => x[k] !== undefined).map(k => [k, key(x[k])])) : x;  // order-blind
-  const ps = q => JSON.stringify(key((q || []).map(p => ({ id: p.id, name: p.name, start: p.start || null, clock: p.clock, session: p.session, at: p.at || null }))));
+  const ps = q => JSON.stringify(key((q || []).map(p => ({ id: p.id, name: p.name, start: p.start || null, clock: p.clock, session: p.session, at: p.at || null, discord: p.discord || null }))));
   return ps(st.parties) !== ps(CS.parties) || (st.active || '') !== CS.active;
 }
 let UNPUB = false;
@@ -1219,7 +1223,55 @@ function partiesLine() {  // the referee's party switcher and creator
   const ps = CS ? CS.parties : [];
   return (ps.length > 1 ? '<small>Party</small> <select data-party aria-label="Party">' + ps.map(q => `<option value="${esc(q.id)}"${q.id === PID ? ' selected' : ''}>${esc(q.name)}</option>`).join('') + '</select> ' : '')
     + (AP() ? `<button data-p="invite" title="${HOSTINV ? 'Invite a player into this party with the Companion' : 'Make a link that invites a player into this party'}">Invite a player</button>` : '')
-    + '<button data-p="new">New party…</button>' + publishLine() + inviteLine();
+    + '<button data-p="new">New party…</button>' + publishLine() + inviteLine() + discordLine();
+}
+// Discord per party (Heph 2026-11-15: a campaign default, which any party can override). The party's own channel (a webhook) and who Discord
+// pings when a request arrives sit on the party (parties[].discord, engine partyChannel); what it leaves out comes from the campaign's, set in
+// Scribe › Communication. Players get it when the campaign is published.
+let DISC = false, DISCMSG = '';
+const DISCORD_HOOK = /^https:\/\/(?:ptb\.|canary\.)?discord(?:app)?\.com\/api\/webhooks\/\d+\/[\w-]+\/?$/;
+function discPing(kind, id) {  // undefined: the campaign's; '' nobody; null: not a user or role id
+  if (kind === 'default') return undefined; if (kind === 'none') return ''; if (kind === 'here') return '@here';
+  const m = /^<?@?(!|&)?(\d{15,21})>?$/.exec(String(id || '').trim()); if (!m || (kind === 'role' && m[1] && m[1] !== '&') || (kind === 'me' && m[1] === '&')) return null;
+  return kind === 'role' ? `<@&${m[2]}>` : `<@${m[2]}>`;
+}
+function discKind(d) { return !d || !('ping' in d) ? 'default' : d.ping === '' ? 'none' : d.ping === '@here' ? 'here' : d.ping.startsWith('<@&') ? 'role' : 'me'; }
+function discordLine() {
+  const ap = AP(); if (LOCK || !ap) return '';
+  const d = ap.discord || {}, k = discKind(d), who = { default: 'the campaign’s ping', none: 'no ping', here: '@here', role: 'a role', me: 'one person' }[k];
+  const tip = 'Where this party’s join requests and rolls are posted, and who Discord pings when a request arrives. Left empty, the party uses the campaign’s channel and ping from Scribe › Communication. Players get it once you publish.';
+  if (!DISC) return `<br><small><button type="button" class="tip" data-tip="${esc(tip)}">Discord</button>: ${d.post ? 'its own channel' : 'the campaign’s channel'}, ${who}</small> <button data-p="disc">Change…</button>${DISCMSG ? `<br><small>${esc(DISCMSG)}</small>` : ''}`;
+  const opt = (v, t) => `<option value="${v}"${v === k ? ' selected' : ''}>${t}</option>`;
+  return `<hr><b><button type="button" class="tip" data-tip="${esc(tip)}">Discord for ${esc(ap.name)}</button></b><br>`
+    + `<label><small><button type="button" class="tip" data-tip="In Discord: Server Settings › Integrations › Webhooks › New Webhook, pick the party’s channel, then Copy Webhook URL.">Channel webhook</button></small> <input data-dc="post" size="28" value="${esc(d.post || '')}" placeholder="the campaign’s channel" autocomplete="off"></label><br>`
+    + `<label><small>Ping</small> <select data-dc="kind">${opt('default', 'The campaign’s')}${opt('me', 'One person')}${opt('role', 'A role')}${opt('here', 'Everyone in the channel (@here)')}${opt('none', 'Nobody')}</select></label> `
+    + `<input data-dc="id" size="20" value="${esc((d.ping || '').replace(/\D/g, ''))}" placeholder="user or role ID" inputmode="numeric" aria-label="Discord user or role ID"><br>`
+    + '<button data-p="discsave">Save</button><button data-p="disctest">Send a test post</button><button data-p="disccancel">Cancel</button>'
+    + (DISCMSG ? `<br><small>${esc(DISCMSG)}</small>` : '');
+}
+function discRead(box) {  // the form's party discord, null for "all the campaign's"; throws what to fix
+  const v = k => box.querySelector(`[data-dc="${k}"]`).value.trim(), post = v('post'), ping = discPing(v('kind'), v('id'));
+  if (post && !DISCORD_HOOK.test(post)) throw new Error('That isn’t a whole Discord webhook address. Copy it again with Copy Webhook URL.');
+  if (ping === null) throw new Error('That isn’t a Discord user or role ID: with Developer Mode on, right-click or long-press the person or role and copy its ID.');
+  const d = { ...(post ? { post } : {}), ...(ping !== undefined ? { ping } : {}) };
+  return Object.keys(d).length ? d : null;
+}
+async function saveDiscord(box) {
+  const ap = AP(); if (!ap || LOCK || !CS) return; let d;
+  try { d = discRead(box); } catch (e) { DISCMSG = e.message; partyBox(); return; }
+  CS = { ...CS, revision: CS.revision + 1, updated: new Date().toISOString(), parties: CS.parties.map(p => { if (p.id !== ap.id) return p; const { discord, ...rest } = p; return d ? { ...rest, discord: d } : rest; }) };
+  await saveState(); if (parent !== window) parent.postMessage({ type: 'hexmarch-atlas', event: 'discord', module: MOD.id, party: ap.id, discord: d }, '*');
+  DISC = false; DISCMSG = 'Saved. Players get it when you publish.'; partyBox();
+}
+async function testDiscord(box) {
+  const ap = AP(); let d; try { d = discRead(box); } catch (e) { DISCMSG = e.message; partyBox(); return; }
+  if (!d || !d.post) { DISCMSG = 'Paste the party’s own webhook to test it; the campaign’s channel is tested in Scribe › Communication.'; partyBox(); return; }
+  const ping = d.ping || '', m = /^<@(&?)(\d+)>$/.exec(ping), allowed = ping === '@here' ? { parse: ['everyone'] } : m ? (m[1] ? { parse: [], roles: [m[2]] } : { parse: [], users: [m[2]] }) : { parse: [] };
+  DISCMSG = 'Sending…'; partyBox();
+  try { const r = await fetch(d.post, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: `${ping ? ping + ' ' : ''}Hexmarch test: requests for “${ap.name}” will arrive in this channel.`.slice(0, 2000), allowed_mentions: allowed }) });
+    DISCMSG = r.ok ? `Sent. Check the channel${ping ? ' and your notifications' : ''}.` : r.status === 401 || r.status === 404 ? 'Discord doesn’t know that webhook. Make a new one and paste it again.' : `Discord said ${r.status}.`;
+  } catch (e) { DISCMSG = 'Couldn’t reach Discord. Check your connection and try again.'; }
+  partyBox();
 }
 function inviteLine() {  // the invitation made standalone, for the referee to send (Heph 2026-11-10: Atlas hands to the Companion per invitation)
   if (!INVITE || INVITE !== PID) return '';
@@ -1262,6 +1314,8 @@ document.getElementById('party').addEventListener('click', e => { if (e.target.c
   else if (a === 'invite' && !LOCK && AP()) { if (HOSTINV && parent !== window) { parent.postMessage({ type: 'hexmarch-atlas', event: 'invite', module: MOD.id, party: PID }, '*'); return; }
     inviteHandoff(PID).then(async l => { if (l) { if (UNPUB) await handOff(await publishLink(backHere(PID)), 'Scribe'); else await handOff(l, 'the Companion'); return; } INVITE = PID; partyBox(); }); return; }
   else if (a === 'publish') { publishLink(backHere('')).then(l => handOff(l, 'Scribe')); return; }
+  else if (a === 'disc' && !LOCK) { DISC = true; DISCMSG = ''; } else if (a === 'disccancel') { DISC = false; DISCMSG = ''; }
+  else if (a === 'discsave') { saveDiscord(document.getElementById('party')); return; } else if (a === 'disctest') { testDiscord(document.getElementById('party')); return; }
   else if (a === 'copyinv') { const i = document.querySelector('#party input[data-inv]'); if (i) { i.select(); try { navigator.clipboard.writeText(i.value); b.textContent = 'Copied'; } catch (x) { document.execCommand('copy'); } } return; }
   else if (a === 'save') { if (CS) saveFile(); return; } else if (a === 'load') { loadFile(); return; } else if (a === 'who') { loadWhoFile(); return; }
   partyBox(); });

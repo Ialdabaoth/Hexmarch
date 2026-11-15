@@ -44,6 +44,7 @@ button.tip:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; 
 .files a { color: var(--accent); }
 .starts { margin: -4px 0 8px 30px; font-size: .95rem; } .starts summary { cursor: pointer; color: var(--accent); } .starts ul { margin: 4px 0 0; padding-left: 18px; } .starts li { margin: 4px 0; }
 ol.gh li { margin: 0 0 10px; }
+ol.gh li.stuck { outline: 2px solid var(--bad, #b00); outline-offset: 2px; border-radius: 4px; }
 ol.gh label.field { margin: 4px 0 0; }
 details.atlas { margin-top: 0; }
 details.atlas > summary { font-size: 1.15em; }

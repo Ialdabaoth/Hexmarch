@@ -1,0 +1,1 @@
+Party box (Referee mode): each party can have its own Discord channel and ping. "Change…" opens a channel webhook field and who to ping (the campaign's, one person, a role, @here or nobody), with "Send a test post". Left empty, the party uses the campaign's channel and ping from Scribe › Communication. A changed channel counts as unpublished, so "Publish for players" appears.

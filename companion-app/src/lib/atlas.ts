@@ -18,7 +18,9 @@ export interface AtlasActive { type: 'hexmarch-atlas'; event: 'active'; module: 
 export interface AtlasKnowledge { type: 'hexmarch-atlas'; event: 'knowledge'; module: string; ids: string[]; add: unknown[]; remove: string[] }
 // The referee pressed the party builder's "Invite a player" (offered when the app sends hostActions: ['invite']).
 export interface AtlasInvite { type: 'hexmarch-atlas'; event: 'invite'; module: string; party: string }
-export type AtlasMessage = AtlasView | AtlasParty | AtlasNewParty | AtlasActive | AtlasInvite | AtlasKnowledge;
+// The referee set a party's own Discord channel and ping in the Atlas's party box (null: back to the campaign's).
+export interface AtlasDiscord { type: 'hexmarch-atlas'; event: 'discord'; module: string; party: string; discord: Record<string, unknown> | null }
+export type AtlasMessage = AtlasView | AtlasParty | AtlasNewParty | AtlasActive | AtlasInvite | AtlasKnowledge | AtlasDiscord;
 
 // The Atlas ships beside the app (<site>/atlas/, the Companion being <site>/companion/) and loads the module from its own site (?site=<base>).
 export function atlasUrl(base: string, id: string, app: string = appAtlas()): string {
@@ -45,6 +47,7 @@ export function isAtlasMessage(d: unknown): d is AtlasMessage {
     return partyId(m.party) && (m.hex === null || isAtlasAddress(m.hex)) && typeof m.hours === 'number' && Number.isFinite(m.hours) && m.hours >= 0;
   if (m.event === 'party-new') return !!m.party && typeof m.party === 'object' && partyId((m.party as { id?: unknown }).id);
   if (m.event === 'active' || m.event === 'invite') return partyId(m.party);
+  if (m.event === 'discord') return partyId(m.party) && (m.discord === null || (!!m.discord && typeof m.discord === 'object'));
   return false;
 }
 

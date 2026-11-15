@@ -18,6 +18,14 @@
   onMount(() => {
     app.load();
     requestPersistence();
+    // Scribe saves the referee's bot; read it again whenever this window comes back to the front.
+    const again = () => document.visibilityState === 'visible' && app.loaded && void app.loadBotTokens();
+    document.addEventListener('visibilitychange', again);
+    window.addEventListener('focus', again);
+    return () => {
+      document.removeEventListener('visibilitychange', again);
+      window.removeEventListener('focus', again);
+    };
   });
 
   // The Inbox shows as an envelope: 📩 when something is waiting, ✉️ when not.
@@ -29,9 +37,9 @@
     { name: 'settings', label: '⚙️', aria: 'Settings' }
   ] as const);
 
-  // Referee mode: hold the campaign channel's live reader while the app is open (lib/gateway.ts).
+  // Referee mode: hold the campaign channel's live reader while the app is open (engine/gateway.ts).
   $effect(() => {
-    void [app.loaded, app.mode, app.campaignWebhook, app.discordBot];
+    void [app.loaded, app.mode, app.discordHooks, app.discordBot];
     void app.listenDiscord();
   });
 

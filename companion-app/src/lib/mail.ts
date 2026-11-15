@@ -13,8 +13,9 @@ export interface MailItem {
   box: 'in' | 'out';
   // The referee's answer to a request: approved (in the next publish) or sent back with a note.
   answer?: { kind: 'approved' | 'sent-back'; note?: string; at: string };
-  // Sent to a Discord channel: the post's id, and the status its text last showed (the witness post).
-  discord?: { id: string; shows?: string };
+  // Sent to a Discord channel: the post's id, the status its text last showed (the witness post), and the webhook it
+  // went to (a party's own channel, else the campaign's).
+  discord?: { id: string; shows?: string; hook?: string };
 }
 
 export async function loadMail(): Promise<MailItem[]> {
