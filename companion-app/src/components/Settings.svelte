@@ -201,6 +201,11 @@
       onchange={(e) => app.updateSettings({ autoPost: (e.target as HTMLInputElement).checked })} />
     Post every roll to Discord automatically
   </label>
+  {#if app.mode === 'referee' && app.campaign && !app.campaignWebhook}
+    <p class="small muted bot-line">Referee's bot: in Scribe › Discord, send this campaign's requests to a Discord channel and set up the bot there, then Publish.</p>
+  {:else if app.mode === 'referee' && !app.campaign}
+    <p class="small muted bot-line">Referee's bot: pick a campaign first (Campaign tab or the Launcher); the bot reads that campaign's channel.</p>
+  {/if}
   {#if app.mode === 'referee' && app.campaignWebhook}
     <!-- The referee's bot is set up in Scribe's Discord steps (Heph 2026-11-15: one Discord setup, in Scribe). -->
     <p class="small bot-line">

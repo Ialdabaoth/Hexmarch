@@ -1,0 +1,1 @@
+Settings › Discord: in referee mode, when the campaign's requests don't go to a Discord webhook yet (or no campaign is picked), the Referee's bot area now says what to do first, so it no longer just isn't there.
