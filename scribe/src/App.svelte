@@ -541,7 +541,7 @@
 
   {#if built && !built.problems.length && isBuilt}
     <section>
-      <h2><button type="button" class="tip" data-tip="Players read the campaign from a web address you choose. Publish puts the files there for you, free, on an account of yours.">Where players find it</button></h2>
+      <h2><button type="button" class="tip" data-tip="Players read the campaign from a web address you choose. Publish puts the files there for you, free, on an account of yours.">Hosting</button></h2>
       {#if !record}
         <p class="small muted">Save the campaign on this device first (above). Players can't join until it is published.</p>
       {:else}
