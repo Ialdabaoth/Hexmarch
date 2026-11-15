@@ -5,56 +5,38 @@
   "e9mm",
   "mm"
  ],
- "_comment": "E9's generic procedures (EVENTS_FORMAT.md section 7). travel and sight-range are the questions the Atlas asks; a module's own terrain travel and sight fields win on its map. The sight ranges are the Atlas's stand-in numbers until the handbook's are worded in. mm uses this file until mm-core has its own. navigate and move are mechanical only (time and position); the rolls along the way belong to each ruleset's own thread.",
+ "_comment": "E9's generic procedures (EVENTS_FORMAT.md section 7). sight-range answers by the hex's view grade, move times a hex by the party's speed; terrain traits (ATLAS_FORMAT.md) replace travel multipliers. mm uses this file until mm-core has its own. The rolls along the way belong to the E9 thread.",
  "procedures": {
   "travel": {
    "params": [
     "terrain",
     "road"
    ],
+   "about": "Retired by terrain traits (Heph 2026-11-15): time now comes from move with the hex's traverse grade and the party's speed. Answers 1 until the Atlas stops asking.",
    "steps": [
     {
-     "result": {
-      "by": "terrain",
-      "of": {},
-      "else": 1
-     }
+     "result": 1
     }
    ]
   },
   "sight-range": {
    "params": [
+    "view",
     "terrain"
    ],
+   "about": "Miles seen from a hex, by its view grade (rules.json movement.view_mi).",
    "steps": [
     {
      "result": {
-      "by": "terrain",
-      "else": 3,
+      "by": "view",
       "of": {
-       "grass": 3,
-       "woods": 1.5,
-       "forest": 0.5,
-       "hills": 6,
-       "mount": 12,
-       "bog": 2,
-       "sea": 6,
-       "lake": 3,
-       "clear": 3,
-       "mixed-woods": 1.5,
-       "grassland": 3,
-       "mountains": 12,
-       "barren-mountains": 12,
-       "scrub-desert": 4,
-       "sandy-desert": 4,
-       "rocky-desert": 4,
-       "marsh": 2,
-       "swamp": 1,
-       "black-sand": 4,
-       "deep-ocean": 6,
-       "ocean": 6,
-       "shallows": 6
-      }
+       "automatic": 6,
+       "easy": 3,
+       "normal": 1.5,
+       "hard": 0.5,
+       "impossible": 0
+      },
+      "else": 3
      }
     }
    ]
@@ -83,12 +65,20 @@
     "mi",
     "mph",
     "pace",
-    "party"
+    "party",
+    "orient",
+    "traverse",
+    "hide",
+    "investigate",
+    "view",
+    "speed",
+    "modes"
    ],
+   "about": "Time for one hex: distance over the party's speed (slowest member's slowest mode, with the hex's traverse grade already applied by the Atlas from rules.json movement). Roll-free, so the Atlas can dry-run it for estimates; the rolls (orient, traverse, hide) run as their own procedures.",
    "steps": [
     {
      "effect": "clock",
-     "hours": "{mi} * {pace} / {mph}"
+     "hours": "{mi} / ({mph} * {speed})"
     },
     {
      "effect": "move",
