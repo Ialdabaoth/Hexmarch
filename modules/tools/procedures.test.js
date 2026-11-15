@@ -14,7 +14,7 @@ test('travel and sight-range answer from e9-core', () => {
   const l = P.load('e9', [E9], null);
   assert.strictEqual(P.ask(l, 'sight-range', { view: 'automatic' }), 6);  // by the hex's view grade (terrain traits)
   assert.strictEqual(P.ask(l, 'sight-range', { terrain: 'unknown-type' }), 3);
-  assert.strictEqual(P.ask(l, 'travel', { terrain: 'bog', road: '' }), 1);  // retired by terrain traits
+  assert.strictEqual(P.ask(l, 'travel', { terrain: 'bog', road: '' }), undefined);  // retired by terrain traits
   assert.strictEqual(P.ask(P.load('acks', [E9], null), 'sight-range', { view: 'easy' }), undefined);  // not served
 });
 
@@ -49,7 +49,7 @@ test('arithmetic in templates, walk, offers and previews', () => {
   const e = P.run(l, 'navigate', { walk: (name, vars, sub, entry, stop) => { seen.push(stop); for (const mi of [3, 1.5]) seen.push(sub(name, { mi, mph: 3, to: 'x', traverse: 'easy', speed: 1 }).effects[0].hours); } });
   assert.deepStrictEqual(seen, ['queued', 1, 0.5]);
   assert.deepStrictEqual(e.warnings, []);
-  assert.deepStrictEqual(P.rollsOf(l, 'navigate'), []);
+  assert.deepStrictEqual(P.rollsOf(l, 'navigate'), ['Footing: Agility vs traverse']);  // e9's walk rolls footing in each hex
 });
 
 test('e9 movement: move times a hex by the party speed (e9-core movement.md)', () => {
@@ -95,6 +95,47 @@ test('walk passes "then" procedures to the map', () => {
   P.run(l, 'go', { walk: (name, vars, sub, entry, stop, then) => { got = [name, stop, then, sub('lost', {}).rolls.length]; } });
   assert.deepStrictEqual(got, ['move', 'queued', ['lost'], 1]);
   assert.deepStrictEqual(P.rollsOf(l, 'go'), ['lost check']);
+});
+
+test('e9 talent checks by grade, and footing (e9-core movement.md, rolls along the way)', () => {
+  const l = P.load('e9', [E9], null);
+  assert.deepStrictEqual(l.report, []);
+  const party = [{ id: 'a', name: 'Ann', modes: [] }, { id: 'b', name: 'Bo', modes: [] }];
+  const foot = (traverse, ...xs) => P.run(l, 'footing', { party, vars: { traverse }, rng: seq(...xs) });  // 0.9 -> 6, 0.7 -> 5, 0.5 -> 4, 0.0 -> 1
+  let e = foot('automatic', 0.0);
+  assert.deepStrictEqual(e.effects, []);                          // no roll needed
+  e = foot('normal', 0.7, 0.5);                                   // Ann 5 passes, Bo 4 fails at 5+
+  assert.deepStrictEqual(e.text, ['Bogged down: Bo failed Agility (normal).']);
+  assert.strictEqual(e.effects[0].effect, 'halt');
+  e = foot('easy', 0.5, 0.7, 0.0, 0.9);                           // easy: Ann 4 then 5, Bo 1 then 6: both pass on the better die
+  assert.deepStrictEqual(e.effects, []);
+  e = foot('hard', 0.9, 0.5, 0.9, 0.9);                           // hard: Ann 6 then 4 fails on the worse die, Bo 6 and 6 passes
+  assert.deepStrictEqual(e.text, ['Bogged down: Ann failed Agility (hard).']);
+  e = foot('impossible');
+  assert.strictEqual(e.effects[0].effect, 'halt');
+  assert.deepStrictEqual(P.rollsOf(l, 'navigate'), ['Footing: Agility vs traverse']);
+});
+
+test('e9 lost (each shift) and forced march (each hour), with their clock triggers', () => {
+  const l = P.load('e9', [E9], null);
+  assert.deepStrictEqual(l.report, []);
+  const party = [{ id: 'a', name: 'Ann', modes: ['navigate'] }, { id: 'b', name: 'Bo', modes: ['navigate', 'forced-march'] }, { id: 'c', name: 'Cy', modes: ['forced-march'] }];
+  const lost = (orient, ...xs) => P.run(l, 'lost', { party, vars: { orient }, rng: seq(...xs) });
+  let e = lost('normal', 0.5, 0.7);                               // Ann 4 fails, Bo 5 passes: anyone on Navigate is enough
+  assert.deepStrictEqual(e.effects, []);
+  assert.ok(e.rolls.filter(r => r.who).every(r => r.secret));
+  e = lost('normal', 0.5, 0.0);                                   // both fail
+  assert.deepStrictEqual(e.text, ['Lost: nobody on Navigate kept the way (normal).']);
+  assert.strictEqual(e.effects[0].effect, 'halt');
+  assert.deepStrictEqual(lost('automatic').effects, []);
+  const march = (road, ...xs) => P.run(l, 'forced-march', { party, vars: { road }, rng: seq(...xs) });
+  e = march(undefined, 0.7, 0.5);                                 // off-road is normal: Bo 5 passes, Cy 4 fails
+  assert.deepStrictEqual(e.effects.map(f => [f.target, f.effect]), [['Cy', 'damage']]);
+  e = march('roman', 0.5, 0.0, 0.0, 0.9);                         // easy on a Roman road: Bo 4 then 1 fails, Cy 1 then 6 passes
+  assert.deepStrictEqual(e.effects.map(f => [f.target, f.effect]), [['Bo', 'damage']]);
+  e = march('trail', 0.9, 0.9);
+  assert.deepStrictEqual(e.effects, []);
+  assert.deepStrictEqual(E9.triggers.map(t => [t.id, t.every.n, t.run.call]), [['lost-shift', 4, 'lost'], ['forced-march-hour', 1, 'forced-march']]);
 });
 
 test('ruleset triggers load with the procedures, and "ease" picks whose Help counts for everyone', () => {
