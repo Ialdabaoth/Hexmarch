@@ -500,7 +500,7 @@
 
   {#if built}
     <section>
-      <h2><button type="button" class="tip" data-tip="This will create the campaign files for a new campaign from the modules you have chosen. The Companion, Atlas, and Scribe will all read from the campaign files on this device.">Build</button></h2>
+      <h2><button type="button" class="tip" data-tip="This will create the campaign files for a new campaign from the modules you have chosen. The Companion, Atlas, and Scribe tools will all read from the campaign files on this device.">Build</button></h2>
       {#if built.problems.length}
         <p class="bad">Scribe can't settle the modules yet:</p>
         <ul class="problems">{#each built.problems as p}<li>{describeProblem(p)}</li>{/each}</ul>
