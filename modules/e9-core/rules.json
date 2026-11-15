@@ -45,8 +45,8 @@
       "impossible": { "speed": 0 }
     },
     "view_mi": { "automatic": 6, "easy": 3, "normal": 1.5, "hard": 0.5, "impossible": 0 },
-    "_roads": "Heph 2026-11-15: every road is 1x; road quality makes the Forced March roll easier or automatic. Off a road, Forced March rolls Agility at normal.",
-    "roads": { "roman": { "forced-march": "automatic" }, "local": { "forced-march": "easy" }, "trail": { "forced-march": "normal" } }
+    "_roads": "Heph 2026-11-15: every road is 1x; road quality makes the Forced March roll easier. Off a road, Forced March rolls Agility at normal.",
+    "roads": { "roman": { "forced-march": "easy" }, "local": { "forced-march": "easy" }, "trail": { "forced-march": "normal" } }
   },
   "_terrain": "Heph 2026-11-15: E9's default terrain traits by Atlas terrain id (orient and traverse agreed; hide, investigate and view a first draft). A module's terrain type, then atlas.hex_traits per hex, then the campaign override these (ATLAS_FORMAT.md, Terrain traits). A road makes orient and traverse automatic.",
   "terrain": {
