@@ -42,7 +42,7 @@ Checked against the E9 System Reference Handbook: 5 paces a round (p. 33), half 
 - The Atlas works out each hex's traits (ruleset default, then the module's terrain type, then `hex_traits` per hex, then the campaign; a road makes orient and traverse automatic) and the party's `speed` from `movement`: each member's slowest applicable mode, with `movement.traverse[grade].requires` forcing a mode on everyone and `speed: 0` stopping the walk before that hex.
 - `move` gets `mi`, `mph`, `speed`, `modes` and the five traits, and passes {mi} ÷ (mph × speed) hours. It rolls nothing, so the Atlas can dry-run it for the key, the Route estimate and the Navigate preview.
 - `sight-range` answers miles by the hex's `view` grade (`movement.view_mi`).
-- `travel` is retired and answers 1 until the Atlas stops asking.
+- `travel` is retired and removed.
 - Rolls (Survival at the orient grade each shift, Agility at the traverse grade, Stealth at the hide grade, On Watch Alertness for an encounter) are their own procedures, added in later PRs.
 
 ## Rolls along the way (Heph 2026-11-15)
@@ -58,4 +58,4 @@ At each trigger the members in a mode roll that mode's talent at the hex's grade
 | An encounter is rolled | everyone On Watch: Alertness | any | all fail and the other side sneaked: surprised |
 | A turn spent investigating | each investigator: Alertness vs investigate | any | found |
 
-These become E9 procedures once the Atlas runner can roll for every member in a mode and combine the results (a request for the Atlas thread).
+Built so far (`procedures/e9.json`): `e9-check` is the E9 talent check by grade (automatic passes, easy keeps the better of 2d6, normal 1d6, hard keeps the worse of 2d6, impossible fails), at the default 5+ threshold until the Atlas reads characters' talent thresholds; `survival`, `agility`, `stealth` and `alertness` are aliases of it. `footing` is the traverse roll, run in every walked hex (`navigate` walks `move` then `footing`). The shift and Forced March rolls wait for clock triggers in the Atlas; the sneak, watch and investigate rolls come with encounters and exploration turns.

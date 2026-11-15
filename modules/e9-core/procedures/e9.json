@@ -7,18 +7,6 @@
  ],
  "_comment": "E9's generic procedures (EVENTS_FORMAT.md section 7). sight-range answers by the hex's view grade, move times a hex by the party's speed; terrain traits (ATLAS_FORMAT.md) replace travel multipliers. mm uses this file until mm-core has its own. The rolls along the way belong to the E9 thread.",
  "procedures": {
-  "travel": {
-   "params": [
-    "terrain",
-    "road"
-   ],
-   "about": "Retired by terrain traits (Heph 2026-11-15): time now comes from move with the hex's traverse grade and the party's speed. Answers 1 until the Atlas stops asking.",
-   "steps": [
-    {
-     "result": 1
-    }
-   ]
-  },
   "sight-range": {
    "params": [
     "view",
@@ -52,6 +40,9 @@
    "steps": [
     {
      "walk": "move",
+     "then": [
+      "footing"
+     ],
      "stop": "queued"
     }
    ]
@@ -89,6 +80,308 @@
      "from": "{to}"
     }
    ]
+  },
+  "e9-grade": {
+   "params": [
+    "vs"
+   ],
+   "steps": [
+    {
+     "result": {
+      "by": "vs",
+      "of": {
+       "automatic": {
+        "total": 1
+       },
+       "easy": {
+        "total": 2
+       },
+       "normal": {
+        "total": 3
+       },
+       "hard": {
+        "total": 4
+       },
+       "impossible": {
+        "total": 5
+       }
+      },
+      "else": {
+       "total": 3
+      }
+     }
+    }
+   ]
+  },
+  "e9-check": {
+   "params": [
+    "vs",
+    "who"
+   ],
+   "about": "An E9 talent check (p. 8): automatic passes, easy rolls 2d6 and keeps the better, normal rolls 1d6, hard rolls 2d6 and keeps the worse, impossible fails. The threshold is the default 5+ until the Atlas reads characters' talent thresholds.",
+   "steps": [
+    {
+     "call": "e9-grade",
+     "with": {
+      "vs": "{vs}"
+     },
+     "as": "g"
+    },
+    {
+     "branch": "g",
+     "ranges": [
+      {
+       "roll": [
+        1,
+        1
+       ],
+       "steps": [
+        {
+         "result": {
+          "pass": true
+         }
+        }
+       ]
+      },
+      {
+       "roll": [
+        2,
+        2
+       ],
+       "steps": [
+        {
+         "roll": "1d6",
+         "as": "a"
+        },
+        {
+         "branch": "a",
+         "ranges": [
+          {
+           "roll": [
+            5,
+            6
+           ],
+           "steps": [
+            {
+             "result": {
+              "pass": true
+             }
+            }
+           ]
+          },
+          {
+           "roll": [
+            1,
+            4
+           ],
+           "steps": [
+            {
+             "roll": "1d6",
+             "as": "b"
+            },
+            {
+             "branch": "b",
+             "ranges": [
+              {
+               "roll": [
+                5,
+                6
+               ],
+               "steps": [
+                {
+                 "result": {
+                  "pass": true
+                 }
+                }
+               ]
+              },
+              {
+               "roll": [
+                1,
+                4
+               ],
+               "steps": [
+                {
+                 "result": {
+                  "pass": false
+                 }
+                }
+               ]
+              }
+             ]
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "roll": [
+        3,
+        3
+       ],
+       "steps": [
+        {
+         "roll": "1d6",
+         "as": "a"
+        },
+        {
+         "branch": "a",
+         "ranges": [
+          {
+           "roll": [
+            5,
+            6
+           ],
+           "steps": [
+            {
+             "result": {
+              "pass": true
+             }
+            }
+           ]
+          },
+          {
+           "roll": [
+            1,
+            4
+           ],
+           "steps": [
+            {
+             "result": {
+              "pass": false
+             }
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "roll": [
+        4,
+        4
+       ],
+       "steps": [
+        {
+         "roll": "1d6",
+         "as": "a"
+        },
+        {
+         "branch": "a",
+         "ranges": [
+          {
+           "roll": [
+            5,
+            6
+           ],
+           "steps": [
+            {
+             "roll": "1d6",
+             "as": "b"
+            },
+            {
+             "branch": "b",
+             "ranges": [
+              {
+               "roll": [
+                5,
+                6
+               ],
+               "steps": [
+                {
+                 "result": {
+                  "pass": true
+                 }
+                }
+               ]
+              },
+              {
+               "roll": [
+                1,
+                4
+               ],
+               "steps": [
+                {
+                 "result": {
+                  "pass": false
+                 }
+                }
+               ]
+              }
+             ]
+            }
+           ]
+          },
+          {
+           "roll": [
+            1,
+            4
+           ],
+           "steps": [
+            {
+             "result": {
+              "pass": false
+             }
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "roll": [
+        5,
+        5
+       ],
+       "steps": [
+        {
+         "result": {
+          "pass": false
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  "footing": {
+   "params": [
+    "traverse",
+    "to"
+   ],
+   "about": "Rolls along the way (movement.md): everyone rolls Agility at the hex's traverse grade on entering it; if anyone fails, the party is bogged down and the walk halts in that hex.",
+   "steps": [
+    {
+     "each": "*",
+     "roll": "agility",
+     "vs": "{traverse}",
+     "combine": "all",
+     "as": "r",
+     "label": "Footing: Agility vs traverse"
+    },
+    {
+     "branch": "r",
+     "fail": [
+      {
+       "text": "Bogged down: {r.failed} failed Agility ({traverse})."
+      },
+      {
+       "effect": "halt"
+      }
+     ]
+    }
+   ]
   }
+ },
+ "aliases": {
+  "survival": "e9-check",
+  "agility": "e9-check",
+  "stealth": "e9-check",
+  "alertness": "e9-check"
  }
 }
