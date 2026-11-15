@@ -58,7 +58,9 @@ jobs:
         with:
           python-version: '3.12'
       - name: Atlas
-        run: python3 -I modules/tools/atlas_app.py _site
+        run: |
+          node --test modules/tools/procedures.test.js
+          python3 -I modules/tools/atlas_app.py _site
       - name: Scribe
         working-directory: scribe
         run: |

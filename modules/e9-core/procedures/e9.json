@@ -1,0 +1,104 @@
+{
+ "format": "hexmarch-procedures/1",
+ "rules": [
+  "e9",
+  "e9mm",
+  "mm"
+ ],
+ "_comment": "E9's generic procedures (EVENTS_FORMAT.md section 7). travel and sight-range are the questions the Atlas asks; a module's own terrain travel and sight fields win on its map. The sight ranges are the Atlas's stand-in numbers until the handbook's are worded in. mm uses this file until mm-core has its own. navigate and move are mechanical only (time and position); the rolls along the way belong to each ruleset's own thread.",
+ "procedures": {
+  "travel": {
+   "params": [
+    "terrain",
+    "road"
+   ],
+   "steps": [
+    {
+     "result": {
+      "by": "terrain",
+      "of": {},
+      "else": 1
+     }
+    }
+   ]
+  },
+  "sight-range": {
+   "params": [
+    "terrain"
+   ],
+   "steps": [
+    {
+     "result": {
+      "by": "terrain",
+      "else": 3,
+      "of": {
+       "grass": 3,
+       "woods": 1.5,
+       "forest": 0.5,
+       "hills": 6,
+       "mount": 12,
+       "bog": 2,
+       "sea": 6,
+       "lake": 3,
+       "clear": 3,
+       "mixed-woods": 1.5,
+       "grassland": 3,
+       "mountains": 12,
+       "barren-mountains": 12,
+       "scrub-desert": 4,
+       "sandy-desert": 4,
+       "rocky-desert": 4,
+       "marsh": 2,
+       "swamp": 1,
+       "black-sand": 4,
+       "deep-ocean": 6,
+       "ocean": 6,
+       "shallows": 6
+      }
+     }
+    }
+   ]
+  },
+  "navigate": {
+   "offer": "hex",
+   "label": "Navigate to here",
+   "about": "Move the party hex by hex along the way, passing time on its clock and stopping where something happens.",
+   "default": true,
+   "params": [
+    "to"
+   ],
+   "steps": [
+    {
+     "walk": "move",
+     "stop": "queued"
+    }
+   ]
+  },
+  "move": {
+   "params": [
+    "from",
+    "to",
+    "terrain",
+    "road",
+    "mi",
+    "mph",
+    "pace",
+    "party"
+   ],
+   "steps": [
+    {
+     "effect": "clock",
+     "hours": "{mi} * {pace} / {mph}"
+    },
+    {
+     "effect": "move",
+     "to": "{to}"
+    },
+    {
+     "effect": "reveal",
+     "from": "{to}"
+    }
+   ]
+  }
+ }
+}
