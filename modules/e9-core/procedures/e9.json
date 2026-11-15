@@ -5,69 +5,38 @@
   "e9mm",
   "mm"
  ],
- "_comment": "E9's generic procedures (EVENTS_FORMAT.md section 7). travel and sight-range are the questions the Atlas asks; a module's own terrain travel and sight fields win on its map. The sight ranges are the Atlas's stand-in numbers until the handbook's are worded in. mm uses this file until mm-core has its own. navigate and move are mechanical only (time and position); the rolls along the way belong to each ruleset's own thread. travel, terrain-kind and move follow e9-core's movement data (movement.md); e9-* helpers are internal.",
+ "_comment": "E9's generic procedures (EVENTS_FORMAT.md section 7). sight-range answers by the hex's view grade, move times a hex by the party's speed; terrain traits (ATLAS_FORMAT.md) replace travel multipliers. mm uses this file until mm-core has its own. The rolls along the way belong to the E9 thread.",
  "procedures": {
   "travel": {
    "params": [
     "terrain",
     "road"
    ],
+   "about": "Retired by terrain traits (Heph 2026-11-15): time now comes from move with the hex's traverse grade and the party's speed. Answers 1 until the Atlas stops asking.",
    "steps": [
     {
-     "result": {
-      "by": "terrain",
-      "of": {
-       "mount": 2,
-       "mountains": 2,
-       "barren-mountains": 2,
-       "forest": 2,
-       "bog": 2,
-       "marsh": 2,
-       "swamp": 2,
-       "lake": 2,
-       "sea": 2,
-       "ocean": 2,
-       "deep-ocean": 2,
-       "shallows": 2
-      },
-      "else": 1
-     }
+     "result": 1
     }
    ]
   },
   "sight-range": {
    "params": [
+    "view",
     "terrain"
    ],
+   "about": "Miles seen from a hex, by its view grade (rules.json movement.view_mi).",
    "steps": [
     {
      "result": {
-      "by": "terrain",
-      "else": 3,
+      "by": "view",
       "of": {
-       "grass": 3,
-       "woods": 1.5,
-       "forest": 0.5,
-       "hills": 6,
-       "mount": 12,
-       "bog": 2,
-       "sea": 6,
-       "lake": 3,
-       "clear": 3,
-       "mixed-woods": 1.5,
-       "grassland": 3,
-       "mountains": 12,
-       "barren-mountains": 12,
-       "scrub-desert": 4,
-       "sandy-desert": 4,
-       "rocky-desert": 4,
-       "marsh": 2,
-       "swamp": 1,
-       "black-sand": 4,
-       "deep-ocean": 6,
-       "ocean": 6,
-       "shallows": 6
-      }
+       "automatic": 6,
+       "easy": 3,
+       "normal": 1.5,
+       "hard": 0.5,
+       "impossible": 0
+      },
+      "else": 3
      }
     }
    ]
@@ -97,22 +66,19 @@
     "mph",
     "pace",
     "party",
-    "kind",
+    "orient",
+    "traverse",
+    "hide",
+    "investigate",
+    "view",
     "speed",
     "modes"
    ],
-   "about": "Time for one hex: pace is the hex's travel multiplier and speed the party's (slowest member's slowest mode, rules.json movement). On difficult ground Climb/Swim/Maneuver's 0.5x is the slowdown, so the travel multiplier's own 2x is taken out once (movement.md).",
+   "about": "Time for one hex: distance over the party's speed (slowest member's slowest mode, with the hex's traverse grade already applied by the Atlas from rules.json movement). Roll-free, so the Atlas can dry-run it for estimates; the rolls (orient, traverse, hide) run as their own procedures.",
    "steps": [
     {
-     "call": "e9-kind-base",
-     "with": {
-      "kind": "{kind}"
-     },
-     "as": "base"
-    },
-    {
      "effect": "clock",
-     "hours": "{mi} * {pace} / ({mph} * {speed} * {base})"
+     "hours": "{mi} / ({mph} * {speed})"
     },
     {
      "effect": "move",
@@ -121,117 +87,6 @@
     {
      "effect": "reveal",
      "from": "{to}"
-    }
-   ]
-  },
-  "terrain-kind": {
-   "params": [
-    "terrain",
-    "road",
-    "travel"
-   ],
-   "about": "Heph 2026-11-15: mountain, heavy forest, marshland and water are difficult (rules.json movement.terrain.difficultTerrain); a road makes any hex open.",
-   "steps": [
-    {
-     "call": "e9-road-kind",
-     "with": {
-      "road": "{road}"
-     },
-     "as": "rk"
-    },
-    {
-     "call": "e9-terrain-kind",
-     "with": {
-      "terrain": "{terrain}"
-     },
-     "as": "tk"
-    },
-    {
-     "call": "e9-kind-of",
-     "with": {
-      "key": "{rk}-{tk}"
-     },
-     "as": "kind"
-    },
-    {
-     "result": "{kind}"
-    }
-   ]
-  },
-  "e9-road-kind": {
-   "params": [
-    "road"
-   ],
-   "steps": [
-    {
-     "result": {
-      "by": "road",
-      "of": {
-       "roman": "open",
-       "local": "open",
-       "trail": "open"
-      },
-      "else": "none"
-     }
-    }
-   ]
-  },
-  "e9-terrain-kind": {
-   "params": [
-    "terrain"
-   ],
-   "steps": [
-    {
-     "result": {
-      "by": "terrain",
-      "of": {
-       "mount": "difficult",
-       "mountains": "difficult",
-       "barren-mountains": "difficult",
-       "forest": "difficult",
-       "bog": "difficult",
-       "marsh": "difficult",
-       "swamp": "difficult",
-       "lake": "difficult",
-       "sea": "difficult",
-       "ocean": "difficult",
-       "deep-ocean": "difficult",
-       "shallows": "difficult"
-      },
-      "else": "open"
-     }
-    }
-   ]
-  },
-  "e9-kind-of": {
-   "params": [
-    "key"
-   ],
-   "steps": [
-    {
-     "result": {
-      "by": "key",
-      "of": {
-       "none-difficult": "difficult"
-      },
-      "else": "open"
-     }
-    }
-   ]
-  },
-  "e9-kind-base": {
-   "params": [
-    "kind"
-   ],
-   "steps": [
-    {
-     "result": {
-      "by": "kind",
-      "of": {
-       "difficult": 2
-      },
-      "else": 1
-     }
     }
    ]
   }

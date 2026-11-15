@@ -34,15 +34,17 @@ Checked against the E9 System Reference Handbook: 5 paces a round (p. 33), half 
 - **How many modes.** A non-Expert takes one mode at a time. An Expert takes 2 at level 1, 3 at level 5 and 4 at level 9. Help is an Expert mode and uses one of the Expert's slots (Heph 2026-11-15): the Expert helps an ally with a roll, and that ally may take one more mode than usual.
 - **Several modes.** The slowest mode sets the character's speed. Extra modes add rolls but don't slow the character further.
 - **The party.** The party moves at its slowest member's speed, or splits into separate parties (separate Atlas markers).
-- **Difficult terrain** forces Climb/Swim/Maneuver on everyone crossing it, so 0.5x is the most anyone moves there. Forced March and Dash need a road or clear terrain.
+- **Terrain** is graded, not multiplied (Heph 2026-11-15). Each hex has five traits on the handbook's difficulty steps (automatic, easy, normal, hard, impossible): orient, traverse, hide, investigate and view (ATLAS_FORMAT.md in the data repo, "Terrain traits"). E9's defaults by terrain id are in `rules.json` `terrain`; a module's terrain type, a single hex and the campaign can override them. Traverse sets the speed: automatic, easy and normal are 1x (easy and normal ask for an Agility roll at that difficulty), hard forces Climb/Swim/Maneuver (0.5x), impossible stops travel on foot. Forced March and Dash need automatic traverse (a road or grassland). Navigate rolls Survival at the orient grade, Sneak rolls Stealth at the hide grade, Investigate rolls Alertness at the investigate grade, and the view grade sets how far one sees.
 - **No mode** means 1x and no roll.
-- **Which terrain is difficult** (Heph 2026-11-15, for now): mountain, heavy forest, marshland and water. In Atlas ids that's `mount`, `mountains`, `barren-mountains`, `forest`, `bog`, `marsh`, `swamp`, `lake`, `sea`, `ocean`, `deep-ocean` and `shallows` (`movement.terrain.difficultTerrain`). Everything else, woods and hills included, is clear. A road makes any hex open.
 
 ## For the Atlas
 
-The Atlas (Hexmarch #68) stores each member's modes in `parties[].modes` and works out the party's `speed` generically from this data. E9's procedures (`procedures/e9.json`) answer the rest:
+- The Atlas works out each hex's traits (ruleset default, then the module's terrain type, then `hex_traits` per hex, then the campaign; a road makes orient and traverse automatic) and the party's `speed` from `movement`: each member's slowest applicable mode, with `movement.traverse[grade].requires` forcing a mode on everyone and `speed: 0` stopping the walk before that hex.
+- `move` gets `mi`, `mph`, `speed`, `modes` and the five traits, and passes {mi} ÷ (mph × speed) hours. It rolls nothing, so the Atlas can dry-run it for the key, the Route estimate and the Navigate preview.
+- `sight-range` answers miles by the hex's `view` grade (`movement.view_mi`).
+- `travel` is retired and answers 1 until the Atlas stops asking.
+- Rolls (Survival at the orient grade each shift, Agility at the traverse grade, Stealth at the hide grade, On Watch Alertness for an encounter) are their own procedures, added in later PRs.
 
-- `travel` {terrain, road} answers the hex's time multiplier: 2 on difficult terrain, 1 elsewhere. A module's own terrain `travel` value still wins on its map, and roads use the module's road multipliers.
-- `terrain-kind` {terrain, road} answers `difficult` or `open`. A road makes any hex open.
-- `move` gets `pace` (the travel multiplier), `kind`, `speed` and `modes` for each walked hex, and passes {mi} × pace ÷ (mph × speed × base) hours, where base is 2 on difficult ground and 1 elsewhere. Climb/Swim/Maneuver's 0.5x already is the difficult-terrain slowdown, so the travel multiplier's own 2x is taken out once. A plain difficult hex costs 2x, not 4x, and a module's bog 3 still costs 3x.
-- Rolls: each mode's talent check is rolled when its procedure runs (the navigator's Survival at the start of a shift, On Watch Alertness for an encounter, Agility for a Forced March). These come in their own PRs.
+## Open
+
+- Roads: do roads keep a speed bonus by class (Roman, local, trail), or is every road 1x? Asked Heph 2026-11-15.

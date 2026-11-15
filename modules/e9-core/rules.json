@@ -14,7 +14,7 @@
   },
   "time": { "round": 0.1, "turn": 10, "hour": 60, "shift": 240 },
   "movement": {
-    "_comment": "Heph 2026-11-15. One speed for every scale: 1x is 5 paces a round = 5 furlongs a turn = 3 miles an hour (5-ft pace, 500-ft furlong, 5000-ft mile). A mode multiplies it. Procedures read this block; see movement.md.",
+    "_comment": "Heph 2026-11-15. One speed for every scale: 1x is 5 paces a round = 5 furlongs a turn = 3 miles an hour (5-ft pace, 500-ft furlong, 5000-ft mile). A mode multiplies it; a hex's traverse grade (terrain traits, ATLAS_FORMAT.md) can force a mode or stop travel. See movement.md.",
     "base": { "paces_per_round": 5, "pace_ft": 5, "furlong_ft": 500, "mph": 3 },
     "scales": {
       "encounter": { "step": "round", "unit": "pace" },
@@ -24,23 +24,52 @@
     "default": { "speed": 1, "roll": null },
     "modes": [
       { "id": "watch", "name": "On Watch", "talent": "alertness", "speed": 1 },
-      { "id": "navigate", "name": "Navigate", "talent": "survival", "speed": 1 },
-      { "id": "sneak", "name": "Sneak", "talent": "stealth", "speed": 0.5 },
-      { "id": "maneuver", "name": "Climb/Swim/Maneuver", "talent": "agility", "speed": 0.5, "terrain": "difficult" },
-      { "id": "forced-march", "name": "Forced March", "talent": "agility", "speed": 2, "scales": ["exploration", "narration"], "terrain": "open" },
-      { "id": "dash", "name": "Dash", "talent": "agility", "speed": 4, "scales": ["encounter"], "terrain": "open" },
-      { "id": "investigate", "name": "Investigate", "talent": "alertness", "speed": 0.04, "scales": ["exploration"] },
+      { "id": "navigate", "name": "Navigate", "talent": "survival", "trait": "orient", "speed": 1 },
+      { "id": "sneak", "name": "Sneak", "talent": "stealth", "trait": "hide", "speed": 0.5 },
+      { "id": "maneuver", "name": "Climb/Swim/Maneuver", "talent": "agility", "trait": "traverse", "speed": 0.5, "traverse": ["hard"] },
+      { "id": "forced-march", "name": "Forced March", "talent": "agility", "speed": 2, "scales": ["exploration", "narration"], "traverse": ["automatic"] },
+      { "id": "dash", "name": "Dash", "talent": "agility", "speed": 4, "scales": ["encounter"], "traverse": ["automatic"] },
+      { "id": "investigate", "name": "Investigate", "talent": "alertness", "trait": "investigate", "speed": 0.04, "scales": ["exploration"] },
       { "id": "help", "name": "Help", "speed": 1, "classKind": "expert", "grants": { "target": "ally", "modes": 1 } }
     ],
     "modeSlots": { "default": 1, "classKind": "expert", "byLevel": [ { "from": 1, "slots": 2 }, { "from": 5, "slots": 3 }, { "from": 9, "slots": 4 } ] },
     "combine": "slowest",
     "party": "slowest",
-    "terrain": {
-      "difficult": "requires maneuver",
-      "open": ["road", "clear"],
-      "_comment": "Heph 2026-11-15: for now mountain, heavy forest, marshland and water are difficult; every other terrain is clear. Ids are the Atlas terrain ids in use.",
-      "difficultTerrain": ["mount", "mountains", "barren-mountains", "forest", "bog", "marsh", "swamp", "lake", "sea", "ocean", "deep-ocean", "shallows"]
-    }
+    "_traits": "What a hex's trait grades mean under E9. Each grade is the difficulty of that trait's talent roll (p. 8: automatic no roll, easy 2 dice keep better, normal 1 die, hard 2 dice keep worse, impossible no roll possible).",
+    "traits": { "orient": "survival", "traverse": "agility", "hide": "stealth", "investigate": "alertness", "view": null },
+    "traverse": {
+      "automatic": { "speed": 1 },
+      "easy": { "speed": 1, "roll": "agility" },
+      "normal": { "speed": 1, "roll": "agility" },
+      "hard": { "requires": "maneuver", "roll": "agility" },
+      "impossible": { "speed": 0 }
+    },
+    "view_mi": { "automatic": 6, "easy": 3, "normal": 1.5, "hard": 0.5, "impossible": 0 }
+  },
+  "_terrain": "Heph 2026-11-15: E9's default terrain traits by Atlas terrain id (orient and traverse agreed; hide, investigate and view a first draft). A module's terrain type, then atlas.hex_traits per hex, then the campaign override these (ATLAS_FORMAT.md, Terrain traits). A road makes orient and traverse automatic.",
+  "terrain": {
+    "grass": { "orient": "easy", "traverse": "automatic", "hide": "hard", "investigate": "easy", "view": "easy" },
+    "grassland": { "orient": "easy", "traverse": "automatic", "hide": "hard", "investigate": "easy", "view": "easy" },
+    "clear": { "orient": "easy", "traverse": "automatic", "hide": "hard", "investigate": "easy", "view": "easy" },
+    "woods": { "orient": "normal", "traverse": "easy", "hide": "normal", "investigate": "normal", "view": "normal" },
+    "mixed-woods": { "orient": "normal", "traverse": "easy", "hide": "normal", "investigate": "normal", "view": "normal" },
+    "hills": { "orient": "easy", "traverse": "normal", "hide": "normal", "investigate": "normal", "view": "automatic" },
+    "forest": { "orient": "hard", "traverse": "normal", "hide": "easy", "investigate": "normal", "view": "hard" },
+    "mount": { "orient": "easy", "traverse": "hard", "hide": "normal", "investigate": "hard", "view": "automatic" },
+    "mountains": { "orient": "easy", "traverse": "hard", "hide": "normal", "investigate": "hard", "view": "automatic" },
+    "barren-mountains": { "orient": "easy", "traverse": "hard", "hide": "normal", "investigate": "hard", "view": "automatic" },
+    "bog": { "orient": "normal", "traverse": "hard", "hide": "normal", "investigate": "hard", "view": "normal" },
+    "marsh": { "orient": "normal", "traverse": "hard", "hide": "normal", "investigate": "hard", "view": "normal" },
+    "swamp": { "orient": "hard", "traverse": "hard", "hide": "easy", "investigate": "hard", "view": "hard" },
+    "scrub-desert": { "orient": "hard", "traverse": "easy", "hide": "normal", "investigate": "normal", "view": "easy" },
+    "sandy-desert": { "orient": "hard", "traverse": "normal", "hide": "hard", "investigate": "hard", "view": "easy" },
+    "rocky-desert": { "orient": "hard", "traverse": "normal", "hide": "normal", "investigate": "normal", "view": "easy" },
+    "black-sand": { "orient": "hard", "traverse": "normal", "hide": "normal", "investigate": "normal", "view": "easy" },
+    "lake": { "orient": "easy", "traverse": "hard", "hide": "hard", "investigate": "hard", "view": "easy" },
+    "shallows": { "orient": "easy", "traverse": "hard", "hide": "hard", "investigate": "hard", "view": "easy" },
+    "sea": { "orient": "impossible", "traverse": "impossible", "hide": "impossible", "investigate": "impossible", "view": "automatic" },
+    "ocean": { "orient": "impossible", "traverse": "impossible", "hide": "impossible", "investigate": "impossible", "view": "automatic" },
+    "deep-ocean": { "orient": "impossible", "traverse": "impossible", "hide": "impossible", "investigate": "impossible", "view": "automatic" }
   },
   "equipment": ["e9", "mm"],
   "originRoll": {
