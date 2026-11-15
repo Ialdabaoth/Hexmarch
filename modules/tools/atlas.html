@@ -465,10 +465,11 @@ const hm = h => { const m = Math.round(h * 60); return m < 60 ? m + ' min' : Mat
 function routeBox() {
   const box = document.getElementById('route'); box.hidden = !ROUTE; if (!ROUTE) return;
   if (!STOPS.length) { box.innerHTML = '<b>Route</b> · click hexes to add stops. <small>Drag still moves the map.</small><br><button data-r="done">Done</button>'; return; }
-  const { legs, unknown } = routeLegs(), r = HexmarchAtlas.travel(legs.map(g => ({ mi: g.mi, terrain: g.terrain || 'unknown', road: g.road }))), P = (D.travel || {}).pace || {}, onRoad = legs.reduce((a, g) => a + (g.road ? g.mi : 0), 0);
+  const { legs, unknown } = routeLegs(), P = (D.travel || {}).pace || {}, onRoad = legs.reduce((a, g) => a + (g.road ? g.mi : 0), 0), est = STOPS.length > 1 ? estimate(STOPS, LV[V.lvl].draw) : { hours: 0 };
+  const r = { hours: est.hours, days: est.hours / (P.hours_per_day || 8), mi: legs.reduce((a, g) => a + g.mi, 0), blocked: est.blocked };  // timed hex by hex, as Navigate walks it
   const unit = LVN ? { region: LVN[1], march: LVN[1], league: LVN[2], field: LVN[3], furlong: LVN[4] }[V.lvl] + ' hexes' : { region: 'Leagues', march: 'Leagues', league: 'Fields', field: 'Furlongs', furlong: '100-ft hexes' }[V.lvl];
   let h = `<b>Route</b> · ${STOPS.length} stop${STOPS.length === 1 ? '' : 's'} · ${r.mi.toFixed(r.mi < 10 ? 1 : 0)} mi`;
-  if (STOPS.length > 1) h += r.blocked ? ` · <b>crosses ${esc(TYPES.find(t => t.id === r.blocked).name.toLowerCase())}</b>: no way on foot`
+  if (STOPS.length > 1) h += r.blocked ? ` · <b>crosses ${esc(((TYPES.find(t => t.id === r.blocked) || { name: 'unmapped ground' }).name).toLowerCase())}</b>: no way on foot`
     : ` · ${hm(r.hours)}${r.days >= .5 ? ` · ${r.days.toFixed(1)} days of ${P.hours_per_day || 8} h` : ''}`;
   h += `<br><small>Terrain read from ${unit}${unknown > .05 ? `; ${unknown.toFixed(1)} mi unmapped, at normal pace` : ''}${onRoad > .05 ? `; ${onRoad.toFixed(onRoad < 10 ? 1 : 0)} mi on roads` : ''}.</small><br>${STOPS.length > 1 && !r.blocked && !LOCK ? `<button data-r="move" title="${procLib() && procLib().procs.navigate ? 'Navigate along this route, hex by hex' : 'Put the party at the last stop and add the travel time'}">${procLib() && procLib().procs.navigate ? 'Navigate' : 'Move party here'}</button>` : ''}<button data-r="undo">Undo</button><button data-r="clear">Clear</button><button data-r="done">Done</button>`;
   box.innerHTML = h;
@@ -725,18 +726,19 @@ function know() {
 // Moving the party reveals the hexes in sight along the whole route to each character in the party.
 let FOG = null, PREVIEW = false, BRUSH = '';  // BRUSH: '' or the state a click paints: visited, explored, rumour or hide
 const SHOWN = new Map();
-// how far one sees from a hex, in miles. Line of sight is a Procedure (Heph 2026-11-09): the ruleset's "sight-range" (with the terrain;
-// later light and height) gives the miles, and a terrain type's own "sight" in the module overrides it
+// how far one sees from a hex, in miles. Line of sight is a Procedure (Heph 2026-11-09): the ruleset's "sight-range", asked with the
+// hex's view grade (terrain traits) and terrain, gives the miles (later light and height); a terrain type's own "sight" overrides it
 const SIGHTC = new Map();
-function sightOf(ty) { if (!ty) return 3; if (typeof ty.sight === 'number') return ty.sight;
-  if (!SIGHTC.has(ty.id)) { const v = askP('sight-range', { terrain: ty.id }); SIGHTC.set(ty.id, typeof v === 'number' && v >= 0 ? v : 3); } return SIGHTC.get(ty.id); }
+function sightOf(ty, x, y) { if (!ty) return 3; if (typeof ty.sight === 'number') return ty.sight;
+  const view = traitsAt(ty.id, null, x, y, NL).view, k = ty.id + '|' + view;
+  if (!SIGHTC.has(k)) { const v = askP('sight-range', { terrain: ty.id, view }); SIGHTC.set(k, typeof v === 'number' && v >= 0 ? v : 3); } return SIGHTC.get(k); }
 const lkey = (C, R) => nearest(C, R, NL).join(',');  // the painted-level hex that owns a lattice hex
 const lAddr = k => { const [i, j] = k.split(',').map(Number); return addr(...centre(i, j, NL)).slice(1); };
 function partyIds() {  // the shown party's members (characters[].party); a state without characters: the player characters loaded here
   return CS && CS.characters.length ? CS.characters.filter(c => c && c.id && (!PID || c.party === PID || (CS.parties.length < 2 && !c.party))).map(c => c.id) : WHO.filter(w => w.owner !== 'referee').map(w => w.id);
 }
 function sightFrom(x, y, out) {  // the painted-level hexes whose centre lies within sight (plus half a hex) of a point
-  const [li, lj] = hexAt(x, y, NL), t = T(li, lj, NL), ty = TYPES[t - 1], mi = sightOf(ty), R = mi * MILE + NL * 50, n = Math.ceil(R / (NL * 100)) + 1;
+  const [li, lj] = hexAt(x, y, NL), t = T(li, lj, NL), ty = TYPES[t - 1], mi = sightOf(ty, x, y), R = mi * MILE + NL * 50, n = Math.ceil(R / (NL * 100)) + 1;
   for (let i = li - n; i <= li + n; i++) for (let j = lj - n - 1; j <= lj + n + 1; j++) { const [cx, cy] = hexFt(i, j, NL); if (Math.hypot(cx - x, cy - y) <= R) out.add(i + ',' + j); }
   return out;
 }
@@ -879,7 +881,7 @@ function placeParty(x, y) {  // the centre 100-ft hex of the hex clicked at this
   PLACE = false; hoverHint(); setParty(N === 1 ? [i, j] : centre(i, j, N), PARTY ? PARTY.hours : 0);
 }
 function moveParty() {  // along the route: to its last stop, adding the route's time; the route then starts again from there
-  const { legs } = routeLegs(), r = HexmarchAtlas.travel(legs.map(g => ({ mi: g.mi, terrain: g.terrain || 'unknown', road: g.road }))); if (r.blocked || STOPS.length < 2) return;
+  if (STOPS.length < 2) return; const r = estimate(STOPS, LV[V.lvl].draw); if (r.blocked) return;
   const end = STOPS[STOPS.length - 1]; setParty(hexAt(end[0], end[1], 1), (PARTY ? PARTY.hours : 0) + r.hours, false, STOPS.slice()).then(() => { STOPS = [ft(...PARTY.hex)]; routeBox(); redraw(); });
 }
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -938,14 +940,37 @@ async function setActive(id) {
 // this page; a module's events and its own procedures come from its events.json (build.py). The referee queues a manual trigger,
 // then runs, skips or reorders the queue; each run is one entry in the shown party's Events log (parties[].log), on that party's clock.
 const RULEPROCS = {{RULEPROCS}};
-const RULEMOVE = {{RULEMOVE}};  // each ruleset's movement data (rules.json "movement"): modes, slots, how speeds combine
-const movementOf = () => RULEMOVE[rulesetOf()] || null;
+const RULEDATA = {{RULEDATA}};  // each ruleset's rules.json "movement" (modes, slots, how speeds combine, what a traverse grade does) and "terrain" (trait defaults)
+const movementOf = () => (RULEDATA[rulesetOf()] || {}).movement || null;
+const traitsOn = () => { const mv = movementOf(); return !!(mv && mv.traverse); };  // the ruleset reads terrain traits; else the map's travel multipliers
+// terrain traits (Heph 2026-11-15, ATLAS_FORMAT.md): five traits, each graded automatic..impossible. Layers, weakest first: the ruleset's
+// default for the terrain id, the module's terrain type, then module.json atlas.hex_traits and the campaign's hex_traits[module] by hex
+// address, a coarser hex before a finer one inside it. A road makes orient and traverse automatic. Read at the level shown.
+const TRAITS = ['orient', 'traverse', 'hide', 'investigate', 'view'];
+let HTR = null, HTRSRC = [];
+function hexTraitList() {  // [{N, i, j, t}] for the map shown, coarse to fine, the module's before the campaign's
+  const src = [MOD && MOD.traits, CS && CS.hex_traits, D]; if (HTR && src.every((x, k) => x === HTRSRC[k])) return HTR;
+  HTRSRC = src; HTR = [];
+  const camp = CS && CS.hex_traits && typeof CS.hex_traits === 'object' ? CS.hex_traits[MOD.id] : null, NN = { march: NM, league: NL, field: NF };
+  for (const layer of [((MOD && MOD.traits) || {}).hexes, camp]) { const one = [];
+    for (const [a, t] of Object.entries(layer && typeof layer === 'object' ? layer : {})) { if (!t || typeof t !== 'object') continue;
+      const v = parse('#' + a); if (v.sel) one.push({ N: 1, i: v.sel[0], j: v.sel[1], t }); else if (NN[v.lvl]) one.push({ N: NN[v.lvl], i: v.i, j: v.j, t }); }
+    HTR.push(...one.sort((a, b) => b.N - a.N)); }
+  return HTR;
+}
+function traitsAt(terrain, road, x, y, N) {  // the traits of the level-N hex at a point (x undefined: the terrain type alone)
+  const t = Object.fromEntries(TRAITS.map(k => [k, 'normal'])), rd = RULEDATA[rulesetOf()] || {};
+  Object.assign(t, (rd.terrain || {})[terrain], (((MOD && MOD.traits) || {}).terrain || {})[terrain]);
+  if (road) t.orient = t.traverse = 'automatic';
+  if (x !== undefined) for (const h of hexTraitList()) if (h.N >= N) { const [i, j] = hexAt(x, y, h.N); if (i === h.i && j === h.j) Object.assign(t, h.t); }
+  return t;
+}
 let PLIB = null, PEVENTS = null, PRULESET = '';
 const PQUEUE = new Map();  // party id -> its queued triggers; the queue is the referee's, kept on this page only
 function rulesetOf() { return (CS && CS.rules && typeof CS.rules.ruleset === 'string' && CS.rules.ruleset) || 'e9'; }
 function procLib() {
   const rs = rulesetOf();
-  if (window.HexmarchProcedures && (!PLIB || PRULESET !== rs)) { PRULESET = rs; PLIB = HexmarchProcedures.load(rs, RULEPROCS, PEVENTS); SIGHTC.clear(); TRAVELC.clear(); }
+  if (window.HexmarchProcedures && (!PLIB || PRULESET !== rs)) { PRULESET = rs; PLIB = HexmarchProcedures.load(rs, RULEPROCS, PEVENTS); SIGHTC.clear(); }
   return PLIB;
 }
 function askP(name, w) { const l = procLib(); return l ? HexmarchProcedures.ask(l, name, w) : undefined; }
@@ -1036,42 +1061,58 @@ function firedBetween(a, b, lib) {  // the terrain triggers crossing from point 
   return out;
 }
 // the party's speed in one hex, read from the ruleset's movement data (E9: Heph 2026-11-15): each member's chosen modes
-// (parties[].modes) that apply at this scale and on this kind of ground, or the mode the ground requires; a member goes at the
-// slowest of theirs ("combine": "slowest") and the party at its slowest member's ("party": "slowest")
-function partySpeed(kind, scale) {
-  const mv = movementOf(), ap = AP(); if (!mv || !ap) return { speed: 1, modes: '' };
-  const byId = new Map((mv.modes || []).map(m => [m.id, m])), dflt = (mv.default || {}).speed ?? 1, chosen = ap.modes || {};
-  const req = (/^requires\s+(\S+)/.exec(String((mv.terrain || {})[kind] || '')) || [])[1], used = new Set(); let party = Infinity;
+// (parties[].modes) that apply at this scale and on this traverse grade, or the mode the grade requires; a member goes at the
+// slowest of theirs ("combine": "slowest") and the party at its slowest member's ("party": "slowest"). blocked: no way on (speed 0)
+function partySpeed(grade, scale) {
+  const mv = movementOf(), ap = AP(); if (!mv) return { speed: 1, modes: '' };
+  const tv = (mv.traverse || {})[grade] || {}; if (tv.speed === 0) return { speed: 0, modes: '', blocked: true };
+  const byId = new Map((mv.modes || []).map(m => [m.id, m])), dflt = (mv.default || {}).speed ?? 1, chosen = (ap && ap.modes) || {}, used = new Set(); let party = Infinity;
   const fold = (xs, how) => xs.length ? (how === 'fastest' ? Math.max(...xs) : Math.min(...xs)) : dflt;
-  for (const id of partyIds()) {
-    let ms = (chosen[id] || []).map(x => byId.get(x)).filter(m => m && (!m.scales || m.scales.includes(scale)) && (!m.terrain || m.terrain === kind));
-    if (req && byId.has(req)) ms = [byId.get(req)];
+  const ids = ap ? partyIds() : []; for (const id of ids.length ? ids : ['']) {
+    let ms = (chosen[id] || []).map(x => byId.get(x)).filter(m => m && (!m.scales || m.scales.includes(scale)) && (!m.traverse || m.traverse.includes(grade)));
+    if (tv.requires && byId.has(tv.requires)) ms = [byId.get(tv.requires)];
     ms.forEach(m => used.add(m.id));
     party = fold([party, fold(ms.map(m => m.speed).filter(x => typeof x === 'number'), mv.combine)], mv.party);
   }
-  return { speed: party === Infinity ? dflt : party, modes: [...used].join(',') };
+  return { speed: (party === Infinity ? dflt : party) * (tv.speed ?? 1), modes: [...used].join(',') };
 }
-function walker(pts, N, out) {  // the map side of a `walk` step: fills out {hours, at, path, queued, stopped, rest}
-  const RD = (D.travel || {}).roads || {}, mph = ((D.travel || {}).pace || {}).mi_per_hour || 3;
+const MPH = () => ((D.travel || {}).pace || {}).mi_per_hour || 3;
+// what `move` is told about one hex: under terrain traits its grades and the party's speed there; otherwise the map's travel
+// multiplier (map.json travel: a road's replaces the terrain's), as a speed. null: no way on foot
+function hexVars(terrain, road, mi, x, y, N) {
+  const base = { terrain: terrain || 'unknown', road: road || '', mi: +mi.toFixed(3), mph: MPH() }, scale = N <= NU ? 'exploration' : 'narration';
+  if (traitsOn()) { const tr = traitsAt(terrain || 'unknown', road, x, y, N), sp = partySpeed(tr.traverse, scale); if (sp.blocked) return null;
+    return { ...base, ...tr, pace: 1, speed: sp.speed, modes: sp.modes }; }
+  const RD = (D.travel || {}).roads || {}, ty = TYPES.find(t => t.id === terrain), pace = road && RD[road] !== undefined ? RD[road] : ty && ty.travel !== undefined ? ty.travel : 1;
+  return pace === null ? null : { ...base, pace, speed: 1 / (pace || 1), modes: '' };
+}
+// the time for one hex: the ruleset's `move` run dry (it is roll-free), else miles over speed
+function hexHours(v) { const l = procLib();
+  if (l && l.procs.move) { const e = HexmarchProcedures.run(l, 'move', { rng: () => .5, vars: v }); return e.effects.reduce((a, f) => a + (f.effect === 'clock' && typeof f.hours === 'number' ? f.hours : 0), 0); }
+  return v.mi / (v.mph * v.speed); }
+function walker(pts, N, out) {  // the map side of a `walk` step: fills out {hours, mi, at, path, queued, stopped, rest}
   return (name, vars, sub, entry, stop) => {
     const steps = routeSteps(pts, N), lib = procLib(); let prev = pts[0];
-    Object.assign(out, { hours: 0, at: null, path: [pts[0]], queued: [], stopped: false, rest: null, hexes: 0, total: steps.length });
+    Object.assign(out, { hours: 0, mi: 0, at: null, path: [pts[0]], queued: [], stopped: false, rest: null, hexes: 0, total: steps.length, blocked: null });
     for (let k = 0; k < steps.length; k++) { const st = steps[k], c = hexFt(st.i, st.j, N), ty = TYPES.find(x => x.id === st.terrain);
-      const pace = st.road && RD[st.road] !== undefined ? RD[st.road] : ty && ty.travel !== undefined ? ty.travel : travelOf(st.terrain || 'unknown', st.road);
-      if (pace === null) { entry.warnings.push(`no way on foot into ${ty ? ty.name.toLowerCase() : 'that hex'}`); out.stopped = true; out.rest = null; break; }
+      const v = hexVars(st.terrain, st.road, st.mi, ...c, N);
+      if (!v) { entry.warnings.push(`no way on into ${ty ? ty.name.toLowerCase() : 'that hex'}`); out.stopped = true; out.blocked = st.terrain || 'unknown'; out.rest = null; break; }
       const to = addr(...(N === 1 ? [st.i, st.j] : centre(st.i, st.j, N))).slice(1);
-      const kind = askP('terrain-kind', { terrain: st.terrain || 'unknown', road: st.road || '', travel: pace ?? 1 }), ground = typeof kind === 'string' ? kind : '', sp = partySpeed(ground, N <= NU ? 'exploration' : 'narration');
-      const e = sub(name, { from: out.at ? addr(...out.at).slice(1) : '', to, terrain: st.terrain || 'unknown', road: st.road || '', mi: +st.mi.toFixed(3), mph, pace: pace ?? 1, party: vars.party,
-        kind: ground, speed: sp.speed, modes: sp.modes });
+      const e = sub(name, { from: out.at ? addr(...out.at).slice(1) : '', to, party: vars.party, ...v });
       entry.rolls.push(...e.rolls); entry.text.push(...e.text); entry.players.push(...e.players); entry.warnings.push(...e.warnings);
       let halt = false;
       for (const f of e.effects) { if (f.effect === 'clock') out.hours += typeof f.hours === 'number' ? f.hours : 0; else if (f.effect === 'halt') halt = true; else if (!['move', 'reveal', 'explore'].includes(f.effect)) entry.effects.push(f); }
-      out.at = N === 1 ? [st.i, st.j] : centre(st.i, st.j, N); out.path.push(c); out.hexes++;
+      out.mi += st.mi; out.at = N === 1 ? [st.i, st.j] : centre(st.i, st.j, N); out.path.push(c); out.hexes++;
       const fired = lib ? firedBetween(prev, c, lib) : []; prev = c;
       for (const t of fired) out.queued.push(Object.assign({}, t, { at: to }));
       if (halt || (stop !== 'never' && fired.length)) { if (k < steps.length - 1) { out.stopped = true; out.rest = [c, ...pts.slice(st.leg)]; } break; }
     }
   };
+}
+function estimate(pts, N) {  // a route's time and miles, hex by hex as Navigate would walk it, without rolling or stopping for events
+  const out = {}, entry = { rolls: [], text: [], players: [], warnings: [], effects: [] };
+  walker(pts, N, out)('move', { party: (AP() || {}).name || '' }, (name, w) => ({ rolls: [], text: [], players: [], warnings: [], effects: [{ effect: 'clock', hours: hexHours(w) }] }), entry, 'never');
+  return out;
 }
 // a dry run for the menu: the time, how far it gets, what it would queue, and the rolls it makes, without rolling for real
 function offerPreview(name, pts, N) {
@@ -1220,19 +1261,21 @@ function drawParty() {  // a red pennant planted on the party's hex centre, over
   ctx.beginPath(); ctx.arc(sx, sy, 3.5, 0, 7); ctx.fillStyle = '#2b2418'; ctx.fill(); ctx.strokeStyle = '#f4efe1'; ctx.lineWidth = 1.5; ctx.stroke();
 }
 
-// travel (Heph 2026-11-06, ATLAS_FORMAT.md "Travel"): each terrain type's time multiplier against the module's pace, and the roads'.
-// HexmarchAtlas.travel(legs) adds up a route for the path tool to come: legs = [{mi, terrain: id, road?: class}] -> {hours, days, mi}
-const travelNote = t => t.travel === null ? 'no travel on foot' : t.travel === undefined ? '' : (() => { const p = (D.travel || {}).pace || {}, mph = (p.mi_per_hour || 3) / t.travel;
-  return `${t.travel === 1 ? 'normal pace' : '×' + t.travel + ' travel time'} · ${+mph.toFixed(1)} mi/h`; })();
-// a terrain the module gives no multiplier: the ruleset's "travel" procedure answers (EVENTS_FORMAT.md section 7), else normal pace
-const TRAVELC = new Map();
-function travelOf(terrain, road) { const k = terrain + '|' + (road || ''); if (!TRAVELC.has(k)) { const v = askP('travel', { terrain, road: road || '' }); TRAVELC.set(k, v === null || typeof v === 'number' ? v : 1); } return TRAVELC.get(k); }
+// travel: a ruleset with terrain traits (E9, Heph 2026-11-15) times each hex by its traverse grade and the party's modes, through the
+// ruleset's `move`; otherwise each terrain type's time multiplier against the module's pace, and the roads' (ATLAS_FORMAT.md "Travel").
+// HexmarchAtlas.travel(legs) adds up a route: legs = [{mi, terrain: id, road?: class}] -> {hours, days, mi, blocked?}
+function travelNote(t) {  // the key's line for a terrain type: walking speed at the level shown, and the traits in a tooltip
+  const v = hexVars(t.id, null, 1, undefined, undefined, LV[V.lvl].draw), tr = traitsOn() ? traitsAt(t.id) : null;
+  const tip = tr ? ` title="${esc(TRAITS.map(k => k + ' ' + tr[k]).join(' · '))}"` : '';
+  if (!v) return `<small${tip}>no way on foot</small>`;
+  const mph = v.mi / hexHours(v), mv = movementOf(), ms = v.modes ? v.modes.split(',').map(id => ((mv.modes || []).find(m => m.id === id) || { name: id }).name) : [];
+  return `<small${tip}>${tr ? '' : v.pace === 1 ? 'normal pace · ' : '×' + v.pace + ' travel time · '}${+mph.toFixed(1)} mi/h${ms.length ? ' · ' + esc(ms.join(', ')) : ''}${tr ? ' · traverse ' + tr.traverse : ''}</small>`;
+}
 window.HexmarchAtlas = { travel(legs) {
-  const P = (D.travel || {}).pace || {}, mph = P.mi_per_hour || 3, day = P.hours_per_day || 8, RD = (D.travel || {}).roads || {};
-  let hours = 0, mi = 0;
-  for (const g of legs) { const t = TYPES.find(x => x.id === g.terrain), k = g.road && RD[g.road] !== undefined ? RD[g.road] : t && t.travel !== undefined ? t.travel : travelOf(g.terrain, g.road);
-    if (k === null) return { hours: Infinity, days: Infinity, mi: mi + g.mi, blocked: g.terrain };  // no travel on foot (sea, lake): boats come later
-    hours += g.mi * (k ?? 1) / mph; mi += g.mi; }
+  const day = ((D.travel || {}).pace || {}).hours_per_day || 8; let hours = 0, mi = 0;
+  for (const g of legs) { const v = hexVars(g.terrain, g.road, g.mi, undefined, undefined, NL);
+    if (!v) return { hours: Infinity, days: Infinity, mi: mi + g.mi, blocked: g.terrain };  // no way on foot (sea, lake): boats come later
+    hours += hexHours(v); mi += g.mi; }
   return { hours, days: hours / day, mi };
 } };
 
@@ -1245,11 +1288,12 @@ const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;',
 function key(ts, ps) {
   let h = '<h2>Terrain</h2>';
   TYPES.forEach((t, k) => { if (!ts.has(k + 1)) return;
-    h += `<div class="row"><span class="sw" style="background-color:${t.color};background-image:url(${tileURL(t.tile)})">${t.icon ? `<img src="${tileURL(t.icon)}" alt="">` : ''}</span><span>${esc(t.name)}<br><small>${travelNote(t)}</small></span></div>`; });
-  const RC = new Set((D.roads || []).map(r => r['class'])), RDm = (D.travel || {}).roads || {}, mph = ((D.travel || {}).pace || {}).mi_per_hour || 3;
+    h += `<div class="row"><span class="sw" style="background-color:${t.color};background-image:url(${tileURL(t.tile)})">${t.icon ? `<img src="${tileURL(t.icon)}" alt="">` : ''}</span><span>${esc(t.name)}<br>${travelNote(t)}</span></div>`; });
+  const RC = new Set((D.roads || []).map(r => r['class'])), mv = movementOf();
   if (RC.size) { h += '<h2>Roads</h2>';
-    for (const c of ['roman', 'local', 'trail']) if (RC.has(c)) { const st = ROAD_STYLE[c], k = RDm[c] ?? 1;
-      h += `<div class="row"><span class="sw"><svg width="30" height="10"><line x1="1" y1="5" x2="29" y2="5" stroke="${st.c}" stroke-width="${st.px}"${st.dash ? ' stroke-dasharray="5 3"' : ''}/></svg></span><span>${{ roman: 'Roman road', local: 'Local road', trail: 'Trail' }[c]}<br><small>${k === 1 ? 'normal pace' : '×' + k + ' travel time'} · ${+(mph / k).toFixed(1)} mi/h${c === 'roman' ? ' · bridges' : ' · fords'}</small></span></div>`; } }
+    for (const c of ['roman', 'local', 'trail']) if (RC.has(c)) { const st = ROAD_STYLE[c], v = hexVars('grass', c, 1, undefined, undefined, LV[V.lvl].draw), mph = v ? v.mi / hexHours(v) : MPH();
+      const eases = traitsOn() ? Object.entries((mv.roads || {})[c] || {}).map(([m, g]) => `${((mv.modes || []).find(x => x.id === m) || { name: m }).name} ${g}`) : [];  // E9: road class eases the Forced March roll
+      h += `<div class="row"><span class="sw"><svg width="30" height="10"><line x1="1" y1="5" x2="29" y2="5" stroke="${st.c}" stroke-width="${st.px}"${st.dash ? ' stroke-dasharray="5 3"' : ''}/></svg></span><span>${{ roman: 'Roman road', local: 'Local road', trail: 'Trail' }[c]}<br><small${traitsOn() ? ' title="A road makes orient and traverse automatic"' : ''}>${traitsOn() ? '' : v && v.pace !== 1 ? '×' + v.pace + ' travel time · ' : 'normal pace · '}${+mph.toFixed(1)} mi/h${eases.length ? ' · ' + esc(eases.join(', ')) : ''}${c === 'roman' ? ' · bridges' : ' · fords'}</small></span></div>`; } }
   if (ps.length) {
     h += '<h2>Places</h2>';
     // every view (Heph 2026-11-07): the places in view, with ▶ in front of one that has sub-places; clicking ▶ turns it to ▼ and lists them under it
@@ -1495,7 +1539,7 @@ async function loadModules() {
   try { const { url, id } = await currentCampaign(); if (id && !CMODS) await campaignLock(url, id); } catch (e) {}
   MODS = (await Promise.all((await knownSites()).filter(m => !local.some(l => l.id === m.id)).map(async m => {
     const base = new URL(m.path.replace(/\/?$/, '/'), m.site).href, r = { id: m.id, path: m.path, title: m.id, version: '', base, ok: false };
-    try { const j = await (await fetch(base + 'module.json')).json(); Object.assign(r, { events: typeof j.events === 'string' ? j.events : '', title: j.title || m.id, version: j.version || '', credits: j.credits || [], languages: j.languages, starts: Array.isArray(j.starts) ? j.starts : [], ok: !!j.atlas_map }); } catch (e) {}
+    try { const j = await (await fetch(base + 'module.json')).json(); Object.assign(r, { events: typeof j.events === 'string' ? j.events : '', title: j.title || m.id, version: j.version || '', credits: j.credits || [], languages: j.languages, starts: Array.isArray(j.starts) ? j.starts : [], traits: j.traits && typeof j.traits === 'object' ? j.traits : null, ok: !!j.atlas_map }); } catch (e) {}
     return r; }))).concat(local);
   if (CMODS && MODS.some(m => CMODS.has(m.id))) MODS = MODS.filter(m => CMODS.has(m.id));  // the campaign as a filter
   const want = new URLSearchParams(location.search).get('module') || store.get('hexmarch-atlas-module');
