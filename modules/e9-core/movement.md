@@ -1,5 +1,7 @@
 # E9 movement: scales and modes
 
+In the game a mode is called an **exploration action** (Heph 2026-11-16); `movement.modeTerm` gives the apps that word. "Mode" stays the data name.
+
 Heph's design (2026-11-15), as data for the Atlas's procedures. It is the source for E9's `travel` and `move` procedures (EVENTS_FORMAT.md in the data repo). Heph will word it as game rules separately. The numbers live in `rules.json` under `movement` and `time`.
 
 ## One speed for every scale
