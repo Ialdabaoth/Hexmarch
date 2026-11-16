@@ -1,0 +1,1 @@
+- Each movement mode has an `about` line (Heph's wording) for the Atlas mode tooltips.
