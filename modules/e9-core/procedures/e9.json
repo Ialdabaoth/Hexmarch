@@ -40,9 +40,6 @@
    "steps": [
     {
      "walk": "move",
-     "then": [
-      "footing"
-     ],
      "stop": "queued"
     }
    ]
@@ -354,25 +351,39 @@
     "traverse",
     "to"
    ],
-   "about": "Rolls along the way (movement.md): everyone rolls Agility at the hex's traverse grade on entering it; if anyone fails, the party is bogged down and the walk halts in that hex.",
+   "about": "Rolls along the way (movement.md), each shift after Navigate: everyone rolls Agility at the hex's traverse grade, one step easier on course and with Help on Climb/Swim/Maneuver (never past easy). Each member who fails chooses: stuck (lose an hour; the party waits or splits) or injured (1d6, keep pace).",
    "steps": [
     {
      "each": "*",
      "roll": "agility",
      "vs": "{traverse}",
-     "combine": "all",
+     "ease": "maneuver",
+     "easier": "flags.on-course",
+     "combine": "each",
      "as": "r",
-     "label": "Footing: Agility vs traverse",
-     "ease": "maneuver"
+     "label": "Footing: Agility vs traverse"
     },
     {
-     "branch": "r",
-     "fail": [
+     "effect": "choose",
+     "for": "r.failed",
+     "options": [
       {
-       "text": "Bogged down: {r.failed} failed Agility ({traverse})."
+       "label": "Stuck (lose an hour)",
+       "effects": [
+        {
+         "effect": "clock",
+         "hours": 1
+        }
+       ]
       },
       {
-       "effect": "halt"
+       "label": "Injured (1d6)",
+       "effects": [
+        {
+         "effect": "damage",
+         "amount": "1d6"
+        }
+       ]
       }
      ]
     }
@@ -383,7 +394,7 @@
     "orient",
     "to"
    ],
-   "about": "Rolls along the way (movement.md): each shift, everyone on Navigate rolls Survival at the hex's orient grade, in secret. If nobody passes, the party is lost and the walk halts.",
+   "about": "Rolls along the way (movement.md), first each shift: everyone on Navigate rolls Survival at the hex's orient grade, in secret. If anyone passes, the party is on course until the next shift: footing and Sneak rolls are one step easier, and any drift ends. If nobody passes, the party is lost and drifts off course, still walking.",
    "steps": [
     {
      "each": "navigate",
@@ -392,16 +403,32 @@
      "combine": "any",
      "as": "r",
      "secret": true,
-     "label": "Lost? Survival vs orient"
+     "label": "Navigate: Survival vs orient"
     },
     {
      "branch": "r",
-     "fail": [
+     "pass": [
       {
-       "text": "Lost: nobody on Navigate kept the way ({orient})."
+       "text": "On course."
       },
       {
-       "effect": "halt"
+       "effect": "flag",
+       "name": "on-course",
+       "value": true,
+       "until": "shift"
+      },
+      {
+       "effect": "drift",
+       "dir": 0
+      }
+     ],
+     "fail": [
+      {
+       "text": "Lost: the party drifts off course ({orient})."
+      },
+      {
+       "effect": "drift",
+       "dir": "1d6"
       }
      ]
     }
@@ -459,16 +486,30 @@
  "triggers": [
   {
    "id": "lost-shift",
-   "name": "Lost? (each shift)",
+   "name": "Navigate (each shift)",
    "on": "clock",
    "every": {
-    "n": 4,
-    "unit": "hour"
+    "n": 1,
+    "unit": "shift"
    },
    "while": "walking",
    "auto": true,
    "run": {
     "call": "lost"
+   }
+  },
+  {
+   "id": "footing-shift",
+   "name": "Footing (each shift)",
+   "on": "clock",
+   "every": {
+    "n": 1,
+    "unit": "shift"
+   },
+   "while": "walking",
+   "auto": true,
+   "run": {
+    "call": "footing"
    }
   },
   {
