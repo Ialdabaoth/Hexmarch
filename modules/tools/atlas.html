@@ -45,8 +45,9 @@ footer{display:flex;justify-content:space-between;gap:12px;padding:4px 16px;font
 footer a{color:var(--red)}
 /* a tooltip that also shows on a tap (Heph: explanations in tooltips, never a bare title) */
 #party .tip{all:unset;position:relative;cursor:help;text-decoration:underline dotted;text-underline-offset:3px}#party .tip:focus-visible{outline:2px solid var(--red)}
-#party .tip::after{content:attr(data-tip);position:absolute;left:0;bottom:calc(100% + 4px);z-index:5;width:max-content;max-width:min(280px,70vw);padding:6px 8px;border-radius:5px;background:#2b2118;color:#fffaf0;font-size:12px;font-weight:normal;line-height:1.35;white-space:normal;opacity:0;visibility:hidden;pointer-events:none}
+#party .tip::after{content:attr(data-tip);position:absolute;left:0;bottom:calc(100% + 4px);z-index:5;width:max-content;max-width:min(280px,70vw);padding:6px 8px;border-radius:5px;background:#2b2118;color:#fffaf0;font-size:12px;font-weight:normal;line-height:1.35;white-space:pre-line;opacity:0;visibility:hidden;pointer-events:none}
 #party .tip:hover::after,#party .tip:focus::after{opacity:1;visibility:visible}
+#party .mode{white-space:nowrap;margin-right:6px}
 </style></head><body>
 <header><h1 id="crumbs"></h1>
 <div class="ctl"><select id="lang" aria-label="Language" hidden></select>
@@ -987,24 +988,42 @@ async function loadEvents() {
 }
 function queueOf() { if (!PQUEUE.has(PID)) PQUEUE.set(PID, []); return PQUEUE.get(PID); }
 const UNIT_H = { minute: 1 / 60, hour: 1, day: 24, week: 168 };
+// hours in a unit: the clock's own, or the ruleset's rules.json "time" (minutes: E9 "shift": 240); a {n, unit} is n of them
+function periodH(u) { if (u && typeof u === 'object') return (+u.n || 1) * periodH(u.unit); if (UNIT_H[u] !== undefined) return UNIT_H[u];
+  const m = ((RULEDATA[rulesetOf()] || {}).time || {})[u]; return typeof m === 'number' ? m / 60 : NaN; }
+// a party's flags and drift (Heph 2026-11-16, E9 footing and the lost roll): parties[].flags {name: {value, until}} (until: the clock hour it
+// ends, null: until changed) and parties[].drift {dir, turn} (lost: each hex walked goes one hex-side clockwise (turn 1) or counter-clockwise
+// (-1) of the way meant, until a "drift" effect with no dir). Procedures see the flags still on at that time as {flags.<name>}
+const flagsOn = (fl, t) => Object.fromEntries(Object.entries(fl || {}).filter(([, f]) => f && (f.until == null || t < f.until - 1e-9)).map(([k, f]) => [k, f.value]));
+function applyMark(st, f, t) {  // a flag or drift effect onto st {flags, drift} at clock hour t; true when it was one of them
+  if (f.effect === 'flag' && f.name) { const per = f.until ? periodH(f.until) : NaN;
+    if (f.value === false || f.value === null || f.value === '') delete st.flags[f.name];
+    else st.flags[f.name] = { value: f.value === undefined ? true : f.value, until: per > 0 ? (Math.floor(t / per + 1e-9) + 1) * per : null };
+    return f.applied = true; }
+  if (f.effect === 'drift') { const d = +f.dir || 0; st.drift = d ? { dir: d, turn: d <= 3 ? 1 : -1 } : null; return f.applied = true; }
+  return false;
+}
+const marksOf = ap => ({ flags: { ...((ap && ap.flags) || {}) }, drift: (ap && ap.drift) || null });
 async function runQueued(i) {
   const ap = AP(), q = queueOf(), t = q[i], l = procLib(); if (!ap || !t || !l) return;
   q.splice(i, 1);
-  const e = HexmarchProcedures.run(l, t, { party: members(), vars: { ...(t.vars || {}), party: ap.name }, roles: { party: ap.name } });
-  e.at = ap.clock.hours;
+  const mk = marksOf(ap), e = HexmarchProcedures.run(l, t, { party: members(), vars: { ...(t.vars || {}), party: ap.name, flags: flagsOn(mk.flags, ap.clock.hours) }, roles: { party: ap.name } });
+  e.at = ap.clock.hours; for (const f of e.effects) applyMark(mk, f, ap.clock.hours);
   let hours = 0;  // the effects the Atlas applies now: passing time on the party's clock; the rest are listed for the referee
   for (const f of e.effects) if (f.effect === 'clock') { const h = typeof f.hours === 'number' ? f.hours : (+f.n || +f.amount || 0) * (UNIT_H[f.unit] ?? 1); if (h > 0) { hours += h; f.applied = true; } }
   for (const [ct, n] of hours ? clockFired(l, ap.clock.hours, ap.clock.hours + hours, false) : []) for (let k = 0; k < n; k++) q.push(ct);  // time passed off a walk
-  CS = { ...CS, revision: CS.revision + 1, updated: new Date().toISOString(), parties: CS.parties.map(p => p.id !== ap.id ? p : { ...p, clock: { ...p.clock, hours: p.clock.hours + hours }, log: [...(p.log || []), e] }) };
+  CS = { ...CS, revision: CS.revision + 1, updated: new Date().toISOString(), parties: CS.parties.map(p => p.id !== ap.id ? p : { ...p, flags: mk.flags, drift: mk.drift, clock: { ...p.clock, hours: p.clock.hours + hours }, log: [...(p.log || []), e] }) };
   await saveState(); fromState();
   if (parent !== window) parent.postMessage({ type: 'hexmarch-atlas', event: 'log', module: MOD.id, party: ap.id, entry: e, hours }, '*');
   partyBox();
 }
-function entryHtml(e, ap) {
+function entryHtml(e, ap, li) {
   const rolls = (e.rolls || []).map(x => `${x.who ? esc(x.who) + ' ' : ''}${esc(x.roll)}${x.vs ? ' vs ' + esc(x.vs) : ''} ${esc(x.total ?? (x.dice || []).join('+'))}${x.pass === true ? ' ✓' : x.pass === false ? ' ✗' : ''}${x.secret ? ' (secret)' : ''}`.trim()).join(', ');
-  const later = (e.effects || []).filter(f => !f.applied && f.effect !== 'note').map(f => esc(f.effect + (f.target ? ' · ' + f.target : '') + (f.amount !== undefined ? ' ' + f.amount : '') + (f.condition ? ' ' + f.condition : '')));
+  const pick = (e.effects || []).map((f, k) => f.effect !== 'choose' || !Array.isArray(f.options) ? '' : f.picked !== undefined ? `<br><small>${esc(f.target || '')}: ${esc((f.options[f.picked] || {}).label || '')}</small>`
+    : `<br><small>${esc(f.target || 'Choose')}:</small> <select data-choose="${li}|${k}"${LOCK ? ' disabled' : ''}><option value="">choose…</option>${f.options.map((o, n) => `<option value="${n}">${esc((o && o.label) || 'option ' + (n + 1))}</option>`).join('')}</select>`).join('');
+  const later = (e.effects || []).filter(f => !f.applied && f.effect !== 'note' && f.effect !== 'choose').map(f => esc(f.effect + (f.target ? ' · ' + f.target : '') + (f.amount !== undefined ? ' ' + f.amount : '') + (f.condition ? ' ' + f.condition : '')));
   return `<p class="ev"><small>${esc(clockLabel({ start: ap.clock.start, hours: typeof e.at === 'number' ? e.at : ap.clock.hours }))}${rolls ? ' · ' + rolls : ''}</small><br><b>${esc(e.proc || '')}</b> ${(e.text || []).map(esc).join(' ')}`
-    + `${(e.players || []).length ? `<br><small title="What the players are told">Players: ${e.players.map(esc).join(' ')}</small>` : ''}${later.length ? `<br><small title="Apply these by hand for now">To apply: ${later.join('; ')}</small>` : ''}`
+    + pick + `${(e.players || []).length ? `<br><small title="What the players are told">Players: ${e.players.map(esc).join(' ')}</small>` : ''}${later.length ? `<br><small title="Apply these by hand for now">To apply: ${later.join('; ')}</small>` : ''}`
     + `${(e.warnings || []).length ? `<br><small class="warn">${e.warnings.map(esc).join('; ')}</small>` : ''}</p>`;
 }
 let MODEEDIT = '';  // the member whose modes are being picked
@@ -1031,15 +1050,21 @@ function movementLine() {  // the referee picks each member's movement modes for
   const nameOf = memberName, hg = helpGiven(ap), helpIds = new Set(mv.modes.filter(m => m.grants).map(m => m.id));
   const forced = Object.values(mv.traverse || {}).map(t => t && t.requires).filter(Boolean);  // a mode the ground can force (E9: maneuver on hard) can be helped too
   const byId = new Map(mv.modes.map(m => [m.id, m])), slots = mv.modeSlots || {}, max = Math.max(slots.default || 1, ...((slots.byLevel || []).map(b => b.slots || 0)));
-  const rule = `${slots.default || 1} mode${(slots.default || 1) === 1 ? '' : 's'}${slots.classKind ? `; ${slots.classKind}s ` + (slots.byLevel || []).map(b => `${b.slots} from level ${b.from}`).join(', ') : ''}`;
-  let h = `<hr><b title="${esc(rule)}">Movement</b>`;
+  const T = Object.assign({ one: 'mode', many: 'modes' }, mv.modeTerm || {}), Tn = n => n === 1 ? T.one : T.many, Cap = t => t[0].toUpperCase() + t.slice(1);  // what the game calls a mode (E9: "exploration action", Heph 2026-11-16)
+  const helpTxt = `Help gives one ally one more ${T.one}, or makes one of their ${T.many} a step easier (never past easy); helps stack`;
+  const rule = `${slots.default || 1} ${Tn(slots.default || 1)}${slots.classKind ? `; ${slots.classKind}s ` + (slots.byLevel || []).map(b => `${b.slots} from level ${b.from}`).join(', ') : ''}`;
+  // each mode's tooltip (Heph 2026-11-16): the ruleset's "about", then a summary of its talent, speed and limits; tap-friendly (.tip)
+  const summary = m => [m.talent && 'talent: ' + m.talent, m.speed !== undefined && m.speed + '×', m.traverse && 'on ' + m.traverse.join('/') + ' ground', m.scales && m.scales.join('/'), m.classKind && m.classKind + 's only', m.grants && 'helps an ally'].filter(Boolean).join(' · ');
+  const tipOf = m => [m.about, summary(m)].filter(Boolean).join('\n'), modeTip = m => `<button type="button" class="tip" data-tip="${esc(tipOf(m))}">${esc(m.name)}</button>`;
+  let h = `<hr><b><button type="button" class="tip" data-tip="${esc([mv.modesAbout, Cap(T.many) + ' per member: ' + rule].filter(Boolean).join('\n'))}">Movement</button></b>`;
   for (const id of ids) { const have = ((ap.modes || {})[id] || []).filter(x => byId.has(x));
     const got = hg[id] || { modes: 0, ease: {} }, cap = max + got.modes, eased = Object.entries(got.ease).map(([m, n]) => `${(byId.get(m) || { name: m }).name} ${n} step${n === 1 ? '' : 's'} easier`);
-    h += `<br>${esc(nameOf(id))}: ${have.length ? have.map(x => esc(byId.get(x).name)).join(', ') : '<small>no mode</small>'}${got.modes || eased.length ? ` <small title="From Help">(${[got.modes && '+' + got.modes + ' mode', ...eased].filter(Boolean).map(esc).join(', ')})</small>` : ''} <button data-mv="${esc(id)}" title="Pick ${esc(nameOf(id))}’s modes (${esc(rule)})">Modes…</button>`;
+    h += `<br>${esc(nameOf(id))}: ${have.length ? have.map(x => modeTip(byId.get(x))).join(', ') : `<small>no ${esc(T.one)}</small>`}${got.modes || eased.length ? ` <small title="From Help">(${[got.modes && '+' + got.modes + ' ' + Tn(got.modes), ...eased].filter(Boolean).map(esc).join(', ')})</small>` : ''} <button data-mv="${esc(id)}" title="Pick ${esc(nameOf(id))}’s ${esc(T.many)} (${esc(rule)})">${esc(Cap(T.many))}…</button>`;
     if (have.some(x => helpIds.has(x))) { const cur = (ap.help || {})[id] || {}, val = cur.for ? [cur.for, cur.grant, cur.mode || ''].join('|') : '';
-      const opts = ids.filter(o => o !== id).flatMap(o => [[`${o}|modes|`, `${nameOf(o)}: one more mode`], ...[...new Set([...((ap.modes || {})[o] || []), ...forced])].filter(x => byId.has(x) && !helpIds.has(x)).map(x => [`${o}|easier|${x}`, `${nameOf(o)}: ${byId.get(x).name} easier`])]);
-      h += `<br>&nbsp;&nbsp;<small>helps</small> <select data-help="${esc(id)}" title="Help gives one ally one more mode, or makes one of their modes a step easier (never past easy); helps stack"><option value="">nobody yet</option>${opts.map(([v, t]) => `<option value="${esc(v)}"${v === val ? ' selected' : ''}>${esc(t)}</option>`).join('')}</select>`; }
-    if (MODEEDIT === id) h += '<br>' + mv.modes.map(m => `<label title="${esc([m.talent && 'talent: ' + m.talent, m.speed !== undefined && m.speed + '×', m.traverse && 'on ' + m.traverse.join('/') + ' ground', m.scales && m.scales.join('/'), m.classKind && m.classKind + 's only', m.grants && 'helps an ally'].filter(Boolean).join(' · '))}"><input type="checkbox" data-mode="${esc(m.id)}" data-who="${esc(id)}"${have.includes(m.id) ? ' checked' : ''}${!have.includes(m.id) && have.length >= cap ? ' disabled' : ''}> ${esc(m.name)}</label>`).join(' ');
+      const opts = ids.filter(o => o !== id).flatMap(o => [[`${o}|modes|`, `${nameOf(o)}: one more ${T.one}`], ...[...new Set([...((ap.modes || {})[o] || []), ...forced])].filter(x => byId.has(x) && !helpIds.has(x)).map(x => [`${o}|easier|${x}`, `${nameOf(o)}: ${byId.get(x).name} easier`])]);
+      const hm = byId.get(have.find(x => helpIds.has(x)));
+      h += `<br>&nbsp;&nbsp;<small><button type="button" class="tip" data-tip="${esc([hm && hm.about, helpTxt + '.'].filter(Boolean).join('\n'))}">helps</button></small> <select data-help="${esc(id)}" title="${esc(helpTxt)}"><option value="">nobody yet</option>${opts.map(([v, t]) => `<option value="${esc(v)}"${v === val ? ' selected' : ''}>${esc(t)}</option>`).join('')}</select>`; }
+    if (MODEEDIT === id) h += '<br>' + mv.modes.map(m => `<span class="mode"><input type="checkbox" id="md-${esc(id)}-${esc(m.id)}" data-mode="${esc(m.id)}" data-who="${esc(id)}" aria-label="${esc(m.name)}"${have.includes(m.id) ? ' checked' : ''}${!have.includes(m.id) && have.length >= cap ? ' disabled' : ''}> ${modeTip(m)}</span>`).join(' ');
   }
   return h;
 }
@@ -1059,11 +1084,28 @@ function eventsLine() {  // the referee's events for the party shown: manual tri
   const man = l.triggers.filter(t => t.on === 'manual'), q = queueOf(), log = ap.log || [];
   let h = '<hr><b>Events</b>' + (NAV && PARTY ? ` <button data-ev="continue" title="${esc(offerPreview(NAV.proc, NAV.pts, NAV.N))}">Continue</button><button data-ev="stopnav" title="Stay here">Stay</button>` : '');
   if (l.report.length) h += ` <details class="evrep"><summary title="Names the module uses that the ${esc(l.ruleset)} rules don’t provide">⚠ ${l.report.length}</summary><small>${l.report.map(esc).join('<br>')}</small></details>`;
+  const on = flagsOn(ap.flags, ap.clock.hours), marks = [...Object.entries(on).map(([k, v]) => v === true ? k : k + ': ' + v), ...(ap.drift ? [`lost, drifting ${ap.drift.turn > 0 ? 'clockwise' : 'counter-clockwise'}`] : [])];
+  if (marks.length) h += ` <small title="The party’s flags and drift, which procedures read (the players aren’t told)">· ${marks.map(esc).join(' · ')}</small>`;
   h += '<br>' + (man.length ? man.map(t => `<button data-ev="queue" data-id="${esc(t.id)}" title="Add to the queue for ${esc(ap.name)}">${esc(t.label || t.id)}</button>`).join('') : '<small>This module has no manual events yet.</small>');
   if (q.length) h += '<ol class="evq">' + q.map((t, i) => `<li>${esc(t.label || t.id)} <button data-ev="run" data-i="${i}">Run</button><button data-ev="skip" data-i="${i}">Skip</button>${i ? `<button data-ev="up" data-i="${i}" title="Run this one sooner">↑</button>` : ''}</li>`).join('') + '</ol>';
-  if (log.length) h += log.slice(-5).reverse().map(e => entryHtml(e, ap)).join('') + (log.length > 5 ? `<small>${log.length} entries this session</small>` : '');
+  if (log.length) h += log.slice(-5).map((e, k) => entryHtml(e, ap, log.length - Math.min(5, log.length) + k)).reverse().join('') + (log.length > 5 ? `<small>${log.length} entries this session</small>` : '');
   return h;
 }
+// a "choose" effect (E9 footing: stuck or injured per member who failed): the referee picks; the option's effects apply then. Clock time
+// from the picks of one log entry counts once, as the most any of them takes (several members stuck lose the party one hour, not one each)
+document.getElementById('party').addEventListener('change', async ev => { const c = ev.target.closest('select[data-choose]'); if (!c || LOCK || c.value === '') return;
+  const ap = AP(), l = procLib(), [li, k] = c.dataset.choose.split('|').map(Number); if (!ap || !CS) return;
+  const log = (ap.log || []).map(x => ({ ...x, effects: (x.effects || []).map(f => ({ ...f })) })), e = log[li], f = e && e.effects[k]; if (!f || f.picked !== undefined) return;
+  const hOf = o => ((o && o.effects) || []).reduce((a, x) => a + (x && x.effect === 'clock' ? (typeof x.hours === 'number' ? x.hours : (+x.n || +x.amount || 0) * (UNIT_H[x.unit] ?? 1)) : 0), 0);
+  const before = Math.max(0, ...e.effects.filter(x => x.effect === 'choose' && x.picked !== undefined).map(x => hOf(x.options[x.picked])));
+  f.picked = +c.value; const o = f.options[f.picked] || {}, mk = marksOf(ap);
+  for (const x of (o.effects || []).filter(x => x && x.effect && x.effect !== 'clock')) { const y = { ...x, target: x.target ?? f.target };
+    if (typeof y.amount === 'string') { const m = y.amount.replace(/\s+/g, '').match(/^(\d*)d(\d+)([+-]\d+)?$/i); if (m) { let t = +(m[3] || 0); for (let n = 0; n < +(m[1] || 1); n++) t += 1 + Math.floor(Math.random() * +m[2]); y.amount = t; } }
+    if (!applyMark(mk, y, ap.clock.hours)) e.effects.push(y); }
+  const hours = Math.max(before, hOf(o)) - before;
+  if (hours > 0) { e.effects.push({ effect: 'clock', hours, applied: true }); if (l) for (const [ct, n] of clockFired(l, ap.clock.hours, ap.clock.hours + hours, false)) for (let q = 0; q < n; q++) queueOf().push(ct); }
+  CS = { ...CS, revision: CS.revision + 1, updated: new Date().toISOString(), parties: CS.parties.map(p => p.id !== ap.id ? p : { ...p, flags: mk.flags, drift: mk.drift, clock: { ...p.clock, hours: p.clock.hours + hours }, log }) };
+  await saveState(); if (hours) fromState(); partyBox(); });
 document.getElementById('party').addEventListener('click', e => { const b = e.target.closest('button[data-ev]'); if (!b || LOCK || !AP()) return; const a = b.dataset.ev, q = queueOf(), i = +b.dataset.i;
   if (a === 'queue') { const t = (procLib() || { triggers: [] }).triggers.find(x => x.id === b.dataset.id); if (t) q.push(t); }
   else if (a === 'run') { runQueued(i); return; }
@@ -1127,25 +1169,39 @@ function hexHours(v) { const l = procLib();
 function walker(pts, N, out, dry) {  // the map side of a `walk` step: fills out {hours, mi, at, path, queued, stopped, rest}. dry: a preview,
   // so the step's "then" procedures (the rolls along the way) are left out
   return (name, vars, sub, entry, stop, then) => {
-    const steps = routeSteps(pts, N), lib = procLib(), clock0 = ((AP() || {}).clock || {}).hours || 0; let prev = pts[0];
-    Object.assign(out, { hours: 0, mi: 0, at: null, path: [pts[0]], queued: [], stopped: false, rest: null, hexes: 0, total: steps.length, blocked: null });
-    for (let k = 0; k < steps.length; k++) { const st = steps[k], c = hexFt(st.i, st.j, N), ty = TYPES.find(x => x.id === st.terrain);
+    const steps = routeSteps(pts, N), lib = procLib(), clock0 = ((AP() || {}).clock || {}).hours || 0, mk = marksOf(AP()); let prev = pts[0];
+    Object.assign(out, { hours: 0, mi: 0, at: null, path: [pts[0]], queued: [], stopped: false, rest: null, hexes: 0, total: steps.length, blocked: null, marks: mk });
+    // drift: a lost party (not in a preview) takes each step of the route turned one hex-side (60°) from where it means to go, from
+    // wherever it really is; once it is back on course (the drift ends) it heads for the route's next point from there. here: the hex
+    // it is in, meant: the route's
+    let here = hexAt(...pts[0], N), meant = here, off = false;
+    for (let k = 0; k < steps.length; k++) {
+      if (off && !mk.drift) { const L = steps[k].leg; steps.splice(k, steps.length - k, ...routeSteps([hexFt(...here, N), ...pts.slice(L)], N).map(x => ({ ...x, leg: L + x.leg - 1 })));
+        off = false; meant = here; out.total = steps.length; if (k >= steps.length) break; }
+      let st = steps[k];
+      if (!dry && (mk.drift || off)) { const [ax, ay] = hexFt(...meant, N), [bx, by] = hexFt(st.i, st.j, N), a = (mk.drift ? mk.drift.turn : 0) * Math.PI / 3, [hx, hy] = hexFt(...here, N);
+        const dx = bx - ax, dy = by - ay, to = hexAt(hx + dx * Math.cos(a) - dy * Math.sin(a), hy + dx * Math.sin(a) + dy * Math.cos(a), N), t = T(to[0], to[1], N), rd = roadAt(...hexFt(...to, N), Math.max(150, N * 35));
+        meant = [st.i, st.j]; st = { ...st, i: to[0], j: to[1], terrain: t ? TYPES[t - 1].id : null, road: rd ? rd['class'] : undefined }; off = off || to[0] !== meant[0] || to[1] !== meant[1]; }
+      else meant = [st.i, st.j];
+      here = [st.i, st.j];
+      const c = hexFt(st.i, st.j, N), ty = TYPES.find(x => x.id === st.terrain);
       const v = hexVars(st.terrain, st.road, st.mi, ...c, N);
       if (!v) { entry.warnings.push(`no way on into ${ty ? ty.name.toLowerCase() : 'that hex'}`); out.stopped = true; out.blocked = st.terrain || 'unknown'; out.rest = null; break; }
       const to = addr(...(N === 1 ? [st.i, st.j] : centre(st.i, st.j, N))).slice(1);
       const w = { from: out.at ? addr(...out.at).slice(1) : '', to, party: vars.party, ...v };
       let halt = false; const h0 = out.hours;
-      const absorb = e => { entry.rolls.push(...e.rolls.map(r => ({ ...r, at: to }))); entry.text.push(...e.text); entry.players.push(...e.players); entry.warnings.push(...e.warnings);
-        for (const f of e.effects) { if (f.effect === 'clock') out.hours += typeof f.hours === 'number' ? f.hours : (+f.n || +f.amount || 0) * (UNIT_H[f.unit] ?? 1); else if (f.effect === 'halt') halt = true; else if (!['move', 'reveal', 'explore'].includes(f.effect)) entry.effects.push(f); } };
-      for (const p of [name, ...(dry ? [] : then || [])]) absorb(sub(p, w));
+      const run = p => sub(p, Object.assign(w, { flags: flagsOn(mk.flags, clock0 + out.hours) }));  // the flags as they stand when it runs
+      const absorb = e => { for (const f of e.effects) applyMark(mk, f, clock0 + out.hours); entry.rolls.push(...e.rolls.map(r => ({ ...r, at: to }))); entry.text.push(...e.text); entry.players.push(...e.players); entry.warnings.push(...e.warnings);
+        for (const f of e.effects) { if (f.effect === 'clock') out.hours += typeof f.hours === 'number' ? f.hours : (+f.n || +f.amount || 0) * (UNIT_H[f.unit] ?? 1); else if (f.effect === 'halt') halt = true; else if (!f.applied && !['move', 'reveal', 'explore'].includes(f.effect) || f.effect === 'choose') entry.effects.push(f); } };
+      for (const p of [name, ...(dry ? [] : then || [])]) absorb(run(p));
       out.mi += st.mi; out.at = N === 1 ? [st.i, st.j] : centre(st.i, st.j, N); out.path.push(c); out.hexes++;
       const fired = lib ? firedBetween(prev, c, lib) : []; prev = c;
       // clock triggers whose boundary this hex's time crosses (each shift, each hour of Forced March): "auto" ones run here like the
       // `then` procedures (not in a preview), the rest join the queue with the hex's params
       for (const [t, n] of lib ? clockFired(lib, clock0 + h0, clock0 + out.hours, true) : []) for (let q = 0; q < n; q++)
-        if (t.auto && t.run && t.run.call) { if (!dry) absorb(sub(t.run.call, w)); } else fired.push(Object.assign({}, t, { vars: w }));
+        if (t.auto && t.run && t.run.call) { if (!dry) absorb(run(t.run.call)); } else fired.push(Object.assign({}, t, { vars: w }));
       for (const t of fired) out.queued.push(Object.assign({}, t, { at: to }));
-      if (halt || (stop !== 'never' && fired.length)) { if (k < steps.length - 1) { out.stopped = true; out.rest = [c, ...pts.slice(st.leg)]; } break; }
+      if (halt || (stop !== 'never' && fired.length)) { if (k < steps.length - 1) { out.stopped = true; out.rest = [c, ...pts.slice(steps[k].leg)]; } break; }
     }
   };
 }
@@ -1156,9 +1212,9 @@ function clockFired(lib, a, b, walking) {
   const out = [], ms = members();
   for (const t of lib.triggers) { if (t.on !== 'clock' || !t.every) continue; if (t.while === 'walking' && !walking) continue;
     if (t.if && t.if.mode && !ms.some(m => m.modes.includes(t.if.mode))) continue;
-    const per = (+t.every.n || 1) * (UNIT_H[t.every.unit] ?? NaN); if (!(per > 0)) continue;
-    const k = Math.floor(b / per + 1e-9) - Math.floor(a / per + 1e-9); if (k > 0) out.push([t, k]); }
-  return out;
+    const per = periodH(t.every); if (!(per > 0)) continue;  // "unit": the clock's, or the ruleset's (E9 "shift")
+    for (let m = Math.floor(a / per + 1e-9) + 1; m <= Math.floor(b / per + 1e-9); m++) out.push([m * per, out.length, t]); }
+  return out.sort((x, y) => x[0] - y[0] || x[1] - y[1]).map(x => [x[2], 1]);  // boundary by boundary; at one boundary in the list's order
 }
 function estimate(pts, N) {  // a route's time and miles, hex by hex as Navigate would walk it, without rolling or stopping for events
   const out = {}, entry = { rolls: [], text: [], players: [], warnings: [], effects: [] };
@@ -1178,7 +1234,7 @@ function offerPreview(name, pts, N) {
 }
 async function runOffer(name, pts, N) {
   const ap = AP(), l = procLib(); if (!ap || !l || !PARTY) return;
-  const out = {}, e = HexmarchProcedures.run(l, name, { walk: walker(pts, N, out), party: members(), vars: { party: ap.name }, roles: { party: ap.name } });
+  const out = {}, e = HexmarchProcedures.run(l, name, { walk: walker(pts, N, out), party: members(), vars: { party: ap.name, flags: flagsOn(ap.flags, ap.clock.hours) }, roles: { party: ap.name } });
   e.at = ap.clock.hours;
   if (out.hexes !== undefined) {
     const lbl = { [NL]: 'League', [NF]: 'Field', [NU]: 'Furlong', 1: '100-ft' }[N] || '';
@@ -1188,7 +1244,8 @@ async function runOffer(name, pts, N) {
     if (out.at) await setParty(out.at, PARTY.hours + out.hours, false, out.path);
     for (const t of out.queued) queueOf().push(t);
   }
-  CS = { ...CS, revision: CS.revision + 1, updated: new Date().toISOString(), parties: CS.parties.map(p => p.id !== ap.id ? p : { ...p, log: [...(p.log || []), e] }) };
+  const mk = out.marks || marksOf(ap); for (const f of e.effects) applyMark(mk, f, ap.clock.hours + (out.hours || 0));  // flags and drift
+  CS = { ...CS, revision: CS.revision + 1, updated: new Date().toISOString(), parties: CS.parties.map(p => p.id !== ap.id ? p : { ...p, flags: mk.flags, drift: mk.drift, log: [...(p.log || []), e] }) };
   await saveState();
   if (parent !== window) parent.postMessage({ type: 'hexmarch-atlas', event: 'log', module: MOD.id, party: ap.id, entry: e, hours: 0 }, '*');
   PBOX = true; partyBox(); redraw();

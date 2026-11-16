@@ -148,3 +148,23 @@ test('ruleset triggers load with the procedures, and "ease" picks whose Help cou
   const e = P.run(l2, 'footing', { party: [{ name: 'Ann', modes: [], ease: { maneuver: 1 } }, { name: 'Bo', modes: [] }] });
   assert.deepStrictEqual(e.rolls.map(r => [r.who, r.vs, r.pass]), [['Ann', 'easy', true], ['Bo', 'normal', false]]);
 });
+
+test('flags: "easier" and branching on a flag; drift and choose effects', () => {
+  const R = { format: 'hexmarch-procedures/1', rules: ['t'], procedures: {
+    check: { params: ['vs', 'who'], steps: [{ result: { by: 'vs', of: { easy: { pass: true } }, else: { pass: false } } }] },
+    footing: { steps: [{ each: '*', roll: 'check', vs: 'normal', easier: 'flags.on-course', combine: 'each', as: 'r' },
+      { effect: 'choose', for: 'r.failed', options: [{ label: 'Stuck', effects: [{ effect: 'clock', hours: 1 }] }, { label: 'Injured', effects: [{ effect: 'damage', amount: '1d6' }] }] }] },
+    lost: { steps: [{ roll: 'check', vs: 'normal', easier: ['flags.on-course'], as: 'r' }, { branch: 'r', pass: [{ effect: 'flag', name: 'on-course', value: true, until: 'shift' }], fail: [{ effect: 'drift', dir: '1d6' }] }] },
+    which: { steps: [{ branch: 'flags.on-course', pass: [{ text: 'On course.' }], fail: [{ text: 'Not sure.' }] }] } } };
+  const l = P.load('t', [R], null), party = [{ name: 'Ann', modes: [] }, { name: 'Bo', modes: [] }];
+  let e = P.run(l, 'footing', { party, vars: { flags: { 'on-course': true } } });
+  assert.deepStrictEqual(e.rolls.map(r => [r.who, r.vs, r.pass]), [['Ann', 'easy', true], ['Bo', 'easy', true]]); assert.strictEqual(e.effects.length, 0);
+  e = P.run(l, 'footing', { party, vars: { flags: {} } });
+  assert.deepStrictEqual(e.effects.map(f => [f.effect, f.target, f.options.length]), [['choose', 'Ann', 2], ['choose', 'Bo', 2]]);
+  e = P.run(l, 'lost', { vars: { flags: {} }, rng: seq(0.5) });
+  assert.deepStrictEqual(e.effects, [{ effect: 'drift', dir: 4 }]);
+  e = P.run(l, 'lost', { vars: { flags: { 'on-course': true } } });
+  assert.deepStrictEqual(e.effects, [{ effect: 'flag', name: 'on-course', value: true, until: 'shift' }]);
+  assert.deepStrictEqual(P.run(l, 'which', { vars: { flags: {} } }).text, ['Not sure.']);
+  assert.deepStrictEqual(P.run(l, 'which', { vars: { flags: { 'on-course': true } } }).text, ['On course.']);
+});

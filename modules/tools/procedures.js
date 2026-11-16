@@ -120,7 +120,7 @@
         const everyone = s.each === '*' || s.each === 'everyone', ms = (Array.isArray(ctx.party) ? ctx.party : []).filter(m => isObj(m) && (everyone || (Array.isArray(m.modes) && m.modes.includes(s.each))));
         const passed = [], failed = [];
         for (const m of ms) {
-          const em = s.ease || (everyone ? '' : s.each), vs = ease(value(s.vs, vars), em ? +((m.ease || {})[em] || 0) : 0, s.floor || 'easy');  // "ease": whose Help counts
+          const em = s.ease || (everyone ? '' : s.each), vs = ease(value(s.vs, vars), (em ? +((m.ease || {})[em] || 0) : 0) + easier(s, vars), s.floor || 'easy');  // "ease": whose Help counts
           const r = rollOne(lib, s.roll, vs, m.name || m.id, ctx, entry, depth);
           if (r) entry.rolls[entry.rolls.length - 1] = Object.assign(entry.rolls[entry.rolls.length - 1], { who: m.name || m.id, ...(vs !== undefined && vs !== '' ? { vs } : {}), ...(s.secret ? { secret: true } : {}) });
           (r && r.pass === true ? passed : failed).push(m.name || m.id);
@@ -131,16 +131,17 @@
       }
       if (s.role) { vars.who = vars[s.role] || (ctx.roles && ctx.roles[s.role]) || s.role; say(s, vars, entry); continue; }
       if (s.roll) {
-        const r = rollOne(lib, value(s.roll, vars), value(s.vs, vars), vars.who, ctx, entry, depth);
+        const r = rollOne(lib, value(s.roll, vars), ease(value(s.vs, vars), easier(s, vars), s.floor || 'easy'), vars.who, ctx, entry, depth);
         if (r && s.show && entry.rolls.length) entry.rolls[entry.rolls.length - 1].show = true;
         if (s.as) vars[s.as] = r;
         vars.roll = r ? r.total : '?'; say(s, vars, entry); continue;
       }
       if (s.branch) {
-        const r = vars[s.branch];
+        const r = String(s.branch).includes('.') ? path(vars, s.branch) : vars[s.branch];
         let pick;
         if (Array.isArray(s.ranges)) { const n = r && typeof r.total === 'number' ? r.total : NaN; pick = (s.ranges.find(x => Array.isArray(x.roll) && n >= x.roll[0] && n <= (x.roll[1] ?? x.roll[0])) || {}).steps; }
         else if (r && typeof r.pass === 'boolean') pick = r.pass ? s.pass : s.fail;
+        else if (!isObj(r) && (r !== undefined || String(s.branch).includes('.'))) pick = r ? s.pass : s.fail;  // a flag or other plain value: set or not ("flags.on-course")
         else { entry.warnings.push(`can't tell how "${s.branch}" went; neither branch ran`); continue; }
         result = steps(lib, pick || [], vars, ctx, entry, depth) ?? result; continue;
       }
@@ -153,7 +154,7 @@
           const e = { effect: s.effect };
           for (const [k, v] of Object.entries(s)) if (!['effect', 'text', 'players', 'show', 'for'].includes(k)) e[k] = value(v, vars);
           if (name !== null && e.target === undefined) e.target = name;
-          if (typeof e.amount === 'string') { const d = dice(e.amount, ctx.rng); if (d) e.amount = d.total; }
+          for (const k of ['amount', 'dir']) if (typeof e[k] === 'string') { const d = dice(e[k], ctx.rng); if (d) e[k] = d.total; }
           vars.amount = e.amount; entry.effects.push(e); say(s, vars, entry);
         }
         continue;
@@ -178,6 +179,10 @@
   function ease(g, n, floor) {
     const k = GRADES.indexOf(g), f = GRADES.indexOf(floor); if (!n || k < 1 || k >= 4) return g;
     return GRADES[Math.max(k, Math.min(k + n, f < 0 ? 3 : f))];
+  }
+  // "easier": a var path or a list of them ("flags.on-course"): each one set makes the grade a step easier (a number: that many steps)
+  function easier(s, vars) {
+    return (Array.isArray(s.easier) ? s.easier : s.easier ? [s.easier] : []).reduce((n, p) => { const v = typeof p === 'number' ? p : path(vars, p); return n + (typeof v === 'number' ? v : v && v !== 'false' ? 1 : 0); }, 0);
   }
   const path = (vars, p) => String(p).replace(/^\{|\}$/g, '').split('.').reduce((o, k) => (o == null ? undefined : o[k]), vars);
 
