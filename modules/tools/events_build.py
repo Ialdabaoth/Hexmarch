@@ -73,8 +73,8 @@ def rules_procedures(repo):
 
 
 def rules_data(repo):
-    """Each ruleset's movement data and terrain trait defaults (rules.json "movement" and "terrain" of its core rules module),
-    built into the Atlas page: {ruleset: {"movement": {...}, "terrain": {id: {trait: grade}}}}."""
+    """Each ruleset's movement data and terrain trait defaults (rules.json "movement", "terrain" and "time" of its core rules module),
+    built into the Atlas page: {ruleset: {"movement": {...}, "terrain": {id: {trait: grade}}, "time": {unit: minutes}}}."""
     out, mods = {}, os.path.join(repo, 'modules')
     for m in sorted(os.listdir(mods)) if os.path.isdir(mods) else []:
         d = os.path.join(mods, m)
@@ -83,7 +83,7 @@ def rules_data(repo):
         for rs, f in [(man.get('ruleset'), man.get('rules'))] + [(o.get('ruleset'), o.get('rules')) for o in man.get('options') or [] if isinstance(o, dict)]:
             p = os.path.join(d, f) if rs and isinstance(f, str) else ''
             if p and os.path.isfile(p):
-                r = json.load(open(p, encoding='utf-8')); mv, tr = r.get('movement'), r.get('terrain')
-                one = {**({'movement': mv} if isinstance(mv, dict) else {}), **({'terrain': tr} if isinstance(tr, dict) else {})}
+                r = json.load(open(p, encoding='utf-8')); mv, tr, tm = r.get('movement'), r.get('terrain'), r.get('time')
+                one = {**({'movement': mv} if isinstance(mv, dict) else {}), **({'terrain': tr} if isinstance(tr, dict) else {}), **({'time': tm} if isinstance(tm, dict) else {})}
                 if one: out[rs] = one
     return out
