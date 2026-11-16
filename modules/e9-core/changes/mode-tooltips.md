@@ -1,0 +1,2 @@
+- Each movement mode has an `about` line (Heph's wording) for the Atlas mode tooltips.
+- `movement.modesAbout`: Heph's text for the Movement header tooltip.
