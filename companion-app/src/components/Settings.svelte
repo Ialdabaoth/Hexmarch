@@ -185,6 +185,9 @@
 
 <section class="card" style="margin-top:0.75rem">
   <h3>Discord</h3>
+  {#if app.mode === 'player' && app.campaignWebhook}
+    <p class="small" title="Your referee set this up; there's nothing to do here.">Your rolls go to {partyOwn ? 'your party' : app.campaign?.campaign.name}'s Discord channel.</p>
+  {:else}
   <p class="small muted">
     In Discord, open your channel's settings, then Integrations, Webhooks, New Webhook, and Copy Webhook URL. Paste it here.
     Anyone with this link can post to that channel, so keep it to your group.
@@ -200,10 +203,11 @@
     <button onclick={test} disabled={!app.canPost}>Send test</button>
   </div>
   <label class="check small" style="margin-top:0.75rem">
-    <input type="checkbox" checked={app.settings.autoPost} disabled={!app.canPost}
+    <input type="checkbox" checked={app.autoPosting} disabled={!app.canPost}
       onchange={(e) => app.updateSettings({ autoPost: (e.target as HTMLInputElement).checked })} />
     Post every roll to Discord automatically
   </label>
+  {/if}
   {#if app.mode === 'referee' && app.campaign && !app.discordHooks.length}
     <p class="small muted bot-line">Referee's bot: in Scribe › Discord, send this campaign's requests to a Discord channel and set up the bot there, then Publish.</p>
   {:else if app.mode === 'referee' && !app.campaign}

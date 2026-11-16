@@ -47,7 +47,7 @@
           </div>
         {/if}
       </div>
-      {#if app.canPost && !app.settings.autoPost}
+      {#if app.canPost && !app.autoPosting}
         <div class="actions">
           <button onclick={() => app.post(entry!)}>Discord</button>
         </div>

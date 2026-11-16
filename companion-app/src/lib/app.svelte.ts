@@ -1145,6 +1145,7 @@ class AppState {
   // Where rolls go: this device's own webhook (Settings › Discord), else the party's Discord channel, so players post
   // to the table with nothing to paste.
   get rollWebhook(): string {
+    if (this.mode === 'player' && this.campaignWebhook) return this.campaignWebhook;
     if (isWebhookUrl(this.settings.webhookUrl)) return this.settings.webhookUrl;
     return this.campaignWebhook;
   }
@@ -1156,6 +1157,13 @@ class AppState {
   // Referee: every Discord channel requests can arrive in, the campaign's and each party's (the bot hears them all).
   get discordHooks(): string[] {
     return discordChannels(this.state.parties, this.campaign?.published?.post ?? '');
+  }
+  // Rolls post by themselves unless the player said otherwise; with no choice made, on when the campaign has a channel.
+  // A player in a campaign with a channel makes no choice at all (Heph 2026-11-15: "a player should be making zero
+  // configuration decisions"): every roll goes to the table.
+  get autoPosting(): boolean {
+    if (this.mode === 'player' && this.campaignWebhook) return true;
+    return this.settings.autoPost ?? !!this.campaignWebhook;
   }
   get canPost(): boolean {
     return !!this.rollWebhook;
@@ -1269,7 +1277,7 @@ class AppState {
     this.lastRoll = entry;
     this.log.unshift(entry);
     await saveLog(this.log).catch((e) => console.warn("Could not save", e));
-    if (this.settings.autoPost && this.canPost) await this.post(entry);
+    if (this.autoPosting && this.canPost) await this.post(entry);
   }
 
   async post(entry: LogEntry) {
