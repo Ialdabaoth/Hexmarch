@@ -24,7 +24,8 @@
     "default": { "speed": 1, "roll": null },
     "modes": [
       { "id": "watch", "name": "On Watch", "about": "You focus on watching for trouble, making an Alertness check to spot ambushes and approaching encounters as you travel.", "talent": "alertness", "speed": 1 },
-      { "id": "navigate", "name": "Navigate", "about": "You focus on finding a path to your destination, making a Survival check to stay on course and avoid hazards and obstacles.", "talent": "survival", "trait": "orient", "speed": 1 },
+      { "id": "navigate", "name": "Navigate", "about": "You focus on plotting a course to your destination, making a Survival check to avoid becoming lost.", "talent": "survival", "trait": "orient", "speed": 1 },
+      { "id": "pathfind", "name": "Pathfinding", "about": "You focus on finding a path through the terrain, making a Survival check to avoid hazards and obstacles.", "talent": "survival", "trait": "traverse", "speed": 1, "eases": ["agility", "stealth"] },
       { "id": "sneak", "name": "Sneak", "about": "You focus on moving silently, staying unseen, and covering your tracks, making a Stealth check as you travel to avoid being noticed.", "talent": "stealth", "trait": "hide", "speed": 0.5 },
       { "id": "maneuver", "name": "Climb/Swim/Maneuver", "about": "You focus on traversing difficult terrain, making an Agility check to avoid getting stuck or injured.", "talent": "agility", "trait": "traverse", "speed": 0.5, "traverse": ["hard"] },
       { "id": "forced-march", "name": "Forced March", "about": "You focus on moving as quickly as you can, making periodic Agility checks as you travel to avoid fatigue or injury.", "talent": "agility", "speed": 2, "scales": ["exploration", "narration"], "traverse": ["automatic"] },
