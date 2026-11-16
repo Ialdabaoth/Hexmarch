@@ -351,14 +351,14 @@
     "traverse",
     "to"
    ],
-   "about": "Rolls along the way (movement.md), each shift after Navigate: everyone rolls Agility at the hex's traverse grade, one step easier on course and with Help on Climb/Swim/Maneuver (never past easy). Each member who fails chooses: stuck (lose an hour; the party waits or splits) or injured (1d6, keep pace).",
+   "about": "Rolls along the way (movement.md), each shift after Navigate: everyone rolls Agility at the hex's traverse grade, one step easier on a found path and with Help on Climb/Swim/Maneuver (never past easy). Each member who fails chooses: stuck (lose an hour; the party waits or splits) or injured (1d6, keep pace).",
    "steps": [
     {
      "each": "*",
      "roll": "agility",
      "vs": "{traverse}",
      "ease": "maneuver",
-     "easier": "flags.on-course",
+     "easier": "flags.path",
      "combine": "each",
      "as": "r",
      "label": "Footing: Agility vs traverse"
@@ -394,7 +394,7 @@
     "orient",
     "to"
    ],
-   "about": "Rolls along the way (movement.md), first each shift: everyone on Navigate rolls Survival at the hex's orient grade, in secret. If anyone passes, the party is on course until the next shift: footing and Sneak rolls are one step easier, and any drift ends. If nobody passes, the party is lost and drifts off course, still walking.",
+   "about": "Rolls along the way (movement.md), first each shift: everyone on Navigate rolls Survival at the hex's orient grade, in secret. If anyone passes, any drift ends. If nobody passes, the party is lost and drifts off course, still walking.",
    "steps": [
     {
      "each": "navigate",
@@ -410,12 +410,6 @@
      "pass": [
       {
        "text": "On course."
-      },
-      {
-       "effect": "flag",
-       "name": "on-course",
-       "value": true,
-       "until": "shift"
       },
       {
        "effect": "drift",
@@ -458,7 +452,7 @@
     "road",
     "to"
    ],
-   "about": "Rolls along the way (movement.md): each hour of Forced March, every marcher rolls Agility at the road's grade; each one who fails takes 1d6 damage.",
+   "about": "Rolls along the way (movement.md): each hour of Forced March, every marcher rolls Agility at the road's grade; each one who fails takes 1d6 damage. One step easier on a found path.",
    "steps": [
     {
      "call": "march-grade",
@@ -473,12 +467,44 @@
      "vs": "{g}",
      "combine": "each",
      "as": "r",
-     "label": "Forced March: Agility vs road"
+     "label": "Forced March: Agility vs road",
+     "easier": "flags.path"
     },
     {
      "effect": "damage",
      "for": "r.failed",
      "amount": "1d6"
+    }
+   ]
+  },
+  "pathfind": {
+   "params": [
+    "traverse",
+    "to"
+   ],
+   "about": "Rolls along the way (movement.md), each shift after Navigate: everyone on Pathfinding rolls Survival at the hex's traverse grade. If anyone passes, the party has found a path until the next shift: every Agility and Stealth roll along the way is one step easier (never past easy).",
+   "steps": [
+    {
+     "each": "pathfind",
+     "roll": "survival",
+     "vs": "{traverse}",
+     "combine": "any",
+     "as": "r",
+     "label": "Pathfinding: Survival vs traverse"
+    },
+    {
+     "branch": "r",
+     "pass": [
+      {
+       "text": "A path found."
+      },
+      {
+       "effect": "flag",
+       "name": "path",
+       "value": true,
+       "until": "shift"
+      }
+     ]
     }
    ]
   }
@@ -496,6 +522,20 @@
    "auto": true,
    "run": {
     "call": "lost"
+   }
+  },
+  {
+   "id": "pathfind-shift",
+   "name": "Pathfinding (each shift)",
+   "on": "clock",
+   "every": {
+    "n": 1,
+    "unit": "shift"
+   },
+   "while": "walking",
+   "auto": true,
+   "run": {
+    "call": "pathfind"
    }
   },
   {
