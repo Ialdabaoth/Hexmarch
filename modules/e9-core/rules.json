@@ -32,7 +32,7 @@
       { "id": "investigate", "name": "Investigate", "about": "You stop to carefully examine a patch of ground about 100 feet across, moving carefully to avoid missing details or setting off traps. An Alertness check will determine if you find what you're looking for.", "talent": "alertness", "trait": "investigate", "speed": 0.04, "scales": ["exploration"] },
       { "id": "help", "name": "Help", "about": "You use your expertise to aid another member of the party as you travel together.", "speed": 1, "classKind": "expert", "roll": null, "target": "any", "sameMode": false, "grants": { "choose": [ { "modes": 1 }, { "easier": 1, "floor": "easy" } ], "stacks": true } }
     ],
-    "modesAbout": "Most creatures have a normal movement pace of about three miles per hour over even terrain, which is about five 100-foot hexes per ten-minute exploration turn.\n\nAs you move, you can choose various exploration actions to perform each turn. Experts can perform more than one action at a time, and can even help non-experts with their actions.",
+    "modesAbout": "Most creatures have a normal movement pace of about three miles per hour over even terrain, which is about five 500-foot furlongs per ten-minute exploration turn.\n\nAs you move, you can choose various exploration actions to perform each turn. Experts can perform more than one action at a time, and can even help non-experts with their actions.",
     "modeSlots": { "default": 1, "classKind": "expert", "byLevel": [ { "from": 1, "slots": 2 }, { "from": 5, "slots": 3 }, { "from": 9, "slots": 4 } ] },
     "combine": "slowest",
     "party": "slowest",
