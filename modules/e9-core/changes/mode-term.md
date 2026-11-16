@@ -1,0 +1,1 @@
+- `movement.modeTerm`: in the game a mode is an "exploration action"; the apps use this word in their labels.
