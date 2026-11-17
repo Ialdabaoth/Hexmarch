@@ -8,7 +8,7 @@
   import { isWebhook, pingChoice, pingFrom, testPost, type PingKind } from './lib/discord';
   import type { UploadCheck, UploadReport } from '../../engine';
   import { BOT_TOKENS, botAppId, botTokens, inviteLink as botInviteLink, testBot, webhookInfo, withBotToken, type GatewayStatus } from '../../engine';
-  import { appsScriptCode, appsScriptStore, githubStore, handOff, messageLink, takeHandOffs, newKey, readMessageHash, servicesFor, staticServices, upload, type Services, type StoreKind } from '../../engine';
+  import { appsScriptCode, appsScriptStore, githubStore, gitlabStore, handOff, messageLink, takeHandOffs, newKey, readMessageHash, servicesFor, staticServices, upload, type Services, type StoreKind } from '../../engine';
 
   const VERSION = __SCRIBE_VERSION__;
   const params = new URLSearchParams(location.search);
@@ -196,7 +196,7 @@
   // Google Drive through their own Apps Script, or by hand as before.
   let storeKind = $state<StoreKind>('github');
   // The tooltip on Where to host explains the choice picked (Heph 2026-11-15: one dropdown instead of radio buttons).
-  const STORE_TIPS: Record<StoreKind, string> = {"github": "GitHub is a free, open-source repository that anyone can use. It is unaffiliated with Hexmarch, so your files will always be yours. Hexmarch will provide step-by-step instructions for setting up your campaign.", "apps-script": "Google Drive is a popular file storage service that comes with any GMail account. Hexmarch will walk you through setting up an Apps Script, which will give Hexmarch limited access to the files on your Drive that Hexmarch will use to share your campaign with players and co-referees.", "manual": "If you have your own website or server, Hexmarch can simply hand you the campaign files and let you place them somewhere that your players and co-referees can access them."};
+  const STORE_TIPS: Record<StoreKind, string> = {"github": "GitHub is a free, open-source repository that anyone can use. It is unaffiliated with Hexmarch, so your files will always be yours. Hexmarch will provide step-by-step instructions for setting up your campaign.", "gitlab": "GitLab is a free alternative to GitHub that works the same way. It is unaffiliated with Hexmarch, so your files will always be yours. Hexmarch will provide step-by-step instructions for setting up your campaign.", "apps-script": "Google Drive is a popular file storage service that comes with any GMail account. Hexmarch will walk you through setting up an Apps Script, which will give Hexmarch limited access to the files on your Drive that Hexmarch will use to share your campaign with players and co-referees.", "manual": "If you have your own website or server, Hexmarch can simply hand you the campaign files and let you place them somewhere that your players and co-referees can access them."};
   let scriptUrl = $state('');
   // Repository = the referee's GitHub username / the repository name (step 2 suggests one from the campaign name).
   let ghUser = $state('');
@@ -207,6 +207,7 @@
   );
   $effect(() => {
     if (storeKind === 'github' && !ghName && built) ghName = suggestedName;
+    if (storeKind === 'gitlab' && !glName && built) glName = suggestedName;
   });
   const newRepoLink = $derived(`https://github.com/new?${new URLSearchParams({ name: ghName.trim() || suggestedName, visibility: 'public', description: 'Hexmarch campaign files' })}`);
   const tokenLink = $derived(
@@ -219,17 +220,28 @@
   );
   let ghDir = $state('');
   let ghBranch = $state('main');
+  // GitLab (Heph 2026-11-17): the same four steps, on gitlab.com or a GitLab of the referee's own (Advanced).
+  let glUser = $state('');
+  let glName = $state('');
+  let glHost = $state('https://gitlab.com');
+  let glDir = $state('');
+  let glBranch = $state('main');
+  const glProject = $derived(glUser.trim() && glName.trim() ? `${glUser.trim()}/${glName.trim()}` : '');
+  const glSite = $derived((glHost.trim() || 'https://gitlab.com').replace(/\/+$/, ''));
   let secret = $state('');
   let scriptKey = $state(newKey()); // only for a script not set up yet
   let copied = $state(false);
   function services(): Services {
     const post = postKind === 'none' ? '' : postUrl;
     if (postKind === 'discord' && post.trim() && !isWebhook(post)) throw new Error("That isn't a whole Discord webhook address. Copy it again with Copy Webhook URL.");
-    const sv = storeKind === 'manual' ? staticServices(folder, post) : servicesFor(storeKind === 'github' ? githubStore(ghRepo, ghDir, ghBranch) : appsScriptStore(scriptUrl), post);
+    const sv = storeKind === 'manual' ? staticServices(folder, post) : servicesFor(
+          storeKind === 'github' ? githubStore(ghRepo, ghDir, ghBranch) : storeKind === 'gitlab' ? gitlabStore(glProject, glDir, glBranch, glSite) : appsScriptStore(scriptUrl),
+          post
+        );
     if (ping === null) throw new Error("That isn't a Discord user or role ID. With Developer Mode on, right-click or long-press the person or role and Copy User ID or Copy Role ID.");
     return ping && post ? { ...sv, ping } : sv;
   }
-  const storeReady = $derived(storeKind === 'manual' ? !!folder : storeKind === 'github' ? !!ghRepo && !!secret : !!scriptUrl && !!secret);
+  const storeReady = $derived(storeKind === 'manual' ? !!folder : storeKind === 'github' ? !!ghRepo && !!secret : storeKind === 'gitlab' ? !!glProject && !!secret : !!scriptUrl && !!secret);
   async function copyScript() {
     try {
       await navigator.clipboard.writeText(appsScriptCode(scriptKey));
@@ -261,6 +273,14 @@
           ghName = st.repo;
           ghDir = st.dir;
           ghBranch = st.branch;
+        }
+        if (st?.kind === 'gitlab') {
+          const cut = st.project.lastIndexOf('/');
+          glUser = st.project.slice(0, cut);
+          glName = st.project.slice(cut + 1);
+          glHost = st.host;
+          glDir = st.dir;
+          glBranch = st.branch;
         }
       }
       if (r) publishSecret(id).then((v) => v && (secret = v));
@@ -596,6 +616,7 @@
         <div class="field"><button type="button" class="tip" data-tip={STORE_TIPS[storeKind]}>Where to host</button>
           <select bind:value={storeKind} aria-label="Where to host">
             <option value="github">GitHub (preferred)</option>
+            <option value="gitlab">GitLab</option>
             <option value="apps-script">Google Drive</option>
             <option value="manual">My Own Host</option>
           </select></div>
@@ -625,6 +646,37 @@
             <div class="row">
               <label class="field">Folder (optional) <input type="text" bind:value={ghDir} placeholder="kells" autocapitalize="off" /></label>
               <label class="field">Branch <input type="text" bind:value={ghBranch} autocapitalize="off" /></label>
+            </div>
+          </details>
+        {/if}
+        {#if storeKind === 'gitlab'}
+          <ol class="small gh">
+            <li>
+              Make a free <a href="{glSite}/users/sign_up" target="_blank" rel="noopener">GitLab account</a>, if you don't have one.
+              <label class="field">Your GitLab username <input type="text" bind:value={glUser} placeholder="heph" autocapitalize="off" autocomplete="username" /></label>
+            </li>
+            <li>
+              Name your <button type="button" class="tip" data-tip="A project is a folder on GitLab. It has to be Public so players can read it, but only you can change it.">project</button>,
+              then <a href="{glSite}/projects/new#blank_project" target="_blank" rel="noopener">create it on GitLab</a>: type the same name, set
+              <strong>Visibility Level</strong> to <strong>Public</strong>, and press <strong>Create project</strong>.
+              <label class="field">Project name <input type="text" bind:value={glName} placeholder={suggestedName} autocapitalize="off" /></label>
+            </li>
+            <li>
+              Make a <button type="button" class="tip" data-tip="The key stays on this device and never goes into your campaign or its links. It can only touch this one project.">key</button>
+              so Scribe can save there: <a href="{glSite}/-/user_settings/personal_access_tokens" target="_blank" rel="noopener">open the key page</a>
+              and choose <strong>Generate token</strong> › <strong>Fine-grained token</strong>. Name it, pick only your project, and give it
+              <strong>Project: Read</strong> and <strong>Repository: Create, Read, Update</strong>. Press <strong>Generate token</strong> and copy it.
+            </li>
+            <li>Paste the key here, then press Publish (below).
+              <label class="field">Key <input type="password" bind:value={secret} autocomplete="off" /></label>
+            </li>
+          </ol>
+          <details class="small">
+            <summary>Advanced</summary>
+            <label class="field">GitLab address <input type="url" bind:value={glHost} placeholder="https://gitlab.com" autocapitalize="off" /></label>
+            <div class="row">
+              <label class="field">Folder (optional) <input type="text" bind:value={glDir} placeholder="kells" autocapitalize="off" /></label>
+              <label class="field">Branch <input type="text" bind:value={glBranch} autocapitalize="off" /></label>
             </div>
           </details>
         {/if}

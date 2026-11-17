@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { appsScriptCode, appsScriptStore, fileUrl, githubStore, newKey, servicesFor, upload } from './adapters';
+import { appsScriptCode, appsScriptStore, fileUrl, githubStore, gitlabStore, newKey, servicesFor, upload } from './adapters';
 import { checkUpload, pointer } from './publish';
 
 const files = { 'campaign.json': { a: 1 }, 'snapshot.json': { revision: 2, name: 'Ó Néill' } };
@@ -125,5 +125,70 @@ describe('apps script store', () => {
     const s = servicesFor(appsScriptStore('https://script.google.com/macros/s/A/exec'));
     const r = await checkUpload(s, { pointer: pointer('c', 'C', s), snapshot: { revision: 1 } as never }, f);
     expect(r).toEqual({ pointer: 'missing', snapshot: 'missing' });
+  });
+});
+
+describe('gitlab store', () => {
+  const api = 'https://gitlab.com/api/v4/projects/heph%2Fkells';
+  it('reads user/name in its usual spellings, and refuses others', () => {
+    expect(gitlabStore('https://gitlab.com/heph/kells-1422.git', '/play/')).toEqual({ kind: 'gitlab', host: 'https://gitlab.com', project: 'heph/kells-1422', branch: 'main', dir: 'play' });
+    expect(gitlabStore('https://gitlab.com/heph/kells/-/tree/main').project).toBe('heph/kells');
+    expect(gitlabStore('group/sub/kells', '', 'main', 'https://git.example.org/').host).toBe('https://git.example.org');
+    expect(() => gitlabStore('kells')).toThrow(/username\/name/);
+    expect(() => gitlabStore('heph/kells', '', 'main', 'http://git.example.org')).toThrow(/https/);
+  });
+
+  it('gives raw API addresses players can read, and the pointer names the adapter', () => {
+    const s = servicesFor(gitlabStore('heph/kells', 'c1'));
+    expect(s.read).toBe(`${api}/repository/files/c1%2Fsnapshot.json/raw?ref=main`);
+    expect(s.pointer).toBe(`${api}/repository/files/c1%2Fcampaign.json/raw?ref=main`);
+    expect(s.folder).toBe('https://gitlab.com/heph/kells/-/tree/main/c1');
+    expect(pointer('c', 'C', s).adapters.store).toBe('gitlab');
+  });
+
+  it('replaces files that are there and makes the others', async () => {
+    const calls: { url: string; init?: RequestInit }[] = [];
+    const f = (async (url: string, init?: RequestInit) => {
+      calls.push({ url, init });
+      if (url === api) return json(200, { visibility: 'public', default_branch: 'main', empty_repo: false });
+      if (url.endsWith('/repository/branches/main')) return json(200, {});
+      if (init?.method === 'HEAD') return new Response(null, { status: url.includes('campaign.json') ? 200 : 404 });
+      return json(201, {});
+    }) as typeof fetch;
+    expect(await upload(gitlabStore('heph/kells', 'c1'), ' tok ', files, 'Publish', f)).toBe(true);
+    const writes = calls.filter((c) => c.init?.method === 'POST' || c.init?.method === 'PUT');
+    expect(writes.map((c) => `${c.init!.method} ${c.url}`)).toEqual([
+      `PUT ${api}/repository/files/c1%2Fcampaign.json`,
+      `POST ${api}/repository/files/c1%2Fsnapshot.json`
+    ]);
+    const b = JSON.parse(String(writes[1].init!.body));
+    expect(b).toMatchObject({ branch: 'main', encoding: 'base64', commit_message: 'Publish' });
+    expect(new TextDecoder().decode(Uint8Array.from(atob(b.content), (ch) => ch.charCodeAt(0)))).toContain('Ó Néill');
+    expect((writes[0].init!.headers as Record<string, string>)['PRIVATE-TOKEN']).toBe('tok');
+  });
+
+  it('makes the first files of an empty project without looking for them', async () => {
+    const methods: string[] = [];
+    const f = (async (url: string, init?: RequestInit) => {
+      methods.push(init?.method ?? 'GET');
+      if (url === api) return json(200, { visibility: 'public', default_branch: null, empty_repo: true });
+      return json(201, {});
+    }) as typeof fetch;
+    await upload(gitlabStore('heph/kells'), 'tok', files, 'x', f);
+    expect(methods).toEqual(['GET', 'POST', 'POST']);
+  });
+
+  it('says what went wrong', async () => {
+    const at = (status: number, body: unknown = {}) => (async () => json(status, body)) as unknown as typeof fetch;
+    await expect(upload(gitlabStore('heph/kells'), '', files)).rejects.toThrow(/GitLab key first/);
+    await expect(upload(gitlabStore('heph/kells'), 'tok', files, 'x', at(401))).rejects.toThrow(/refused the key/);
+    await expect(upload(gitlabStore('heph/kells'), 'tok', files, 'x', at(404))).rejects.toThrow(/doesn't know the project heph\/kells/);
+    await expect(upload(gitlabStore('heph/kells'), 'tok', files, 'x', at(403))).rejects.toThrow(/Project: Read/);
+    await expect(upload(gitlabStore('heph/kells'), 'tok', files, 'x', at(200, { visibility: 'private' }))).rejects.toThrow(/isn't public/);
+    const noBranch = (async (url: string) => (url === api ? json(200, { visibility: 'public', default_branch: 'trunk' }) : json(404, {}))) as unknown as typeof fetch;
+    await expect(upload(gitlabStore('heph/kells'), 'tok', files, 'x', noBranch)).rejects.toThrow(/Leave Branch as trunk/);
+    const readOnly = (async (url: string, init?: RequestInit) =>
+      url === api ? json(200, { visibility: 'public', empty_repo: true }) : init?.method ? json(403, {}) : json(200, {})) as unknown as typeof fetch;
+    await expect(upload(gitlabStore('heph/kells'), 'tok', files, 'x', readOnly)).rejects.toThrow(/can't save to heph\/kells/);
   });
 });

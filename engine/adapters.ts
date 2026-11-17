@@ -4,6 +4,9 @@
 //   manual       the referee downloads both files and uploads them to a static folder (the old way, kept as fallback)
 //   github       the referee's own public GitHub repo, written through the GitHub API with a fine-grained token that
 //                may only change that one repo; players read the files from raw.githubusercontent.com (no Pages setup)
+//   gitlab       the same on GitLab (Heph 2026-11-17: a GitLab-specific adapter, not git over a proxy that would see the
+//                key): a public project written through the Files API with a fine-grained personal access token;
+//                players read through the API's raw-file address, which other sites may read (gitlab.com's /-/raw/ may not)
 //   apps-script  the referee's own Google Apps Script web app (script below), which keeps the files in a Drive folder
 //                of theirs and serves them back; no Google Cloud project or OAuth client (WORKFLOWS.md, Heph 2026-11-08)
 //
@@ -12,7 +15,7 @@
 
 import { PublishError, type Services } from './publish';
 
-export type StoreKind = 'manual' | 'github' | 'apps-script';
+export type StoreKind = 'manual' | 'github' | 'gitlab' | 'apps-script';
 
 export interface GithubStore {
   kind: 'github';
@@ -20,6 +23,15 @@ export interface GithubStore {
   repo: string;
   branch: string;
   // A folder inside the repo, '' for its root; one repo can hold several campaigns.
+  dir: string;
+}
+export interface GitlabStore {
+  kind: 'gitlab';
+  // https://gitlab.com, or the address of a GitLab someone runs themselves.
+  host: string;
+  // The project's path, "user/name" (or "group/subgroup/name").
+  project: string;
+  branch: string;
   dir: string;
 }
 export interface AppsScriptStore {
@@ -31,7 +43,7 @@ export interface ManualStore {
   kind: 'manual';
   folder: string;
 }
-export type Store = ManualStore | GithubStore | AppsScriptStore;
+export type Store = ManualStore | GithubStore | GitlabStore | AppsScriptStore;
 
 const FILES = ['campaign.json', 'snapshot.json'] as const;
 export type FileName = (typeof FILES)[number];
@@ -48,6 +60,31 @@ export function githubStore(repo: string, dir = '', branch = 'main'): GithubStor
   if (!/^[A-Za-z0-9._/-]+$/.test(b)) throw new PublishError("That branch name won't work.");
   return { kind: 'github', owner: m[0], repo: m[1], branch: b, dir: d };
 }
+
+// "user/name" or a project's address on GitLab, plus an optional folder; `host` for a GitLab other than gitlab.com.
+export function gitlabStore(project: string, dir = '', branch = 'main', host = 'https://gitlab.com'): GitlabStore {
+  let h: URL;
+  try {
+    h = new URL(host.trim() || 'https://gitlab.com');
+  } catch {
+    throw new PublishError("The GitLab address isn't a web address.");
+  }
+  if (h.protocol !== 'https:') throw new PublishError('The GitLab address must start with https://.');
+  const origin = h.origin;
+  let path = project.trim();
+  if (path.startsWith(origin + '/')) path = path.slice(origin.length + 1);
+  path = path.replace(/^https?:\/\/[^/]+\//, '').replace(/\.git$/, '').replace(/\/-\/.*$/, '').replace(/\/+$/, '');
+  const m = path.split('/');
+  if (m.length < 2 || !m.every(slug)) throw new PublishError('Give the project as username/name, for example heph/kells-1422.');
+  const d = dir.trim().replace(/^\/+|\/+$/g, '');
+  if (d && !d.split('/').every(slug)) throw new PublishError('The folder may hold only letters, numbers, dots, dashes and underscores.');
+  const b = branch.trim() || 'main';
+  if (!/^[A-Za-z0-9._/-]+$/.test(b)) throw new PublishError("That branch name won't work.");
+  return { kind: 'gitlab', host: origin, project: m.join('/'), branch: b, dir: d };
+}
+
+const glPath = (store: GitlabStore, name: string) => `${store.dir ? store.dir + '/' : ''}${name}`;
+const glApi = (store: GitlabStore) => `${store.host}/api/v4/projects/${encodeURIComponent(store.project)}`;
 
 export function appsScriptStore(url: string): AppsScriptStore {
   let u: URL;
@@ -68,6 +105,8 @@ export function fileUrl(store: Store, name: FileName): string {
       return new URL(name, store.folder.replace(/\/?$/, '/')).href;
     case 'github':
       return `https://raw.githubusercontent.com/${store.owner}/${store.repo}/${store.branch}/${store.dir ? store.dir + '/' : ''}${name}`;
+    case 'gitlab':
+      return `${glApi(store)}/repository/files/${encodeURIComponent(glPath(store, name))}/raw?ref=${encodeURIComponent(store.branch)}`;
     case 'apps-script':
       return `${store.url}?file=${name}`;
   }
@@ -78,7 +117,9 @@ export function servicesFor(store: Store, post = ''): Services & { store: Store 
   const p = post.trim();
   if (p && !/^https:\/\//.test(p)) throw new PublishError('The post URL must be a web address (https).');
   const read = fileUrl(store, 'snapshot.json');
-  return { folder: read.replace(/snapshot\.json$/, ''), read, post: p, pointer: fileUrl(store, 'campaign.json'), store };
+  // GitLab's raw addresses end in ?ref=, so its label is the folder as people see it on GitLab.
+  const folder = store.kind === 'gitlab' ? `${store.host}/${store.project}/-/tree/${store.branch}${store.dir ? '/' + store.dir : ''}` : read.replace(/snapshot\.json$/, '');
+  return { folder, read, post: p, pointer: fileUrl(store, 'campaign.json'), store };
 }
 
 
@@ -159,6 +200,66 @@ async function githubPut(store: GithubStore, token: string, files: Record<FileNa
   }
 }
 
+const glHeaders = (token: string) => ({ 'PRIVATE-TOKEN': token.trim() });
+
+async function glFailure(res: Response, what: string): Promise<PublishError> {
+  let detail = '';
+  try {
+    const b = (await res.json()) as { message?: unknown; error?: unknown };
+    detail = typeof b.message === 'string' ? b.message : typeof b.error === 'string' ? b.error : '';
+  } catch {
+    // not JSON
+  }
+  return new PublishError(`${what}: GitLab said ${res.status}${detail ? ` (${detail})` : ''}.`);
+}
+
+// Before writing, checks in plain words that the project is there, public, and has the branch, as checkGithub does.
+// A brand-new project with no files has no branch yet; `empty` lets the first file make it.
+export async function checkGitlab(store: GitlabStore, token: string, f: typeof fetch = fetch): Promise<{ empty: boolean }> {
+  const headers = glHeaders(token);
+  let res: Response;
+  try {
+    res = await f(glApi(store), { headers, cache: 'no-store' });
+  } catch {
+    throw new PublishError("Couldn't reach GitLab. Check your connection and try again.");
+  }
+  if (res.status === 401) throw new PublishError('GitLab refused the key. Make a new one (it may have expired) and paste it again.');
+  if (res.status === 403) throw new PublishError(`Your key can't see the project ${store.project}. Make a new key with Project: Read and Repository: Create, Read and Update for this project.`);
+  if (res.status === 404) throw new PublishError(`GitLab doesn't know the project ${store.project}, or your key can't see it. Check your username and the project name.`);
+  if (!res.ok) throw await glFailure(res, 'Checking the project');
+  const info = (await res.json()) as { visibility?: string; default_branch?: string | null; empty_repo?: boolean };
+  if (info.visibility && info.visibility !== 'public')
+    throw new PublishError(`The project ${store.project} isn't public, so players can't read it. On GitLab, open it, then Settings › General › Visibility, project features, permissions › Project visibility: Public, and Save changes.`);
+  if (info.empty_repo) return { empty: true };
+  const branch = await f(`${glApi(store)}/repository/branches/${encodeURIComponent(store.branch)}`, { headers, cache: 'no-store' });
+  if (branch.ok) return { empty: false };
+  if (branch.status !== 404) throw await glFailure(branch, 'Checking the branch');
+  throw new PublishError(`The project ${store.project} has no branch called ${store.branch}. Leave Branch as ${info.default_branch ?? 'main'} unless you know you need another.`);
+}
+
+// One call per file through the Files API: POST makes a file, PUT replaces one.
+async function gitlabPut(store: GitlabStore, token: string, files: Record<FileName, unknown>, message: string, f: typeof fetch): Promise<void> {
+  const headers = glHeaders(token);
+  const { empty } = await checkGitlab(store, token, f); // an empty project has neither file, so both are made
+  for (const name of FILES) {
+    const api = `${glApi(store)}/repository/files/${encodeURIComponent(glPath(store, name))}`;
+    let had = false;
+    if (!empty) {
+      const head = await f(`${api}?ref=${encodeURIComponent(store.branch)}`, { method: 'HEAD', headers, cache: 'no-store' });
+      if (!head.ok && head.status !== 404) throw await glFailure(head, `Reading ${name}`);
+      had = head.ok;
+    }
+    const res = await f(api, {
+      method: had ? 'PUT' : 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ branch: store.branch, encoding: 'base64', content: b64(fileText(files[name])), commit_message: message })
+    });
+    if (res.status === 401 || res.status === 403)
+      throw new PublishError(`Your key can't save to ${store.project}. Make a new key with Repository: Create, Read and Update for this project.`);
+    if (!res.ok) throw await glFailure(res, `Writing ${name}`);
+  }
+}
+
 // Apps Script answers a POST with a redirect to googleusercontent.com, which fetch follows. A text/plain body keeps
 // the browser from sending a preflight request, which Apps Script can't answer.
 async function appsScriptPut(store: AppsScriptStore, key: string, files: Record<FileName, unknown>, f: typeof fetch): Promise<void> {
@@ -184,8 +285,9 @@ async function appsScriptPut(store: AppsScriptStore, key: string, files: Record<
 // Puts both files where players read them. Returns false for the Manual adapter, whose files the referee uploads.
 export async function upload(store: Store, secret: string, files: Record<FileName, unknown>, message = 'Publish campaign', f: typeof fetch = fetch): Promise<boolean> {
   if (store.kind === 'manual') return false;
-  if (!secret.trim()) throw new PublishError(store.kind === 'github' ? 'Paste your GitHub key first.' : "Paste your script's key first.");
+  if (!secret.trim()) throw new PublishError(store.kind === 'github' ? 'Paste your GitHub key first.' : store.kind === 'gitlab' ? 'Paste your GitLab key first.' : "Paste your script's key first.");
   if (store.kind === 'github') await githubPut(store, secret, files, message, f);
+  else if (store.kind === 'gitlab') await gitlabPut(store, secret, files, message, f);
   else await appsScriptPut(store, secret, files, f);
   return true;
 }
